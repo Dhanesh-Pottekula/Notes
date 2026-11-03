@@ -1,0 +1,1699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Tooling Stack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.1) ---- */
+.toks { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.toks span { border: 1px solid var(--rule); border-radius: 4px; padding: 2px 7px; background: var(--paper); }
+.toks span.a { background: var(--tint2); border-color: var(--c2); }
+.toks span.b { background: var(--tint3); border-color: var(--c3); }
+.toks span.v { background: var(--tint); border-color: var(--c1); }
+.toks span.gen { background: var(--tint); border-color: var(--c1); font-weight: 600; }
+.toks span.mask { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.toks span.dim { opacity: .45; }
+.vec { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vec i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--rule); border-radius: 2px; }
+.heat { border-collapse: separate; border-spacing: 3px; width: auto; font-family: var(--mono); font-size: 12px; }
+.heat th, .heat td { border: 0; padding: 0; text-align: center; }
+.heat th { font-family: var(--mono); font-weight: 600; font-size: 12px; padding: 2px 6px; }
+.heat td.cell { width: 52px; height: 34px; border-radius: 3px; border: 1px solid var(--rule); cursor: pointer; font-size: 11px; }
+.heat td.cell.blocked { background: repeating-linear-gradient(45deg, var(--paper), var(--paper) 4px, var(--rule) 4px, var(--rule) 6px) !important; color: var(--muted); }
+.heat td.cell.sel { outline: 2px solid var(--c1); }
+.bar { height: 12px; background: var(--c2); border-radius: 2px; }
+.barrow { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+.barrow .track { background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; height: 14px; overflow: hidden; }
+.barrow .track div { height: 100%; background: var(--c2); }
+.barrow .track div.warn { background: var(--c1); }
+.barrow .track div.bad { background: var(--sell); }
+.legendc { display: flex; flex-wrap: wrap; gap: 6px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legendc span::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; background: var(--sw); }
+.out { font-family: var(--mono); font-size: 13px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 3em; }
+.out .p { color: var(--muted); }
+.out .g { color: var(--c2); font-weight: 600; }
+.tl { display: grid; gap: 6px; }
+.tl .yr { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.mrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.mbtn { font-family: var(--mono); font-size: 12.5px; border-radius: 99px; padding: 3px 10px; }
+.mbtn.dec { border-color: #d98b8b; }
+.mbtn.enc { border-color: #b98bd9; }
+.mbtn.non { border-color: var(--rule); }
+.mbtn.ed  { border-color: #7fc3a3; }
+.mbtn.prop { border-color: #6ea6d6; }
+.mbtn.open { border-color: #e6aa62; }
+.mbtn.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.sw-dec { --sw: #e6a3a3; } .sw-enc { --sw: #cf9be8; } .sw-non { --sw: #d8d8d8; } .sw-ed { --sw: #9fd8bd; }
+.sw-prop { --sw: #8dbde6; } .sw-open { --sw: #f3c99a; }
+.box.interview { background: var(--paper); border-left: 3px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+pre.code code { background: none; border: 0; padding: 0; font-size: 12.5px; }
+.qa { display: grid; gap: 8px; }
+.matrix { overflow-x: auto; }
+.scatter circle { stroke: var(--ink); stroke-width: 1.2; cursor: pointer; }
+.scatter circle.sel { stroke: var(--c1); stroke-width: 3; }
+.scatter line.nn { stroke: var(--c1); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.scatter text { font-size: 12px; pointer-events: none; }
+.scatter rect.bg { fill: var(--plate); stroke: var(--rule); }
+.scatter line.g { stroke: var(--grid); }
+</style>
+<style>
+/* ---- page-specific additions (LLM Engineer's Handbook ch.1) ---- */
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.pipe .stage { border: 1.5px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; line-height: 1.45; transition: border-color .2s, background .2s; }
+.pipe .stage b { font-family: var(--display); font-size: 13.5px; display: block; }
+.pipe .stage.on { border-color: var(--c1); background: var(--tint); }
+.pipe .stage.done { border-color: var(--buy); }
+.pipe .stage.off { opacity: .45; }
+.feat { display: flex; flex-wrap: wrap; gap: 6px; }
+.feat label { font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; background: var(--paper); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.feat label.must { border-color: var(--c2); }
+.meter { height: 14px; border: 1px solid var(--rule); border-radius: 3px; background: var(--paper); overflow: hidden; }
+.meter div { height: 100%; background: var(--c2); transition: width .2s; }
+.meter div.over { background: var(--sell); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-family: var(--mono); font-size: 12.5px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.arch svg { width: 100%; min-width: 600px; height: auto; display: block; }
+.arch { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.arch rect.blk { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.arch rect.blk.on { fill: var(--tint); stroke: var(--c1); stroke-width: 2.6; }
+.arch rect.grp { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.arch rect.grp.on { stroke: var(--c1); stroke-width: 2; }
+.arch path, .arch line { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.arch path.on, .arch line.on { stroke: var(--c1); stroke-width: 3; }
+.arch text.g { font-family: var(--display); font-weight: 700; font-size: 13px; }
+.arch text.m { fill: var(--muted); font-size: 11px; }
+.req { font-family: var(--mono); font-size: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.bad-t { color: var(--sell); font-weight: 600; } .good-t { color: var(--buy); font-weight: 600; }
+.vers { display: grid; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+.vers .vrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vers .f { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 7px; background: var(--paper); }
+.vers .f.use { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.vers .live { color: var(--buy); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch01_llm_twin_concept_and_architecture.html">← Ch.1 LLM Twin concept</a><a href="ch03_data_engineering.html">Ch.3 Data Engineering →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 2 · PDF p54–83</div>
+  <h1>The <em>toolbox</em> behind the LLM Twin: Python setup, MLOps tools, two databases and the AWS account</h1>
+  <p class="lede">Before writing any LLM code, the authors list every tool the book will lean on and say <b>why</b> each one was picked, so later chapters don't keep stopping to explain setup. First the <b>Python ecosystem</b>: <b>pyenv</b> pins the exact Python (3.11.8), <b>Poetry</b> builds an isolated virtual environment and locks every dependency, and <b>Poe the Poet</b> turns long commands into short named tasks. Then the <b>MLOps / LLMOps</b> tools: <b>Hugging Face</b> as the model registry, <b>ZenML</b> as the orchestrator that also versions every step's output as an <b>artifact</b> with <b>metadata</b>, <b>Comet ML</b> to track training experiments and <b>Opik</b> to monitor prompt traces. Then the two databases: <b>MongoDB</b> for raw crawled documents and <b>Qdrant</b> for vectors. Finally <b>AWS</b>: an IAM user, access keys, the CLI, a cost warning, and why <b>SageMaker</b> beats Bedrock (too hidden) and EKS/ECS (too much work) for a book about engineering.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is a tour of a stack, layer by layer. Each layer answers a problem the layer below cannot. Orange boxes are the tools the book picks; grey boxes are the problems they solve.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 2">
+    <div class="row"><span class="tag">Run code</span><span class="node">"works on my machine" Python versions</span><span class="arr">→</span><span class="node key">pyenv: 3.11.8 per folder</span><span class="arr">→</span><span class="node">clashing packages between projects</span><span class="arr">→</span><span class="node key">Poetry: venv + lock file</span><span class="arr">→</span><span class="node">commands scattered in READMEs</span><span class="arr">→</span><span class="node key">Poe the Poet tasks</span></div>
+    <div class="row"><span class="tag">Share models</span><span class="node">where do fine-tuned weights live?</span><span class="arr">→</span><span class="node key">Hugging Face model registry</span></div>
+    <div class="row"><span class="tag">Run pipelines</span><span class="node">notebooks don't reproduce</span><span class="arr">→</span><span class="node key">ZenML: @pipeline + @step</span><span class="arr">→</span><span class="node">every output becomes a versioned artifact + metadata</span><span class="arr">→</span><span class="node">YAML configs at runtime</span><span class="arr">→</span><span class="node">stack = swap clouds without code changes</span></div>
+    <div class="row"><span class="tag">Watch</span><span class="node">many training runs to compare</span><span class="arr">→</span><span class="node key">Comet ML experiment tracker</span><span class="arr">→</span><span class="node">prompts are chains, not log lines</span><span class="arr">→</span><span class="node key">Opik prompt traces</span></div>
+    <div class="row"><span class="tag">Store</span><span class="node">raw messy web text</span><span class="arr">→</span><span class="node key">MongoDB (NoSQL)</span><span class="arr">→</span><span class="node">cleaned, embedded chunks</span><span class="arr">→</span><span class="node key">Qdrant (vector DB)</span></div>
+    <div class="row"><span class="tag">Cloud</span><span class="node key">AWS: IAM user → access keys → CLI</span><span class="arr">→</span><span class="node">S3 · ECR · GPU compute</span><span class="arr">→</span><span class="node">Bedrock too hidden · EKS/ECS too DIY</span><span class="arr">→</span><span class="node key">SageMaker = the middle</span></div>
+  </div>
+  <svg viewBox="0 0 660 250" class="dg" role="img" aria-label="Layered stack of the tools in this chapter" style="width:100%;height:auto;max-width:660px">
+    <rect x="10" y="10" width="640" height="40" rx="5" class="s"/><text x="20" y="35" class="b">Local Python</text><text x="210" y="35" class="m">pyenv (3.11.8) · Poetry (venv + poetry.lock) · Poe the Poet (tasks)</text>
+    <rect x="10" y="58" width="640" height="40" rx="5" class="hi"/><text x="20" y="83" class="b">Orchestration</text><text x="210" y="83">ZenML: pipelines · steps · artifacts · metadata · stacks</text>
+    <rect x="10" y="106" width="310" height="40" rx="5" class="f"/><text x="20" y="131" class="b">Track</text><text x="90" y="131" class="m">Comet ML · Opik</text>
+    <rect x="340" y="106" width="310" height="40" rx="5" class="f"/><text x="350" y="131" class="b">Share</text><text x="420" y="131" class="m">Hugging Face registry</text>
+    <rect x="10" y="154" width="310" height="40" rx="5" class="f"/><text x="20" y="179" class="b">Store</text><text x="90" y="179" class="m">MongoDB · Qdrant (Docker)</text>
+    <rect x="340" y="154" width="310" height="40" rx="5" class="f"/><text x="350" y="179" class="b">Secrets</text><text x="420" y="179" class="m">.env: AWS, OpenAI, HF</text>
+    <rect x="10" y="202" width="640" height="40" rx="5" class="s"/><text x="20" y="227" class="b">AWS cloud</text><text x="210" y="227" class="m">IAM + CLI · S3 (artifacts) · ECR (images) · SageMaker (GPU train + serve)</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening: why a tooling chapter</a>
+    <a href="#s2"><span>02</span>Python ecosystem: interpreter + pyenv</a>
+    <a href="#s3"><span>03</span>Poetry: dependencies + virtual env</a>
+    <a href="#s4"><span>04</span>Poe the Poet: task execution</a>
+    <a href="#s5"><span>05</span>MLOps and LLMOps tooling (run it locally)</a>
+    <a href="#s6"><span>06</span>Hugging Face: model registry</a>
+    <a href="#s7"><span>07</span>ZenML: the bridge, and its stacks</a>
+    <a href="#s8"><span>08</span>Orchestrator: pipelines and the dashboard</a>
+    <a href="#s9"><span>09</span>ZenML steps, modular code, serialization</a>
+    <a href="#s10"><span>10</span>Artifacts and metadata</a>
+    <a href="#s11"><span>11</span>Running and configuring a ZenML pipeline</a>
+    <a href="#s12"><span>12</span>Comet ML: experiment tracker</a>
+    <a href="#s13"><span>13</span>Opik: prompt monitoring</a>
+    <a href="#s14"><span>14</span>Databases: MongoDB (NoSQL)</a>
+    <a href="#s15"><span>15</span>Qdrant: vector database</a>
+    <a href="#s16"><span>16</span>Preparing for AWS: why AWS</a>
+    <a href="#s17"><span>17</span>AWS account, access keys, CLI</a>
+    <a href="#s18"><span>18</span>A note on AWS costs</a>
+    <a href="#s19"><span>19</span>SageMaker: training and inference compute</a>
+    <a href="#s20"><span>20</span>Why SageMaker (vs Bedrock, EKS, ECS)</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Why a whole chapter on tools, and what it will (and won't) cover</h2></div><span class="chip">pdf p54–55</span></div>
+  <p>This chapter is a <b>setup chapter</b>. It lists every essential tool that the rest of the book uses to build and deploy the <b>LLM Twin</b> (the AI that writes like you, from Chapter 1). The authors say clearly what it is <i>not</i>: it is <b>not</b> the place for deep explanations of LLMs, <b>RAG</b> (retrieval-augmented generation), <b>MLOps</b> (operations practices for machine-learning systems) or <b>LLMOps</b> (the same, specialised for LLM apps). Those come later. The goal here is simple: explain the tech stack and its prerequisites <b>once</b>, so later chapters don't keep repeating "how to install X and why we chose it".</p>
+  <p>The real work starts in <b>Chapter 3</b>, with a <b>data collection ETL</b> (extract–transform–load job) that crawls data from the internet.</p>
+  <p>The chapter moves through four parts:</p>
+  <div class="grid2">
+    <div class="card"><b>1 · Python ecosystem and project installation</b><span>Tools to manage several Python versions, create a virtual environment and install the <b>pinned</b> (exact-version) dependencies. Also how to install the book's GitHub repo, <code>LLM-Engineers-Handbook</code>, on your laptop. Plates 02–04.</span></div>
+    <div class="card"><b>2 · MLOps and LLMOps tooling</b><span>From generic tools (a <b>model registry</b>) to LLM-specific ones (LLM evaluation and <b>prompt monitoring</b>), plus how <b>ZenML</b>, an orchestrator that bridges ML and MLOps, manages a project with many ML pipelines. Plates 05–13.</span></div>
+    <div class="card"><b>3 · Databases for unstructured and vector data</b><span>One NoSQL database and one vector database, both run locally with <b>Docker</b>. Plates 14–15.</span></div>
+    <div class="card"><b>4 · Preparing for AWS</b><span>Create an AWS user and access keys, install and configure the AWS CLI (command-line interface), and see what <b>SageMaker</b> is and why it trains and serves the open-source LLMs. Plates 16–20.</span></div>
+  </div>
+  <p>Two practical notes. If you already know these tools, the authors say you can skip the chapter. And the repo's <b>README</b> has a shorter install guide, so if you plan to run the code while reading, you can use that as the concise version. By the end you should know every tool in the book, how to install the repo, and how to set up and use the rest.</p>
+
+  <div class="fig">
+    <h3>Step through the chapter's four layers</h3>
+    <div class="pipe" id="c1_stages">
+      <div class="stage"><b>1 · Python</b>pyenv · Poetry · Poe</div>
+      <div class="stage"><b>2 · MLOps / LLMOps</b>HF · ZenML · Comet · Opik</div>
+      <div class="stage"><b>3 · Databases</b>MongoDB · Qdrant</div>
+      <div class="stage"><b>4 · AWS</b>IAM · CLI · SageMaker</div>
+    </div>
+    <div class="caption" id="c1_cap"></div>
+    <div class="stepbar"><button id="c1_prev" type="button">◀ Back</button><button id="c1_next" type="button">Next ▶</button><span id="c1_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>Before a long cooking session, a good cook gets everything ready: gas cylinder checked, masala dabba filled, knives sharpened, pressure-cooker gasket fitted. Nothing is cooked yet, but every later step goes faster because nobody stops mid-recipe to find the jeera. <i>Where it breaks:</i> kitchen tools rarely change; software tools change versions every few months, which is exactly why this chapter pins versions so carefully.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An ML system is mostly <b>not</b> model code (Chapter 1's point). It is environments, pipelines, storage, tracking and cloud accounts. Each needs a decision ("which tool?") and a reason ("why this one?"). Collecting the decisions in one place gives the rest of the book a shared vocabulary: when Chapter 4 says "push to Qdrant" or a training chapter says "check the Comet run", you already know what those are.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What's your ML / LLM stack and why?" Answer by layer, each with a reason: "Python pinned with pyenv and Poetry for reproducible installs; an orchestrator like ZenML so every pipeline run is versioned; an experiment tracker for training and a tracing tool for prompts; a document store for raw data and a vector DB for retrieval; managed GPU compute in the cloud." Interviewers care more about the <i>why</i> per layer than the brand names.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The architecture these tools implement: <a href="ch01_llm_twin_concept_and_architecture.html">Ch.1 (FTI pipelines)</a>.</li>
+    <li>The first real pipeline built with them: <a href="ch03_data_engineering.html">Ch.3 Data Engineering</a>. The MLOps theory deferred from here: <a href="ch11_mlops_and_llmops.html">Ch.11</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SECTION</div><h2>Python ecosystem: the interpreter, and pinning it with pyenv</h2></div><span class="chip">pdf p55–56</span></div>
+  <p>According to the authors, <b>every Python project needs three basic tools</b>:</p>
+  <ol class="plain">
+    <li><b>The Python interpreter</b>: the program that actually runs your Python code.</li>
+    <li><b>Dependency management</b>: something that installs and pins the external libraries you use (plate 03, Poetry).</li>
+    <li><b>A task execution tool</b>: one place to run all the project's commands (plate 04, Poe the Poet).</li>
+  </ol>
+  <p>All the book's code is tested with <b>Python 3.11.8</b>. You can download Python from python.org, but the authors recommend installing that <b>exact</b> version through <b>pyenv</b>, which makes it simple.</p>
+  <p><b>pyenv</b> is a <b>Python version manager</b>. Instead of installing several Python versions globally (where they fight over which <code>python</code> your terminal runs), pyenv keeps them side by side and lets each project choose its own. The basic flow:</p>
+  <pre class="code"><code>pyenv install 3.11.8      # download + build this exact version
+pyenv versions            # list installed versions; "*" marks the active one
+#   * system
+#     3.11.8
+pyenv global 3.11.8       # (optional) default in every new terminal</code></pre>
+  <p>But the authors don't want 3.11.8 everywhere; they want it <b>only inside the repo</b>. So you clone the repo and step into it:</p>
+  <pre class="code"><code>git clone https://github.com/PacktPublishing/LLM-Engineers-Handbook.git
+cd LLM-Engineers-Handbook
+python --version          # → Python 3.11.8 (picked up automatically)</code></pre>
+  <p>Why does this work? The repo contains a small file called <b><code>.python-version</code></b>. Whenever you're inside that folder, pyenv reads it and uses the version written there. The file is created by running <code>pyenv local 3.11.8</code> <b>once</b> in the folder; after that, pyenv always knows which Python to use in that directory.</p>
+
+  <div class="fig">
+    <h3>Try it · which Python runs here?</h3>
+    <p class="small">Pick a folder. pyenv looks for a <code>.python-version</code> file in the current folder and its parents; if none is found it falls back to the global setting. (Folders and the 3.9.18 project are modelled.)</p>
+    <div class="controls" id="py_btns">
+      <button type="button" data-k="0">~/Desktop</button>
+      <button type="button" data-k="1">~/LLM-Engineers-Handbook</button>
+      <button type="button" data-k="2">~/LLM-Engineers-Handbook/steps/etl</button>
+      <button type="button" data-k="3">~/old-flask-app</button>
+    </div>
+    <div class="verdict" id="py_v">Pick a folder.</div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A railway station where each platform has its own fixed train. Stand on platform 3 (the repo folder) and you always get the 3.11.8 express; on platform 1 you get the station's default. The <code>.python-version</code> file is the platform board. <i>Where it breaks:</i> at a station you walk; with pyenv you just <code>cd</code>, and the switch happens silently, which can surprise you if you forget the file is there.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>pyenv puts small "shim" programs named <code>python</code>, <code>pip</code> and so on at the front of your <code>PATH</code>. When you type <code>python</code>, the shim runs first, checks for a <code>.python-version</code> file (current folder, then parents), then the global setting, and hands the command to the matching real interpreter. Pinning even the <i>patch</i> number (3.11.<b>8</b>) removes one more source of "it works for the authors but not for me". (The shim detail is beyond the book.)</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you make a Python service reproducible across laptops and CI?" Say: "Pin the interpreter (pyenv's <code>.python-version</code>, or the base image tag in Docker), pin every dependency with a lock file, and run commands through one task runner. Then the only things that vary are data and config." The same discipline applies to any backend service.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Next layer: <a href="#s3">03 Poetry</a> builds the virtual environment on top of this interpreter.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · SUB-SECTION</div><h2>Poetry: dependency and virtual environment management</h2></div><span class="chip">pdf p56–58</span></div>
+  <p><b>Poetry</b> is one of the most popular <b>dependency and virtual environment managers</b> in Python. First, what is a <b>dependency manager</b>? It is a tool that lets you <b>specify, install, update and manage</b> the external libraries (packages, or <b>dependencies</b>) that your project relies on.</p>
+  <p>The book shows a tiny Poetry requirements file: a project that needs Python 3.11 plus the <code>requests</code> and <code>numpy</code> packages, and a <code>[build-system]</code> block that tells Python tools to build the project with <code>poetry-core</code>. Here is the same shape with a different package so you can see each part:</p>
+  <pre class="code"><code>[tool.poetry.dependencies]
+python = "^3.11"            # which interpreter versions are allowed
+httpx  = "^0.27.0"          # a library + an allowed version range
+pandas = "^2.2.0"
+
+[build-system]              # how tools should build/install this project
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"</code></pre>
+  <p>Poetry keeps these requirements in a file called <b><code>pyproject.toml</code></b> at the <b>root of the repository</b> (you can see it in the cloned repo). <b>Pinning</b> your dependencies there means you always install versions your project is known to work with.</p>
+
+  <h3>Advantage 1: a virtual environment per project</h3>
+  <p>Poetry also creates a new <b>virtual environment</b> and installs the chosen Python version and requirements into it. A virtual environment <b>isolates</b> your project's packages from the global Python packages and from other projects, so versions never clash.</p>
+  <p>The book's example: <b>Project A</b> needs <code>numpy == 1.19.5</code> and <b>Project B</b> needs <code>numpy == 1.26.0</code>. If both live in the <b>global</b> environment, installing B <b>overwrites</b> A's numpy, which breaks A. With Poetry, each project gets its own environment with its own numpy, so nothing clashes. Try it:</p>
+
+  <div class="fig">
+    <h3>Try it · two projects, one numpy</h3>
+    <div class="controls">
+      <button type="button" id="ve_mode" class="on">Mode: global Python</button>
+      <button type="button" id="ve_a">Install Project A (numpy 1.19.5)</button>
+      <button type="button" id="ve_b">Install Project B (numpy 1.26.0)</button>
+      <button type="button" id="ve_reset">Reset</button>
+    </div>
+    <div class="grid2" id="ve_envs"></div>
+    <div class="verdict" id="ve_v">Install both projects, then switch mode and try again.</div>
+  </div>
+
+  <h3>Installing the repo with Poetry</h3>
+  <p>The book uses <b>Poetry 1.8.3</b> (install it from python-poetry.org). Inside the cloned repo, one command installs everything:</p>
+  <pre class="code"><code>poetry install --without aws     # all deps except the optional "aws" group
+poetry shell                     # activate the env in this terminal, or…
+poetry run &lt;your command&gt;        # …prefix single commands instead</code></pre>
+  <p><code>poetry install</code> reads both <code>pyproject.toml</code> and <code>poetry.lock</code>. <code>--without aws</code> skips the dependency group the repo marks as "aws" (cloud-only packages you don't need yet). After installing, you either <b>activate</b> the environment with <code>poetry shell</code> or put <code>poetry run</code> in front of each command.</p>
+  <div class="box beyond"><b>Beyond the book</b><p>In Poetry 2.0 (released after the book), <code>poetry shell</code> moved out of the core into a plugin; <code>poetry env activate</code> or <code>poetry run</code> are the built-in options now. The book's commands are for Poetry 1.8.3.</p></div>
+
+  <h3>Advantage 2: the lock file</h3>
+  <p>Poetry writes the <b>exact</b> versions of the whole dependency tree into <b><code>poetry.lock</code></b>, based on what <code>pyproject.toml</code> declares (the book's text calls it "project.toml" once; it means <code>pyproject.toml</code>). The difference:</p>
+  <ul class="plain">
+    <li><code>pyproject.toml</code> may allow a <b>range</b>, e.g. <code>requests = "^2.25.1"</code>.</li>
+    <li><code>poetry.lock</code> records the one version that was <b>actually installed</b>, e.g. <code>requests = "2.25.1"</code>.</li>
+    <li>It also locks <b>sub-dependencies</b> (the dependencies of your dependencies), which you never listed yourself.</li>
+  </ul>
+  <p>Because every package and sub-package is fixed, every install of the project gets the same versions. That gives <b>predictable behaviour</b> and fewer "works on my machine" problems.</p>
+
+  <div class="fig">
+    <h3>Try it · range vs lock, six months later</h3>
+    <p class="small">Your <code>pyproject.toml</code> says <code>requests = "^2.25.1"</code>. A teammate installs the project later, after newer versions were published. (Release history is modelled; caret meaning is Poetry's documented rule: same major version, at least the stated one.)</p>
+    <div class="controls"><label>newest published 2.x release <select id="lk_new"><option>2.25.1</option><option>2.28.2</option><option selected>2.31.0</option><option>2.32.3</option></select></label><label><input type="checkbox" id="lk_on" checked> poetry.lock committed</label></div>
+    <div class="readout" id="lk_r"></div>
+  </div>
+
+  <h3>Alternatives the book names</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Tool</th><th>What the book says</th></tr>
+    <tr><td><b>venv</b>, <b>Conda</b></td><td>Create virtual environments, but <b>no dependency management</b>: you fall back to a plain <code>requirements.txt</code>, which is less powerful than a lock file.</td></tr>
+    <tr><td><b>Pipenv</b></td><td>Feature-wise close to Poetry, but <b>slower</b>.</td></tr>
+    <tr><td><b>uv</b></td><td>A Poetry replacement written in <b>Rust</b>, so very fast. The authors think it has a lot of potential to replace Poetry and is worth testing.</td></tr>
+  </table></div>
+
+  <div class="box work"><b>Worked example · why requirements.txt is weaker</b><p>A <code>requirements.txt</code> with <code>langchain&gt;=0.2</code> installs whatever is newest that day, plus whatever sub-packages <i>that</i> version pulls. Two installs a month apart can differ in dozens of sub-packages. You could pin them all by hand with <code>pip freeze</code>, but then nobody can tell which pins you chose on purpose and which are incidental. Poetry keeps both: your intent (ranges, in <code>pyproject.toml</code>) and the exact result (in <code>poetry.lock</code>).</p></div>
+  <div class="box picture"><b>Picture it</b><p><code>pyproject.toml</code> is your mother's shopping note: "Basmati rice, any good brand, 5 kg". <code>poetry.lock</code> is the kirana bill from last time: "India Gate Classic, 5 kg, batch 2311". Hand the bill, not the note, to whoever shops next, and the biryani tastes the same. The virtual environment is giving each household its own rice bin so one family's brand doesn't get poured into another's. <i>Where it breaks:</i> shops run out of a batch; package indexes keep old versions available, so the lock file almost always works.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Poetry runs a <b>resolver</b>: it finds one set of versions that satisfies every range of every package at once, then writes that solution (with file hashes) to the lock file. A virtual environment is just a folder with its own <code>site-packages</code> and a <code>python</code> that looks there first, so two projects' numpy copies live in different folders and never see each other.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Lock file vs requirements file?" Say: "The manifest states intent as ranges; the lock file records the exact resolved tree, including transitive dependencies, so every machine and CI run installs identical versions. Commit both. Upgrade deliberately with an update command and review the lock diff." For a production LLM gateway, an unplanned minor bump of an SDK is a classic outage cause.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s4">04 Poe the Poet</a> lives in the same <code>pyproject.toml</code>. Dependency pinning for training jobs: <a href="ch05_supervised_fine_tuning.html">Ch.5</a>.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · SUB-SECTION</div><h2>Poe the Poet: one place for every command</h2></div><span class="chip">pdf p58–59</span></div>
+  <p>The third basic tool is a <b>task execution tool</b>. The book uses <b>Poe the Poet</b>, a <b>plugin on top of Poetry</b> that defines and runs all the CLI commands you need to work with the project. It simplifies automation and running scripts.</p>
+  <p>Common alternatives are a <b>Makefile</b>, <b>Invoke</b> or plain <b>shell scripts</b>. Poe's advantage: you don't need separate scripts or Makefiles, because tasks live in the <b>same <code>pyproject.toml</code></b> that Poetry already uses for dependencies.</p>
+  <p>So instead of documenting commands in a README (where they go stale), you write them as named tasks and run them by alias. The book's example defines tasks for testing, formatting and starting the app; here is the same idea with our own names:</p>
+  <pre class="code"><code>[tool.poe.tasks]
+lint   = "ruff check ."              # alias → real command
+serve  = "uvicorn app.main:api"
+crawl  = "python -m tools.run --run-etl"</code></pre>
+  <pre class="code"><code>poetry poe lint        # runs: ruff check .
+poetry poe serve
+poetry poe crawl</code></pre>
+  <p>Install Poe as a Poetry plugin with:</p>
+  <pre class="code"><code>poetry self add 'poethepoet[poetry_plugin]'</code></pre>
+  <p>The authors' conclusion: a <b>façade</b> (a simple front) over all your CLI commands is needed to run the app. It greatly simplifies the project and helps collaboration, because the task list is <b>documentation that runs</b>.</p>
+  <p><b>The full install, assuming pyenv and Poetry are already installed:</b></p>
+  <pre class="code"><code>git clone https://github.com/PacktPublishing/LLM-Engineers-Handbook.git
+cd LLM-Engineers-Handbook
+poetry install --without aws
+poetry self add 'poethepoet[poetry_plugin]'</code></pre>
+  <p>To be fully working, a few more steps remain, such as filling a <b><code>.env</code></b> file with your credentials and getting <b>tokens from OpenAI and Hugging Face</b>. The book is not an installation guide, so those details live in the repo's README; they matter only if you plan to run the code.</p>
+
+  <div class="fig">
+    <h3>Step through · from empty laptop to working repo</h3>
+    <div class="pipe" id="in_stages">
+      <div class="stage"><b>1 · pyenv</b>Python 3.11.8</div>
+      <div class="stage"><b>2 · clone</b>repo + .python-version</div>
+      <div class="stage"><b>3 · poetry install</b>venv + lock</div>
+      <div class="stage"><b>4 · Poe plugin</b>poetry poe …</div>
+      <div class="stage"><b>5 · .env</b>keys + tokens</div>
+    </div>
+    <div class="caption" id="in_cap"></div>
+    <div class="stepbar"><button id="in_prev" type="button">◀ Back</button><button id="in_next" type="button">Next ▶</button><span id="in_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>Speed-dial on an old phone: press 2 for home, 3 for the office. You don't memorise numbers; you remember "2 = home". <code>poetry poe local-infrastructure-up</code> is speed-dial for a long Docker command. <i>Where it breaks:</i> speed-dial hides the number; Poe tasks are still readable in <code>pyproject.toml</code>, so anyone can see what "2" actually dials.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Poe reads the <code>[tool.poe.tasks]</code> table and runs each task inside the project's Poetry environment, so the right Python and packages are always used. Tasks can also chain other tasks, which is how the repo builds bigger commands from smaller ones in later chapters.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you onboard a new engineer in a day?" A strong answer: "One clone, one install command, one <code>.env</code> template, and a task runner listing every operation: start infra, run pipelines, run tests. The task list is the runbook." Mention Make/Invoke/Poe as interchangeable; the point is a single entry point.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The Poe task that starts ZenML, MongoDB and Qdrant: <a href="#s5">05</a>. The pipeline-running tasks: <a href="#s11">11</a>.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SECTION</div><h2>MLOps and LLMOps tooling, and running everything locally</h2></div><span class="chip">pdf p59–60</span></div>
+  <p>This section is a quick tour of every <b>MLOps</b> and <b>LLMOps</b> tool in the book and the role each plays in building ML systems with good practices. The authors are explicit about the scope:</p>
+  <ul class="plain">
+    <li>It does <b>not</b> go deep into components such as <b>model registries</b> and <b>orchestrators</b>; it gives a quick idea of <b>what they are</b> and <b>how to use them</b>. Hands-on examples come as the LLM Twin is built.</li>
+    <li>The <b>theory</b> of MLOps and LLMOps is saved for <b>Chapter 11</b>. Because the field is very practical, the authors think theory is easier to understand <i>after</i> you've built the use case.</li>
+    <li>It is <b>not</b> a setup guide for each tool; it focuses on <b>what each tool is used for</b> and the core features the book uses.</li>
+  </ul>
+  <p>If you already know these tools, you can skip ahead to the databases section (<a href="#s14">plate 14</a>).</p>
+  <h3>Run the whole infrastructure locally in three steps</h3>
+  <p>Using <b>Docker</b>, you can run all the infrastructure on your laptop:</p>
+  <ol class="plain">
+    <li>Install <b>Docker 27.1.1</b> or higher.</li>
+    <li>Fill your <code>.env</code> file with the credentials the README asks for.</li>
+    <li>Run <code>poetry poe local-infrastructure-up</code>. This starts <b>ZenML</b> (dashboard at <code>http://127.0.0.1:8237/</code>) plus the <b>MongoDB</b> and <b>Qdrant</b> databases.</li>
+  </ol>
+  <p>More details on local running are in the repo README, and the book later shows how to deploy each component to the cloud.</p>
+
+  <div class="fig">
+    <h3>What one command brings up (local, modelled diagram)</h3>
+    <svg viewBox="0 0 640 190" class="dg" role="img" aria-label="poetry poe local-infrastructure-up starts ZenML server, MongoDB and Qdrant on your laptop" style="width:100%;height:auto;max-width:640px">
+      <rect x="10" y="70" width="190" height="50" rx="5" class="hi"/><text x="105" y="92" text-anchor="middle" class="b">poetry poe</text><text x="105" y="109" text-anchor="middle" class="m">local-infrastructure-up</text>
+      <rect x="260" y="10" width="370" height="170" rx="8" class="dc"/><text x="275" y="30" class="m">your laptop (Docker + local Python)</text>
+      <rect x="280" y="42" width="330" height="36" rx="5" class="f"/><text x="295" y="65" class="b">ZenML server</text><text x="430" y="65" class="m">127.0.0.1:8237</text>
+      <rect x="280" y="88" width="330" height="36" rx="5" class="f"/><text x="295" y="111" class="b">MongoDB</text><text x="430" y="111" class="m">raw documents</text>
+      <rect x="280" y="134" width="330" height="36" rx="5" class="f"/><text x="295" y="157" class="b">Qdrant</text><text x="430" y="157" class="m">vectors for RAG</text>
+      <path d="M200 90 L280 60"/><path d="M200 95 L280 106"/><path d="M200 100 L280 152"/>
+    </svg>
+    <p class="note">Ports for MongoDB and Qdrant aren't given in this chapter, so they're not shown.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding caterer who arrives with a whole kitchen in one truck: gas stoves, utensils, cold storage. Park the truck, open the doors, and the kitchen is running. Docker images are the packed truck; <code>local-infrastructure-up</code> is "open the doors". <i>Where it breaks:</i> the truck version is a scaled-down kitchen; production uses the cloud versions of ZenML, MongoDB and Qdrant shown later in the book.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Docker runs each database as an isolated container from a published image, so you don't install MongoDB or Qdrant on your machine directly. The ZenML server is a Python package installed by <code>poetry install</code>; locally it is a debugging server with a web dashboard. One task wraps all of it so the start-up order and settings are the same for everyone.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do engineers develop against your infra locally?" Say: "A single command brings up local containers of every stateful dependency (document DB, vector DB, orchestrator UI), configured from a <code>.env</code> file. Code talks to them through settings, so the same code points at managed cloud services in production."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Theory of these tools: <a href="ch11_mlops_and_llmops.html">Ch.11 MLOps and LLMOps</a>; Chip Huyen's view of the AI stack: <a href="../ai_engineering/ch10_architecture_and_user_feedback.html">AI Engineering ch.10</a>.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SUB-SECTION</div><h2>Hugging Face: the model registry</h2></div><span class="chip">pdf p60–61 · Fig 2.1</span></div>
+  <p>A <b>model registry</b> is a <b>central repository</b> that manages ML models through their whole lifecycle. It stores each model together with its <b>metadata</b>, <b>version history</b> and <b>performance metrics</b>, and acts as the <b>single source of truth</b> for "which model is which".</p>
+  <p>Why it matters in MLOps:</p>
+  <ul class="plain">
+    <li>It is where teams <b>track, share and document</b> model versions, which makes collaboration easier.</li>
+    <li>It is a core part of <b>deployment</b>, because it plugs into <b>CI/CD</b> (continuous integration and continuous deployment) pipelines: the deploy step pulls a specific registered version.</li>
+  </ul>
+  <p>The book uses <b>Hugging Face</b> as its model registry, for two reasons:</p>
+  <ol class="plain">
+    <li><b>Sharing</b>: its ecosystem makes it easy to share the fine-tuned LLM Twin models with every reader.</li>
+    <li><b>Integration</b>: following the Hugging Face model interface means the model works with the tools around LLMs, such as <b>Unsloth</b> for fine-tuning and <b>SageMaker</b> for inference.</li>
+  </ol>
+  <p>The fine-tuned models published by the authors:</p>
+  <ul class="plain">
+    <li><b>TwinLlama-3.1-8B</b> (after fine-tuning): <code>huggingface.co/mlabonne/TwinLlama-3.1-8B</code></li>
+    <li><b>TwinLlama-3.1-8B-DPO</b> (after preference alignment): <code>huggingface.co/mlabonne/TwinLlama-3.1-8B-DPO</code></li>
+  </ul>
+  <p>For a quick demo, both also run on <b>Hugging Face Spaces</b> (small hosted demo apps) at <code>huggingface.co/spaces/mlabonne/TwinLlama-3.1-8B</code> and <code>…/TwinLlama-3.1-8B-DPO</code>. (The PDF's text renders the names as "TwinLlama 31 8B"; the URLs show the real names.)</p>
+  <figure class="bookfig"><img src="figs/fig-2-1.png" alt="Hugging Face page header for mlabonne/TwinLlama-3.1-8B with tags and tabs" loading="lazy"><figcaption>Figure 2.1 (book, pdf p60): Hugging Face model registry example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The top line is the model's identity: owner <b>mlabonne</b> / model <b>TwinLlama-3.1-8B</b>, with a like counter (3). Below are <b>tags</b> that act as metadata: the task (<b>Text Generation</b>), the library (<b>Transformers</b>), the weight file format (<b>Safetensors</b>), a dataset/collection tag starting "mlabon…", and the <b>License: apache-2.0</b>. The three tabs are the registry's functions: <b>Model card</b> (documentation), <b>Files and versions</b> (selected; every file is git-versioned, so you can pin a commit) and <b>Community</b> (3 discussions).</p>
+  <p><b>Other registries.</b> Most ML tools have registry features: <b>ZenML</b>, <b>Comet</b> and <b>SageMaker</b> (all covered later) each offer one, and they're good options. The authors picked Hugging Face <b>only for its ecosystem</b>: easy sharing and integration across open source. The general rule: <b>choose the registry that fits best with your project's tools and requirements</b>.</p>
+
+  <div class="fig">
+    <h3>Try it · which registry would you pick?</h3>
+    <p class="small">Apply the book's rule ("integrates most with your tooling and requirements") to a few situations. Scenarios are our own.</p>
+    <div class="controls" id="rg_btns">
+      <button type="button" data-k="0">Open-source model for the public</button>
+      <button type="button" data-k="1">Everything already runs in ZenML</button>
+      <button type="button" data-k="2">Private model, all-in on AWS</button>
+      <button type="button" data-k="3">Team lives in Comet dashboards</button>
+    </div>
+    <div class="verdict" id="rg_v">Pick a situation.</div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A model registry is like the record room of a district court: every judgment (model) has a case number (version), the full file (weights + config), and a summary sheet (model card). Anyone who needs judgment no. 2024/117 gets exactly that one. Hugging Face is a public record room anyone can visit. <i>Where it breaks:</i> court records never change; model "files" can get new commits, which is why you pin a revision when deploying.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A Hugging Face model repo is a git repository (with large files stored separately). Each push is a commit, so "version" means a commit hash or a tag. Libraries such as Transformers know how to download a repo by name and revision, and that shared naming convention is what makes integration with fine-tuning and serving tools easy.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why have a model registry if you can store weights in S3?" Say: "S3 stores bytes; a registry adds identity and lifecycle: versions, metadata, metrics, lineage and stage (staging/production), and it's what CI/CD deploys from. That gives rollback and an audit trail." Then add the book's point: pick the registry your stack integrates with best.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>How TwinLlama is trained: <a href="ch05_supervised_fine_tuning.html">Ch.5 SFT</a> and <a href="ch06_preference_alignment.html">Ch.6 DPO</a>. Deploying it with SageMaker: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>. Model registry in FTI: <a href="ch01_llm_twin_concept_and_architecture.html">Ch.1</a>.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SUB-SECTION</div><h2>ZenML: the bridge between ML and MLOps, and its "stack"</h2></div><span class="chip">pdf p61–62</span></div>
+  <p>The book describes <b>ZenML</b> as the <b>bridge between ML and MLOps</b>. It offers several MLOps features that make your pipelines easier to <b>trace</b>, <b>reproduce</b>, <b>deploy</b> and <b>maintain</b>. At its core it is built to create <b>reproducible ML workflows</b>.</p>
+  <p>The problem it targets: moving from <b>exploratory research in Jupyter notebooks</b> to a <b>production-ready</b> ML setup. Specifically, the replication problems of production:</p>
+  <ul class="plain">
+    <li>versioning is hard,</li>
+    <li>experiments are hard to reproduce,</li>
+    <li>complex ML workflows are hard to organise,</li>
+    <li>there is a gap between training and deployment,</li>
+    <li>metadata is hard to track.</li>
+  </ul>
+  <p>So ZenML's <b>main features</b> are: <b>orchestrating</b> ML pipelines, <b>storing and versioning</b> pipeline outputs, and <b>attaching metadata</b> to artifacts for better observability.</p>
+  <h3>The stack</h3>
+  <p>Instead of being "yet another ML platform", ZenML introduces the <b>stack</b>: a named bundle of infrastructure that ZenML runs on. A stack connects ZenML to cloud services such as:</p>
+  <ul class="plain">
+    <li>an <b>orchestrator and compute engine</b> (for example AWS <b>SageMaker</b> or Google <b>Vertex AI</b>),</li>
+    <li><b>remote storage</b> (for instance AWS <b>S3</b> or <b>Google Cloud Storage</b> buckets),</li>
+    <li>a <b>container registry</b> (for example <b>Docker Registry</b> or AWS <b>ECR</b>, Elastic Container Registry).</li>
+  </ul>
+  <p>ZenML is the <b>glue</b> that brings your infrastructure and tools together in one place, so you can iterate fast and monitor the whole ML system. Its big benefit: <b>no vendor lock-in</b>. It fully separates your Python code from the infrastructure it runs on. For the LLM Twin, the authors used the <b>AWS stack</b>: <b>SageMaker</b> as orchestrator and compute, <b>S3</b> as remote storage for artifacts, <b>ECR</b> as container registry. Yet the Python code contains <b>nothing specific to S3 or ECR</b>; ZenML handles those. So switching to, say, Google Cloud Storage or Azure is easy.</p>
+  <p>The book only uses a few ZenML features (orchestration, artifacts and metadata) and points to ZenML's starter guide for more. The <b>local ZenML server</b> ships as a Python package, so <code>poetry install</code> already gives you a local debugging server. Chapter 11 shows ZenML's <b>cloud serverless</b> option for deploying the pipelines to AWS.</p>
+
+  <div class="fig">
+    <h3>Try it · switch the stack, keep the code</h3>
+    <div class="controls" id="st_btns">
+      <button type="button" data-k="0" class="on">default (local)</button>
+      <button type="button" data-k="1">AWS (book)</button>
+      <button type="button" data-k="2">GCP</button>
+    </div>
+    <svg viewBox="0 0 640 200" class="dg" role="img" aria-label="Same pipeline code mapped onto different stacks" style="width:100%;height:auto;max-width:640px">
+      <rect x="10" y="20" width="200" height="160" rx="6" class="hi"/><text x="110" y="45" text-anchor="middle" class="b">your pipeline code</text>
+      <text x="110" y="75" text-anchor="middle" class="m">@pipeline</text><text x="110" y="95" text-anchor="middle" class="m">@step · @step</text><text x="110" y="125" text-anchor="middle" class="m">no S3 / ECR /</text><text x="110" y="142" text-anchor="middle" class="m">GCS code here</text>
+      <rect x="250" y="20" width="120" height="160" rx="6" class="s"/><text x="310" y="95" text-anchor="middle" class="b">ZenML</text><text x="310" y="113" text-anchor="middle" class="m">stack</text>
+      <rect x="410" y="20" width="220" height="44" rx="5" class="f"/><text x="420" y="38" class="m">orchestrator + compute</text><text x="420" y="56" class="b" id="st_o">local process</text>
+      <rect x="410" y="78" width="220" height="44" rx="5" class="f"/><text x="420" y="96" class="m">artifact store</text><text x="420" y="114" class="b" id="st_a">local disk</text>
+      <rect x="410" y="136" width="220" height="44" rx="5" class="f"/><text x="420" y="154" class="m">container registry</text><text x="420" y="172" class="b" id="st_c">(none needed)</text>
+      <path d="M210 100 L250 100"/><path d="M370 100 L410 42"/><path d="M370 100 L410 100"/><path d="M370 100 L410 158"/>
+    </svg>
+    <div class="verdict" id="st_v">The "default" stack is what runs your pipelines locally.</div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A phone charger with swappable plug heads: Indian, UK, US. The charger (your code) is the same; you clip on the head for the country (the stack) you're in. <i>Where it breaks:</i> some cloud-specific features (like a special GPU instance type) still need settings per stack; the plug analogy makes it sound more free than it is.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each stack component is an adapter behind a common interface: "store this artifact", "run this step in a container", "push this image". Your steps only call ZenML's interface; the active stack decides which adapter implements it. It's the classic <b>ports-and-adapters</b> (hexagonal) idea applied to ML infrastructure.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you avoid cloud lock-in for ML pipelines?" Say: "Keep business logic free of cloud SDK calls and put an abstraction layer between code and infra: an orchestrator with pluggable backends, like ZenML stacks (orchestrator, artifact store, container registry). Switching clouds becomes a config change, not a rewrite."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Pipelines and steps: <a href="#s8">08</a>. Deploying with the AWS stack: <a href="ch11_mlops_and_llmops.html">Ch.11</a>.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · SUB-SUB-SECTION</div><h2>Orchestrator: pipelines, steps, and reading a run in the dashboard</h2></div><span class="chip">pdf p62–65 · Fig 2.2 · 2.3 · 2.4 · 2.5</span></div>
+  <p>An <b>orchestrator</b> is a system that <b>automates, schedules and coordinates</b> all your ML pipelines. It makes sure each pipeline (data ingestion, preprocessing, model training, deployment…) runs <b>in the right order</b> and that <b>dependencies</b> between tasks are handled well. By managing these processes it:</p>
+  <ul class="plain">
+    <li><b>optimises resource use</b>,</li>
+    <li><b>handles failures gracefully</b>,</li>
+    <li><b>improves scalability</b>,</li>
+  </ul>
+  <p>so complex ML pipelines become more reliable and easier to manage.</p>
+  <p><b>How ZenML orchestrates.</b> It works with <b>pipelines</b> and <b>steps</b>. A <b>pipeline</b> is a high-level object containing several steps. A plain Python function becomes a pipeline when decorated with <code>@pipeline</code>, and a step when decorated with <code>@step</code>. This is a standard pattern across orchestrators: a top-level function (the pipeline) calls several units (steps, or tasks).</p>
+  <p>The book's example is a real LLM Twin pipeline, <code>digital_data_etl</code>: it looks up a user by full name in the database (creating them if missing) and then crawls every link given for that user. The shape, in our own words:</p>
+  <pre class="code"><code>from zenml import pipeline
+from steps.etl import find_or_add_author, crawl_urls   # steps live elsewhere
+
+@pipeline
+def author_content_etl(author_name: str, urls: list[str]) -&gt; None:
+    author = find_or_add_author(author_name)          # step 1
+    crawl_urls(author=author, urls=urls)              # step 2 uses step 1's output</code></pre>
+  <ul class="plain">
+    <li><code>@pipeline</code> turns the function into something ZenML can run, track and show in the dashboard.</li>
+    <li>The body only <b>wires steps together</b>; passing <code>author</code> from step 1 into step 2 is how ZenML learns the order (a dependency edge).</li>
+    <li>No crawling logic lives here; that sits in the steps (and, deeper, in the app's own module, plate 09).</li>
+  </ul>
+  <p>You run it with the Poe task <code>poetry poe run-digital-data-etl</code>. Then open the ZenML dashboard at <code>http://127.0.0.1:8237/</code>, click <b>Pipelines</b> on the left, then <b>digital_data_etl</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-2-2.png" alt="ZenML dashboard listing pipelines, with Pipelines tab and digital_data_etl highlighted" loading="lazy"><figcaption>Figure 2.2 (book, pdf p63): ZenML Pipelines dashboard</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The left menu shows the <b>default</b> workspace with a "Production Setup 0/2" checklist and the sections <b>Overview, Pipelines, Models, Artifacts, Stacks</b>; <b>Pipelines</b> is circled in red. The main list shows the LLM Twin's pipelines: <b>digital_data_etl</b> (circled), <b>export_artifact_to_json</b>, <b>generate_datasets</b>, <b>generate_instruct_datasets</b> and <b>feature_engineering</b>, each with a green tick for its last run.</p>
+  <p>Clicking the pipeline shows <b>all its past and current runs</b>: which succeeded, failed or are still running, and the <b>stack</b> each one used. The <b>default</b> stack is the one that runs pipelines locally.</p>
+  <figure class="bookfig"><img src="figs/fig-2-3.png" alt="List of digital_data_etl runs with status, stack, created time and author" loading="lazy"><figcaption>Figure 2.3 (book, pdf p64): ZenML digital_data_etl pipeline dashboard. Example of a specific pipeline</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Each row is one run, named <code>digital_data_etl_run_</code> + a timestamp (the run-name pattern set in plate 11), with a short ID under it. Green ticks are successes; the two red <b>!</b> rows (24/09/2024 at 12:28 and 12:29) are <b>failed</b> runs, followed a minute later by a successful one, which is what debugging looks like. Columns: <b>Stack</b> (all <code>default</code>), <b>Repository</b> (empty), <b>Created at</b>, <b>Author</b> (<code>default</code>).</p>
+  <p>Clicking the latest (or any successful or running) run shows its <b>steps, outputs and insights</b>. This structure is a <b>DAG</b> (directed acyclic graph: boxes connected by one-way arrows with no loops). DAGs are covered more in Chapter 11.</p>
+  <figure class="bookfig"><img src="figs/fig-2-4.png" alt="Run view: DAG of get_or_create_user, user artifact, crawl_links, crawled_links artifact, plus Run Insights panel" loading="lazy"><figcaption>Figure 2.4 (book, pdf p64): ZenML digital_data_etl pipeline run dashboard (example of a specific pipeline run)</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left, the DAG top to bottom: step <b>get_or_create_user</b> (white box, green tick) → its output artifact <b>user</b> (purple pill, type <code>llm_engineering.domain.documents.UserDocument</code>) → step <b>crawl_links</b> → output artifact <b>crawled_links</b> (type <code>builtins.list</code>). White boxes are <b>steps</b>; purple pills are <b>artifacts</b> (plate 10). Right, <b>Run Insights</b>: the run's ID, Status <b>completed</b>, the pipeline, author, start and end time (both 15:38:51, a very short run), and a <b>Stack</b> section showing the <b>default</b> artifact store.</p>
+  <p>Clicking a <b>step</b> shows its code and configuration, and even <b>collects the logs</b> that step printed, so you don't need to switch to another tool to read them.</p>
+  <figure class="bookfig"><img src="figs/fig-2-5.png" alt="Step detail for get_or_create_user with Logs tab open" loading="lazy"><figcaption>Figure 2.5 (book, pdf p65): Example of insights from a specific step of the digital_data_etl pipeline run</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The step <b>get_or_create_user</b> is marked <b>completed</b>. Tabs: <b>Overview, Code, Logs</b> (selected), <b>Configuration</b>. The log shows the step starting, one INFO line from the step's own logger ("Getting or creating user: Maxime Labonne", with file and line number), then "finished in <b>0.073s</b>" and "completed successfully".</p>
+
+  <div class="fig">
+    <h3>Step through · a run, the way the orchestrator sees it</h3>
+    <div class="pipe" id="dg_stages">
+      <div class="stage"><b>get_or_create_user</b>step</div>
+      <div class="stage"><b>user</b>artifact</div>
+      <div class="stage"><b>crawl_links</b>step</div>
+      <div class="stage"><b>crawled_links</b>artifact</div>
+    </div>
+    <div class="caption" id="dg_cap"></div>
+    <div class="stepbar"><button id="dg_prev" type="button">◀ Back</button><button id="dg_next" type="button">Next ▶</button><span id="dg_n"></span><button type="button" id="dg_fail">Make crawl_links fail</button></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A Mumbai dabbawala network. Each dabba passes through fixed hand-offs (home → station → sorting → office) in a fixed order, the coding on the lid tells every handler where it goes next, and if one train is late the system knows exactly which dabbas are stuck. The orchestrator is the coding system; steps are the hand-offs; the DAG is the route map. <i>Where it breaks:</i> dabbawalas don't keep a copy of every lunch; ZenML stores every step output as an artifact, so you can inspect or reuse it later.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>When the pipeline function is called, ZenML doesn't run steps immediately; it records which step outputs feed which step inputs and builds the DAG. Then it runs steps in dependency order (in parallel where possible), saves each output, records status, timing and logs, and stops downstream steps if an upstream one fails. Because outputs are saved, a re-run can <b>cache</b> unchanged steps (which is why the book later passes <code>--no-cache</code> to force fresh crawling).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What does an orchestrator give you over cron + scripts?" Say: "Dependency-ordered execution as a DAG, retries and failure handling, per-run history with logs, versioned outputs and caching, and resource scheduling. Cron just starts a process at a time." Name examples: ZenML, Airflow, Prefect, Dagster.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The real ETL logic inside these steps: <a href="ch03_data_engineering.html">Ch.3</a>. DAGs and orchestration theory: <a href="ch11_mlops_and_llmops.html">Ch.11</a>.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · SUB-SUB-SECTION</div><h2>Writing a ZenML step: modular code, a clean folder split, serializable outputs</h2></div><span class="chip">pdf p65–67 · Fig 2.6</span></div>
+  <p>A ZenML <b>step</b> works like a normal Python function, just decorated with <code>@step</code>. The book shows the <code>get_or_create_user()</code> step (the ETL logic itself is Chapter 3's topic). The idea, with our own names:</p>
+  <pre class="code"><code>from typing_extensions import Annotated
+from zenml import step
+from loguru import logger
+from my_app.domain import AuthorDoc          # domain model from the app package
+from my_app import helpers
+
+@step
+def find_or_add_author(full_name: str) -&gt; Annotated[AuthorDoc, "author"]:
+    logger.info(f"Looking up author: {full_name}")
+    first, last = helpers.split_name(full_name)
+    return AuthorDoc.get_or_create(first_name=first, last_name=last)</code></pre>
+  <ul class="plain">
+    <li><code>@step</code> makes the function a unit ZenML can run, log and track.</li>
+    <li><code>Annotated[AuthorDoc, "author"]</code> gives the output both a <b>type</b> and a <b>name</b>; the name is what you see as the artifact label in the dashboard (like <code>user</code> in Figure 2.4).</li>
+    <li>The logger line is what appears in the step's Logs tab (Figure 2.5).</li>
+    <li>The real work is delegated to the app's own code (<code>split_name</code>, <code>get_or_create</code>).</li>
+  </ul>
+  <p>Inside a step you can put <b>any</b> Python logic: here it just fetches or creates a user, but it could be data collection, feature engineering or training.</p>
+  <h3>Design rule 1: modular code</h3>
+  <p>To use ZenML well, your code must be <b>modular</b>: <b>each function does one thing</b>. Then it's easy to decorate functions with <code>@step</code> and glue them in a <code>@pipeline</code>. A key design choice is the <b>granularity</b> of each step, because <b>in the cloud each step runs as a separate unit on a different machine</b>. Too fine and you pay start-up and data-transfer overhead per step; too coarse and you lose visibility and caching.</p>
+  <h3>Design rule 2: keep the app logic independent of ZenML</h3>
+  <p>To <b>decouple</b> the code from ZenML, the authors put all application and domain logic into the <b><code>llm_engineering</code></b> Python module. ZenML code lives in two separate folders:</p>
+  <ul class="plain">
+    <li><b><code>steps</code></b>: each step imports only what it needs from <code>llm_engineering</code> (like using any Python package).</li>
+    <li><b><code>pipelines</code></b>: only glues steps into final pipelines.</li>
+  </ul>
+  <p>With this design you can <b>swap ZenML for another orchestrator</b>, or reuse the app logic somewhere else, such as a <b>REST API</b>, by replacing only the ZenML code. <code>llm_engineering</code>, where all the logic lives, stays untouched.</p>
+  <figure class="bookfig"><img src="figs/fig-2-6.png" alt="GitHub view of the LLM-Engineers-Handbook repository root folders" loading="lazy"><figcaption>Figure 2.6 (book, pdf p67): LLM-Engineers-Handbook repository folder structure</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The public GitHub repo (branch <b>main</b>, 7 branches, 0 tags, 116 commits at the time). The root folders are <code>.github/workflows</code> (CI), <code>.vscode</code>, <code>code_snippets</code>, <code>configs</code> (pipeline YAMLs, plate 11), <code>dummy_dataset</code>, <code>images</code>, and the three that matter here: <b><code>llm_engineering</code></b> (all app/domain logic), <b><code>pipelines</code></b> and <b><code>steps</code></b> (the ZenML layer), plus <b><code>tools</code></b> (where <code>run.py</code> lives). The middle column is each folder's last commit message.</p>
+
+  <div class="fig">
+    <h3>Try it · what changes if you swap the orchestrator?</h3>
+    <div class="controls" id="dc_btns">
+      <button type="button" data-k="0">Swap ZenML → Airflow</button>
+      <button type="button" data-k="1">Expose crawling as a REST API</button>
+      <button type="button" data-k="2">Change how crawling works</button>
+    </div>
+    <div class="verdict" id="dc_v">Pick a change and see which folders you must edit.</div>
+  </div>
+
+  <h3>Design rule 3: step outputs must be serializable</h3>
+  <p>If a step <b>returns</b> a value, that value must be <b>serializable</b> (convertible to bytes that can be saved and loaded), because ZenML turns every output into a stored artifact. ZenML handles most objects that reduce to primitive types, with some exceptions. The authors used <b>UUID</b> types as IDs across the code, and ZenML didn't support them natively, so they <b>extended ZenML's materializer</b> (the component that saves/loads a type) to handle UUIDs. They reported it to ZenML, and future versions were to support UUIDs, but it's a good example of how function outputs become artifacts.</p>
+  <div class="box picture"><b>Picture it</b><p>A restaurant kitchen (the <code>llm_engineering</code> module) and two ways to serve: a dine-in waiter (ZenML pipelines) and a Swiggy counter (a REST API). The recipes don't change when you add delivery; only the counter does. And every dish sent out must fit a standard box (serializable): a dish that doesn't fit needs a custom box (a materializer). <i>Where it breaks:</i> kitchens don't care which machine cooks each dish; in the cloud each step may run on a different machine, which is why step size matters.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Between steps, data doesn't stay in memory: step A's output is written to the artifact store by a <b>materializer</b>, and step B (maybe on another machine) reads it back. That's why outputs must be serializable, and why each step boundary has a cost. The upside is that every intermediate result is saved and inspectable.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you structure ML pipeline code so it's testable and portable?" Say: "Pure domain logic in a package with no orchestrator imports; thin step wrappers that call it; pipelines that only wire steps. Steps return serializable types. Then the same logic serves a batch pipeline, a REST endpoint or a unit test." This is the same layering as hexagonal architecture in backend services.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Artifacts produced by these outputs: <a href="#s10">10</a>. Domain documents like <code>UserDocument</code>: <a href="ch03_data_engineering.html">Ch.3</a>.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · SUB-SUB-SECTION</div><h2>Artifacts and metadata</h2></div><span class="chip">pdf p68–71 · Fig 2.7 · 2.8 · 2.9</span></div>
+  <p>ZenML turns <b>every step output into an artifact</b>. In MLOps, an <b>artifact</b> is <b>any file (or files) produced during the ML lifecycle</b>: datasets, trained models, checkpoints, logs. Artifacts are essential for <b>reproducing experiments</b> and <b>deploying models</b>. Anything can be made into an artifact; a model registry, for example, is just a special use of artifacts.</p>
+  <p>Artifacts have three special properties:</p>
+  <ol class="plain">
+    <li><b>Versioned</b>: each run produces a new version; old ones stay.</li>
+    <li><b>Shareable</b>: others (and other pipelines) can load them.</li>
+    <li><b>Metadata attached</b>: a description of what's inside so you can understand it <b>without downloading it</b>. For a dataset that could be its size, the train-test split ratio, the label types and anything else useful.</li>
+  </ol>
+  <p>Back to the <code>digital_data_etl</code> example: the crawled links are a step output, so they're an artifact.</p>
+  <figure class="bookfig"><img src="figs/fig-2-7.png" alt="DAG with the crawled_links artifact boxed in red" loading="lazy"><figcaption>Figure 2.7 (book, pdf p68): ZenML artifact example using the digital_data_etl pipeline as an example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The same DAG as Figure 2.4, with the final purple pill <b>crawled_links</b> (<code>builtins.list</code>) boxed in red: that pill <i>is</i> the artifact. The other pill, <b>user</b>, is an artifact too. Every step's output becomes one.</p>
+  <p>Click <code>crawled_links</code> and open the <b>Metadata</b> tab: it shows every domain crawled for that author, how many links were crawled per domain, and how many succeeded.</p>
+  <figure class="bookfig"><img src="figs/fig-2-8.png" alt="Metadata tab of crawled_links with per-domain successful and total counts" loading="lazy"><figcaption>Figure 2.8 (book, pdf p69): ZenML metadata example using the digital_data_etl pipeline as an example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> At the top, the artifact's UUID and name <b>crawled_links</b> with a version badge <b>8</b> (the eighth version). Tabs: Overview, <b>Metadata</b>, Visualization. Groups: <b>Uncategorized</b> (collapsed), <b>mlabonne.github.io</b> with successful <b>2</b> / total <b>2</b>, and <b>maximelabonne.substack.com</b> with successful <b>24</b> / total <b>24</b>. So this run crawled 26 links, all successfully, and you learn that without opening the data.</p>
+  <p>A more interesting case is the generated dataset artifact <b><code>instruct_datasets</code></b>, created automatically and later used to fine-tune the LLM Twin (instruction datasets are Chapter 5's topic). Its metadata was <b>precomputed</b>: how many data categories it has, its storage size, and how many samples are in each training and test split.</p>
+  <figure class="bookfig"><img src="figs/fig-2-9.png" alt="Metadata tab of instruct_datasets showing categories, size, split and sample counts" loading="lazy"><figcaption>Figure 2.9 (book, pdf p70): ZenML metadata example for the instruct_datasets artifact</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Artifact <b>instruct_datasets</b>, version <b>10</b>, with its UUID (<code>8bba35c4-…</code>, the same one used in the loading snippet below). <b>Uncategorized</b>: <code>data_categories</code> = articles, <code>storage_size</code> = 493.23 KB, <code>test_split_size</code> = 0.1. A collapsed <b>schema</b> group. <code>train_num_samples_per_category</code>: articles <b>738</b>. <code>test_num_samples_per_category</code>: articles <b>82</b>. Check: 82 / (738 + 82) = 82 / 820 = <b>0.1</b>, matching the split size.</p>
+  <h3>How the metadata gets there</h3>
+  <p>The metadata is added <b>by hand</b> in the step code, so you can precompute anything that helps people <b>discover datasets</b> across projects. The book's step names its output artifact, tags it, and attaches a dictionary of statistics. Our condensed version of the same pattern:</p>
+  <pre class="code"><code>from zenml import ArtifactConfig, get_step_context, step
+
+@step
+def build_qa_dataset(prompts) -&gt; Annotated[
+        QASplit, ArtifactConfig(name="qa_datasets", tags=["dataset", "qa"])]:
+    splits = make_splits(prompts)                       # the real work
+    get_step_context().add_output_metadata(
+        output_name="qa_datasets", metadata=summarise(splits))
+    return splits
+
+def summarise(splits: QASplit) -&gt; dict:
+    return {
+        "categories": list(splits.train.keys()),
+        "test_fraction": splits.test_fraction,
+        "train_count": {c: d.num_samples for c, d in splits.train.items()},
+        "test_count":  {c: d.num_samples for c, d in splits.test.items()},
+    }</code></pre>
+  <ul class="plain">
+    <li><code>ArtifactConfig(name=…, tags=…)</code> fixes the artifact's <b>name</b> and adds <b>tags</b> (the book uses "dataset", "instruct", "cleaned") so it's easy to search for.</li>
+    <li><code>get_step_context()</code> gives access to the running step; <code>add_output_metadata</code> attaches the dictionary to the named output.</li>
+    <li>The helper computes the categories, the test-split size, and sample counts per category for train and test: exactly the fields in Figure 2.9.</li>
+    <li>(The book's step is called <code>generate_intruction_dataset</code>, a typo for "instruction" in the original.)</li>
+  </ul>
+  <p>You can also <b>download any specific version</b> of an artifact by its <b>UUID</b> (universally unique identifier), found in the dashboard or CLI:</p>
+  <pre class="code"><code>from zenml.client import Client
+art = Client().get_artifact_version("&lt;artifact-version-uuid&gt;")
+data = art.load()        # the Python object, rebuilt by its materializer</code></pre>
+
+  <div class="fig">
+    <h3>Try it · what metadata would you precompute?</h3>
+    <p class="small">Adjust a modelled dataset and see the metadata a step like the one above would attach. The defaults reproduce Figure 2.9's numbers.</p>
+    <div class="controls"><label>total samples <input type="range" id="md_n" min="100" max="5000" step="10" value="820"><output id="md_no"></output></label><label>test split <input type="range" id="md_t" min="0.05" max="0.3" step="0.05" value="0.1"><output id="md_to"></output></label><label><input type="checkbox" id="md_posts"> add a "posts" category (modelled)</label></div>
+    <pre class="code" id="md_out"></pre>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Courier parcels with a printed label: sender, weight, contents ("2 books"), parcel number. The sorting office routes it without opening it. Metadata is the label; the UUID is the tracking number; versions are "this is the 10th parcel of this kind you've sent". <i>Where it breaks:</i> a courier label is printed by the sender in a standard format; ZenML metadata is whatever <i>you</i> choose to compute, so it's only as useful as the fields you add.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The artifact's bytes go to the <b>artifact store</b> (local disk, or S3 on the AWS stack), while its name, version, tags, type and metadata go into ZenML's <b>metadata database</b> on the server. The dashboard reads only the database, which is why you can browse counts and sizes without downloading the data. Linking each artifact to the run and step that made it gives <b>lineage</b>: for any model you can trace back which dataset version trained it.</p></div>
+  <div class="box work"><b>Worked example · reproducing a training run</b><p>Six weeks later the fine-tuned model behaves oddly. Its run points to <code>instruct_datasets</code> v10. You load v10 by UUID and see 738 train / 82 test, articles only. The latest version, v12, has posts too. Now you know the model was never trained on posts. Without versioned artifacts you'd only know "the dataset at the time".</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you make ML experiments reproducible?" Say: "Version every intermediate output as an artifact with metadata and lineage (which code, config and inputs produced it), load by immutable ID, and record the artifact IDs used by each training run. Then any model can be rebuilt or audited." In a RAG system the same applies to the chunked/embedded corpus snapshot behind an index.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>How <code>instruct_datasets</code> is generated: <a href="ch05_supervised_fine_tuning.html">Ch.5</a>. Chip Huyen on data lineage and versioning: <a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering ch.8</a>.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · SUB-SUB-SECTION</div><h2>How to run and configure a ZenML pipeline (and other orchestrators)</h2></div><span class="chip">pdf p72–74 · Fig 2.10</span></div>
+  <p>All ZenML pipelines are started from one file, <b><code>tools/run.py</code></b>, a small CLI where you choose which pipeline to run. For example, to run the ETL for Maxime's content:</p>
+  <pre class="code"><code>python -m tools.run --run-etl --no-cache --etl-config-filename digital_data_etl_maxime_labonne.yaml</code></pre>
+  <p>and for Paul's content, the same command with <code>digital_data_etl_paul_iusztin.yaml</code>. (<code>--no-cache</code> asks ZenML not to reuse cached step outputs, so the crawl really runs again.)</p>
+  <p>As promised with Poe the Poet, every project command goes through Poe, so these become:</p>
+  <pre class="code"><code>poetry poe run-digital-data-etl-maxime
+poetry poe run-digital-data-etl-paul</code></pre>
+  <p>Only the <b>config file name</b> changes between people. ZenML lets you <b>inject a configuration file at runtime</b>. The book's <code>run.py</code> builds the config path, checks the file exists, gives the run a timestamped name, and calls the pipeline with those options. Our version of the idea:</p>
+  <pre class="code"><code>cfg = project_root / "configs" / cfg_name
+assert cfg.exists(), f"missing config: {cfg}"
+stamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+author_content_etl.with_options(
+    config_path=cfg, run_name=f"author_content_etl_run_{stamp}")()</code></pre>
+  <ul class="plain">
+    <li><code>with_options(config_path=…)</code> tells ZenML to read the pipeline's <b>parameters from YAML</b>; the final <code>()</code> runs it.</li>
+    <li>The timestamped <code>run_name</code> is why runs in Figure 2.3 look like <code>digital_data_etl_run_2024_09_26_15_38_51</code>.</li>
+  </ul>
+  <p>The YAML lists every parameter the pipeline takes. The book's Maxime config sets <code>user_full_name</code> and a list of <code>links</code> (his personal blog posts and Substack articles, "… more links"). Shape with made-up values:</p>
+  <pre class="code"><code>parameters:
+  author_name: Asha Rao          # [first name(s)] [last name]
+  urls:
+    # personal blog
+    - https://asha.example.dev/posts/kv-cache
+    # newsletter
+    - https://asha.substack.example/p/rag-in-prod</code></pre>
+  <p>The keys match the pipeline signature (in the book: <code>digital_data_etl(user_full_name: str, links: list[str])</code>; there it's shown returning <code>str</code>, earlier <code>None</code>). Benefits of this approach:</p>
+  <ul class="plain">
+    <li>You configure each pipeline <b>at runtime without changing code</b>.</li>
+    <li>The <b>inputs of every run are clearly tracked</b>, which supports <b>reproducibility</b>.</li>
+  </ul>
+  <p>Each pipeline has one or more configs:</p>
+  <figure class="bookfig"><img src="figs/fig-2-10.png" alt="GitHub configs folder listing nine YAML files" loading="lazy"><figcaption>Figure 2.10 (book, pdf p73): ZenML pipeline configs</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The repo's <code>configs/</code> folder. Three ETL configs, one per author: <code>digital_data_etl_alex_vesa.yaml</code>, <code>…_maxime_labonne.yaml</code>, <code>…_paul_iusztin.yaml</code> (same pipeline, different people). Then one config per other pipeline: <code>end_to_end_data.yaml</code>, <code>export_artifact_to_json.yaml</code>, <code>feature_engineering.yaml</code>, <code>generate_instruct_datasets.yaml</code>, <code>generate_preference_datasets.yaml</code> and <code>training.yaml</code>. The file names are effectively a map of the whole project's pipelines.</p>
+
+  <div class="fig">
+    <h3>Try it · one pipeline, many configs</h3>
+    <div class="controls"><label>config <select id="cf_sel"><option value="0">digital_data_etl_maxime_labonne.yaml</option><option value="1">digital_data_etl_paul_iusztin.yaml</option><option value="2">digital_data_etl_alex_vesa.yaml</option></select></label></div>
+    <pre class="code" id="cf_out"></pre>
+    <p class="note">Commands and file names are the book's; the clock time in the run name is modelled.</p>
+  </div>
+  <h3>Other orchestrators</h3>
+  <p>Orchestrators the authors have tested and consider powerful: <b>Airflow</b>, <b>Prefect</b>, <b>Metaflow</b> and <b>Dagster</b>. Heavy <b>Kubernetes</b> users can choose <b>Argo Workflows</b> (printed as "Agro" in the book) or <b>Kubeflow</b>, which runs only on top of Kubernetes. The authors still think ZenML is the best trade-off between <b>ease of use, features and cost</b>, and none of the others offers ZenML's <b>stack</b> feature, which avoids locking you into one cloud. Chapter 11 goes deeper into using an orchestrator for MLOps best practices.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Orchestrator</th><th>What the book says</th></tr>
+    <tr><td>ZenML</td><td>Chosen: best trade-off of ease, features, cost; unique stack feature (no vendor lock-in)</td></tr>
+    <tr><td>Airflow, Prefect, Metaflow, Dagster</td><td>Tested by the authors; powerful alternatives</td></tr>
+    <tr><td>Argo Workflows, Kubeflow</td><td>For heavy Kubernetes users; Kubeflow works only on Kubernetes</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>A pressure cooker is the pipeline; the recipe card is the config. Same cooker for rajma or chana, you just swap the card (ingredients and whistles). And you keep every used card in a file, so you know exactly what went into last Sunday's batch. <i>Where it breaks:</i> a recipe card can't change the cooker; a config can't change pipeline code either, only its parameters, which is the point.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>ZenML merges the YAML's <code>parameters</code> into the pipeline function's arguments, and stores the resolved configuration with the run. Because the config is a file in git and also saved per run, you can always answer "which inputs produced this artifact?"</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you parametrise batch jobs?" Say: "Code takes parameters; values live in versioned config files injected at runtime; each run records its resolved config and a unique run name. New tenant or dataset = new config, no code change." For a multi-tenant RAG ingestion job, one config per customer is exactly this pattern.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The configs in use: <a href="ch03_data_engineering.html">Ch.3</a> (ETL), <a href="ch04_rag_feature_pipeline.html">Ch.4</a> (feature engineering), <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (datasets, training). Orchestrators in depth: <a href="ch11_mlops_and_llmops.html">Ch.11</a>.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · SUB-SECTION</div><h2>Comet ML: the experiment tracker</h2></div><span class="chip">pdf p74–75 · Fig 2.11 · 2.12</span></div>
+  <p>Training ML models is <b>iterative and experimental</b>. Unlike normal software development, you run <b>many experiments in parallel</b>, compare them on <b>predefined metrics</b>, and decide which one goes to production. An <b>experiment tracker</b> logs everything you need for that (metrics, visualisations of predictions and so on) so you can compare runs and pick the best model quickly. The LLM project is no exception.</p>
+  <p>The authors used <b>Comet</b> to track metrics such as <b>training and evaluation loss</b> and the <b>gradient norm</b> across all experiments.</p>
+  <figure class="bookfig"><img src="figs/fig-2-11.png" alt="Comet ML panels for the TwinLlama-3.1-8B-SFT run: loss, learning rate, epoch, eval loss, grad norm" loading="lazy"><figcaption>Figure 2.11 (book, pdf p74): Comet ML training metrics example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The run is <b>TwinLlama-3.1-8B-SFT</b> (supervised fine-tuning). The left menu lists what Comet can store: Panels, Code, <b>Hyperparameters</b>, Metrics, Graph definition, Output, <b>System metrics</b>, Installed packages, Notes and more. "Metrics (11)" shows six panels, x-axis = training <b>step</b>: <b>loss</b> (noisy, roughly 0.5–1.1 over ~12k steps); a bar chart of <b>train_loss</b> (~0.7) vs <b>train_steps_per_second</b> (~0.3); <b>learning_rate</b> starting at about 100µ and falling in a straight line to 0 (a linear decay schedule); <b>epoch</b> rising linearly from 0 to 1 (one pass over the data); <b>eval_loss</b> falling smoothly from ~0.76 to ~0.71; and <b>grad_norm</b> mostly around 0.5 with one spike near 2. Smooth falling eval loss with noisy training loss is the healthy pattern.</p>
+  <p>A tracker goes beyond training and evaluation metrics: you can also log <b>hyperparameters</b> to compare configurations across experiments. It also logs <b>system metrics</b> out of the box (GPU, CPU, memory use), showing what resources training needs and where <b>bottlenecks</b> slow it down.</p>
+  <figure class="bookfig"><img src="figs/fig-2-12.png" alt="Comet system metrics: GPU utilization and GPU memory utilization for four GPUs" loading="lazy"><figcaption>Figure 2.12 (book, pdf p75): Comet ML system metrics example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same run, <b>System metrics</b> tab, x-axis = <b>wall time</b> (about 02:00 to 11:00 on Aug 5, 2024, so roughly a nine-hour run). Four coloured series, <code>sys.gpu.0</code> to <code>sys.gpu.3</code>: <b>four GPUs</b>. <b>GPU Utilization</b> jumps constantly between 0% and 100%, and <b>GPU Memory Utilization</b> swings mostly between ~20% and ~80%. Below, panels for <b>GPU Power Usage</b> and <b>GPU Memory Usage</b> (axis up to 45 GB) begin. Spiky utilisation like this hints that the GPUs sometimes wait (for data or communication), the kind of bottleneck these charts help you find.</p>
+  <p>You <b>don't need to install Comet locally</b>: the book uses its free online version without limits. The authors made their <b>fine-tuning experiments public</b> on Comet (project <code>mlabonne/llm-twin-training</code>) if you want to explore.</p>
+  <p><b>Alternatives:</b> <b>W&amp;B</b> (Weights &amp; Biases), <b>MLflow</b> and <b>Neptune</b>. The authors have used them all and say they have mostly the same features; Comet stands out for its <b>ease of use and intuitive interface</b>.</p>
+
+  <div class="fig">
+    <h3>Try it · pick the run to promote</h3>
+    <p class="small">Three modelled fine-tuning runs logged to a tracker. Choose the selection rule and see which run wins. This is the decision an experiment tracker exists to make easy.</p>
+    <div class="tablewrap"><table id="ex_tbl"></table></div>
+    <div class="controls"><label>rank by <select id="ex_rule"><option value="eval">lowest eval_loss</option><option value="train">lowest final train loss</option><option value="speed">fastest (steps/s)</option></select></label></div>
+    <div class="verdict" id="ex_v"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A cricket team's analyst who records every net session: bowler, ball type, pitch, speed, line and length. When choosing the XI, the coach compares sessions on the same numbers instead of memory. Hyperparameters are the conditions; loss curves are the stats; system metrics are the fitness tracker. <i>Where it breaks:</i> net sessions are cheap; one LLM fine-tuning run can cost hours of multi-GPU time, so losing its record is far more expensive.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The training script calls the tracker's SDK (or a training library's built-in integration) every few steps to send metric values; a background thread also samples GPU/CPU stats. Everything is stored under one experiment ID with its hyperparameters, code and installed packages, so runs can be overlaid and compared on the same axes.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you know a fine-tuning run is healthy?" Say: "Watch train and eval loss together (eval should fall, a widening gap means overfitting), the learning-rate schedule, gradient norm for spikes (instability), and GPU utilisation and memory for bottlenecks. Log hyperparameters so runs are comparable, and promote based on eval metrics, not train loss."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>These exact curves explained: <a href="ch05_supervised_fine_tuning.html">Ch.5 SFT</a> and <a href="ch06_preference_alignment.html">Ch.6</a>. Evaluation: <a href="ch07_evaluating_llms.html">Ch.7</a>.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · SUB-SECTION</div><h2>Opik: prompt monitoring</h2></div><span class="chip">pdf p75–76</span></div>
+  <p>The last MLOps piece is <b>prompt monitoring</b>. The authors say you <b>can't use standard logging and monitoring tools</b> for prompts. The full reasoning comes in Chapter 11; the short version:</p>
+  <ul class="plain">
+    <li>Prompts are <b>complex, unstructured chains</b>.</li>
+    <li>When you interact with an LLM app, several input prompts and generated outputs are <b>chained into a trace</b>, where <b>one prompt depends on earlier ones</b>.</li>
+    <li>So instead of plain text logs, you need a <b>specialised dashboard</b> that groups these traces, making it easier to debug and monitor them.</li>
+  </ul>
+  <p>The book uses <b>Opik</b>, an <b>open-source</b> tool made by <b>Comet</b>, because it follows Comet's philosophy of <b>simplicity and ease of use</b>, which the authors call rare in the LLM landscape. Opik has a serverless option and also a <b>free open-source version you fully control</b>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Tool</th><th>Open source?</th><th>Book's view</th></tr>
+    <tr><td><b>Opik</b> (Comet)</td><td>Yes (plus serverless)</td><td>Chosen: simple, easy to use</td></tr>
+    <tr><td>Langfuse</td><td>Yes</td><td>Similar features; more cumbersome to use and implement</td></tr>
+    <tr><td>Galileo</td><td>No</td><td>Similar features; more cumbersome</td></tr>
+    <tr><td>LangSmith</td><td>No</td><td>Similar features; more cumbersome</td></tr>
+  </table></div>
+
+  <div class="fig">
+    <h3>Step through · why a trace beats a log file (modelled request)</h3>
+    <p class="small">One user question to an LLM Twin-style RAG app. Flat logs scatter these lines among thousands of others; a trace keeps them as one tree.</p>
+    <div class="pipe" id="tr_stages">
+      <div class="stage"><b>user query</b>"Write a post on RAG"</div>
+      <div class="stage"><b>query rewrite</b>LLM call 1</div>
+      <div class="stage"><b>retrieval</b>vector DB top-k</div>
+      <div class="stage"><b>prompt build</b>template + chunks</div>
+      <div class="stage"><b>generation</b>LLM call 2</div>
+    </div>
+    <div class="caption" id="tr_cap"></div>
+    <div class="stepbar"><button id="tr_prev" type="button">◀ Back</button><button id="tr_next" type="button">Next ▶</button><span id="tr_n"></span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>An IRCTC PNR status page. One PNR groups the whole journey: booking, waitlist movements, chart preparation, final berth. If a passenger complains, you open the PNR and see each event in order. Flat logs are like searching the whole railway's event stream for one passenger. <i>Where it breaks:</i> a PNR has a fixed shape; an LLM trace's tree changes with every request (more or fewer tool calls, retries).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A tracing tool gives each user request a <b>trace ID</b> and each sub-operation (LLM call, retrieval, tool call) a <b>span</b> with parent–child links, inputs, outputs, latency and token counts. Because later prompts include earlier outputs, debugging a bad answer means walking up the tree to find which step went wrong, which a tree view makes easy and grep makes hard.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you monitor an LLM app in production?" Say: "Trace every request as a tree of spans (retrieval, each LLM call, tools) with full prompts, outputs, latency, tokens and cost, then add evaluations or feedback on top. Tools: Opik, Langfuse, LangSmith. Plain logs can't show how one prompt depended on the previous one." This maps directly to debugging a voice agent's multi-turn tool-calling flow.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Prompt monitoring implemented: <a href="ch11_mlops_and_llmops.html">Ch.11</a>. The RAG flow being traced: <a href="ch09_rag_inference_pipeline.html">Ch.9</a>. Chip Huyen on observability: <a href="../ai_engineering/ch10_architecture_and_user_feedback.html">AI Engineering ch.10</a>.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SECTION + SUB-SECTION</div><h2>Databases for unstructured and vector data · MongoDB (NoSQL)</h2></div><span class="chip">pdf p76</span></div>
+  <p>The book uses two databases: one <b>NoSQL</b> and one <b>vector</b>. Locally both are already wired up through <b>Docker</b>: when you run <code>poetry poe local-infrastructure-up</code> (plate 05), Docker pulls and runs local images of both. For deployment, the book later uses their <b>serverless</b> (managed cloud) versions and connects them to the rest of the LLM Twin.</p>
+  <h3>MongoDB: NoSQL database</h3>
+  <p><b>MongoDB</b> is described as one of today's most popular, robust, fast and feature-rich <b>NoSQL</b> databases (databases that don't force a fixed table schema; MongoDB stores JSON-like <b>documents</b>). It integrates well with most clouds: <b>AWS, Google Cloud, Azure</b> and <b>Databricks</b>. So the authors call choosing it a "no-brainer".</p>
+  <p>When the book was written, MongoDB was used by big companies such as <b>Novo Nordisk, Delivery Hero, Okta</b> and <b>Volvo</b>. The authors read this wide adoption as a sign it will stay a leading NoSQL database for a long time.</p>
+  <p><b>Its job in the LLM Twin:</b> store the <b>raw data collected from the internet</b>, before it's processed and pushed into the vector database. Because this is <b>unstructured text</b>, a flexible NoSQL store fits well: an article, a post and a code repo can all be stored without forcing them into one table shape.</p>
+  <div class="fig">
+    <h3>Try it · store a crawled item</h3>
+    <p class="small">Three crawled items (modelled). Each has different fields; a document store keeps them as they are.</p>
+    <div class="controls" id="mg_btns">
+      <button type="button" data-k="0">Article</button>
+      <button type="button" data-k="1">LinkedIn post</button>
+      <button type="button" data-k="2">GitHub repo</button>
+    </div>
+    <pre class="code" id="mg_out">Pick an item.</pre>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A big steel almirah where each family member keeps things in their own way: one has saris folded with tags, another has files in plastic folders. You can still find anything by owner. A SQL table is a medicine cabinet with fixed labelled slots. <i>Where it breaks:</i> flexibility has a price; if every document has a different shape, the code reading them must handle all shapes (the book later adds a typed model layer, called an ODM, to keep this in check).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>MongoDB stores BSON documents (binary JSON) in collections, indexes chosen fields, and lets each document carry its own set of fields. That suits a crawler, where each source (Medium, Substack, LinkedIn, GitHub) returns different metadata. Here it plays the <b>data warehouse</b> role for raw data, which the feature pipeline later reads.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why a document DB for raw crawled data?" Say: "Sources have heterogeneous, evolving shapes; a document store accepts them without migrations, keeps raw data as the source of truth, and lets downstream pipelines re-process it when the chunking or embedding logic changes." The trade-off to mention: weaker cross-document constraints and joins than SQL.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Writing crawled data into MongoDB with an ODM: <a href="ch03_data_engineering.html">Ch.3</a>. Qdrant, the next stop: <a href="#s15">15</a>. NoSQL in depth (DDIA ch.2): <a href="../../system_design/ddia/ch02_data_models_and_query_languages.html">DDIA data models</a>.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SUB-SECTION</div><h2>Qdrant: the vector database</h2></div><span class="chip">pdf p76–77</span></div>
+  <p><b>Qdrant</b> (qdrant.tech) is described as one of the most popular, robust and feature-rich <b>vector databases</b> (databases that store <b>embeddings</b>, lists of numbers representing meaning, and find the nearest ones quickly). The authors admit almost any vector DB would do for a small MVP, but they wanted something <b>light</b> and likely to be <b>used in industry for many years</b>.</p>
+  <p><b>Its job:</b> store the data from MongoDB <b>after</b> it has been processed and transformed for <b>GenAI</b> use (cleaned, chunked, embedded), so the RAG system can search it.</p>
+  <p>Qdrant is used by <b>X (formerly Twitter), Disney, Microsoft, Discord</b> and <b>Johnson &amp; Johnson</b>, so the authors expect it to stay around for a long time.</p>
+  <p><b>Alternatives</b> popular when the book was written: <b>Milvus</b>, <b>Redis</b>, <b>Weaviate</b>, <b>Pinecone</b>, <b>Chroma</b> and <b>pgvector</b> (a PostgreSQL plugin for vector indexes). The authors found Qdrant gave the <b>best trade-off between RPS</b> (requests per second), <b>latency</b> and <b>index time</b> (how long building the index takes), making it a solid choice for many GenAI apps.</p>
+  <p>A full comparison "could be a chapter in itself", so they skip it and point to <b>Superlinked's Vector DB Comparison</b>, which compares the top vector DBs on everything from licence and release year to features, supported embedding models and frameworks.</p>
+
+  <div class="fig">
+    <h3>Try it · follow one article from crawl to vector search</h3>
+    <div class="pipe" id="vq_stages">
+      <div class="stage"><b>crawl</b>raw HTML/text</div>
+      <div class="stage"><b>MongoDB</b>raw document</div>
+      <div class="stage"><b>clean + chunk</b>feature pipeline</div>
+      <div class="stage"><b>embed</b>vectors</div>
+      <div class="stage"><b>Qdrant</b>vector + payload</div>
+      <div class="stage"><b>query</b>nearest chunks</div>
+    </div>
+    <div class="caption" id="vq_cap"></div>
+    <div class="stepbar"><button id="vq_prev" type="button">◀ Back</button><button id="vq_next" type="button">Next ▶</button><span id="vq_n"></span></div>
+    <p class="note">Chunk counts, vector size and scores are modelled for illustration; the real feature pipeline is in Ch.4.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>MongoDB</th><th>Qdrant</th></tr>
+    <tr><td>Type</td><td>NoSQL document DB</td><td>Vector DB</td></tr>
+    <tr><td>Holds</td><td>Raw crawled data (before processing)</td><td>Processed, GenAI-ready data (after the feature pipeline)</td></tr>
+    <tr><td>Why chosen</td><td>Popular, robust, integrates with every cloud</td><td>Light, popular, best RPS / latency / index-time trade-off</td></tr>
+    <tr><td>Named users</td><td>Novo Nordisk, Delivery Hero, Okta, Volvo</td><td>X, Disney, Microsoft, Discord, J&amp;J</td></tr>
+    <tr><td>Local / cloud</td><td colspan="2">Docker locally; serverless versions at deployment</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>A library. MongoDB is the stack room where every donated book is kept as received. Qdrant is the librarian's mental map: "books about monsoon farming are on this shelf, near the irrigation books". You ask by meaning, not by exact title. <i>Where it breaks:</i> a librarian understands; a vector DB only measures distance between numbers, so result quality depends on the embedding model and the chunking.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A vector DB stores each chunk's embedding plus a <b>payload</b> (the text and metadata such as author or source). It builds an approximate-nearest-neighbour index (HNSW graphs in Qdrant's case; beyond the book) so a query embedding finds the closest vectors in milliseconds instead of comparing against every vector. RPS, latency and index time are the three axes the book weighs.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you choose a vector database?" Say: "Throughput (RPS) and p95 latency at my vector count and dimension, index build/update time, metadata filtering, hosting model (managed vs self-host), and whether I can just use pgvector in an existing Postgres. For a small MVP almost anything works; pick something light with a future." That's precisely the book's reasoning, and it applies directly to a RAG memory layer.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Filling Qdrant: <a href="ch04_rag_feature_pipeline.html">Ch.4 RAG feature pipeline</a>; querying it: <a href="ch09_rag_inference_pipeline.html">Ch.9</a>. Vector search basics: <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering ch.6</a>.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · SECTION</div><h2>Preparing for AWS: why AWS at all</h2></div><span class="chip">pdf p77</span></div>
+  <p>The last part of the chapter covers setting up an <b>AWS account</b> (if you don't have one), an <b>AWS access key</b> and the <b>CLI</b>, and then what <b>SageMaker</b> is and why the book uses it.</p>
+  <p><b>Why AWS?</b> Because it is the <b>most popular</b> cloud and the one the authors have the <b>most experience</b> with. They are honest that <b>GCP</b> and <b>Azure</b> offer similar services; the real choice is always a <b>trade-off between development time (what you know best), features and cost</b>. For this MVP, AWS fits because it has solid services for everything needed:</p>
+  <div class="grid2">
+    <div class="card"><b>S3</b><span>Object storage: where ZenML keeps artifacts on the AWS stack.</span></div>
+    <div class="card"><b>ECR</b><span>Container registry: where pipeline Docker images are pushed.</span></div>
+    <div class="card"><b>SageMaker</b><span>Compute for training and inference (GPU clusters, real-time endpoints).</span></div>
+  </div>
+  <div class="fig">
+    <h3>Try it · weigh the cloud choice</h3>
+    <p class="small">The book's three-way trade-off. Move the weights for your own situation (scores are modelled, not the book's).</p>
+    <div class="controls">
+      <label>team experience <input type="range" id="cl_e" min="0" max="10" value="7"><output id="cl_eo"></output></label>
+      <label>features needed <input type="range" id="cl_f" min="0" max="10" value="5"><output id="cl_fo"></output></label>
+      <label>cost sensitivity <input type="range" id="cl_c" min="0" max="10" value="4"><output id="cl_co"></output></label>
+      <label>team knows <select id="cl_k"><option value="0" selected>AWS</option><option value="1">GCP</option><option value="2">Azure</option></select></label>
+    </div>
+    <div class="readout" id="cl_r"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Choosing a bank for a new business current account. SBI, HDFC and ICICI all offer the same basics; you usually pick the one whose app and branch you already know, unless fees or a special feature push you elsewhere. <i>Where it breaks:</i> switching banks is a form and a week; switching clouds after you've built on their services is months, which is why ZenML's stack abstraction (plate 07) matters.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The three services map one-to-one onto ZenML stack components: S3 = artifact store, ECR = container registry, SageMaker = orchestrator/compute. The same Python pipeline code runs locally on the default stack and on AWS by switching stacks.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why did you pick that cloud?" A mature answer names the trade-off: "Team expertise and speed first, then whether it has managed services for each need (object storage, container registry, GPU training and serving), then cost. The big three are close on features, so I'd avoid lock-in in the code where it's cheap to do so."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Stack components: <a href="#s7">07</a>. AWS deployment end to end: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a> and <a href="ch11_mlops_and_llmops.html">Ch.11</a>.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · SUB-SECTION</div><h2>Setting up an AWS account, an access key and the CLI</h2></div><span class="chip">pdf p77–79 · Fig 2.13</span></div>
+  <p>Because AWS often changes its UI, the book doesn't describe screens; it points to AWS's official guides. The flow:</p>
+  <ol class="plain">
+    <li><b>Create an AWS account</b> (AWS's "creating an account" guide). Then sign in at <code>console.aws.amazon.com</code> with <b>"Sign in using root user email"</b> (under the Sign in button), using the account's email and password.</li>
+    <li><b>Create an IAM user with administrative access.</b> To use AWS from code you need <b>access keys</b>, and the best way is to first create an <b>IAM</b> (Identity and Access Management) user, following AWS's setup tutorial.</li>
+    <li><b>Permissions.</b> For <b>production</b> accounts, best practice is <b>least privilege</b>: give each user only the permissions their role needs. To keep this <b>test account</b> simple, the book attaches the <b>AdministratorAccess</b> managed policy (full access).</li>
+    <li><b>Create an access key</b> for that IAM user (AWS's access-keys guide).</li>
+    <li><b>Install the AWS CLI</b> and run <code>aws configure</code> with the new keys.</li>
+    <li><b>Put the same values in the project's <code>.env</code></b>.</li>
+  </ol>
+  <figure class="bookfig"><img src="figs/fig-2-13.png" alt="IAM user Permissions tab with AdministratorAccess and IAMUserChangePassword policies" loading="lazy"><figcaption>Figure 2.13 (book, pdf p78): IAM user permission policies example</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The IAM user's <b>Permissions</b> tab (others: Groups, Tags (2), Security credentials, Last Accessed). "Permissions policies (2)": <b>AdministratorAccess</b>, type <i>AWS managed – job function</i>, and <b>IAMUserChangePassword</b>, type <i>AWS managed</i> (lets the user change their own console password). Both are <b>Attached via: Directly</b> (to the user, not through a group). Buttons on the right let you add or remove permissions.</p>
+  <h3>The access key</h3>
+  <p>An access key is a pair: an <b>access key ID</b> and a <b>secret access key</b>. Two warnings from the book:</p>
+  <ul class="plain">
+    <li><b>Store them somewhere safe</b> right away: you <b>can't view the secret again</b> after creating it.</li>
+    <li><b>Be careful who you share them with</b>: anyone who has them can access your AWS account and change its resources.</li>
+  </ul>
+  <h3>Configuring the CLI and the project</h3>
+  <p><code>aws configure</code> asks for the key ID, secret, default region and output format, and saves them as a <b>profile</b>. The book's example uses the <code>[default]</code> profile, region <b><code>eu-central-1</code></b> (Frankfurt) and <code>json</code> output. The resulting files look roughly like this (placeholders, not real keys):</p>
+  <pre class="code"><code># ~/.aws/credentials
+[default]
+aws_access_key_id = AKIA…EXAMPLE
+aws_secret_access_key = ••••••••
+
+# ~/.aws/config
+[default]
+region = eu-central-1
+output = json</code></pre>
+  <p>The project reads AWS settings from its <b><code>.env</code></b> file, with three variables: <code>AWS_REGION</code> (the book's default is <code>eu-central-1</code>; change it to yours), <code>AWS_ACCESS_KEY</code> and <code>AWS_SECRET_KEY</code>.</p>
+  <pre class="code"><code>AWS_REGION="ap-south-1"           # your region (book default: eu-central-1)
+AWS_ACCESS_KEY="&lt;your access key id&gt;"
+AWS_SECRET_KEY="&lt;your secret access key&gt;"</code></pre>
+  <div class="box beyond"><b>Beyond the book</b><p>In the AWS CLI, the default <code>aws configure</code> writes the keys to <code>~/.aws/credentials</code> and region/output to <code>~/.aws/config</code>; the book shows them together as one block. Also, many teams now prefer short-lived credentials (IAM Identity Center / SSO, or roles) over long-lived access keys; the book uses keys for simplicity on a test account.</p></div>
+
+  <div class="fig">
+    <h3>Step through · from root login to a working CLI</h3>
+    <div class="pipe" id="aw_stages">
+      <div class="stage"><b>root login</b>account email</div>
+      <div class="stage"><b>IAM user</b>+ policy</div>
+      <div class="stage"><b>access key</b>ID + secret</div>
+      <div class="stage"><b>aws configure</b>profile</div>
+      <div class="stage"><b>.env</b>project reads it</div>
+    </div>
+    <div class="caption" id="aw_cap"></div>
+    <div class="stepbar"><button id="aw_prev" type="button">◀ Back</button><button id="aw_next" type="button">Next ▶</button><span id="aw_n"></span></div>
+  </div>
+  <div class="fig">
+    <h3>Try it · least privilege vs AdministratorAccess</h3>
+    <div class="controls" id="lp_btns">
+      <button type="button" data-k="0">Pipeline needs to read/write S3</button>
+      <button type="button" data-k="1">Key leaked on GitHub</button>
+      <button type="button" data-k="2">Personal test account, learning</button>
+    </div>
+    <div class="verdict" id="lp_v">Pick a situation.</div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>The root account is the owner of a housing society with every key. An IAM user is a staff member with a key ring; AdministratorAccess gives the watchman a master key (fine while it's your own empty test flat, risky in a full building). The access key pair is like a UPI ID plus PIN: the ID can be seen, the PIN must stay secret and can't be shown again. <i>Where it breaks:</i> a stolen PIN costs one account's balance; a stolen admin key can spin up GPU machines that bill you thousands.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every AWS API call is signed with the secret key; AWS checks the signature, finds the IAM user, then evaluates the attached policies to allow or deny the action. The CLI and SDKs (like boto3) look for credentials in a fixed order (environment variables, then the config files, then roles), which is why both <code>aws configure</code> and the <code>.env</code> variables work.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you manage cloud credentials for an ML project?" Say: "Never use root for daily work; create IAM identities with least privilege per role or service; keep secrets out of git (a <code>.env</code> that's gitignored, or a secrets manager); prefer short-lived role credentials in production; rotate keys and alert on leaks." Mention the book's admin shortcut as acceptable only for a personal sandbox.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Settings loaded from <code>.env</code> in code: <a href="ch03_data_engineering.html">Ch.3</a>. SageMaker roles and deployment: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>.</li></ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · NOTE BOX</div><h2>An important note about AWS costs</h2></div><span class="chip">pdf p79</span></div>
+  <p>Every cloud service in the book stays within its <b>free (freemium) tier</b>, <b>except AWS</b>. So if you use a personal AWS account, <b>you pay</b> the AWS costs as you follow along. Some services may fall under the <b>AWS Free Tier</b>; others won't. You are responsible for checking your <b>billing console</b> regularly.</p>
+  <p>Most cost comes from <b>testing SageMaker for training and inference</b>. In the authors' tests, AWS costs ranged between <b>$50 and $100</b> using the book's and repo's specifications. They point to AWS's guide on <b>billing alarms</b> (CloudWatch alerts on estimated charges) to monitor spend.</p>
+  <div class="fig">
+    <h3>Try it · where AWS money goes (modelled prices)</h3>
+    <p class="small">Prices below are illustrative placeholders, not current AWS prices and not from the book. The point is the shape: GPU hours dominate, and an endpoint you forget to delete keeps billing.</p>
+    <div class="controls">
+      <label>training hours (multi-GPU) <input type="range" id="co_t" min="0" max="20" value="3"><output id="co_to"></output></label>
+      <label>endpoint left running (hours) <input type="range" id="co_e" min="0" max="168" step="4" value="8"><output id="co_eo"></output></label>
+      <label>S3 + ECR (GB) <input type="range" id="co_s" min="0" max="200" step="10" value="40"><output id="co_so"></output></label>
+    </div>
+    <div class="readout" id="co_r"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>An auto-rickshaw with the meter running while you go inside a shop. Training is the ride you wanted; a forgotten SageMaker endpoint is the meter ticking while you shop. A billing alarm is a friend who calls when the meter crosses ₹500. <i>Where it breaks:</i> the rickshaw driver will eventually leave; AWS will happily keep the meter running for a month.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>SageMaker training jobs bill per second of instance time while they run; real-time endpoints bill for every hour the instances exist, whether or not they get requests. Storage is cheap by comparison. CloudWatch billing alarms watch AWS's estimated-charges metric and notify you when it crosses a threshold.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you control GPU cloud costs?" Say: "Budgets and billing alarms from day one, tag resources per project, autoscale or scale-to-zero endpoints, delete idle endpoints, use spot instances for fault-tolerant training, and track cost per experiment alongside its metrics." That last point ties the experiment tracker to the bill.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Why SageMaker idles cost money: <a href="#s20">20</a>. Autoscaling endpoints: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>.</li></ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · SUB-SECTION</div><h2>SageMaker: training and inference compute</h2></div><span class="chip">pdf p79–80</span></div>
+  <p><b>SageMaker</b> is an ML platform for <b>training and deploying</b> ML models. AWS's own description, paraphrased: a <b>fully managed ML service</b> that lets developers and data scientists <b>build, train and deploy models at scale</b>, handling the underlying infrastructure so users can focus on building good models.</p>
+  <p>The book uses it for two things:</p>
+  <ol class="plain">
+    <li><b>Fine-tuning</b>: running and operationalising the <b>training pipeline on clusters of GPUs</b>.</li>
+    <li><b>Serving</b>: deploying the custom LLM Twin model as a <b>REST API</b> that can be called <b>in real time from anywhere in the world</b>.</li>
+  </ol>
+  <svg viewBox="0 0 640 170" class="dg" role="img" aria-label="SageMaker's two roles: GPU training job producing a model, and a real-time endpoint serving it" style="width:100%;height:auto;max-width:640px">
+    <rect x="10" y="20" width="150" height="48" rx="5" class="f"/><text x="85" y="40" text-anchor="middle" class="b">dataset</text><text x="85" y="57" text-anchor="middle" class="m">(ZenML artifact)</text>
+    <rect x="200" y="20" width="200" height="48" rx="5" class="hi"/><text x="300" y="40" text-anchor="middle" class="b">SageMaker training</text><text x="300" y="57" text-anchor="middle" class="m">GPU cluster</text>
+    <rect x="440" y="20" width="190" height="48" rx="5" class="f"/><text x="535" y="40" text-anchor="middle" class="b">fine-tuned LLM</text><text x="535" y="57" text-anchor="middle" class="m">→ Hugging Face registry</text>
+    <rect x="200" y="105" width="200" height="48" rx="5" class="hi"/><text x="300" y="125" text-anchor="middle" class="b">SageMaker endpoint</text><text x="300" y="142" text-anchor="middle" class="m">real-time REST API</text>
+    <rect x="10" y="105" width="150" height="48" rx="5" class="s"/><text x="85" y="133" text-anchor="middle">app / user</text>
+    <path d="M160 44 L200 44"/><path d="M400 44 L440 44"/><path d="M535 68 C535 110 450 129 400 129"/><path d="M160 129 L200 129"/>
+  </svg>
+  <div class="box picture"><b>Picture it</b><p>A fully serviced co-working space: you bring your laptop (model code), they provide desks, power, internet and cleaning (GPUs, networking, scaling). You also rent a reception desk (the endpoint) that answers visitors any time. <i>Where it breaks:</i> a co-working desk is cheap to keep; a reserved GPU "desk" is very expensive to leave empty.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A training job starts instances with your container, mounts the data, runs the script and saves the model, then shuts down. An endpoint keeps instances running behind an HTTPS API, loads the model into GPU memory, and routes requests to it. SageMaker handles provisioning, health checks and scaling policies; you choose instance types and code.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you serve a fine-tuned 8B model?" Say: "Package it with an inference server on a GPU instance behind a managed endpoint (e.g. SageMaker real-time endpoint), autoscale on load, and watch latency and cost; or a serverless API if a base model is enough." Then explain the trade-off in the next plate.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Training on SageMaker: <a href="ch05_supervised_fine_tuning.html">Ch.5</a>. Deploying the endpoint: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>. Inference speed-ups: <a href="ch08_inference_optimization.html">Ch.8</a>.</li></ul></div>
+</section>
+
+<!-- 20 -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · SUB-SECTION</div><h2>Why AWS SageMaker? (vs Bedrock, EKS and ECS)</h2></div><span class="chip">pdf p80–81</span></div>
+  <p>The authors explain why they chose SageMaker over simpler, cheaper options such as <b>Amazon Bedrock</b>.</p>
+  <h3>Amazon Bedrock</h3>
+  <ul class="plain">
+    <li>A <b>serverless</b> way to use LLMs: <b>no servers or infrastructure to manage</b>.</li>
+    <li>Gives <b>pre-trained models</b> that you call directly through an <b>API</b>. When the book was written it supported only <b>Mistral, Flan, Llama 2 and Llama 3</b>, which the authors call quite limited.</li>
+    <li>You send input and get predictions back without managing hardware or software. That cuts the complexity and time to add AI to an app, so it suits developers with <b>limited ML expertise</b>.</li>
+    <li>The price of that ease: <b>limited customisation</b>. You're restricted to Bedrock's pre-trained models and APIs.</li>
+    <li><b>Pricing</b> is simple: based on the <b>number of API calls</b>, which makes costs easy to estimate and control.</li>
+  </ul>
+  <h3>SageMaker</h3>
+  <ul class="plain">
+    <li>A <b>comprehensive platform</b> to build, train and deploy models; you can fully customise your ML processes or even use it for research.</li>
+    <li>So it's mostly used by data scientists and ML experts who can program, understand ML and are comfortable with AWS.</li>
+    <li>Costs are a "double-edged sword": <b>pay-as-you-go</b> like most AWS services. You pay for compute, storage and every other service you use.</li>
+    <li>Unlike Bedrock, <b>you pay for deployed resources even when the endpoint isn't used</b> (for example running EC2 instances). So you must design <b>autoscaling</b> that removes unused resources.</li>
+  </ul>
+  <p>In short: Bedrock is an <b>out-of-the-box</b> way to get an API endpoint backed by one of the available foundation models; SageMaker is a <b>multi-purpose platform</b> where you control the ML logic fully.</p>
+  <h3>The decision</h3>
+  <p>Bedrock would be great for <b>quick prototypes</b>. But this is a book about <b>LLM engineering</b>, and the goal is to dig into the engineering that Bedrock hides. So they chose SageMaker for its <b>customisability</b>, which lets them show all the engineering needed to deploy a model.</p>
+  <p>Even SageMaker isn't <i>fully</i> customisable. For complete control, use <b>EKS</b>, AWS's managed Kubernetes service (the book calls it "self-managed"): you get direct access to the virtual machines and can fully customise how pipelines are built, how they interact and how resources are managed. The book says the same is possible with <b>ECS</b>, which it calls "AWS's version of Kubernetes". With EKS or ECS you could also <b>reduce costs</b>, as these services cost considerably less.</p>
+  <div class="box beyond"><b>Beyond the book</b><p>Small corrections: <b>ECS</b> (Elastic Container Service) is AWS's <i>own</i> container orchestrator, not Kubernetes; <b>EKS</b> is the Kubernetes service, where AWS manages the control plane and you manage worker nodes. Also, Bedrock's model list has grown a lot since the book (and it now supports some fine-tuning and importing custom models), but the core trade-off the book describes still holds.</p></div>
+  <p><b>Conclusion:</b> SageMaker sits in the middle, between <b>complete control</b> and a <b>fully managed service</b> that hides the engineering. You get the control you need plus the convenience of a managed service.</p>
+
+  <div class="fig">
+    <h3>Try it · the control vs convenience spectrum</h3>
+    <div class="controls"><label>option <input type="range" id="sp_x" min="0" max="2" step="1" value="1"><output id="sp_xo"></output></label></div>
+    <svg viewBox="0 0 640 90" class="dg" role="img" aria-label="Spectrum from Bedrock (most managed) through SageMaker to EKS/ECS (most control)" style="width:100%;height:auto;max-width:640px">
+      <line x1="40" y1="45" x2="600" y2="45"/>
+      <text x="40" y="20" class="m">more managed, less control</text><text x="600" y="20" text-anchor="end" class="m">more control, more work</text>
+      <circle cx="80" cy="45" r="9" id="sp_c0"/><text x="80" y="75" text-anchor="middle">Bedrock</text>
+      <circle cx="320" cy="45" r="9" id="sp_c1"/><text x="320" y="75" text-anchor="middle">SageMaker</text>
+      <circle cx="560" cy="45" r="9" id="sp_c2"/><text x="560" y="75" text-anchor="middle">EKS / ECS</text>
+    </svg>
+    <div class="verdict" id="sp_v"></div>
+  </div>
+  <div class="fig">
+    <h3>Try it · per-call pricing vs always-on endpoint (modelled)</h3>
+    <p class="small">Illustrative numbers only: per-call API at a flat modelled price per request; a dedicated endpoint at a modelled hourly rate that bills even when idle.</p>
+    <div class="controls">
+      <label>requests per day <input type="range" id="bp_q" min="0" max="200000" step="1000" value="5000"><output id="bp_qo"></output></label>
+      <label>endpoint hours per day <input type="range" id="bp_h" min="0" max="24" value="24"><output id="bp_ho"></output></label>
+    </div>
+    <div class="readout" id="bp_r"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Three ways to get lunch at work. <b>Bedrock</b> is ordering from Swiggy: tap and eat, pay per order, but only from the menu. <b>SageMaker</b> is a rented, equipped kitchen: cook anything, but rent is due even on days you don't cook. <b>EKS/ECS</b> is building your own kitchen: cheapest per meal at scale and fully yours, but you install the gas line, plumbing and chimney. <i>Where it breaks:</i> food choice is personal taste; here the "menu" limit is concrete: you can't serve your own fine-tuned TwinLlama on a fixed model list.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The difference is <b>who owns the idle capacity</b>. A serverless API spreads idle GPUs across many customers and charges per call. A dedicated endpoint reserves GPUs for you, so you pay for every hour, busy or not, which is why autoscaling (including scaling down) is essential. Self-managed clusters remove the managed-service markup but add operations work.</p></div>
+  <div class="box work"><b>Worked example · when each wins (modelled)</b><p>With the default numbers above: 5,000 requests/day on a pay-per-call API is cheap, while a 24-hour endpoint costs the same whether you get 5 or 50,000 requests. Push requests to ~150,000/day and the per-call bill overtakes the endpoint. Low or spiky traffic favours per-call; steady high traffic, or a custom model, favours a dedicated endpoint.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Managed LLM API or self-hosted model?" Say: "Managed API (Bedrock, OpenAI) for speed, low ops and spiky or low traffic, if the available models are good enough. Self-host (SageMaker endpoint, or Kubernetes for full control and lower unit cost) when you need a fine-tuned or custom model, data control, or steady high volume, and then you own autoscaling and idle cost." That's exactly the book's Bedrock → SageMaker → EKS ladder.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Deploying to SageMaker, autoscaling: <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>. Chip Huyen on build vs buy for models: <a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering ch.4</a>; inference cost: <a href="../ai_engineering/ch09_inference_optimization.html">ch.9</a>.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>Summary and key terms</h2></div><span class="chip">pdf p81</span></div>
+  <p>The book's own wrap-up, in plain words:</p>
+  <ul class="plain">
+    <li><b>Python:</b> install the right Python for the repo (pyenv, 3.11.8), create a virtual environment and install all dependencies with <b>Poetry</b>, and gather every command the app needs in a task runner, <b>Poe the Poet</b>.</li>
+    <li><b>MLOps tools:</b> a <b>model registry</b> to share models (Hugging Face), an <b>experiment tracker</b> to manage training experiments (Comet ML), an <b>orchestrator</b> to manage all ML pipelines and artifacts (ZenML), and <b>metadata</b> to manage files and datasets. (Plus <b>Opik</b> for prompt monitoring.)</li>
+    <li><b>Databases:</b> the kinds needed for the LLM Twin: NoSQL for raw data (<b>MongoDB</b>) and a vector DB for processed data (<b>Qdrant</b>).</li>
+    <li><b>AWS:</b> create an account, generate an access key and configure the AWS CLI for programmatic access, and understand <b>SageMaker</b> and why it was chosen over Bedrock and EKS/ECS.</li>
+  </ul>
+  <p><b>Next:</b> Chapter 3 starts the implementation with the <b>data collection ETL</b> that scrapes posts, articles and repositories from the internet and stores them in a <b>data warehouse</b> (MongoDB).</p>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning (plain words)</th></tr>
+    <tr><td>pyenv</td><td>Python version manager; picks a version per folder via <code>.python-version</code>.</td></tr>
+    <tr><td>Virtual environment</td><td>A per-project folder of installed packages, isolated from other projects and the global Python.</td></tr>
+    <tr><td>Dependency manager</td><td>Tool to specify, install, update and manage the libraries a project uses.</td></tr>
+    <tr><td>pyproject.toml</td><td>Project file at the repo root holding Poetry's dependency ranges and Poe tasks.</td></tr>
+    <tr><td>poetry.lock</td><td>Exact versions of every dependency and sub-dependency; makes installs identical.</td></tr>
+    <tr><td>Poe the Poet</td><td>Poetry plugin that runs named tasks from pyproject.toml (<code>poetry poe &lt;task&gt;</code>).</td></tr>
+    <tr><td>Model registry</td><td>Central store of models with metadata, versions and metrics; single source of truth; feeds CI/CD.</td></tr>
+    <tr><td>Orchestrator</td><td>Automates, schedules and coordinates pipelines in the right order, handling dependencies and failures.</td></tr>
+    <tr><td>Pipeline / step</td><td>In ZenML: <code>@pipeline</code> function that wires <code>@step</code> functions together.</td></tr>
+    <tr><td>DAG</td><td>Directed acyclic graph: one-way arrows, no loops; the shape of a pipeline run.</td></tr>
+    <tr><td>Stack (ZenML)</td><td>Pluggable infrastructure bundle: orchestrator/compute, artifact store, container registry.</td></tr>
+    <tr><td>Artifact</td><td>Any file produced in the ML lifecycle; versioned, shareable, with metadata.</td></tr>
+    <tr><td>Metadata</td><td>Facts attached to an artifact (size, split, counts) so you understand it without downloading it.</td></tr>
+    <tr><td>Materializer</td><td>ZenML component that serializes/deserializes a step output type.</td></tr>
+    <tr><td>Experiment tracker</td><td>Logs metrics, hyperparameters and system stats per training run to compare experiments.</td></tr>
+    <tr><td>Prompt monitoring / trace</td><td>Recording chained prompts and outputs as one grouped trace for debugging LLM apps.</td></tr>
+    <tr><td>NoSQL / vector DB</td><td>Flexible document store for raw data / store for embeddings with fast similarity search.</td></tr>
+    <tr><td>IAM, access key</td><td>AWS identity and permissions; key ID + secret for programmatic access.</td></tr>
+    <tr><td>Least privilege</td><td>Give each identity only the permissions it needs.</td></tr>
+    <tr><td>SageMaker / Bedrock / EKS / ECS</td><td>Managed ML platform / serverless model API / managed Kubernetes / AWS container service.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">named in the chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Tool / company</th><th>Role in the chapter</th></tr>
+    <tr><td>pyenv · Poetry 1.8.3 · Poe the Poet</td><td>Interpreter pinning, dependency + venv management, task runner.</td></tr>
+    <tr><td>venv · Conda · Pipenv · uv</td><td>Alternatives to Poetry (no dep mgmt / slower / Rust-fast replacement).</td></tr>
+    <tr><td>Makefile · Invoke · shell scripts</td><td>Alternatives to Poe the Poet.</td></tr>
+    <tr><td>Docker 27.1.1+</td><td>Runs ZenML, MongoDB and Qdrant locally with one Poe task.</td></tr>
+    <tr><td>Hugging Face (Hub, Spaces)</td><td>Model registry for TwinLlama-3.1-8B and -DPO; demo Spaces.</td></tr>
+    <tr><td>Unsloth</td><td>Fine-tuning framework that integrates with the Hugging Face model format.</td></tr>
+    <tr><td>ZenML</td><td>Orchestrator, artifacts, metadata, stacks; local server on 127.0.0.1:8237; cloud serverless in Ch.11.</td></tr>
+    <tr><td>Airflow · Prefect · Metaflow · Dagster · Argo Workflows · Kubeflow</td><td>Alternative orchestrators (last two for Kubernetes users).</td></tr>
+    <tr><td>Comet ML</td><td>Experiment tracker (free online); public LLM Twin training runs.</td></tr>
+    <tr><td>W&amp;B · MLflow · Neptune</td><td>Alternative trackers with mostly the same features.</td></tr>
+    <tr><td>Opik (by Comet)</td><td>Open-source prompt monitoring / tracing.</td></tr>
+    <tr><td>Langfuse · Galileo · LangSmith</td><td>Alternative prompt monitoring tools (open / closed / closed).</td></tr>
+    <tr><td>MongoDB</td><td>NoSQL store for raw crawled data; used by Novo Nordisk, Delivery Hero, Okta, Volvo.</td></tr>
+    <tr><td>Qdrant</td><td>Vector DB for processed data; used by X, Disney, Microsoft, Discord, Johnson &amp; Johnson.</td></tr>
+    <tr><td>Milvus · Redis · Weaviate · Pinecone · Chroma · pgvector</td><td>Alternative vector stores; Superlinked's Vector DB Comparison for details.</td></tr>
+    <tr><td>OpenAI</td><td>API token needed in <code>.env</code> to run the project.</td></tr>
+    <tr><td>AWS S3 · ECR · SageMaker</td><td>Artifact storage, container registry, GPU training + real-time endpoints.</td></tr>
+    <tr><td>AWS IAM · CLI · CloudWatch billing alarms</td><td>Identity/keys, programmatic access, cost monitoring.</td></tr>
+    <tr><td>Amazon Bedrock · EKS · ECS</td><td>Rejected alternatives: too managed / more control, cheaper, more work.</td></tr>
+    <tr><td>GCP (Vertex AI, GCS) · Azure · Databricks</td><td>Other clouds/platforms named as equivalents or integrations.</td></tr>
+  </table></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Check yourself</h2></div><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. What are the three tools every Python project needs, according to the book?</summary><p>The Python interpreter, dependency management, and a task execution tool. In the book: Python 3.11.8 via pyenv, Poetry, and Poe the Poet.</p></details>
+  <details class="ans"><summary>2. How does pyenv know to use 3.11.8 inside the repo but not elsewhere?</summary><p>The repo has a <code>.python-version</code> file (created once with <code>pyenv local 3.11.8</code>). pyenv reads it whenever you're in that folder; elsewhere it falls back to the global version.</p></details>
+  <details class="ans"><summary>3. pyproject.toml says requests = "^2.25.1". What does poetry.lock add?</summary><p>The exact installed version (e.g. 2.25.1) and the exact versions of all sub-dependencies, so every install is identical and "works on my machine" problems drop.</p></details>
+  <details class="ans"><summary>4. What happens if Project A (numpy 1.19.5) and Project B (numpy 1.26.0) share the global environment?</summary><p>Installing B overwrites A's numpy, breaking A. Separate virtual environments (Poetry creates one per project) avoid this.</p></details>
+  <details class="ans"><summary>5. Why did the authors choose Hugging Face as the model registry, not ZenML's or SageMaker's?</summary><p>Only for its ecosystem: easy sharing of the TwinLlama models with readers and integration with open-source LLM tools (Unsloth, SageMaker). The general rule is to pick the registry that integrates best with your tooling.</p></details>
+  <details class="ans"><summary>6. What is a ZenML stack, and what did the LLM Twin's AWS stack contain?</summary><p>A pluggable bundle of infrastructure ZenML runs on: orchestrator/compute, remote (artifact) storage, container registry. AWS stack: SageMaker, S3, ECR. The Python code has no S3/ECR specifics, so there's no vendor lock-in.</p></details>
+  <details class="ans"><summary>7. Why does step granularity matter when the pipeline runs in the cloud?</summary><p>Each step runs as a separate unit, possibly on a different machine, so every step boundary adds start-up and data-transfer cost; too coarse loses visibility and reuse.</p></details>
+  <details class="ans"><summary>8. Why did the authors put all logic in <code>llm_engineering</code> and keep ZenML code in <code>steps</code>/<code>pipelines</code>?</summary><p>To decouple app logic from the orchestrator: you could swap ZenML for another orchestrator, or reuse the logic in a REST API, by replacing only the ZenML layer.</p></details>
+  <details class="ans"><summary>9. A step returns a UUID and ZenML fails to save it. Why, and what did the authors do?</summary><p>Step outputs must be serializable to become artifacts, and UUIDs weren't natively supported. They extended ZenML's materializer to handle UUIDs (and reported it to ZenML).</p></details>
+  <details class="ans"><summary>10. In Figure 2.9, test_split_size is 0.1 with 738 train and 82 test samples. Is that consistent?</summary><p>Yes: 82 / (738 + 82) = 82 / 820 = 0.1.</p></details>
+  <details class="ans"><summary>11. How do you crawl a new author's content without changing code?</summary><p>Add a new YAML config (user name + links) in <code>configs/</code> and run the ETL with <code>--etl-config-filename</code> pointing to it (wrapped in a Poe task). ZenML injects the parameters at runtime and records them with the run.</p></details>
+  <details class="ans"><summary>12. Why can't standard logging tools monitor prompts well?</summary><p>Prompts and outputs form chains (traces) where one prompt depends on earlier ones; plain text logs lose that structure. A specialised dashboard groups traces for debugging (Opik in the book).</p></details>
+  <details class="ans"><summary>13. What goes in MongoDB and what goes in Qdrant?</summary><p>MongoDB: raw data crawled from the internet (unstructured text, flexible schema). Qdrant: the same data after processing and transformation for GenAI use (embedded chunks for RAG).</p></details>
+  <details class="ans"><summary>14. What if you used AdministratorAccess in production and the key leaked?</summary><p>The attacker could do anything in the account (e.g. launch costly resources). The book uses it only to simplify a test account; production should follow least privilege, and the secret must be stored safely and never shared.</p></details>
+  <details class="ans"><summary>15. Interview: "Why SageMaker instead of Bedrock for the LLM Twin?"</summary><p>Bedrock is serverless and priced per API call but limited to its pre-trained models and hides the engineering. The book needs to deploy a custom fine-tuned model and teach the engineering, so it uses SageMaker: customisable and managed, though you pay for idle endpoints and must autoscale. EKS/ECS would give full control and lower cost but more work.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>References</h2></div><span class="chip">pdf p82–83</span></div>
+  <details><summary>The chapter's 13 references</summary>
+    <ol class="refs">
+      <li>Acsany, P. (2024). <i>Dependency Management With Python Poetry</i>. Real Python.</li>
+      <li>Comet.ml (n.d.). <i>comet-ml/opik: Open-source end-to-end LLM Development Platform</i>. GitHub.</li>
+      <li>Czakon, J. (2024). <i>ML Experiment Tracking: What It Is, Why It Matters, and How to Implement It</i>. neptune.ai.</li>
+      <li>Hopsworks (n.d.). <i>ML Artifacts (ML Assets)?</i></li>
+      <li><i>Introduction | Documentation | Poetry</i> (n.d.). python-poetry.org.</li>
+      <li>Jones, L. (2024). <i>Managing Multiple Python Versions With pyenv</i>. Real Python.</li>
+      <li>Kaewsanmua, K. (2024). <i>Best Machine Learning Workflow and Pipeline Orchestration Tools</i>. neptune.ai.</li>
+      <li>MongoDB (n.d.). <i>What is NoSQL? NoSQL databases explained</i>.</li>
+      <li>Nat-N (n.d.). <i>nat-n/poethepoet: A task runner that works well with poetry</i>. GitHub.</li>
+      <li>Oladele, S. (2024). <i>ML Model Registry: The Ultimate Guide</i>. neptune.ai.</li>
+      <li>Schwaber-Cohen, R. (n.d.). <i>What is a Vector Database &amp; How Does it Work?</i> Pinecone.</li>
+      <li><i>Starter guide | ZenML Documentation</i> (n.d.).</li>
+      <li><i>Vector DB Comparison</i> (n.d.). Superlinked.</li>
+    </ol>
+    <p class="small">The chapter's last page (pdf p83) is only an invitation to the book's Discord community (packt.link/llmeng).</p>
+  </details>
+</section>
+</div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function stepper(prefix, steps, onStep) {
+    var prev = $(prefix + "_prev"), next = $(prefix + "_next"), n = $(prefix + "_n"), cap = $(prefix + "_cap");
+    if (!prev || !next || !cap) return null;
+    var i = 0;
+    function show() {
+      cap.innerHTML = steps[i];
+      if (n) n.textContent = "step " + (i + 1) + " / " + steps.length;
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      if (onStep) onStep(i);
+    }
+    prev.addEventListener("click", function () { if (i > 0) { i--; show(); } });
+    next.addEventListener("click", function () { if (i < steps.length - 1) { i++; show(); } });
+    show();
+    return { refresh: show };
+  }
+  function lightStages(id, i) {
+    var box = $(id); if (!box) return;
+    var st = box.querySelectorAll(".stage");
+    for (var k = 0; k < st.length; k++) st[k].className = "stage" + (k < i ? " done" : (k === i ? " on" : ""));
+  }
+  function picker(btnsId, vId, answers) {
+    var box = $(btnsId), v = $(vId); if (!box || !v) return;
+    var btns = box.querySelectorAll("button");
+    for (var k = 0; k < btns.length; k++) {
+      btns[k].addEventListener("click", function (e) {
+        var b = e.currentTarget, a = answers[+b.getAttribute("data-k")];
+        for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", btns[j] === b);
+        v.className = "verdict " + (a[0] || "");
+        v.innerHTML = a[1];
+      });
+    }
+  }
+  // plate 1
+  stepper("c1", [
+    "<b>Python ecosystem.</b> Pin the interpreter (pyenv), isolate and lock the libraries (Poetry), give every command a short name (Poe the Poet).",
+    "<b>MLOps and LLMOps tools.</b> A place to share models (Hugging Face), a conductor for pipelines (ZenML), a lab notebook for training runs (Comet ML) and a trace viewer for prompts (Opik).",
+    "<b>Databases.</b> MongoDB holds the raw crawled documents; Qdrant holds the processed, embedded data for RAG. Both run in Docker locally.",
+    "<b>AWS.</b> An IAM user and access keys, the CLI configured with them, and SageMaker for GPU training and real-time model serving."
+  ], function (i) { lightStages("c1_stages", i); });
+  // plate 2
+  picker("py_btns", "py_v", [
+    ["warn", "No <code>.python-version</code> here or above → pyenv uses the <b>global</b> version (e.g. <code>system</code>, or 3.11.8 if you ran <code>pyenv global 3.11.8</code>)."],
+    ["good", "Found <code>.python-version</code> → <b>3.11.8</b>. This is the file the repo ships with."],
+    ["good", "No file in <code>steps/etl</code>, so pyenv looks in the parent folders and finds the repo root's file → <b>3.11.8</b>."],
+    ["warn", "This folder has its own file saying <b>3.9.18</b> (modelled). Two projects, two Pythons, no conflict: the whole point of pyenv."]
+  ]);
+  // plate 3: venv simulator
+  (function () {
+    var modeG = true, a = false, b = false;
+    var envs = $("ve_envs"), v = $("ve_v"), mb = $("ve_mode");
+    if (!envs) return;
+    function card(title, body) { return '<div class="card"><b>' + title + '</b><span>' + body + '</span></div>'; }
+    function draw() {
+      var html = "", msg = "", cls = "verdict";
+      if (modeG) {
+        var np = b ? "1.26.0" : (a ? "1.19.5" : "(none)");
+        html = card("Global site-packages", "numpy " + np);
+        html += card("Status", (a ? "Project A " + (np === "1.19.5" ? "works" : "<b>BROKEN</b> (needs 1.19.5)") : "A not installed") + "<br>" + (b ? "Project B works" : "B not installed"));
+        if (a && b) { cls += " bad"; msg = "B's install overwrote A's numpy in the single global environment. Project A is now broken."; }
+        else msg = "One shared environment: whatever was installed last wins.";
+      } else {
+        html = card("Project A venv", a ? "numpy 1.19.5 · works" : "(not installed)");
+        html += card("Project B venv", b ? "numpy 1.26.0 · works" : "(not installed)");
+        if (a && b) { cls += " good"; msg = "Each project has its own environment folder, so both numpy versions coexist. Nothing clashes."; }
+        else msg = "Poetry gives each project its own environment.";
+      }
+      envs.innerHTML = html; v.className = cls; v.innerHTML = msg;
+    }
+    mb.addEventListener("click", function () { modeG = !modeG; a = false; b = false; mb.textContent = "Mode: " + (modeG ? "global Python" : "Poetry venvs"); mb.classList.toggle("on", modeG); draw(); });
+    $("ve_a").addEventListener("click", function () { a = true; draw(); });
+    $("ve_b").addEventListener("click", function () { b = true; draw(); });
+    $("ve_reset").addEventListener("click", function () { a = false; b = false; draw(); });
+    draw();
+  })();
+  // plate 3: lock file
+  (function () {
+    var sel = $("lk_new"), chk = $("lk_on"), r = $("lk_r");
+    if (!sel || !chk || !r) return;
+    function upd() {
+      var got = chk.checked ? "2.25.1" : sel.value;
+      var same = got === "2.25.1";
+      r.innerHTML = "Range <code>^2.25.1</code> allows <b>&gt;=2.25.1, &lt;3.0.0</b>.<br>" +
+        "You installed: <b>2.25.1</b> · Teammate installs: <b>" + got + "</b> " +
+        (same ? '<span class="pill good">identical</span>' : '<span class="pill bad">different</span>') +
+        "<br>" + (chk.checked ? "The lock file pins the exact version (and its sub-dependencies), so the newer release is ignored until someone updates the lock on purpose." :
+        "Without a lock, the resolver picks the newest version allowed by the range" + (same ? " (nothing newer exists yet)." : ", plus whatever sub-dependencies that version wants. Different machines, different code."));
+    }
+    sel.addEventListener("change", upd); chk.addEventListener("change", upd); upd();
+  })();
+  // plate 4
+  stepper("in", [
+    "<b>pyenv.</b> <code>pyenv install 3.11.8</code>. The interpreter the book's code was tested on.",
+    "<b>Clone.</b> <code>git clone …LLM-Engineers-Handbook.git</code> then <code>cd</code> into it. The repo's <code>.python-version</code> makes pyenv switch to 3.11.8 there.",
+    "<b>Install.</b> <code>poetry install --without aws</code> creates the virtual environment and installs the exact versions in <code>poetry.lock</code>.",
+    "<b>Poe plugin.</b> <code>poetry self add 'poethepoet[poetry_plugin]'</code>. Now every project command is <code>poetry poe &lt;task&gt;</code>.",
+    "<b>.env.</b> Fill in credentials (e.g. OpenAI and Hugging Face tokens, later AWS keys) as the README explains. Only needed if you run the code."
+  ], function (i) { lightStages("in_stages", i); });
+  // plate 6
+  picker("rg_btns", "rg_v", [
+    ["good", "<b>Hugging Face.</b> The book's own reason: an ecosystem built for sharing open models, and every LLM tool (Unsloth, Transformers, SageMaker) reads its format."],
+    ["good", "<b>ZenML's model registry</b> is reasonable: it already knows every pipeline run and artifact, so lineage is free."],
+    ["warn", "<b>SageMaker's registry</b> fits a private, all-AWS setup. (Hugging Face also supports private repos; the rule is integration, not a single right answer.)"],
+    ["warn", "<b>Comet's registry</b> sits next to the experiments that produced each model. Fine if that's where the team already works."]
+  ]);
+  // plate 7: stack switcher
+  (function () {
+    var box = $("st_btns"); if (!box) return;
+    var S = [
+      ["local process", "local disk", "(none needed)", "The <b>default</b> stack runs pipelines on your machine; this is what the book's dashboard screenshots use."],
+      ["SageMaker", "S3 bucket", "ECR", "The book's <b>AWS stack</b>. Same Python code; ZenML builds a container, pushes it to ECR, runs steps on SageMaker and stores artifacts in S3."],
+      ["Vertex AI", "GCS bucket", "Docker / Artifact Registry", "A <b>GCP</b>-style stack (modelled). The book only says switching to GCS or Azure is easy because the code has no S3/ECR specifics."]
+    ];
+    var btns = box.querySelectorAll("button");
+    function set(k) {
+      $("st_o").textContent = S[k][0]; $("st_a").textContent = S[k][1]; $("st_c").textContent = S[k][2];
+      $("st_v").innerHTML = S[k][3];
+      for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === k);
+    }
+    for (var j = 0; j < btns.length; j++) btns[j].addEventListener("click", function (e) { set(+e.currentTarget.getAttribute("data-k")); });
+    set(0);
+  })();
+  // plate 8: DAG run
+  (function () {
+    var fail = false;
+    var ok = [
+      "<b>get_or_create_user</b> runs first: it has no upstream dependency. It logs a line and finishes in a fraction of a second.",
+      "Its return value is saved as the artifact <b>user</b> (a <code>UserDocument</code>). It's versioned and visible in the dashboard.",
+      "<b>crawl_links</b> waits for <code>user</code>, then crawls every link in the config for that user.",
+      "Its output <b>crawled_links</b> (a list) is saved with metadata: per domain, how many links were crawled and how many succeeded. Run status: <b>completed</b>."
+    ];
+    var bad = ok.slice(0, 2).concat([
+      "<b>crawl_links</b> raises an error (say, a site blocks the crawler). The orchestrator marks the step and the run <b>failed</b> (red ! in Figure 2.3), and keeps its logs.",
+      "<b>crawled_links</b> is never produced. Fix the bug and re-run; the <code>user</code> artifact already exists, so with caching that step could be skipped."
+    ]);
+    var steps = ok.slice();
+    var st = stepper("dg", steps, function (i) {
+      lightStages("dg_stages", i);
+      if (fail && i >= 2) { var s = $("dg_stages").querySelectorAll(".stage"); for (var k = 2; k <= i; k++) s[k].className = "stage off"; }
+    });
+    var fb = $("dg_fail");
+    if (fb && st) fb.addEventListener("click", function () {
+      fail = !fail; var src = fail ? bad : ok;
+      for (var k = 0; k < src.length; k++) steps[k] = src[k];
+      fb.textContent = fail ? "Make it succeed" : "Make crawl_links fail"; fb.classList.toggle("on", fail);
+      st.refresh();
+    });
+  })();
+  // plate 9
+  picker("dc_btns", "dc_v", [
+    ["good", "Edit <code>steps/</code> and <code>pipelines/</code> only (rewrite them as Airflow tasks/DAGs). <code>llm_engineering/</code> is untouched."],
+    ["good", "Add an API layer (e.g. a FastAPI app) that imports <code>llm_engineering</code> directly. No ZenML code needed, nothing else changes."],
+    ["warn", "Edit <code>llm_engineering/</code> only. Steps and pipelines just call it, so they keep working, and every runner (pipeline or API) gets the new behaviour."]
+  ]);
+  // plate 10: metadata builder
+  (function () {
+    var n = $("md_n"), t = $("md_t"), p = $("md_posts"), out = $("md_out");
+    if (!n || !t || !p || !out) return;
+    function upd() {
+      var N = +n.value, T = +t.value;
+      $("md_no").textContent = N; $("md_to").textContent = T.toFixed(2);
+      var cats = p.checked ? ["articles", "posts"] : ["articles"];
+      var share = p.checked ? [0.7, 0.3] : [1];
+      var tr = {}, te = {}, totalTe = 0;
+      for (var k = 0; k < cats.length; k++) {
+        var c = Math.round(N * share[k]); var tst = Math.round(c * T);
+        tr[cats[k]] = c - tst; te[cats[k]] = tst; totalTe += tst;
+      }
+      var kb = (N * 0.6015).toFixed(2);
+      out.textContent = JSON.stringify({
+        data_categories: cats, storage_size: kb + " KB (modelled)", test_split_size: T,
+        train_num_samples_per_category: tr, test_num_samples_per_category: te
+      }, null, 2);
+    }
+    n.addEventListener("input", upd); t.addEventListener("input", upd); p.addEventListener("change", upd); upd();
+  })();
+  // plate 11: configs
+  (function () {
+    var sel = $("cf_sel"), out = $("cf_out"); if (!sel || !out) return;
+    var who = [["maxime", "maxime_labonne", "Maxime Labonne"], ["paul", "paul_iusztin", "Paul Iusztin"], ["alex", "alex_vesa", "Alex Vesa"]];
+    function upd() {
+      var w = who[+sel.value];
+      var cmd = w[0] === "alex" ? "python -m tools.run --run-etl --no-cache --etl-config-filename digital_data_etl_" + w[1] + ".yaml" : "poetry poe run-digital-data-etl-" + w[0];
+      out.textContent = "$ " + cmd + "\n\n# ZenML reads configs/digital_data_etl_" + w[1] + ".yaml\nparameters:\n  user_full_name: " + w[2] + "\n  links: [ …this person's posts… ]\n\n# new run appears in the dashboard as\ndigital_data_etl_run_2024_09_26_15_38_51";
+    }
+    sel.addEventListener("change", upd); upd();
+  })();
+  // plate 12: experiment picker
+  (function () {
+    var runs = [
+      { name: "sft-lr1e-4", lr: "1e-4", epochs: 1, train: 0.62, ev: 0.735, sps: 0.31 },
+      { name: "sft-lr3e-4", lr: "3e-4", epochs: 3, train: 0.41, ev: 0.792, sps: 0.30 },
+      { name: "sft-lr5e-5-bs16", lr: "5e-5", epochs: 1, train: 0.70, ev: 0.712, sps: 0.22 }
+    ];
+    var tbl = $("ex_tbl"), rule = $("ex_rule"), v = $("ex_v");
+    if (!tbl || !rule || !v) return;
+    function upd() {
+      var key = rule.value, best = 0;
+      for (var k = 1; k < runs.length; k++) {
+        if (key === "eval" && runs[k].ev < runs[best].ev) best = k;
+        if (key === "train" && runs[k].train < runs[best].train) best = k;
+        if (key === "speed" && runs[k].sps > runs[best].sps) best = k;
+      }
+      var h = "<tr><th>run</th><th>lr</th><th>epochs</th><th>final train loss</th><th>eval_loss</th><th>steps/s</th></tr>";
+      for (var j = 0; j < runs.length; j++) {
+        var r = runs[j];
+        h += "<tr" + (j === best ? ' style="background:var(--tint)"' : "") + "><td>" + r.name + "</td><td class=\"num\">" + r.lr + "</td><td class=\"num\">" + r.epochs + "</td><td class=\"num\">" + r.train.toFixed(2) + "</td><td class=\"num\">" + r.ev.toFixed(3) + "</td><td class=\"num\">" + r.sps.toFixed(2) + "</td></tr>";
+      }
+      tbl.innerHTML = h;
+      var msg = {
+        eval: ["good", "<b>" + runs[best].name + "</b> wins on eval_loss: the metric that measures generalisation. This is the sensible choice."],
+        train: ["bad", "<b>" + runs[best].name + "</b> has the lowest train loss but the <i>worst</i> eval loss: 3 epochs at a high learning rate overfit. Promoting by train loss picks the wrong model."],
+        speed: ["warn", "<b>" + runs[best].name + "</b> is fastest, but speed alone says nothing about quality. Useful as a tie-breaker or for cost."]
+      }[key];
+      v.className = "verdict " + msg[0]; v.innerHTML = msg[1] + " (All numbers modelled.)";
+    }
+    rule.addEventListener("change", upd); upd();
+  })();
+  // plate 13: trace
+  stepper("tr", [
+    "<b>Trace starts</b> (trace ID t-81, modelled). Input: the user's request. Everything below is a child span of this trace.",
+    "<b>Span: query rewrite.</b> An LLM call turns the request into a better search query. Its <i>output</i> becomes the next step's <i>input</i>: the dependency plain logs lose.",
+    "<b>Span: retrieval.</b> Top-k chunks from the vector DB, with scores and latency. If the final answer is off-topic, this is often where it went wrong.",
+    "<b>Span: prompt build.</b> The template filled with the rewritten query and retrieved chunks. Seeing the <i>exact</i> final prompt is the most useful debugging view.",
+    "<b>Span: generation.</b> The LLM's answer, tokens and cost. The trace view shows the whole tree; you can click back to any parent to see what fed it."
+  ], function (i) { lightStages("tr_stages", i); });
+  // plate 14: mongo documents
+  (function () {
+    var box = $("mg_btns"), out = $("mg_out"); if (!box || !out) return;
+    var docs = [
+      { _id: "6f1c…", platform: "medium", author_id: "a-17", link: "https://medium.example/rag-in-prod", content: { title: "RAG in production", subtitle: "Lessons", body: "…" } },
+      { _id: "6f1d…", platform: "linkedin", author_id: "a-17", content: { text: "Shipped our voice agent today…", likes: 210 } },
+      { _id: "6f1e…", platform: "github", author_id: "a-17", name: "tiny-rag", link: "https://github.example/a17/tiny-rag", content: { "README.md": "…", "rag/index.py": "…" } }
+    ];
+    var btns = box.querySelectorAll("button");
+    for (var k = 0; k < btns.length; k++) btns[k].addEventListener("click", function (e) {
+      var i = +e.currentTarget.getAttribute("data-k");
+      for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === i);
+      out.textContent = "db.raw_documents.insertOne(\n" + JSON.stringify(docs[i], null, 2) + "\n)\n// different fields per item, same collection: fine for a document DB";
+    });
+  })();
+  // plate 15: crawl to vector
+  stepper("vq", [
+    "<b>Crawl.</b> The ETL fetches an article (say 2,400 words) from a blog.",
+    "<b>MongoDB.</b> Stored as one raw document: title, text, link, author, platform. Nothing is lost; it can be re-processed later.",
+    "<b>Clean + chunk.</b> The feature pipeline strips noise and splits the text into, say, 6 chunks of ~400 words.",
+    "<b>Embed.</b> Each chunk becomes a vector (e.g. 384 numbers) with an embedding model.",
+    "<b>Qdrant.</b> 6 points stored: vector + payload (chunk text, author, link). Indexed for fast nearest-neighbour search.",
+    "<b>Query.</b> \"How do I cut RAG latency?\" is embedded and Qdrant returns the 3 closest chunks (scores 0.82, 0.79, 0.71) for the prompt."
+  ], function (i) { lightStages("vq_stages", i); });
+  // plate 16: cloud weighing
+  (function () {
+    var e = $("cl_e"), f = $("cl_f"), c = $("cl_c"), k = $("cl_k"), r = $("cl_r");
+    if (!e || !f || !c || !k || !r) return;
+    var names = ["AWS", "GCP", "Azure"];
+    var feat = [9, 8, 8], cost = [6, 7, 6];   // modelled, roughly equal on purpose
+    function upd() {
+      $("cl_eo").textContent = e.value; $("cl_fo").textContent = f.value; $("cl_co").textContent = c.value;
+      var best = 0, sc = [], s = "";
+      for (var i = 0; i < 3; i++) {
+        var exp = (+k.value === i) ? 10 : 3;
+        sc[i] = (+e.value * exp + +f.value * feat[i] + +c.value * cost[i]);
+        if (sc[i] > sc[best]) best = i;
+      }
+      for (var j = 0; j < 3; j++) s += names[j] + ": <b>" + sc[j] + "</b>" + (j === best ? ' <span class="pill good">pick</span>' : "") + (j < 2 ? " · " : "");
+      r.innerHTML = s + "<br>Features and cost are scored nearly equal across clouds (as the book says, they offer similar services), so <b>team experience usually decides</b>. (Scores modelled.)";
+    }
+    [e, f, c].forEach(function (x) { x.addEventListener("input", upd); }); k.addEventListener("change", upd); upd();
+  })();
+  // plate 17
+  stepper("aw", [
+    "<b>Root login.</b> Create the account via AWS's guide, then sign in at console.aws.amazon.com with <i>Sign in using root user email</i>. Use root only for setup.",
+    "<b>IAM user.</b> Create a user and attach a policy. Book (test account): <b>AdministratorAccess</b>. Production: least privilege.",
+    "<b>Access key.</b> Generate an access key ID + secret for that user. Copy the secret now; it can't be shown again. Never share it.",
+    "<b>aws configure.</b> Enter key ID, secret, region (book: eu-central-1) and output (json). Saved as the <code>[default]</code> profile.",
+    "<b>.env.</b> Put <code>AWS_REGION</code>, <code>AWS_ACCESS_KEY</code>, <code>AWS_SECRET_KEY</code> in the project's .env so the code (ZenML, SageMaker calls) can use them."
+  ], function (i) { lightStages("aw_stages", i); });
+  picker("lp_btns", "lp_v", [
+    ["good", "<b>Least privilege:</b> a policy allowing only the needed S3 actions on that one bucket. If the key leaks, the damage is limited to that bucket."],
+    ["bad", "With <b>AdministratorAccess</b> the attacker can do anything (for example start expensive GPU instances). Deactivate the key immediately and check billing; least privilege would have limited the blast radius."],
+    ["warn", "The book's choice: <b>AdministratorAccess</b> keeps setup simple on a personal test account. Acceptable for learning, with billing alarms on, and never in production."]
+  ]);
+  // plate 18: cost
+  (function () {
+    var t = $("co_t"), e = $("co_e"), s = $("co_s"), r = $("co_r");
+    if (!t || !e || !s || !r) return;
+    function upd() {
+      $("co_to").textContent = t.value + " h"; $("co_eo").textContent = e.value + " h"; $("co_so").textContent = s.value + " GB";
+      var tr = +t.value * 6, ep = +e.value * 1.5, st = +s.value * 0.03, tot = tr + ep + st;
+      r.innerHTML = "training ≈ $" + tr.toFixed(0) + " · endpoint ≈ $" + ep.toFixed(0) + " · storage ≈ $" + st.toFixed(2) +
+        "<br>total ≈ <b>$" + tot.toFixed(0) + "</b> " + (tot <= 100 ? '<span class="pill good">within the book\'s $50–$100 range or below</span>' : '<span class="pill bad">above the book\'s $50–$100 range</span>') +
+        (+e.value >= 72 ? "<br>An endpoint left on for days is the classic surprise bill: delete it when you're done." : "") +
+        "<br><span class=\"small\">Modelled rates: $6/h multi-GPU training, $1.5/h endpoint, $0.03/GB-month storage.</span>";
+    }
+    [t, e, s].forEach(function (x) { x.addEventListener("input", upd); }); upd();
+  })();
+  // plate 20: spectrum
+  (function () {
+    var x = $("sp_x"), v = $("sp_v"); if (!x || !v) return;
+    var txt = [
+      ["warn", "<b>Bedrock.</b> Serverless, pay per API call, no infra. Limited to its pre-trained models (then: Mistral, Flan, Llama 2, Llama 3). Great for prototypes; hides the engineering the book wants to teach."],
+      ["good", "<b>SageMaker (book's pick).</b> Build, train, deploy any model with managed infrastructure. Pay-as-you-go, including idle endpoints, so autoscaling is your job. The balance of control and convenience."],
+      ["warn", "<b>EKS / ECS.</b> Direct access to the virtual machines and full control over pipelines and resources; considerably cheaper per the book. But you build and operate much more yourself."]
+    ];
+    function upd() {
+      var k = +x.value; $("sp_xo").textContent = ["Bedrock", "SageMaker", "EKS / ECS"][k];
+      for (var j = 0; j < 3; j++) { var c = $("sp_c" + j); if (c) c.style.fill = j === k ? "var(--c1)" : "var(--muted)"; }
+      v.className = "verdict " + txt[k][0]; v.innerHTML = txt[k][1];
+    }
+    x.addEventListener("input", upd); upd();
+  })();
+  // plate 20: pricing
+  (function () {
+    var q = $("bp_q"), h = $("bp_h"), r = $("bp_r"); if (!q || !h || !r) return;
+    function upd() {
+      $("bp_qo").textContent = (+q.value).toLocaleString(); $("bp_ho").textContent = h.value;
+      var api = +q.value * 0.0006, ep = +h.value * 3.6;
+      r.innerHTML = "per-call API ≈ <b>$" + api.toFixed(2) + "/day</b> · dedicated endpoint ≈ <b>$" + ep.toFixed(2) + "/day</b> " +
+        (api < ep ? '<span class="pill good">per-call cheaper</span>' : '<span class="pill warn">endpoint cheaper</span>') +
+        "<br><span class=\"small\">Modelled: $0.0006 per request, $3.60 per endpoint-hour. Break-even here ≈ " + Math.round(+h.value * 3.6 / 0.0006).toLocaleString() + " requests/day. Remember the endpoint can serve your own fine-tuned model; the per-call API can't (in the book's Bedrock).</span>";
+    }
+    q.addEventListener("input", upd); h.addEventListener("input", upd); upd();
+  })();
+})();
+</script>
+</body>
+</html>

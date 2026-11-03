@@ -1,0 +1,1721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Creating Embedding Models</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.10 Creating Text Embedding Models) ---- */
+.box.interview { background: var(--paper); border-left: 4px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+.box.interview q { font-style: italic; }
+.box.interview q::before, .box.interview q::after { content: ""; }
+.box.slip { background: var(--paper); border: 1px dashed var(--sell); }
+.box.slip > b { color: var(--sell); }
+pre.code .cm { color: var(--muted); }
+.codeexp { font-size: 15.5px; }
+.codeexp li { margin-bottom: 2px; }
+.scores { display: grid; gap: 6px; font-family: var(--mono); font-size: 13px; }
+.scores .srow { display: grid; grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) 3.4em; gap: 8px; align-items: center; }
+.scores .bar { height: 16px; border-radius: 3px; background: var(--c2); opacity: .85; }
+.scores .bar.best { background: var(--buy); }
+.scores .bar.base { background: var(--muted); }
+.scores .bar.alt { background: var(--c3); }
+.scores .lbl { overflow-wrap: anywhere; }
+.scores .v { text-align: right; font-weight: 600; }
+@media (max-width: 480px) { .scores .srow { grid-template-columns: minmax(0, 1fr) 3.2em; } .scores .bar { grid-column: 1 / -1; grid-row: 2; } }
+.mtx { overflow-x: auto; }
+.mtx table { width: auto; font-family: var(--mono); font-size: 12px; border-collapse: separate; border-spacing: 2px; }
+.mtx td, .mtx th { border: none; padding: 4px 6px; text-align: center; min-width: 46px; }
+.mtx th { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 400; }
+.mtx td.cell { border-radius: 3px; font-variant-numeric: tabular-nums; }
+.mtx td.diag { outline: 2px solid var(--buy); }
+.toks { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.toks span { border: 1px solid var(--rule); border-radius: 4px; padding: 2px 7px; background: var(--paper); }
+.toks span.del { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; opacity: .75; }
+.toks span.keep { background: var(--tint2); }
+.toks span.rec { background: var(--buy); color: var(--plate); border-color: var(--buy); }
+.toks span.sep { background: var(--tint); border-color: var(--c1); }
+.toks span.a { background: var(--sell); background: color-mix(in srgb, var(--sell) 22%, var(--plate)); }
+.toks span.b { background: color-mix(in srgb, var(--buy) 22%, var(--plate)); }
+.feat { display: flex; flex-wrap: wrap; gap: 5px; font-family: var(--mono); font-size: 13px; }
+.feat span { border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; background: var(--paper); }
+.feat span.shared { text-decoration: line-through; opacity: .45; }
+.feat span.dist { border-color: var(--buy); background: color-mix(in srgb, var(--buy) 16%, var(--plate)); font-weight: 600; }
+.plane { border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); overflow: hidden; }
+.plane svg { display: block; width: 100%; height: auto; }
+.plane .pt rect { stroke: var(--ink); stroke-width: 1; rx: 5; }
+.plane .pt text { font-size: 11px; }
+.plane .pos rect { fill: color-mix(in srgb, var(--buy) 25%, var(--plate)); }
+.plane .neg rect { fill: color-mix(in srgb, var(--sell) 25%, var(--plate)); }
+.plane .neu rect { fill: var(--paper); }
+.plane .pt { transition: transform .6s ease; }
+@media (prefers-reduced-motion: reduce) { .plane .pt { transition: none; } }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 15.5px; }
+.kv dt { font-family: var(--mono); font-size: 13px; color: var(--c2); padding-top: 2px; }
+.kv dd { margin: 0; }
+@media (max-width: 520px) { .kv { grid-template-columns: minmax(0, 1fr); } .kv dd { margin-bottom: 6px; } }
+.box.sidebar { background: var(--paper); border: 1px dashed var(--c2); }
+.box.sidebar > b { color: var(--c2); }
+.hl { background: var(--tint); border-radius: 3px; padding: 0 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch09_multimodal_llms.html">← Ch.9 Multimodal LLMs</a><a href="ch11_fine_tuning_for_classification.html">Ch.11 Fine-Tuning for Classification →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 10 · PDF p309–344</div>
+  <h1>Building your own <em>embedding model</em>: teaching a model what "similar" means</h1>
+  <p class="lede">This chapter opens Part III, where the book stops only <i>using</i> models and starts <b>training</b> them. An embedding model turns text into a vector so that texts that are "alike" end up close together, and the chapter shows that <i>you</i> decide what "alike" means by the examples you show it. The main tool is <b>contrastive learning</b>: show the model pairs that are similar and pairs that are not, and it learns what separates them. Using the <code>sentence-transformers</code> library (SBERT), the authors train a BERT model from scratch on 50,000 NLI (natural language inference) sentence pairs and watch the score climb as they swap losses: softmax loss 0.59, cosine similarity loss 0.72, multiple negatives ranking loss 0.81. Then they fine-tune an already-trained model (0.85), stretch a small labeled set with <b>Augmented SBERT</b> (0.71 with only 20% of the labels), and train with <b>no labels at all</b> using <b>TSDAE</b> (0.70), ending with how TSDAE helps adapt a model to a new domain.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is a chain of "here is how to build it → here is how to make it better → here is what to do when you have less data". Read the rows top to bottom; each orange box is the idea the next row reacts to.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 10">
+    <div class="row"><span class="tag">Goal</span><span class="node">text is hard to compute with</span><span class="arr">→</span><span class="node key">embedding model: text → vector</span><span class="arr">→</span><span class="node">close vectors = "similar" (meaning, or sentiment…)</span></div>
+    <div class="row"><span class="tag">Core idea</span><span class="node key">contrastive learning</span><span class="arr">→</span><span class="node">learn from similar vs dissimilar pairs</span><span class="arr">→</span><span class="node">"why P and not Q?"</span></div>
+    <div class="row"><span class="tag">Architecture</span><span class="node">cross-encoder: accurate, no embeddings, n² cost</span><span class="arr">→</span><span class="node key">bi-encoder (SBERT): fast, gives embeddings</span></div>
+    <div class="row"><span class="tag">Train</span><span class="node">NLI pairs (MNLI)</span><span class="arr">→</span><span class="node">BERT + softmax loss</span><span class="arr">→</span><span class="node">evaluate on STSB / MTEB</span><span class="arr">→</span><span class="node key">baseline 0.59</span></div>
+    <div class="row"><span class="tag">Better loss</span><span class="node">cosine similarity loss 0.72</span><span class="arr">→</span><span class="node key">MNR loss (in-batch negatives) 0.81</span><span class="arr">→</span><span class="node">hard negatives make it harder, and better</span></div>
+    <div class="row"><span class="tag">Less effort</span><span class="node key">fine-tune a pretrained model 0.85</span><span class="arr">→</span><span class="node">few labels? Augmented SBERT 0.71</span><span class="arr">→</span><span class="node">no labels? TSDAE 0.70</span></div>
+    <div class="row"><span class="tag">New domain</span><span class="node key">domain adaptation</span><span class="arr">→</span><span class="node">TSDAE/MLM on target domain</span><span class="arr">→</span><span class="node">then supervised fine-tuning</span></div>
+  </div>
+  <h3>The chapter's scoreboard (book's numbers, STSB pearson_cosine)</h3>
+  <div class="scores" id="scoreboard" role="img" aria-label="Bar chart of the STSB scores reported in the chapter">
+    <div class="srow"><span class="lbl">Softmax loss (plate 8)</span><div class="bar base" style="width:59.8%"></div><span class="v">0.598</span></div>
+    <div class="srow"><span class="lbl">Cosine sim. loss (plate 11)</span><div class="bar" style="width:72.2%"></div><span class="v">0.722</span></div>
+    <div class="srow"><span class="lbl">MNR loss (plate 12)</span><div class="bar" style="width:80.9%"></div><span class="v">0.809</span></div>
+    <div class="srow"><span class="lbl">Fine-tuned MiniLM (plate 15)</span><div class="bar best" style="width:85.1%"></div><span class="v">0.851</span></div>
+    <div class="srow"><span class="lbl">Augmented SBERT (plate 16)</span><div class="bar alt" style="width:71.0%"></div><span class="v">0.710</span></div>
+    <div class="srow"><span class="lbl">TSDAE, no labels (plate 18)</span><div class="bar alt" style="width:69.9%"></div><span class="v">0.699</span></div>
+  </div>
+  <p class="note">Bar length = score out of 1.0. All numbers are the book's printed evaluator outputs. Each run uses a different data setup, so compare with care (for example the fine-tuned MiniLM had already seen all of MNLI).</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s0"><span>00</span>Part III: training and fine-tuning</a>
+    <a href="#s1"><span>01</span>Chapter opening</a>
+    <a href="#s2"><span>02</span>Embedding models</a>
+    <a href="#s3"><span>03</span>What is contrastive learning?</a>
+    <a href="#s4"><span>04</span>SBERT: the cross-encoder problem</a>
+    <a href="#s5"><span>05</span>SBERT: the bi-encoder solution</a>
+    <a href="#s6"><span>06</span>Creating an embedding model</a>
+    <a href="#s7"><span>07</span>Generating contrastive examples</a>
+    <a href="#s8"><span>08</span>Train model</a>
+    <a href="#s9"><span>09</span>In-depth evaluation (MTEB)</a>
+    <a href="#s10"><span>10</span>Loss functions</a>
+    <a href="#s11"><span>11</span>Cosine similarity loss</a>
+    <a href="#s12"><span>12</span>Multiple negatives ranking loss</a>
+    <a href="#s13"><span>13</span>Easy, semi-hard and hard negatives</a>
+    <a href="#s14"><span>14</span>Fine-tuning an embedding model</a>
+    <a href="#s15"><span>15</span>Supervised fine-tuning</a>
+    <a href="#s16"><span>16</span>Augmented SBERT</a>
+    <a href="#s17"><span>17</span>Unsupervised learning</a>
+    <a href="#s18"><span>18</span>TSDAE</a>
+    <a href="#s19"><span>19</span>Using TSDAE for domain adaptation</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 0 -->
+<section class="plate" id="s0">
+  <div class="plate-head"><div><div class="secno">00 · PART III INTRODUCTION</div><h2>Part III: Training and Fine-Tuning Language Models</h2></div><span class="chip">pdf p309–310</span></div>
+  <p>Page 309 is only the part title, <b>"Part III: Training and Fine-Tuning Language Models"</b>, and page 310 is blank. There is no intro text. The title itself tells you the shift in the book:</p>
+  <ul class="plain">
+    <li><b>Part I</b> (Chapters 1–3) explained what language models are: tokens, embeddings, and what happens inside a Transformer.</li>
+    <li><b>Part II</b> (Chapters 4–9) <i>used</i> pretrained models as they are: classification, clustering, prompting, RAG (retrieval-augmented generation), multimodal models.</li>
+    <li><b>Part III</b> (Chapters 10–12) <i>changes the models' weights</i>: Chapter 10 creates and fine-tunes <b>embedding models</b>, Chapter 11 fine-tunes representation models (BERT-like) for <b>classification</b>, Chapter 12 fine-tunes <b>generation models</b> (GPT-like).</li>
+  </ul>
+  <svg viewBox="0 0 640 120" class="dg" role="img" aria-label="Book parts: understand, use, train" style="width:100%;height:auto;max-width:640px">
+    <rect x="10" y="30" width="190" height="60" rx="6" class="s"/><text x="105" y="56" text-anchor="middle" class="b">Part I · understand</text><text x="105" y="76" text-anchor="middle" class="m">Ch.1–3</text>
+    <rect x="225" y="30" width="190" height="60" rx="6" class="s"/><text x="320" y="56" text-anchor="middle" class="b">Part II · use as-is</text><text x="320" y="76" text-anchor="middle" class="m">Ch.4–9</text>
+    <rect x="440" y="30" width="190" height="60" rx="6" class="hi"/><text x="535" y="56" text-anchor="middle" class="b">Part III · train / fine-tune</text><text x="535" y="76" text-anchor="middle" class="m">Ch.10–12 ← you are here</text>
+    <line x1="200" y1="60" x2="225" y2="60"/><line x1="415" y1="60" x2="440" y2="60"/>
+  </svg>
+  <div class="box picture"><b>Picture it</b><p>Parts I and II were like learning to drive a hired cab: you learn how the car works, then you use it to go places. Part III is taking the car to a mechanic and tuning the engine for <i>your</i> roads. <i>Where it breaks:</i> tuning a model does not just make it faster; it changes what it "notices" (for embeddings: what counts as similar).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a> (where embeddings and word2vec were introduced), <a href="ch04_text_classification.html">Ch.4</a>, <a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a>, <a href="ch08_semantic_search_and_rag.html">Ch.8</a> (where embedding models were used as-is).</li><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a> and <a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: the rest of Part III.</li></ul></div>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Why build your own embedding model?</h2></div><span class="chip">pdf p311</span></div>
+  <p><b>Text embedding models</b> sit at the foundation of many powerful NLP (natural language processing) applications. They even power parts of already-impressive technologies like text generation models. The book has already used embedding models many times:</p>
+  <ul class="plain">
+    <li><b>supervised classification</b> (Chapter 4: embeddings + a classifier),</li>
+    <li><b>unsupervised classification</b> (Chapter 5: clustering and topic modeling),</li>
+    <li><b>semantic search</b> (Chapter 8),</li>
+    <li>and even <b>giving memory</b> to text generation models like ChatGPT (retrieving past or external text, Chapter 8's RAG).</li>
+  </ul>
+  <p>The authors say it is nearly impossible to overstate how important embedding models are, because they drive so many applications. So this chapter covers a variety of ways to <b>create</b> an embedding model and to <b>fine-tune</b> one, to increase its <b>representative and semantic power</b> (how well its vectors capture what a text means).</p>
+  <div class="box picture"><b>Picture it</b><p>An embedding model is like the sorting clerk at a big post office: every letter gets a PIN code, and letters with nearby PIN codes end up in the same bag. A good clerk gives nearby codes to letters that "belong together". This chapter is about training that clerk. <i>Where it breaks:</i> a PIN code is 6 digits; an embedding is hundreds of numbers, and "belonging together" can mean topic, sentiment, or question–answer, depending on training.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Why would you fine-tune an embedding model instead of just using OpenAI's or a public one?" <q>Off-the-shelf embedders define 'similar' the way their training data did. If my domain has its own jargon or my notion of a match is different (for example question → correct answer, not topic overlap), retrieval quality drops. Fine-tuning with contrastive pairs from my own data moves the right things closer, which directly improves recall in RAG.</q> In a RAG-memory product this is the lever after chunking and reranking.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 2: what "accurate" means for an embedding.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a> dense retrieval; <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6 RAG</a>; <a href="../llm_engineers_handbook/ch04_rag_feature_pipeline.html">LLM Engineer's Handbook Ch.4 RAG feature pipeline</a>.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · EMBEDDING MODELS</div><h2>Embedding models: turning text into vectors that mean something</h2></div><span class="chip">pdf p311–313 · Fig 10-1, 10-2, 10-3</span></div>
+  <p>Embeddings were already discussed in Chapters 4, 5 and 8. Before training one, the book recaps the basics.</p>
+  <p><b>Unstructured text</b> is hard to process directly. You cannot do arithmetic on it, plot it, or easily build actionable results from it. So you first convert it to <b>numeric representations</b>. This is called <b>embedding</b> the input, and the output vectors are called <b>embeddings</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-10-1.png" alt="Textual input goes into an embedding model, which outputs an embedding, a row of numbers" loading="lazy"><figcaption>Figure 10-1 (book, pdf p312): We use an embedding model to convert textual input, such as documents, sentences, and phrases, to numerical representations, called embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left: a block of text (a document, sentence or phrase). Middle: the <b>embedding model</b> box (the small axis icon is the book's symbol for "produces vectors"). Right: the embedding, drawn as a row of cells, each cell one number. Any text length goes in; one fixed-size row of numbers comes out.</p>
+  <p>The model that does this is typically an LLM, which the book calls an <b>embedding model</b>. Its main job: represent the text as <b>accurately</b> as possible as an embedding.</p>
+  <p>What does "accurate" mean? Usually we want to capture the <b>semantic nature</b>, the <b>meaning</b>, of a document. If we capture the core of what it communicates, we have captured what it is about. In practice: documents that are similar should get similar vectors, and documents about completely different things should get dissimilar vectors. This is <b>semantic similarity</b> (Figure 10-2).</p>
+  <figure class="bookfig"><img src="figs/fig-10-2.png" alt="A 2D grid with review sentences placed so that sentences on the same topic sit close together" loading="lazy"><figcaption>Figure 10-2 (book, pdf p312): The idea of semantic similarity is that we expect textual data with similar meanings to be closer to each other in n-dimensional space (two dimensions are illustrated here).</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Six product reviews are placed on a 2D grid. They pair up <b>by topic</b>: top right, the two vacuum-cleaner reviews ("This vacuum cleans efficiently", "The weak suction left dirt behind"); left, the two skin-care reviews ("This acne cream cleared my skin", "This horrible lotion aggravated my breakouts"); bottom right, the two delivery reviews ("My order was late", "Extremely fast shipping"). Notice each pair holds one <i>positive</i> and one <i>negative</i> review: here, topic wins and sentiment is ignored. The book stresses this is a simplified 2D picture; real embeddings live in <b>high-dimensional</b> spaces (hundreds of dimensions).</p>
+  <p>But an embedding model can be trained for <b>other purposes</b>. If you are building a <b>sentiment classifier</b>, you care more about sentiment than topic. You can fine-tune the model so documents are close <b>by sentiment</b> instead of by meaning (Figure 10-3).</p>
+  <figure class="bookfig"><img src="figs/fig-10-3.png" alt="The same reviews rearranged: positive reviews in green on the left, negative reviews in red on the right" loading="lazy"><figcaption>Figure 10-3 (book, pdf p313): In addition to semantic similarity, an embedding model can be trained to focus on sentiment similarity. In this figure, negative reviews (red) are close to one another and dissimilar to positive reviews (green).</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The same six reviews (two slightly shortened: "The suction left dirt behind", "It aggravated my breakouts"). Now all <b>green (positive)</b> ones sit in a column on the left (vacuum cleans efficiently, acne cream cleared my skin, extremely fast shipping) and all <b>red (negative)</b> ones on the right (suction left dirt, aggravated my breakouts, order was late). Same text, different training, different neighbours. Compare it with Figure 10-2 using the toggle below.</p>
+  <div class="fig">
+    <h3>Same reviews, two kinds of "similar"</h3>
+    <div class="controls"><span class="seg"><button id="m2_sem" type="button" class="on">Trained for meaning (Fig 10-2)</button><button id="m2_sen" type="button">Trained for sentiment (Fig 10-3)</button></span></div>
+    <div class="plane"><svg id="m2_svg" viewBox="0 0 640 300" role="img" aria-label="Six reviews that move between a topic layout and a sentiment layout"></svg></div>
+    <div class="caption" id="m2_cap"></div>
+    <p class="note">Positions follow the book's two figures roughly; the exact coordinates are drawn by hand.</p>
+  </div>
+  <p>Either way, an embedding model learns <b>what makes certain documents similar</b>, and <b>we can steer that</b>. Show it enough examples of semantically similar documents and it moves towards meaning; show it examples grouped by sentiment and it moves towards sentiment.</p>
+  <p>There are many ways to train, fine-tune and guide embedding models, but one of the strongest and most widely used is <b>contrastive learning</b> (next plate).</p>
+  <div class="box work"><b>Worked example · what "close" means in numbers</b>
+    <p>Say a toy model gives 3-number embeddings (modelled numbers): "acne cream cleared my skin" = (0.9, 0.1, 0.8), "lotion aggravated my breakouts" = (0.8, 0.2, −0.7), "extremely fast shipping" = (0.0, 0.9, 0.7). If dimension 1 ≈ "skin care", 2 ≈ "delivery", 3 ≈ "positive/negative", a meaning-trained model puts weight on dims 1–2, so the two skin reviews are close. A sentiment-trained model would make dim 3 dominate, so "acne cream" (+0.8) would sit next to "fast shipping" (+0.7). Real models don't have readable dimensions like this; the idea is that training decides which differences the distance pays attention to.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Think of a kirana shopkeeper arranging shelves. One shopkeeper groups by <i>category</i> (all soaps together, all dals together). Another groups by <i>price band</i> (everything under ₹50 on one shelf). Same products, different notion of "belongs together". The embedding model is the shelf arrangement; the training data is the shopkeeper's rule. <i>Where it breaks:</i> a shelf has one position per item, but an embedding space has hundreds of directions, so a good model can keep several notions of similarity at once, with one dominating the distance.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Distance in embedding space (usually cosine similarity) is the only thing downstream systems see. Search, clustering and classification all just ask "which vectors are near this one?". So whatever the training signal pushed together becomes "similar" for every application built on top. That is why the choice of training pairs matters more than any other knob in this chapter.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Is cosine similarity between embeddings a measure of meaning?" <q>Only of whatever the model was trained to treat as similar. A general model clusters by topic, so 'great vacuum' and 'terrible vacuum' can be neighbours. If I need sentiment or question–answer matching, I either pick a model trained for that or fine-tune with pairs that define it.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>: embeddings + classifier, and zero-shot classification by cosine similarity; <a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a>: clustering embeddings.</li><li>Plate 3: how to steer the model, contrastive learning. Plate 11: cosine similarity in detail.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · WHAT IS CONTRASTIVE LEARNING?</div><h2>Contrastive learning: learn "similar" by comparing</h2></div><span class="chip">pdf p313–315 · Fig 10-4, 10-5</span></div>
+  <p><b>Contrastive learning</b> is one major technique for both <b>training</b> and <b>fine-tuning</b> text embedding models. It trains the model so that <b>similar documents are closer</b> in vector space and <b>dissimilar documents are further apart</b>. This should sound familiar: it is very similar to the <b>word2vec</b> method from Chapter 2, and it is the idea already drawn in Figures 10-2 and 10-3.</p>
+  <p>The core belief: the best way to learn and model similarity/dissimilarity is to <b>feed the model examples of similar and dissimilar pairs</b>. To capture what a document means, it often needs to be <b>contrasted with another document</b>, so the model learns what makes them different or similar. This contrasting is powerful and relates to the <b>context</b> in which documents are written.</p>
+  <figure class="bookfig"><img src="figs/fig-10-4.png" alt="Document A and Document B both go into an embedding model whose output is similar or dissimilar" loading="lazy"><figcaption>Figure 10-4 (book, pdf p314): Contrastive learning aims to teach an embedding model whether documents are similar or dissimilar. It does so by presenting groups of documents to a model that are similar or dissimilar to a certain degree.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Input: two documents, A and B. They go through the same embedding model. Output: a judgement, "similar/dissimilar". The point is that the model is always trained on a <i>relation between documents</i>, never on one document alone. "To a certain degree" in the caption hints that the label can be a score, not only yes/no (plate 11).</p>
+  <h3>Contrastive explanation: "why P and not Q?"</h3>
+  <p>Another way to see it is through how <b>explanations</b> work. The book retells an anecdote: a reporter asks a robber "Why did you rob a bank?", and he answers "Because that is where the money is." (footnote 1, Alan Garfinkel, <i>Forms of Explanation</i>, 1982). Factually correct, but the reporter meant "why do you rob <i>at all</i>?", not "why banks specifically?". This is a <b>contrastive explanation</b>: understanding a case "Why P?" <b>in contrast to alternatives</b>, "Why P and not Q?" (footnote 2, Tim Miller, 2021). The question becomes clear once you give the alternative: "Why did you rob a bank (P) instead of obeying the law (Q)?"</p>
+  <p>Embeddings learn the same way. By seeing similar and dissimilar pairs, the model learns <b>what</b> makes things similar or dissimilar and, more importantly, <b>why</b>.</p>
+  <p>Example: you could teach a model what a dog is by letting it find features like "tail", "nose", "four legs". That is hard, because features are often not well defined and can be read in many ways. A being with a tail, a nose and four legs could also be a <b>cat</b>. To steer the model, you ask: <b>"Why is this a dog and not a cat?"</b> The contrast teaches the features that define the concept <i>and</i> the features that are not related. <b>We get more information when a question is framed as a contrast.</b></p>
+  <figure class="bookfig"><img src="figs/fig-10-5.png" alt="Why is this a horse: four legs, tail, fur, long manes, gallops, ear length. Why is this a horse and not a zebra: shared features crossed out, leaving long manes, ear length, no stripes" loading="lazy"><figcaption>Figure 10-5 (book, pdf p315): When we feed an embedding model different contrasts (degrees of similarity), it starts to learn what makes things different from one another and thereby the distinctive characteristics of concepts.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top row: "Why is this a <b>horse</b>?" lists six features: four legs, tail, fur, long manes, gallops, ear length. Bottom row: "Why is this a horse and not a <b>zebra</b>?" The features both animals share (four legs, tail, fur, gallops) are <b>struck through</b> because they don't help. What's left are the distinctive ones: long manes, ear length, and a new one that only appears through the contrast, <b>no stripes</b>. The contrast both removes noise and reveals a feature you would never list on its own.</p>
+  <div class="fig">
+    <h3>Try it: the contrast decides which features matter</h3>
+    <div class="controls"><label for="c3_q">Why is this a <b>horse</b> and not a… <select id="c3_q"><option value="none">(no contrast)</option><option value="zebra" selected>zebra</option><option value="dog">dog</option><option value="car">car</option></select></label></div>
+    <div class="feat" id="c3_feat"></div>
+    <div class="caption" id="c3_cap"></div>
+    <p class="note">Zebra row follows Figure 10-5. The dog and car rows are modelled examples, not from the book.</p>
+  </div>
+  <div class="box sidebar"><b>Book sidebar · word2vec was contrastive learning</b><p>One of the earliest and most popular examples of contrastive learning in NLP is <b>word2vec</b> (Chapters 1 and 2). It learns word representations by training on individual words in a sentence: a word <b>close to a target word</b> forms a <b>positive pair</b>, and <b>randomly sampled words</b> form <b>dissimilar pairs</b>. In other words, neighbouring words are contrasted with random non-neighbours. The book notes this is not widely known, but it was one of the first major NLP breakthroughs to use contrastive learning with neural networks.</p></div>
+  <p>There are many ways to apply contrastive learning to text embeddings, but the best-known technique and framework is <b>sentence-transformers</b> (next plate).</p>
+  <div class="box picture"><b>Picture it</b><p>A cricket coach teaching a new selector to spot a good fast bowler. Saying "he runs in, bowls, has a strong arm" describes every bowler, including spinners. Showing two bowlers side by side, "why is <i>this</i> one fast and <i>that</i> one not?", points straight at run-up speed and wrist position. <i>Where it breaks:</i> the selector can name the reason; the model never names features, it just moves vectors until the pairs separate.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Without contrast, a model can satisfy "make similar things close" trivially by putting <i>everything</i> close together (all vectors collapse to one point). Negatives (dissimilar examples) forbid that, so the model must find the dimensions that actually tell texts apart. Which negatives you show decides which differences it learns: zebras teach "stripes", dogs teach "hooves". That is the seed of the hard-negatives idea in plate 13.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Explain contrastive learning in one minute." <q>You train on pairs or triplets: an anchor, a positive that should be near it, and negatives that should be far. The loss pulls positives together and pushes negatives apart in vector space. Negatives are essential, otherwise the model collapses everything together. word2vec's negative sampling, SBERT, CLIP and most modern retrievers all use this.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: word2vec, skip-gram and negative sampling; <a href="ch09_multimodal_llms.html">Ch.9</a>: CLIP trains image/text embeddings contrastively.</li><li>Plates 12–13: negatives in practice (in-batch, hard negatives).</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · SBERT (1/2)</div><h2>The problem SBERT fixed: cross-encoders are slow and give no embeddings</h2></div><span class="chip">pdf p315–316 · Fig 10-6</span></div>
+  <p>There are many forms of contrastive learning, but the framework that made it popular in the NLP community is <b>sentence-transformers</b> (footnote 3: Reimers &amp; Gurevych, "Sentence-BERT", 2019). It fixes a major problem of the original BERT approach to sentence embeddings: <b>computational overhead</b>.</p>
+  <p>Before sentence-transformers, sentence similarity with BERT often used a <b>cross-encoder</b>. A cross-encoder passes <b>both sentences into the Transformer at the same time</b> and predicts how similar they are. It does this by adding a <b>classification head</b> on top of the original architecture that outputs a <b>similarity score</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-10-6.png" alt="Sentence A tokens My dog is cute, a SEP token, then sentence B tokens I have a dog, all fed into BERT, then a classifier, outputting a similarity between 0 and 1" loading="lazy"><figcaption>Figure 10-6 (book, pdf p316): The architecture of a cross-encoder. Both sentences are concatenated, separated with a &lt;SEP&gt; token, and fed to the model simultaneously.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: sentence A ("My dog is cute", red tokens) and sentence B ("I have a dog", green tokens) are glued into one sequence with a <b>&lt;SEP&gt;</b> (separator) token between them. All nine tokens go into a single <b>BERT</b>. On top sits a <b>Classifier</b> head, which outputs one number, <b>Similarity 0…1</b>. Note what is missing: there is no vector per sentence. Because both sentences are inside one forward pass, every token of A can attend to every token of B; that is why cross-encoders are accurate, and why you can't reuse any of the work for a third sentence.</p>
+  <p>The catch is cost. To find the most similar pair in a collection of <b>10,000 sentences</b>, a cross-encoder must score every pair: <b>n·(n−1)/2 = 49,995,000</b> inference computations. That is huge overhead. And a cross-encoder <b>generally does not generate embeddings</b>; it only outputs a score for the pair you gave it.</p>
+  <p>An obvious workaround: get embeddings from plain BERT by <b>averaging its output layer</b> or by using the <b>[CLS] token</b> (the special first token). But this has been shown to be <b>worse than simply averaging word vectors like GloVe</b> (footnote 4: Pennington, Socher &amp; Manning, 2014). Plain BERT was never trained to make its sentence vectors comparable.</p>
+  <div class="fig">
+    <h3>Calculator: how many model calls?</h3>
+    <div class="controls"><label for="n4">Sentences in the collection (n) <input id="n4" type="range" min="1" max="6" step="0.05" value="4"><output id="n4o">10,000</output></label><label for="ms4">ms per BERT call <input id="ms4" type="number" min="1" max="1000" value="10"></label></div>
+    <svg id="sv4" viewBox="0 0 640 130" class="dg" role="img" aria-label="Bar comparison of cross-encoder versus bi-encoder model calls" style="width:100%;height:auto"></svg>
+    <div class="readout" id="r4"></div>
+    <p class="note">Formula and the 10,000 → 49,995,000 example are the book's. The milliseconds per call (default 10 ms) and the resulting times are modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding matchmaker (cross-encoder) who must personally meet <i>both</i> families together for every possible pairing. Great judgement, but with 10,000 profiles that is ~50 million meetings. A biodata format (bi-encoder) lets you summarise each person <i>once</i> on one sheet; then comparing sheets is quick. <i>Where it breaks:</i> the matchmaker sees how two families interact; the sheets can't capture that, which is why cross-encoders stay more accurate.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The cost is in the Transformer forward pass. A cross-encoder needs one pass <i>per pair</i>, so the work grows with n². A model that produces one embedding per sentence needs one pass <i>per sentence</i> (grows with n), and comparing two vectors is a cheap dot product. For search over millions of documents, only the second shape is possible; the document vectors can even be computed ahead of time and stored in a vector database.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Cross-encoder vs bi-encoder?" <q>A cross-encoder reads query and document together and outputs a relevance score: most accurate, but one forward pass per pair and no reusable vectors. A bi-encoder embeds each text separately, so documents are pre-indexed and search is a nearest-neighbour lookup. In production you retrieve top-k with the bi-encoder, then rerank those few with a cross-encoder.</q> This is exactly the retrieve-then-rerank stage of a RAG memory service.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: rerankers are cross-encoders; dense retrieval uses bi-encoders.</li><li>Plate 16: Augmented SBERT uses the accurate cross-encoder to label data for the fast bi-encoder.</li><li><a href="../llm_engineers_handbook/ch09_rag_inference_pipeline.html">LLM Engineer's Handbook Ch.9</a>: reranking in a RAG inference pipeline.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SBERT (2/2)</div><h2>The bi-encoder: one BERT, two sentences, comparable vectors</h2></div><span class="chip">pdf p316–318 · Fig 10-7</span></div>
+  <p>The sentence-transformers authors wanted a method that is <b>fast</b> and creates embeddings that can be <b>compared semantically</b>. Their answer is an elegant alternative to the cross-encoder:</p>
+  <ul class="plain">
+    <li>The <b>classification head is dropped</b>.</li>
+    <li><b>Mean pooling</b> is applied to the final output layer: it <b>averages the token (word) embeddings</b> into one vector of fixed dimension. This guarantees a <b>fixed-size embedding</b> whatever the sentence length.</li>
+    <li>Training uses a <b>Siamese architecture</b>: two <b>identical BERT models</b> that share the <b>same weights</b> and architecture. Each gets one sentence; each produces a sentence embedding by pooling its token embeddings; the model is optimised through the <b>similarity of the two sentence embeddings</b>.</li>
+    <li>Because the weights are identical, in practice you use <b>one model</b> and feed it the sentences one after the other.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-10-7.png" alt="Sentence A My dog is cute and sentence B I have a dog each go through BERT with tied weights, giving token embeddings, pooled into sentence embeddings u and v, combined as u, v, absolute u minus v into a softmax" loading="lazy"><figcaption>Figure 10-7 (book, pdf p317): The architecture of the original sentence-transformers model, which leverages a Siamese network, also called a bi-encoder.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two columns, one per sentence. Each sentence goes into a BERT; the double arrow "<b>Tied weights</b>" says the two BERTs are the same model. Each BERT outputs a grid of <b>token embeddings</b> (one row per token). <b>Pooling</b> squashes the grid into one <b>sentence embedding</b>: <b style="color:var(--sell)">u</b> for A and <b style="color:var(--buy)">v</b> for B. At the bottom, the three pieces <b>(u, v, |u − v|)</b> are joined and sent to a <b>Softmax</b> classifier. That bottom box is only for training; at use time you keep u and v and compare them with cosine similarity.</p>
+  <p>Training is driven by <b>loss functions</b>, which can have a major impact on performance. In the original setup, the two sentence embeddings are <b>concatenated together with their difference</b> (u, v, |u−v|), and this combined vector is optimised through a <b>softmax classifier</b> (this is the "softmax loss" used in plate 8).</p>
+  <p>The result is called a <b>bi-encoder</b> or <b>SBERT</b> (sentence-BERT). A bi-encoder is fast and creates accurate sentence representations; <b>cross-encoders generally still perform better</b>, but they do not produce embeddings. Like the cross-encoder, the bi-encoder uses contrastive learning: by optimising the (dis)similarity between pairs of sentences, it eventually learns what makes sentences what they are.</p>
+  <p>To do contrastive learning you need <b>two things</b>: (1) <b>data</b> made of similar/dissimilar pairs, and (2) a definition of <b>how the model measures and optimises similarity</b> (the loss). Plates 7 and 10–13 cover each.</p>
+  <div class="box work"><b>Step through · one training example in the original SBERT</b>
+    <div class="stepbar"><button id="w5_prev" type="button">◀ Back</button><button id="w5_next" type="button">Next ▶</button><span id="w5_n"></span></div>
+    <div id="w5_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w5_cap"></div>
+    <p class="note">Vector sizes shrunk to 4 numbers and all values modelled; BERT-base really gives 768 numbers per token.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>Cross-encoder (Fig 10-6)</th><th>Bi-encoder / SBERT (Fig 10-7)</th></tr>
+    <tr><td>Input</td><td>Both sentences in one sequence, joined by &lt;SEP&gt;</td><td>Each sentence separately, same shared-weight model</td></tr>
+    <tr><td>Output</td><td>A similarity score for the pair</td><td>One fixed-size embedding per sentence</td></tr>
+    <tr><td>Head</td><td>Classification head</td><td>No classification head; mean pooling</td></tr>
+    <tr><td>Cost for n sentences, all pairs</td><td class="num">n·(n−1)/2 passes</td><td class="num">n passes + cheap vector maths</td></tr>
+    <tr><td>Quality</td><td>Generally better</td><td>Fast and accurate, slightly lower</td></tr>
+    <tr><td>Learns by</td><td colspan="2">Contrastive learning on (dis)similar pairs</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>Twins at an exam centre answering the same question paper: same brain (shared weights), different questions (sentences). The examiner grades how alike their answers are. After training, you don't need twins; one person can answer each paper in turn. <i>Where it breaks:</i> real twins differ; "tied weights" means there is literally one model, run twice.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Sharing weights forces both sentences into the <i>same</i> vector space, so u and v are directly comparable. Mean pooling gives every token a vote, so the vector summarises the whole sentence rather than depending on one special token. The |u − v| term hands the classifier the per-dimension differences, which makes it easy for training to push similar sentences towards small differences.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Why can't I just take BERT's [CLS] vector as a sentence embedding?" <q>Plain BERT was trained for masked-word prediction and next-sentence prediction, not for making sentence vectors comparable. Its [CLS] or averaged outputs did worse than averaged GloVe vectors on similarity. SBERT fixes that by fine-tuning BERT in a Siamese setup with a contrastive objective, so cosine similarity becomes meaningful.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a> and <a href="ch03_looking_inside_llms.html">Ch.3</a>: token embeddings from a Transformer.</li><li>Plate 8: training this exact softmax setup. Plate 18: TSDAE uses [CLS] pooling instead of mean pooling, and says why.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · CREATING AN EMBEDDING MODEL</div><h2>Creating an embedding model: the three jobs</h2></div><span class="chip">pdf p318</span></div>
+  <p>There are many ways to create an embedding model, but generally we look to <b>contrastive learning</b>, because it lets the model learn semantic representations efficiently. It is not free, though. You need to understand three things, which are the next three plates:</p>
+  <div class="grid2">
+    <div class="card"><b>1 · Generate contrastive examples</b><span>Where do similar / dissimilar pairs come from? (Plate 7: NLI data.)</span></div>
+    <div class="card"><b>2 · Train the model</b><span>Base model + loss + training arguments + trainer. (Plate 8, then better losses in plates 10–13.)</span></div>
+    <div class="card"><b>3 · Evaluate it properly</b><span>STSB for a quick score, MTEB for a full picture. (Plates 8–9.)</span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Opening a new tiffin service: you need ingredients (data), a recipe and stove (model + loss), and a tasting panel (evaluation). Skimp on any one and the food fails. <i>Where it breaks:</i> in cooking you taste as you go; here the "taste" is a benchmark that may not match your customers (plate 9).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a>: building training data; <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a>: evaluation methods, including embedding similarity.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · GENERATING CONTRASTIVE EXAMPLES</div><h2>Where the pairs come from: NLI datasets</h2></div><span class="chip">pdf p318–319 · Fig 10-8</span></div>
+  <p>When <b>pretraining</b> an embedding model you will often see data from <b>natural language inference (NLI)</b> datasets. NLI is the task of checking whether, for a given <b>premise</b>, a <b>hypothesis</b> is:</p>
+  <ul class="plain">
+    <li><b>entailment</b>: the premise implies the hypothesis,</li>
+    <li><b>contradiction</b>: the premise contradicts it,</li>
+    <li><b>neutral</b>: neither.</li>
+  </ul>
+  <p>Example: premise "He is in the cinema watching Coco" and hypothesis "He is watching Frozen at home" are a <b>contradiction</b>. Premise "He is in the cinema watching Coco" and hypothesis "In the movie theater he is watching the Disney movie Coco" are an <b>entailment</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-10-8.png" alt="Premise He is in the cinema watching Coco branches to an entailment hypothesis marked positive example and a contradiction hypothesis marked negative example" loading="lazy"><figcaption>Figure 10-8 (book, pdf p318): We can leverage the structure of NLI datasets to generate negative examples (contradiction) and positive examples (entailments) for contrastive learning.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> One premise (blue) on the left splits into two hypotheses. The green one ("In the movie theater, he is watching the Disney movie Coco") is an <b>entailment</b>, so the pair becomes a <b>positive example</b>. The red one ("He is watching Frozen at home") is a <b>contradiction</b>, so the pair becomes a <b>negative example</b>. NLI labels were made for a reasoning task, but read as "how alike are these two?" they are free contrastive data.</p>
+  <p>Look closely: entailment and contradiction describe <b>how similar two inputs are</b>. So NLI data can generate negatives (contradictions) and positives (entailments) for contrastive learning.</p>
+  <p>The data used throughout the chapter comes from the <b>GLUE</b> benchmark (General Language Understanding Evaluation), which has <b>nine language-understanding tasks</b> for evaluating and analysing models. One of them is the <b>MNLI</b> corpus (Multi-Genre Natural Language Inference): <b>392,702 sentence pairs</b> labeled entailment / neutral / contradiction. The book uses a <b>subset of 50,000 pairs</b> so the example doesn't need hours of training. Caveat from the book: <b>the smaller the dataset, the more unstable training or fine-tuning is</b>; if possible prefer larger datasets, as long as the data is still high quality.</p>
+<pre class="code"><code>from datasets import load_dataset
+
+<span class="cm"># Load MNLI dataset from GLUE</span>
+<span class="cm"># 0 = entailment, 1 = neutral, 2 = contradiction</span>
+train_dataset = load_dataset(
+    "glue", "mnli", split="train"
+).select(range(50_000))
+train_dataset = train_dataset.remove_columns("idx")</code></pre>
+  <ul class="plain codeexp">
+    <li><code>load_dataset("glue", "mnli", split="train")</code>: downloads the MNLI training split from the Hugging Face Hub.</li>
+    <li><code>.select(range(50_000))</code>: keeps only the first 50,000 rows to keep training short.</li>
+    <li><code>remove_columns("idx")</code>: drops the row-index column; the trainer should see only premise, hypothesis, label.</li>
+    <li>The label encoding to remember: <b>0 = entailment, 1 = neutral, 2 = contradiction</b>.</li>
+  </ul>
+<pre class="code"><code>dataset[2]
+{'premise': 'One of our number will carry out your instructions minutely.',
+ 'hypothesis': 'A member of my team will execute your orders with immense precision.',
+ 'label': 0}</code></pre>
+  <p>Label 0 = <b>entailment</b>: the two sentences are positively related with near-identical meaning, worded differently ("one of our number" ↔ "a member of my team", "minutely" ↔ "with immense precision"). That is exactly what a good embedding should place close together. <span class="note">(The book prints <code>dataset[2]</code>, though the variable defined is <code>train_dataset</code>.)</span></p>
+  <div class="fig">
+    <h3>Explore: an MNLI pair as contrastive data</h3>
+    <div class="controls"><span class="seg"><button type="button" class="on" data-p7="0">entailment</button><button type="button" data-p7="1">neutral</button><button type="button" data-p7="2">contradiction</button></span></div>
+    <div id="p7_box" class="verdict"></div>
+    <p class="note">Entailment and contradiction hypotheses come from the book's Coco example; the neutral one is modelled. The "as training data" mapping for cosine loss is the book's (plate 11).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A railway enquiry clerk checking statements against the chart: "Passenger is on the Rajdhani to Delhi" vs "Passenger is travelling to Delhi by train" (entailment: same fact), vs "Passenger is flying to Mumbai" (contradiction), vs "Passenger likes window seats" (neutral: the chart doesn't say). <i>Where it breaks:</i> neutral pairs can still share a topic, so treating "neutral" as "dissimilar" (as plate 11 does) is a simplification.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Humans who wrote MNLI were asked to write hypotheses that follow from, contradict, or are unrelated to a premise across many genres (hence "multi-genre"). Entailment pairs are paraphrase-like but differently worded, so they teach the model to ignore surface wording and match meaning. Contradictions often share many words with the premise, which makes them naturally "hard-ish" negatives.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "You have no labeled pairs for your retriever. Where do you get training data?" <q>Public NLI or paraphrase data for a general start; then mine my own: question–answer pairs, title–body, query–clicked document, or LLM-generated questions per chunk. Positives are usually easy; good negatives are the hard part.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11: turning these labels into 0/1 similarity scores; plate 12: keeping only entailments as (anchor, positive) pairs.</li><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: more fine-tuning with Hugging Face datasets.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · TRAIN MODEL</div><h2>Train model: BERT + softmax loss, from scratch (baseline 0.59)</h2></div><span class="chip">pdf p319–322</span></div>
+  <p>With the data ready, we need the model. Normally you pick an <b>existing sentence-transformers model</b> and fine-tune it, but here the book trains an embedding model <b>from scratch</b> (meaning: from a plain pretrained BERT that has never been trained for sentence embeddings). Two things to define:</p>
+  <p><b>First, a pretrained Transformer</b> to embed individual words. The book uses <b>BERT base (uncased)</b> as a good introductory model. Many others have been evaluated with sentence-transformers; most notably <b><code>microsoft/mpnet-base</code></b> often gives good results as the word-embedding model.</p>
+<pre class="code"><code>from sentence_transformers import SentenceTransformer
+
+<span class="cm"># Use a base model</span>
+embedding_model = SentenceTransformer('bert-base-uncased')</code></pre>
+  <p>Loading a plain BERT checkpoint into <code>SentenceTransformer</code> wraps it with a pooling layer so it outputs one vector per sentence.</p>
+  <div class="box sidebar"><b>Book note · freeze layers?</b><p>By default <b>all layers</b> of an LLM in sentence-transformers are <b>trainable</b>. You can freeze some layers, but the book advises against it: performance is usually better with all layers unfrozen.</p></div>
+  <p><b>Second, a loss function</b>. As in the first sentence-transformers models, the book uses <b>softmax loss</b> here for illustration, and upgrades it later. Softmax loss needs the number of labels explicitly (3: entailment, neutral, contradiction):</p>
+<pre class="code"><code>from sentence_transformers import losses
+
+<span class="cm"># Define the loss function. In softmax loss, we will also need to explicitly set the number of labels.</span>
+train_loss = losses.SoftmaxLoss(
+    model=embedding_model,
+    sentence_embedding_dimension=embedding_model.get_sentence_embedding_dimension(),
+    num_labels=3
+)</code></pre>
+  <ul class="plain codeexp">
+    <li><code>SoftmaxLoss</code> is the Figure 10-7 setup: build (u, v, |u−v|), put a small classifier on top, train with the 3 NLI labels.</li>
+    <li><code>sentence_embedding_dimension</code>: the classifier needs to know the vector size (768 for BERT-base) to build its input layer (3 × 768).</li>
+    <li><code>num_labels=3</code>: one output per NLI class.</li>
+  </ul>
+  <h3>The evaluator: STSB</h3>
+  <p>Before training, define an <b>evaluator</b>. It measures performance during training and also decides <b>which checkpoint is best to save</b>. The book uses the <b>Semantic Textual Similarity Benchmark (STSB)</b>: human-labeled sentence pairs with similarity scores <b>between 1 and 5</b>. The scores are rescaled to <b>0–1</b> by dividing by 5.</p>
+<pre class="code"><code>from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+
+<span class="cm"># Create an embedding similarity evaluator for STSB</span>
+val_sts = load_dataset("glue", "stsb", split="validation")
+evaluator = EmbeddingSimilarityEvaluator(
+    sentences1=val_sts["sentence1"],
+    sentences2=val_sts["sentence2"],
+    scores=[score/5 for score in val_sts["label"]],
+    main_similarity="cosine",
+)</code></pre>
+  <ul class="plain codeexp">
+    <li>The evaluator embeds every <code>sentence1</code> and <code>sentence2</code>, computes the similarity of each pair, and checks how well those similarities <b>correlate</b> with the human scores.</li>
+    <li><code>main_similarity="cosine"</code>: cosine similarity is the headline metric.</li>
+  </ul>
+  <h3>Training arguments</h3>
+  <p>Next, <code>SentenceTransformerTrainingArguments</code>, similar to training with Hugging Face Transformers (explored more in Chapter 11):</p>
+<pre class="code"><code>from sentence_transformers.training_args import SentenceTransformerTrainingArguments
+
+<span class="cm"># Define the training arguments</span>
+args = SentenceTransformerTrainingArguments(
+    output_dir="base_embedding_model",
+    num_train_epochs=1,
+    per_device_train_batch_size=32,
+    per_device_eval_batch_size=32,
+    warmup_steps=100,
+    fp16=True,
+    eval_steps=100,
+    logging_steps=100,
+)</code></pre>
+  <dl class="kv">
+    <dt>num_train_epochs</dt><dd>Number of training rounds over the data. Kept at <b>1</b> for speed; the book generally advises increasing it.</dd>
+    <dt>per_device_train_batch_size</dt><dd>Number of samples processed at the same time on each device (GPU or CPU) during <b>training</b>. Higher values generally mean faster training. <span class="note">(The book's text says "during evaluation" here, a copy-paste slip from the next item.)</span></dd>
+    <dt>per_device_eval_batch_size</dt><dd>Same, but during <b>evaluation</b>. Higher generally means faster evaluation.</dd>
+    <dt>warmup_steps</dt><dd>Number of steps during which the <b>learning rate rises linearly from zero</b> to the initial learning rate. The book notes no custom learning rate was set.</dd>
+    <dt>fp16</dt><dd>Enables <b>mixed precision training</b>: computations in 16-bit floating point (FP16) instead of the default 32-bit (FP32). Less memory, and potentially faster.</dd>
+    <dt>eval_steps / logging_steps</dt><dd>Evaluate and log every 100 steps (shown in the code; the book doesn't discuss them further).</dd>
+  </dl>
+  <div class="fig">
+    <h3>Calculator: what one epoch means here</h3>
+    <div class="controls"><label for="b8">batch size <select id="b8"><option>8</option><option>16</option><option selected>32</option><option>64</option><option>128</option></select></label><label for="w8">warmup steps <input id="w8" type="number" min="0" max="2000" value="100"></label></div>
+    <svg id="sv8" viewBox="0 0 640 150" class="dg" role="img" aria-label="Learning rate schedule with linear warmup" style="width:100%;height:auto"></svg>
+    <div class="readout" id="r8"></div>
+    <p class="note">Steps = 50,000 pairs ÷ batch size (book's data size). The warmup ramp is the book's description; what happens after warmup (drawn as a linear decay) is the usual Hugging Face default and is "Beyond the book".</p>
+  </div>
+  <h3>Train and evaluate</h3>
+<pre class="code"><code>from sentence_transformers.trainer import SentenceTransformerTrainer
+
+<span class="cm"># Train embedding model</span>
+trainer = SentenceTransformerTrainer(
+    model=embedding_model,
+    args=args,
+    train_dataset=train_dataset,
+    loss=train_loss,
+    evaluator=evaluator
+)
+trainer.train()
+
+<span class="cm"># Evaluate our trained model</span>
+evaluator(embedding_model)
+{'pearson_cosine': 0.5982288436666162,
+ 'spearman_cosine': 0.6026682018489217,
+ 'pearson_manhattan': 0.6100690915500567,
+ 'spearman_manhattan': 0.617732600131989,
+ 'pearson_euclidean': 0.6079280934202278,
+ 'spearman_euclidean': 0.6158926913905742,
+ 'pearson_dot': 0.38364924527804595,
+ 'spearman_dot': 0.37008497926991796,
+ 'pearson_max': 0.6100690915500567,
+ 'spearman_max': 0.617732600131989}</code></pre>
+  <p>The trainer ties together the four pieces: <b>data, model, loss, evaluator</b> (plus the arguments). The output gives several distance measures (cosine, Manhattan, Euclidean, dot product), each with a <b>Pearson</b> and a <b>Spearman</b> correlation. The one the book cares about is <b><code>pearson_cosine</code></b>, which it describes as the cosine similarity between centered vectors, "a value between 0 and 1 where a higher value indicates higher degrees of similarity". The model scores <b>0.59</b>, the <b>baseline</b> for the rest of the chapter.</p>
+  <div class="box beyond"><b>Beyond the book · what pearson_cosine really measures</b><p>Strictly, <code>pearson_cosine</code> is the <b>Pearson correlation</b> between (a) the model's cosine similarities for all STSB pairs and (b) the human scores. A correlation runs from −1 to 1 (1 = the model's similarities rise and fall exactly with the humans'). Spearman is the same idea using ranks only. So "0.59" means "moderately agrees with human judgement", not "59% similar".</p></div>
+  <p>The book adds a tip here (and repeats it word for word in plate 12): <b>larger batch sizes tend to work better with MNR loss</b>, because a larger batch makes the task harder: the model must find the best matching sentence among more candidates. It suggests trying different batch sizes to get a feel for the effect.</p>
+  <div class="box work"><b>Worked example · reading a correlation</b>
+    <p>Three STSB pairs, human scores 5, 3, 1 (÷5 → 1.0, 0.6, 0.2). Model A gives cosines 0.9, 0.7, 0.4: same order and roughly proportional, so Pearson is near 1. Model B gives 0.8, 0.85, 0.82: all nearly equal, ranking wrong, so Pearson is low even though every number is "high". Correlation rewards getting the <i>pattern</i> right, not big numbers. (Modelled numbers.)</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Training from bert-base-uncased is like hiring a fresh graduate who reads English very well but has never done the job of "judge if two sentences mean the same". One day of on-the-job training (1 epoch, 50k examples) and a short test (STSB) gives a first grade: 0.59. <i>Where it breaks:</i> a graduate generalises from a handful of cases; the model needs tens of thousands.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Softmax loss teaches the model to <i>classify</i> pairs into 3 classes using (u, v, |u−v|). Nothing in that objective directly says "make cosine similarity high for entailments". The model may learn vectors that a classifier can separate but whose cosine isn't the best similarity measure. That mismatch is why the next losses, which optimise cosine directly, do better.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "How do you evaluate an embedding model offline?" <q>For general similarity, Spearman or Pearson correlation between model cosine scores and human labels, like STSB. For retrieval, recall@k, MRR or nDCG on query → relevant-document pairs from my own traffic. Public benchmarks like MTEB help shortlist; my own labeled set decides.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 9: broader evaluation with MTEB. Plates 11–12: better losses on the same setup.</li><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: Hugging Face <code>TrainingArguments</code> and trainers in more depth; <a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: mixed precision and quantization.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · IN-DEPTH EVALUATION</div><h2>In-depth evaluation: the MTEB benchmark</h2></div><span class="chip">pdf p322–323</span></div>
+  <p>A good embedding model is <b>more than a good STSB score</b>. GLUE has several tasks, and many more benchmarks exist. To unify evaluation, the <b>Massive Text Embedding Benchmark (MTEB)</b> was built (footnote 5: Muennighoff et al., 2022). It spans <b>8 embedding tasks</b>, <b>58 datasets</b> and <b>112 languages</b>. A public <b>leaderboard</b> compares state-of-the-art embedding models across all tasks.</p>
+<pre class="code"><code>from mteb import MTEB
+
+<span class="cm"># Choose evaluation task</span>
+evaluation = MTEB(tasks=["Banking77Classification"])
+
+<span class="cm"># Calculate results</span>
+results = evaluation.run(model)
+{'Banking77Classification': {'mteb_version': '1.1.2',
+  'dataset_revision': '0fd18e25b25c072e09e0d92ab615fda904d66300',
+  'mteb_dataset_name': 'Banking77Classification',
+  'test': {'accuracy': 0.4926298701298701,
+   'f1': 0.49083335791288685,
+   'accuracy_stderr': 0.010217785746224237,
+   'f1_stderr': 0.010265814957074591,
+   'main_score': 0.4926298701298701,
+   'evaluation_time': 31.83}}}</code></pre>
+  <ul class="plain codeexp">
+    <li><code>MTEB(tasks=[...])</code>: pick one or more tasks by name; here <b>Banking77Classification</b> (classify banking customer messages into intents; the "77" is the number of intent classes, beyond the book).</li>
+    <li><code>evaluation.run(model)</code>: embeds the task's texts with your model and scores it.</li>
+    <li>Output: accuracy ≈ <b>0.49</b>, F1 ≈ 0.49, their standard errors, the <code>main_score</code> used on the leaderboard, and <b>evaluation_time</b> (31.83 seconds).</li>
+  </ul>
+  <p>The great thing about MTEB is not only the diversity of tasks and languages: it also records <b>evaluation time</b>. We typically want models that are both <b>accurate and low-latency</b>, because tasks like semantic search often need fast inference.</p>
+  <p>Testing on the entire MTEB can take <b>a couple of hours</b> depending on your GPU, so the chapter sticks to STSB for illustration.</p>
+  <div class="box sidebar"><b>Book tip · restart the notebook</b><p>When you finish training and evaluating a model, <b>restart the notebook</b>. This clears the GPU memory (<b>VRAM</b>, video RAM) for the next training example. The book repeats this reminder after each experiment.</p></div>
+  <div class="fig">
+    <h3>Picking a model: accuracy vs latency (modelled)</h3>
+    <div class="controls"><label for="lat9">Latency budget per query (ms) <input id="lat9" type="range" min="5" max="120" value="40"><output id="lat9o">40</output></label></div>
+    <div class="tablewrap"><table id="t9"></table></div>
+    <p class="note">Candidate models and all numbers are made up (modelled) to show the trade-off the book mentions; they are not MTEB results.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>STSB is a single unit test; MTEB is the full board exam across subjects (classification, clustering, retrieval…) and languages, with a timer on the desk. <i>Where it breaks:</i> topping the board exam doesn't mean you'll do well on <i>your</i> company's questions, so you still need your own test set.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "How would you choose an embedding model for production?" <q>Shortlist from the MTEB leaderboard on the task type I need (usually retrieval) and my languages, then filter by latency, vector size and cost, then run my own retrieval eval on real queries. A model a few points lower on MTEB but 5× faster often wins for realtime use.</q> For a realtime voice agent, embedding latency sits directly in the response path, so this trade-off is concrete.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: choosing models with public benchmarks and your own evals.</li><li><a href="ch04_text_classification.html">Ch.4</a>: classification with embeddings (what Banking77Classification measures).</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · LOSS FUNCTIONS</div><h2>Loss functions: the part that changes the score most</h2></div><span class="chip">pdf p323–324</span></div>
+  <p>Softmax loss was used to show how one of the first sentence-transformers models was trained. But there is a large variety of loss functions, and <b>softmax loss is generally not advised</b>: there are more performant options.</p>
+  <p>Rather than go through every loss, the book focuses on the two that are typically used and generally perform well:</p>
+  <ul class="plain">
+    <li><b>Cosine similarity loss</b> (plate 11)</li>
+    <li><b>Multiple negatives ranking (MNR) loss</b> (plate 12)</li>
+  </ul>
+  <div class="box sidebar"><b>Book note · other losses</b><p>There are many more losses. For example <b>MarginMSE</b> works great for training or fine-tuning a <b>cross-encoder</b>. The sentence-transformers framework implements a number of interesting loss functions.</p></div>
+  <div class="tablewrap"><table>
+    <tr><th>Loss</th><th>Data it wants</th><th>What it optimises</th><th>Book's STSB score</th></tr>
+    <tr><td>Softmax loss</td><td>Pairs + class label (3 NLI labels)</td><td>Classify (u, v, |u−v|) into the label</td><td class="num">0.59</td></tr>
+    <tr><td>Cosine similarity loss</td><td>Pairs + similarity score 0…1</td><td>Make cosine(u, v) match the score</td><td class="num">0.72</td></tr>
+    <tr><td>MNR loss</td><td>Positive pairs, or (anchor, positive, negative) triplets</td><td>Pick the right partner among all others in the batch</td><td class="num">0.81</td></tr>
+    <tr><td>MarginMSE</td><td colspan="3">Mentioned for cross-encoders; not trained in the chapter</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>Same student, same textbook, different exam format: an essay graded by category (softmax), a fill-in-the-score test (cosine), or a "pick the right answer out of 32" test (MNR). The format you train for shapes what you learn. <i>Where it breaks:</i> a student can study for all formats; a model just follows the gradient of whichever loss you choose.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 8 (softmax baseline), plates 11–12 (the two recommended losses).</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · COSINE SIMILARITY LOSS</div><h2>Cosine similarity loss: make the angle match the label (0.72)</h2></div><span class="chip">pdf p324–326 · Fig 10-9</span></div>
+  <p><b>Cosine similarity loss</b> is intuitive, easy to use, and works across many use cases and datasets. It is typically used for <b>semantic textual similarity</b> tasks, where each pair of texts has a similarity score to optimise towards.</p>
+  <p>Instead of strictly positive or negative pairs, we assume pairs that are similar or dissimilar <b>to a certain degree</b>. Typically the value lies <b>between 0 (dissimilar) and 1 (similar)</b> (Figure 10-9).</p>
+  <figure class="bookfig"><img src="figs/fig-10-9.png" alt="Three arrows from the origin: Sentence 1 in blue, a similar Sentence 2 in green at a small angle, a dissimilar Sentence 3 in red at a large angle, with the cosine similarity formula below" loading="lazy"><figcaption>Figure 10-9 (book, pdf p324): Cosine similarity loss aims to minimize the cosine distance between semantically similar sentences and to maximize the distance between semantically dissimilar sentences.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Each sentence is an arrow from the origin. Sentence<sub>1</sub> (blue) and the similar Sentence<sub>2</sub> (green) are separated by a small orange angle θ; the dissimilar Sentence<sub>3</sub> (red) is at a much larger grey angle. Below, the formula: cosine similarity(S<sub>1</sub>, S<sub>2</sub>) = (‖S<sub>1</sub>‖‖S<sub>2</sub>‖ × cos θ) / (‖S<sub>1</sub>‖‖S<sub>2</sub>‖). The lengths cancel, so it is just <b>cos θ</b>: only the <i>direction</i> of the arrows matters. Small angle → close to 1; right angle → 0. (The numerator is the dot product S<sub>1</sub>·S<sub>2</sub> written in its geometric form.)</p>
+  <p>The loss is straightforward: compute the <b>cosine similarity of the two embeddings</b> and <b>compare it with the labeled similarity score</b>. The model learns to recognise the <b>degree</b> of similarity between sentences.</p>
+  <div class="fig">
+    <h3>Try it: angle → cosine → loss</h3>
+    <div class="controls"><label for="a11">Angle between the two sentence vectors <input id="a11" type="range" min="0" max="180" value="40"><output id="a11o">40°</output></label><label for="l11">Label (gold similarity) <select id="l11"><option value="1" selected>1.0 (entailment)</option><option value="0">0.0 (neutral / contradiction)</option><option value="0.6">0.6 (STSB-style 3/5)</option></select></label></div>
+    <svg id="sv11" viewBox="0 0 640 220" class="dg" role="img" aria-label="Two vectors at an adjustable angle with cosine and loss readout" style="width:100%;height:auto"></svg>
+    <div class="readout" id="r11"></div>
+    <p class="note">Beyond the book: in sentence-transformers, <code>CosineSimilarityLoss</code> uses the squared error between cos(u, v) and the label by default; the book only says "compares". Arrows are 2D for display.</p>
+  </div>
+  <p>This loss works best with pairs labeled 0…1. To use it with NLI, the three labels must be converted. <b>Entailment</b> means high similarity, so it gets <b>1</b>. <b>Neutral</b> and <b>contradiction</b> both represent dissimilarity, so both get <b>0</b>:</p>
+<pre class="code"><code>from datasets import Dataset, load_dataset
+
+<span class="cm"># Load MNLI dataset from GLUE</span>
+<span class="cm"># 0 = entailment, 1 = neutral, 2 = contradiction</span>
+train_dataset = load_dataset(
+    "glue", "mnli", split="train"
+).select(range(50_000))
+train_dataset = train_dataset.remove_columns("idx")
+
+<span class="cm"># (neutral/contradiction)=0 and (entailment)=1</span>
+mapping = {2: 0, 1: 0, 0:1}
+train_dataset = Dataset.from_dict({
+    "sentence1": train_dataset["premise"],
+    "sentence2": train_dataset["hypothesis"],
+    "label": [float(mapping[label]) for label in train_dataset["label"]]
+})</code></pre>
+  <ul class="plain codeexp">
+    <li><code>mapping = {2: 0, 1: 0, 0: 1}</code>: contradiction→0, neutral→0, entailment→1.</li>
+    <li>Columns are renamed to <code>sentence1</code>, <code>sentence2</code>, <code>label</code>, and the label is made a <code>float</code>, because the loss compares it to a real-valued cosine.</li>
+  </ul>
+  <p>The evaluator is the same STSB <code>EmbeddingSimilarityEvaluator</code> as before. Training is identical except for two lines: a fresh <code>bert-base-uncased</code> and a different loss.</p>
+<pre class="code"><code><span class="cm"># Define model</span>
+embedding_model = SentenceTransformer("bert-base-uncased")
+
+<span class="cm"># Loss function</span>
+train_loss = losses.CosineSimilarityLoss(model=embedding_model)
+
+<span class="cm"># Define the training arguments</span>
+args = SentenceTransformerTrainingArguments(
+    output_dir="cosineloss_embedding_model",
+    num_train_epochs=1, per_device_train_batch_size=32, per_device_eval_batch_size=32,
+    warmup_steps=100, fp16=True, eval_steps=100, logging_steps=100,
+)
+<span class="cm"># Train model</span>
+trainer = SentenceTransformerTrainer(model=embedding_model, args=args,
+    train_dataset=train_dataset, loss=train_loss, evaluator=evaluator)
+trainer.train()
+
+evaluator(embedding_model)
+{'pearson_cosine': 0.7222322163831805,
+ 'spearman_cosine': 0.7250508271229599,
+ 'pearson_manhattan': 0.7338163436711481, 'spearman_manhattan': 0.7323479193408869,
+ 'pearson_euclidean': 0.7332716434966307, 'spearman_euclidean': 0.7316999722750905,
+ 'pearson_dot': 0.660366792336156, 'spearman_dot': 0.6624167554844425,
+ 'pearson_max': 0.7338163436711481, 'spearman_max': 0.7323479193408869}</code></pre>
+  <p class="note">(Arguments compacted onto fewer lines; values are exactly the book's.)</p>
+  <p>A Pearson cosine of <b>0.72</b> is a big improvement over softmax loss (<b>0.59</b>), showing how much the <b>loss function alone</b> affects performance. Same data, same base model, same settings. Then: restart the notebook before the next, "more common and performant" loss.</p>
+  <div class="box work"><b>Worked example · one batch of three pairs</b>
+    <p>Labels after mapping: (premise, entailment) → 1, (premise, neutral) → 0, (premise, contradiction) → 0. Suppose current cosines are 0.55, 0.60, 0.20 (modelled). Squared errors: (1−0.55)² = 0.20, (0−0.60)² = 0.36, (0−0.20)² = 0.04. The neutral pair is the biggest error, so most of this step's update pushes that pair apart, and the entailment pair together. After many steps, entailments drift to high cosine and the rest to low.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Tuning a tanpura: each string (pair) has a target pitch (label). You keep turning the peg (weights) until what you hear (cosine) matches the target. <i>Where it breaks:</i> all strings share the same pegs here, so fixing one pair moves all the others a little too.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Softmax loss trained a side classifier; cosine loss trains the very quantity you will use at query time, cos(u, v). Training and usage now line up, which is why scores jump. Its weakness is the labels: mapping neutral and contradiction both to 0 is coarse, and a regression target treats "0.6" pairs as precise when humans are noisy.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Why cosine and not Euclidean distance?" <q>Cosine looks only at direction, so it ignores vector length, which often reflects things like text length rather than meaning. For normalised vectors cosine, dot product and Euclidean give the same ranking anyway. Cosine similarity loss directly trains that score to match labeled similarity.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a> and <a href="ch08_semantic_search_and_rag.html">Ch.8</a>: cosine similarity in classification and search.</li><li>Plate 16: Augmented SBERT reuses this loss on gold + silver data.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · MULTIPLE NEGATIVES RANKING LOSS</div><h2>MNR loss: find your partner in the batch (0.81)</h2></div><span class="chip">pdf p326–329 · Fig 10-10</span></div>
+  <p><b>Multiple negatives ranking (MNR) loss</b> (footnote 6: Henderson et al., 2017), often called <b>InfoNCE</b> (footnote 7: van den Oord et al., 2018) or <b>NTXentLoss</b> (footnote 8: Chen et al., SimCLR, 2020), uses either <b>positive pairs</b> of sentences, or <b>triplets</b>: a positive pair plus an extra unrelated sentence. That unrelated sentence is called a <b>negative</b>; it represents dissimilarity from the positive sentences.</p>
+  <p>Typical positive pairs: <b>question/answer</b>, <b>image/image caption</b>, <b>paper title/paper abstract</b>. The great thing about these pairs is that we can be confident they are <b>hard positive pairs</b> (they truly belong together).</p>
+  <p>In MNR loss, <b>negative pairs are constructed by mixing a positive pair with another positive pair</b>. For paper titles and abstracts, a negative pair is a title combined with a completely different paper's abstract. These are called <b>in-batch negatives</b>, and they can also be used to build the triplets.</p>
+  <figure class="bookfig"><img src="figs/fig-10-10.png" alt="A question point, a related answer moving closer to it with a green arrow, and two unrelated answers moving away with red arrows" loading="lazy"><figcaption>Figure 10-10 (book, pdf p327): Multiple negatives ranking loss aims to minimize the distance between related pairs of text, such as questions and answers, and maximize the distance between unrelated pairs, such as questions and unrelated answers.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A 2D embedding space. The blue dot is the <b>question</b>. Faded circles show where answers start; solid circles show where training moves them. The <b>related answer</b> (green) moves up towards the question (green dashed arrow). The two <b>unrelated answers</b> (red) move away to the right (red dashed arrows). One loss does both pulls and pushes at the same time.</p>
+  <p>Once the positive and negative pairs exist, compute their embeddings and apply <b>cosine similarity</b>. The scores answer "is this pair positive or negative?". In other words, it is treated as a <b>classification task</b> and optimised with <b>cross-entropy loss</b>.</p>
+  <div class="fig">
+    <h3>Simulator: the in-batch similarity matrix</h3>
+    <p class="small">Rows are questions (anchors), columns are answers in the same batch. The green-outlined diagonal is each question's true answer; everything else in its row is an in-batch negative. MNR applies softmax across each row and asks for the diagonal to win.</p>
+    <div class="controls"><label for="bs12">Batch size <input id="bs12" type="range" min="2" max="8" value="4"><output id="bs12o">4</output></label><label for="tr12">Training progress <input id="tr12" type="range" min="0" max="100" value="0"><output id="tr12o">0%</output></label><button id="rs12" type="button">New batch</button></div>
+    <div class="mtx" id="m12"></div>
+    <div class="readout" id="r12"></div>
+    <p class="note">All similarities are modelled (random, then pulled towards a trained pattern as progress rises). Beyond the book: sentence-transformers multiplies cosines by a scale (default 20) before the softmax; the simulator does the same.</p>
+  </div>
+  <h3>Building the triplets from MNLI</h3>
+  <p>Start with an <b>anchor</b> sentence (the "premise"). From MNLI keep <b>only entailment pairs</b> (the hypothesis becomes the <b>positive</b>). For the <b>negative</b>, randomly sample a hypothesis from another row.</p>
+<pre class="code"><code>import random
+from tqdm import tqdm
+from datasets import Dataset, load_dataset
+
+<span class="cm"># # Load MNLI dataset from GLUE</span>
+mnli = load_dataset("glue", "mnli", split="train").select(range(50_000))
+mnli = mnli.remove_columns("idx")
+mnli = mnli.filter(lambda x: True if x["label"] == 0 else False)
+
+<span class="cm"># Prepare data and add a soft negative</span>
+train_dataset = {"anchor": [], "positive": [], "negative": []}
+soft_negatives = mnli["hypothesis"]
+random.shuffle(soft_negatives)
+for row, soft_negative in tqdm(zip(mnli, soft_negatives)):
+    train_dataset["anchor"].append(row["premise"])
+    train_dataset["positive"].append(row["hypothesis"])
+    train_dataset["negative"].append(soft_negative)
+train_dataset = Dataset.from_dict(train_dataset)</code></pre>
+  <ul class="plain codeexp">
+    <li><code>filter(... label == 0)</code>: keep only entailments. Rows drop from <b>50,000 to 16,875</b>.</li>
+    <li><code>soft_negatives</code>: all hypotheses, shuffled, so each anchor gets some random other row's hypothesis as a "soft" (easy) negative.</li>
+    <li>The dataset columns <code>anchor / positive / negative</code> are the triplet format MNR expects. Inside a batch, every other row's positive (and negative) also acts as an extra negative for free.</li>
+  </ul>
+<pre class="code"><code><span class="cm"># Define model</span>
+embedding_model = SentenceTransformer('bert-base-uncased')
+
+<span class="cm"># Loss function</span>
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+
+args = SentenceTransformerTrainingArguments(output_dir="mnrloss_embedding_model", ...)  <span class="cm"># same values as before</span>
+trainer = SentenceTransformerTrainer(model=embedding_model, args=args,
+    train_dataset=train_dataset, loss=train_loss, evaluator=evaluator)
+trainer.train()
+
+evaluator(embedding_model)
+{'pearson_cosine': 0.8093892326162132,
+ 'spearman_cosine': 0.8121064796503025,
+ 'pearson_manhattan': 0.8215001523827565, 'spearman_manhattan': 0.8172161486524246,
+ 'pearson_euclidean': 0.8210391407846718, 'spearman_euclidean': 0.8166537141010816,
+ 'pearson_dot': 0.7473360302629125, 'spearman_dot': 0.7345184137194012,
+ 'pearson_max': 0.8215001523827565, 'spearman_max': 0.8172161486524246}</code></pre>
+  <p class="note">("..." stands for the same arguments as plate 8: 1 epoch, batch 32, warmup 100, fp16, eval/logging every 100 steps. The book prints them in full.)</p>
+  <p>The book: "Compared to our previously trained model with softmax loss (0.72), our model with MNR loss (0.80) seems to be much more accurate!" The model scores about <b>0.81</b>, with only a third of the rows (16,875 entailment triplets instead of 50,000 pairs).</p>
+  <div class="box slip"><b>Small slip in the book</b><p>The 0.72 it compares against was the <b>cosine similarity loss</b> run; the softmax run scored 0.59. And the printed output is 0.809, which the text rounds down to 0.80.</p></div>
+  <div class="box sidebar"><b>Book tip (printed twice in the chapter) · batch size</b><p>Larger batch sizes tend to be better with MNR loss, because a larger batch makes the task <b>more difficult</b>: the model must find the best matching sentence from a larger set of candidates. Try different batch sizes to feel the effect. In the simulator above, raise the batch size and watch the chance-level probability (1 ÷ batch size) fall.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A school sports day "find your partner" game: 32 children each hold half of a torn card. Each child must pick their partner out of the whole group. With 4 children it's easy by luck; with 32 you really have to look at the tear. <i>Where it breaks:</i> the other children were picked at random, so most are obviously wrong (different colour card). That is the "easy negatives" problem of the next plate.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>For a batch of B (anchor, positive) pairs, the loss builds a B × B matrix of cosine similarities and runs a B-way softmax per row, with cross-entropy whose correct class is the diagonal. Every other positive in the batch is a free negative, so one batch of 32 gives each anchor 31 negatives (plus explicit ones from triplets) without extra labeling. Positive pairs are all it needs, which is why question/answer logs and title/body pairs are such good training data.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "What loss would you use to fine-tune a retriever on (query, relevant chunk) pairs?" <q>Multiple negatives ranking loss, also called InfoNCE: it only needs positive pairs and uses the rest of the batch as negatives, so I use the largest batch my GPU fits. Then I add mined hard negatives to make it learn finer distinctions.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch09_multimodal_llms.html">Ch.9</a>: CLIP uses the same in-batch contrastive idea on image/caption pairs.</li><li>Plate 13 (hard negatives), plate 15 (MNR on a pretrained model).</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · HARD NEGATIVES</div><h2>Easy, semi-hard and hard negatives</h2></div><span class="chip">pdf p329–330 · Fig 10-11</span></div>
+  <p>There is a downside to how MNR was used. The negatives were sampled from other pairs, so these <b>in-batch</b> or <b>"easy" negatives</b> may be completely unrelated to the question. That makes the model's job of finding the right answer <b>quite easy</b>.</p>
+  <p>We would rather have negatives that are <b>very related to the question but not the right answer</b>: <b>hard negatives</b>. They make the task harder, the model must learn more nuanced representations, and its performance <b>generally improves quite a bit</b>.</p>
+  <p>The book's example. Question: "How many people live in Amsterdam?" Correct answer: "Almost a million people live in Amsterdam." A good hard negative talks about Amsterdam <i>and</i> about how many people live in a city, but doesn't answer: "More than a million people live in Utrecht, which is more than Amsterdam."</p>
+  <figure class="bookfig"><img src="figs/fig-10-11.png" alt="Question How many people live in Amsterdam, answer Almost a million people live in Amsterdam, and three negatives: easy He was waiting in line for the bus, semi-hard The capital of the Netherlands is Amsterdam, hard A million people live in Utrecht which is more than in Amsterdam" loading="lazy"><figcaption>Figure 10-11 (book, pdf p330): An easy negative is typically unrelated to both the question and answer. A semi-hard negative has some similarities to the topic of the question and answer but is somewhat unrelated. A hard negative is very similar to the question but is generally the wrong answer.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: the question and its correct answer. Below, three negatives, getting darker red as they get harder. <b>Easy</b>: "He was waiting in line for the bus" (nothing in common). <b>Semi-hard</b>: "The capital of the <b>Netherlands</b> is Amsterdam" (same topic, Amsterdam, but not about population). <b>Hard</b>: "A <b>million people live</b> in Utrecht, which is more than in <b>Amsterdam</b>" (bold words overlap with the question and answer, yet it's the wrong answer). (The figure's wording differs slightly from the text's "More than a million…".)</p>
+  <p>Gathering negatives roughly falls into three processes:</p>
+  <dl class="kv">
+    <dt>Easy negatives</dt><dd>By <b>randomly sampling</b> documents, as done above.</dd>
+    <dt>Semi-hard negatives</dt><dd>Use a <b>pretrained embedding model</b>, compute cosine similarity over all sentence embeddings, and take highly related ones. This generally does <b>not</b> give hard negatives, because it finds <i>similar sentences</i>, not question/answer mismatches.</dd>
+    <dt>Hard negatives</dt><dd>Often need to be <b>manually labeled</b> (for instance starting from generated semi-hard negatives), or you can use a <b>generative model</b> to judge or to generate sentence pairs.</dd>
+  </dl>
+  <div class="fig">
+    <h3>Try it: how much does each negative teach?</h3>
+    <div class="controls"><span class="seg"><button type="button" data-n13="easy" class="on">easy</button><button type="button" data-n13="semi">semi-hard</button><button type="button" data-n13="hard">hard</button></span></div>
+    <div id="n13_box" style="display:grid;gap:8px;min-width:0"></div>
+    <p class="note">Sentences are the book's (Figure 10-11). The cosine values and the softmax probabilities are modelled for a half-trained model, to show why hard negatives give a bigger learning signal.</p>
+  </div>
+  <p>Then, as usual: restart the notebook before the fine-tuning section.</p>
+  <div class="box picture"><b>Picture it</b><p>Training a bank's fraud checker on fake signatures. A child's scribble (easy negative) teaches nothing; a different person's neat signature (semi-hard) teaches a bit; a skilled forgery of <i>this</i> customer's signature (hard negative) teaches the details that matter. <i>Where it breaks:</i> if your "forgery" is actually genuine (a mislabeled hard negative, i.e. a real answer), you teach the model to reject correct matches. Hard negatives must be checked.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Under softmax cross-entropy, a negative that already has a very low similarity gets almost zero probability and contributes almost no gradient. A hard negative sits close to the anchor, takes a big share of the probability, and so produces a large gradient that forces the model to find the subtle difference (population of <i>Amsterdam</i>, not Utrecht). That's why the same number of training rows with hard negatives teaches more.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "How do you mine hard negatives for a RAG retriever?" <q>Run the current retriever or BM25, take high-ranked chunks that are not the labeled answer, and optionally filter with a cross-encoder or an LLM judge to drop false negatives that actually answer the query. Mix them with in-batch negatives in MNR loss.</q> The false-negative filter is the part interviewers like to hear.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 16: a cross-encoder as a labeler; <a href="ch08_semantic_search_and_rag.html">Ch.8</a>: retrieval + reranking.</li><li><a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a>: AI-generated and AI-verified data.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · FINE-TUNING AN EMBEDDING MODEL</div><h2>Fine-tuning: start from a model that already knows the job</h2></div><span class="chip">pdf p331</span></div>
+  <p>The previous section trained an embedding model from scratch (from plain BERT) and used loss functions to optimise it. Powerful, but <b>creating an embedding model from scratch is costly and time-consuming</b>.</p>
+  <p>Instead, sentence-transformers lets <b>nearly all embedding models</b> serve as a base for fine-tuning. You pick a model already trained on a large amount of data and fine-tune it for <b>your specific data or purpose</b>.</p>
+  <p>There are several ways to fine-tune, depending on <b>data availability</b> and <b>domain</b>. The book shows two: <b>supervised</b> fine-tuning (plate 15) and <b>Augmented SBERT</b> (plate 16), then goes fully unsupervised (plates 17–19).</p>
+  <div class="fig">
+    <h3>Which path fits your data?</h3>
+    <div class="controls"><label for="d14">Labeled pairs you have <select id="d14"><option value="many">Many (tens of thousands+)</option><option value="few" selected>A few thousand</option><option value="none">None, only raw text</option></select></label><label for="dom14">Your domain vs general web text <select id="dom14"><option value="same">Similar</option><option value="diff">Very different (legal, medical, internal jargon)</option></select></label></div>
+    <div class="verdict" id="v14"></div>
+    <p class="note">A decision helper built from the chapter's advice; the thresholds are rough, not the book's.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Training from scratch is raising a cook from childhood; fine-tuning is hiring an experienced cook and teaching them your restaurant's menu in a week. <i>Where it breaks:</i> an experienced cook may have habits (a pretrained notion of similarity) that clash with yours; fine-tuning has to overwrite them with enough examples.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7</a>: when to fine-tune at all; <a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: fine-tuning for classification.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SUPERVISED</div><h2>Supervised fine-tuning of all-MiniLM-L6-v2 (0.85)</h2></div><span class="chip">pdf p331–333</span></div>
+  <p>The most straightforward way: repeat the training process exactly, but replace <code>'bert-base-uncased'</code> with a <b>pretrained sentence-transformers model</b>. Many exist; <b><code>all-MiniLM-L6-v2</code></b> generally performs well across many use cases and, being small, is <b>fast</b>.</p>
+  <p>The data is the same as in the MNR example. Load it and the STSB evaluator as always:</p>
+<pre class="code"><code>from datasets import load_dataset
+from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+
+<span class="cm"># Load MNLI dataset from GLUE</span>
+<span class="cm"># 0 = entailment, 1 = neutral, 2 = contradiction</span>
+train_dataset = load_dataset(
+    "glue", "mnli", split="train"
+).select(range(50_000))
+train_dataset = train_dataset.remove_columns("idx")
+
+<span class="cm"># Create an embedding similarity evaluator for stsb</span>
+val_sts = load_dataset("glue", "stsb", split="validation")
+evaluator = EmbeddingSimilarityEvaluator(
+    sentences1=val_sts["sentence1"], sentences2=val_sts["sentence2"],
+    scores=[score/5 for score in val_sts["label"]], main_similarity="cosine"
+)</code></pre>
+<pre class="code"><code><span class="cm"># Define model</span>
+embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+<span class="cm"># Loss function</span>
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+
+args = SentenceTransformerTrainingArguments(output_dir="finetuned_embedding_model", ...)  <span class="cm"># same values</span>
+trainer = SentenceTransformerTrainer(model=embedding_model, args=args,
+    train_dataset=train_dataset, loss=train_loss, evaluator=evaluator)
+trainer.train()
+
+evaluator(embedding_model)
+{'pearson_cosine': 0.8509553350510896,
+ 'spearman_cosine': 0.8484676559567688,
+ 'pearson_manhattan': 0.8503896832470704, 'spearman_manhattan': 0.8475760325664419,
+ 'pearson_euclidean': 0.8513115442079158, 'spearman_euclidean': 0.8484676559567688,
+ 'pearson_dot': 0.8489553386816947, 'spearman_dot': 0.8484676559567688,
+ 'pearson_max': 0.8513115442079158, 'spearman_max': 0.8484676559567688}</code></pre>
+  <ul class="plain codeexp">
+    <li>The only real change: the model name. Everything else (MNR loss, arguments, evaluator) is reused.</li>
+    <li>Notice <code>pearson_dot</code> (0.849) is now almost equal to <code>pearson_cosine</code>. Beyond the book: all-MiniLM-L6-v2 outputs normalised vectors, so dot product and cosine coincide; in the from-scratch BERT runs, dot was clearly worse.</li>
+    <li>Here <code>train_dataset</code> is the raw MNLI with premise/hypothesis/label columns, as the book prints it; the text says it is "the same data as … the MNR loss example".</li>
+  </ul>
+  <p><b>0.85</b> is the highest score so far. But the book is honest: the pretrained model was <b>already trained on the full MNLI dataset</b>, whereas we only used 50,000 examples. It may seem redundant; the example's point is to show <b>how</b> to fine-tune a pretrained embedding model on your own data.</p>
+  <div class="box sidebar"><b>Book sidebar · adapt BERT first with masked language modeling</b><p>Instead of a pretrained BERT like <code>'bert-base-uncased'</code> or a possibly <b>out-of-domain</b> model like <code>'all-mpnet-base-v2'</code>, you can first run <b>masked language modeling</b> (MLM: hide words and train the model to fill them in) on the pretrained BERT using <i>your</i> text, to adapt it to your domain. Then use that adapted BERT as the base for training your embedding model. This is a form of <b>domain adaptation</b> (plate 19). Chapter 11 applies MLM to a pretrained model.</p></div>
+  <p>The <b>main difficulty</b> of training or fine-tuning is <b>finding the right data</b>. You want very large datasets, and the data must be <b>high quality</b>. Making positive pairs is generally straightforward; adding <b>hard negative pairs</b> makes building quality data significantly harder.</p>
+  <p>Restart the notebook to free VRAM.</p>
+  <div class="box work"><b>Worked example · building pairs from your own product</b>
+    <p>A support-bot team has 8,000 resolved tickets. Positive pairs: (customer question, the help-centre article the agent linked). In-batch negatives come free from MNR. For hard negatives they take the article ranked #2 by the current retriever when it isn't the linked one. Starting from all-MiniLM-L6-v2 with MNR, this is exactly the plate 15 recipe with their own <code>anchor/positive/negative</code> columns. (Scenario modelled.)</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A trained Carnatic singer learning a new composition: they already have the voice (pretrained embeddings), they just need to practise this piece. A beginner (bert-base-uncased) needs voice training first. <i>Where it breaks:</i> the "new composition" here (MNLI) was one the singer had already performed, so the high score partly reflects memory.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A pretrained sentence-transformer already maps paraphrases close together, so fine-tuning only has to nudge the space towards your pairs instead of building it from nothing. That needs far fewer examples and steps. The risk is the opposite: if your data is narrow, heavy fine-tuning can make the model forget general similarity (beyond the book: often called catastrophic forgetting).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Your fine-tuned embedder scores 0.85, much better than baseline. Do you ship?" <q>First I check for leakage: was the base model already trained on that benchmark or my test data? Here all-MiniLM-L6-v2 had seen full MNLI. Then I evaluate on held-out data from my real queries and check general benchmarks didn't drop.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: masked language modeling to adapt BERT.</li><li>Plate 19: domain adaptation pipeline.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · AUGMENTED SBERT</div><h2>Augmented SBERT: let a cross-encoder label more data (0.71 with 20% of labels)</h2></div><span class="chip">pdf p333–337 · Fig 10-12</span></div>
+  <p>A disadvantage of training or fine-tuning embedding models: they need a lot of training data. Many are trained on <b>more than a billion sentence pairs</b>. For most use cases you can't extract that many; often only <b>a couple of thousand labeled data points</b> exist.</p>
+  <p>Luckily you can <b>augment</b> the data so a model can be fine-tuned with little labeled data. This is <b>Augmented SBERT</b> (footnote 9: Thakur et al., 2020). It uses the <b>slow but more accurate cross-encoder</b> (BERT) to label a larger set of input pairs, and those newly labeled pairs are then used to fine-tune a <b>bi-encoder</b> (SBERT). The four steps:</p>
+  <ol class="plain">
+    <li>Fine-tune a <b>cross-encoder</b> (BERT) on a small annotated dataset (the <b>gold dataset</b>).</li>
+    <li>Create <b>new sentence pairs</b>.</li>
+    <li>Label the new pairs with the fine-tuned cross-encoder (the <b>silver dataset</b>).</li>
+    <li>Train a <b>bi-encoder</b> (SBERT) on the extended dataset (<b>gold + silver</b>).</li>
+  </ol>
+  <p>A <b>gold dataset</b> is small but fully annotated and holds the <b>ground truth</b>. A <b>silver dataset</b> is also fully annotated, but <b>not necessarily ground truth</b>, because its labels are the cross-encoder's predictions.</p>
+  <figure class="bookfig"><img src="figs/fig-10-12.png" alt="Gold dataset trains a cross-encoder, which infers labels on an unlabeled dataset to make a machine-annotated silver dataset; gold and silver together train the bi-encoder" loading="lazy"><figcaption>Figure 10-12 (book, pdf p334): Augmented SBERT works through training a cross-encoder on a small gold dataset, then using that to label an unlabeled dataset to generate a larger silver dataset. Finally, both the gold and silver datasets are used to train the bi-encoder.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Follow the arrows left to right. The orange <b>Gold dataset (ground-truth)</b> → "Train" → <b>Cross-encoder</b>. The cross-encoder then runs "Infer" on the brown <b>Unlabeled dataset</b> (top), producing the grey <b>Silver dataset (machine-annotated)</b>. Silver → "Train" → <b>Bi-encoder</b>. The long line along the bottom shows the gold data <i>also</i> going into the bi-encoder's training. The slow, accurate model is a teacher; the fast model is the student that gets deployed.</p>
+  <div class="box work"><b>Step through · the book's run, with its numbers</b>
+    <div class="stepbar"><button id="w16_prev" type="button">◀ Back</button><button id="w16_next" type="button">Next ▶</button><span id="w16_n"></span></div>
+    <div id="w16_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w16_cap"></div>
+  </div>
+  <h3>Prepare the gold data (10,000 pairs)</h3>
+  <p>To simulate limited labels, take <b>10,000</b> pairs instead of 50,000. As with cosine loss: entailment → 1, neutral and contradiction → 0.</p>
+<pre class="code"><code>import pandas as pd
+from tqdm import tqdm
+from datasets import load_dataset, Dataset
+from sentence_transformers import InputExample
+from sentence_transformers.datasets import NoDuplicatesDataLoader
+
+<span class="cm"># Prepare a small set of 10000 documents for the cross-encoder</span>
+dataset = load_dataset("glue", "mnli", split="train").select(range(10_000))
+mapping = {2: 0, 1: 0, 0:1}
+
+<span class="cm"># Data loader</span>
+gold_examples = [
+    InputExample(texts=[row["premise"], row["hypothesis"]], label=mapping[row["label"]])
+    for row in tqdm(dataset)
+]
+gold_dataloader = NoDuplicatesDataLoader(gold_examples, batch_size=32)
+
+<span class="cm"># Pandas DataFrame for easier data handling</span>
+gold = pd.DataFrame(
+    {
+        "sentence1": dataset["premise"],
+        "sentence2": dataset["hypothesis"],
+        "label": [mapping[label] for label in dataset["label"]]
+    }
+)</code></pre>
+  <ul class="plain codeexp">
+    <li><code>InputExample(texts=[a, b], label=...)</code>: the older sentence-transformers format the <code>CrossEncoder.fit</code> API expects.</li>
+    <li><code>NoDuplicatesDataLoader</code>: a data loader that avoids putting the same sentence twice in a batch (beyond the book, from the class name/library docs).</li>
+    <li><code>gold</code> DataFrame: the same 10,000 pairs kept as a table so they can be concatenated with silver later. This is the gold dataset: labeled ground truth.</li>
+  </ul>
+  <h3>Step 1: train the cross-encoder on gold</h3>
+<pre class="code"><code>from sentence_transformers.cross_encoder import CrossEncoder
+
+<span class="cm"># Train a cross-encoder on the gold dataset</span>
+cross_encoder = CrossEncoder("bert-base-uncased", num_labels=2)
+cross_encoder.fit(
+    train_dataloader=gold_dataloader,
+    epochs=1,
+    show_progress_bar=True,
+    warmup_steps=100,
+    use_amp=False
+)</code></pre>
+  <ul class="plain codeexp">
+    <li><code>num_labels=2</code>: the cross-encoder classifies a pair as 0 (not similar) or 1 (similar).</li>
+    <li><code>use_amp=False</code>: no automatic mixed precision for this run.</li>
+  </ul>
+  <h3>Step 2: new pairs</h3>
+<pre class="code"><code><span class="cm"># Prepare the silver dataset by predicting labels with the cross-encoder</span>
+silver = load_dataset(
+    "glue", "mnli", split="train"
+).select(range(10_000, 50_000))
+pairs = list(zip(silver["premise"], silver["hypothesis"]))</code></pre>
+  <p>The book says this uses "the remaining 400,000 sentence pairs (from our original dataset of 50,000 sentence pairs)".</p>
+  <div class="box slip"><b>Small slip in the book</b><p><code>range(10_000, 50_000)</code> is <b>40,000</b> pairs, not 400,000. The total is 10,000 gold + 40,000 silver = the original 50,000.</p></div>
+  <div class="box sidebar"><b>Book sidebar · no unlabeled pairs? make them</b><p>If you have no extra unlabeled pairs, <b>randomly sample</b> them from the gold data: take the premise from one row and the hypothesis from another. This easily gives <b>10 times</b> as many pairs for the cross-encoder to label. But it likely produces <b>far more dissimilar than similar pairs</b>. Better: use a <b>pretrained embedding model</b> to embed all candidate sentences and retrieve the <b>top-k</b> sentences for each input via semantic search. This rough <b>reranking</b> focuses on pairs that are more likely similar. It's still approximate (the pretrained model wasn't trained on your data), but much better than random sampling.</p></div>
+  <h3>Step 3: label the silver data</h3>
+<pre class="code"><code>import numpy as np
+
+<span class="cm"># Label the sentence pairs using our fine-tuned cross-encoder</span>
+output = cross_encoder.predict(
+    pairs, apply_softmax=True,
+    show_progress_bar=True
+)
+silver = pd.DataFrame(
+    {
+        "sentence1": silver["premise"],
+        "sentence2": silver["hypothesis"],
+        "label": np.argmax(output, axis=1)
+    }
+)</code></pre>
+  <ul class="plain codeexp">
+    <li>The pairs are treated as <b>unlabeled</b> (their real MNLI labels are ignored).</li>
+    <li><code>predict(..., apply_softmax=True)</code>: gives probabilities for the 2 classes per pair; <code>np.argmax(..., axis=1)</code> takes the more likely class (0 or 1) as the silver label.</li>
+  </ul>
+  <h3>Step 4: train the bi-encoder on gold + silver</h3>
+<pre class="code"><code><span class="cm"># Combine gold + silver</span>
+data = pd.concat([gold, silver], ignore_index=True, axis=0)
+data = data.drop_duplicates(subset=["sentence1", "sentence2"], keep="first")
+train_dataset = Dataset.from_pandas(data, preserve_index=False)
+
+<span class="cm"># Define model</span>
+embedding_model = SentenceTransformer("bert-base-uncased")
+<span class="cm"># Loss function</span>
+train_loss = losses.CosineSimilarityLoss(model=embedding_model)
+args = SentenceTransformerTrainingArguments(output_dir="augmented_embedding_model", ...)  <span class="cm"># same values</span>
+trainer = SentenceTransformerTrainer(model=embedding_model, args=args,
+    train_dataset=train_dataset, loss=train_loss, evaluator=evaluator)
+trainer.train()
+
+evaluator(embedding_model)
+{'pearson_cosine': 0.7101597020018693,
+ 'spearman_cosine': 0.7210536464320728,
+ 'pearson_manhattan': 0.7296749443525249, 'spearman_manhattan': 0.7284184255293913,
+ 'pearson_euclidean': 0.7293097297208753, 'spearman_euclidean': 0.7282830906742256,
+ 'pearson_dot': 0.6746605824703588, 'spearman_dot': 0.6754486790570754,
+ 'pearson_max': 0.7296749443525249, 'spearman_max': 0.7284184255293913}</code></pre>
+  <ul class="plain codeexp">
+    <li><code>drop_duplicates</code>: if a pair appears in both gold and silver, keep the first (gold) copy, so ground truth wins.</li>
+    <li>Same STSB evaluator; cosine similarity loss as in plate 11, so the result is directly comparable to 0.72.</li>
+  </ul>
+  <p>The cosine-loss model trained on the full 50,000 human labels scored <b>0.72</b>. Using human labels for only <b>20%</b> of that data (10,000), Augmented SBERT reaches <b>0.71</b>.</p>
+  <p>This grows a dataset without manually labeling hundreds of thousands of pairs. To <b>test the quality of your silver data</b>, also train the embedding model on <b>gold only</b>; the performance difference tells you how much the silver data adds.</p>
+  <p>Then restart the notebook "a final time" for the last example, unsupervised learning.</p>
+  <div class="box picture"><b>Picture it</b><p>A senior CA (chartered accountant) carefully checks 100 invoices (gold). Then she trains a junior; the junior pre-checks 400 more, and the senior's habits are copied into a fast checklist used at every branch (bi-encoder). <i>Where it breaks:</i> the junior's mistakes become part of the checklist; silver labels carry the teacher's errors, so they're only as good as the cross-encoder.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A cross-encoder learns from fewer labels because it sees both sentences together and can compare words directly. Its knowledge is "distilled" into the bi-encoder through the silver labels. The bi-encoder sees 5× more pairs than it would from gold alone. It's a form of knowledge distillation / pseudo-labeling (beyond the book's terms): a strong-but-slow teacher creates training data for a fast student.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "You have 2,000 labeled query–document pairs and millions of unlabeled ones. How do you train a good retriever?" <q>Train a cross-encoder on the 2,000, generate candidate pairs by retrieving top-k with an off-the-shelf embedder, label them with the cross-encoder, and train the bi-encoder on gold plus silver. Compare against a gold-only model to prove the silver data helps. Today an LLM judge can also serve as the labeler.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 4 (cross- vs bi-encoder), plate 13 (using models to judge or generate pairs).</li><li><a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a>: data synthesis and model distillation.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · UNSUPERVISED LEARNING</div><h2>Unsupervised learning: training with no labels at all</h2></div><span class="chip">pdf p338</span></div>
+  <p>Creating an embedding model usually needs labeled data, but many real-world datasets have no labels. So we look for techniques that train without predetermined labels: <b>unsupervised learning</b>. Many approaches exist:</p>
+  <div class="grid2">
+    <div class="card"><b>SimCSE</b><span>Simple Contrastive Learning of Sentence Embeddings (footnote 10: Gao, Yao &amp; Chen, 2021).</span></div>
+    <div class="card"><b>CT</b><span>Contrastive Tension (footnote 11: Carlsson et al., ICLR 2021).</span></div>
+    <div class="card"><b>TSDAE</b><span>Transformer-based Sequential Denoising Auto-Encoder (footnote 12: Wang, Reimers &amp; Gurevych, 2021).</span></div>
+    <div class="card"><b>GPL</b><span>Generative Pseudo-Labeling (footnote 13: Wang et al., 2021).</span></div>
+  </div>
+  <p>The book focuses on <b>TSDAE</b>, because it has shown great performance on unsupervised tasks <b>and</b> on domain adaptation.</p>
+  <div class="box beyond"><b>Beyond the book · one line on the other three</b><p>The book only names them. In short: <b>SimCSE</b> encodes the same sentence twice with different dropout and treats the two outputs as a positive pair; <b>CT</b> trains two models to give high dot products for identical sentences and low for different ones; <b>GPL</b> uses a generator to write queries for passages and a cross-encoder to pseudo-label them (close to Augmented SBERT).</p></div>
+  <div class="box picture"><b>Picture it</b><p>Learning a language with no teacher and no answer key, only a pile of newspapers. You can still get good by covering words and guessing them. <i>Where it breaks:</i> you learn what the newspapers talk about, not the specific task your boss needs, which is why unsupervised models usually trail supervised ones.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 18 (TSDAE) and plate 19 (domain adaptation).</li></ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · TSDAE</div><h2>TSDAE: delete words, rebuild the sentence from one vector (0.70)</h2></div><span class="chip">pdf p338–342 · Fig 10-13</span></div>
+  <p><b>TSDAE</b> is an elegant unsupervised approach. It assumes <b>no labeled data at all</b> and doesn't require creating labels artificially.</p>
+  <p>The idea: add <b>noise</b> to the input sentence by <b>removing a certain percentage of its words</b>. This "damaged" sentence goes through an <b>encoder</b> with a <b>pooling layer</b> on top, giving a <b>sentence embedding</b>. From that embedding alone, a <b>decoder</b> tries to <b>reconstruct the original sentence</b> without the noise. The key concept: <b>the more accurate the sentence embedding, the more accurate the reconstruction</b>.</p>
+  <p>This is very similar to <b>masked language modeling</b>, where certain masked words are reconstructed. Here, instead of reconstructing masked words, we reconstruct the <b>entire sentence</b>.</p>
+  <p>After training, you use only the <b>encoder</b> to make embeddings. The decoder exists only to judge whether the embeddings can reconstruct the original (Figure 10-13).</p>
+  <figure class="bookfig"><img src="figs/fig-10-13.png" alt="Text with noise: blank capital of blank is Amsterdam, goes through an encoder and pooling to a sentence embedding, then a decoder outputs The capital of the Netherlands is Amsterdam with the restored words highlighted" loading="lazy"><figcaption>Figure 10-13 (book, pdf p339): TSDAE randomly removes words from an input sentence that is passed through an encoder to generate a sentence embedding. From this sentence embedding, the original sentence is reconstructed.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: "Text with noise": "<span class="hl">.....</span> capital of <span class="hl">..........</span> is Amsterdam", two red blocks marked "Deleted". It flows down through the <b>Encoder</b> (labelled e.g. 'bert-base-cased'), <b>Pooling</b>, to a small <b>sentence embedding</b>. The <b>Decoder</b> (also e.g. 'bert-base-cased', with a speech-bubble icon for "generates text") outputs "Text without noise": "<b>The</b> capital of <b>the Netherlands</b> is Amsterdam", the green words marked "Reconstruct". Everything the decoder knows about the sentence must squeeze through that one small vector, so the vector is forced to carry the meaning. (The figure says 'bert-base-cased'; the code uses 'bert-base-uncased'. "e.g." means any encoder works.)</p>
+  <div class="fig">
+    <h3>Toy: damage a sentence</h3>
+    <div class="controls"><label for="r18">Share of words deleted <input id="r18" type="range" min="0" max="90" step="10" value="60"><output id="r18o">60%</output></label><label for="sn18">Sentence <select id="sn18"><option value="0">Grim faces and hardened jaws are not people-friendly.</option><option value="1">The capital of the Netherlands is Amsterdam.</option><option value="2">He is in the cinema watching Coco.</option></select></label><button id="g18" type="button">Delete again</button></div>
+    <div class="toks" id="t18a" aria-label="damaged sentence"></div>
+    <div class="toks" id="t18b" aria-label="what the decoder must rebuild"></div>
+    <div class="readout" id="rd18"></div>
+    <p class="note">The book only says "a certain percentage" of words is removed. Beyond the book: sentence-transformers' <code>DenoisingAutoEncoderDataset</code> deletes about 60% by default, which is why the slider starts there. Sentences are from the chapter.</p>
+  </div>
+  <h3>The code</h3>
+  <p>Only unlabeled sentences are needed, so training is straightforward. First download an external <b>tokenizer</b> used by the denoising (word-splitting) procedure:</p>
+<pre class="code"><code><span class="cm"># Download additional tokenizer</span>
+import nltk
+nltk.download("punkt")</code></pre>
+  <p>Then make a flat list of sentences and drop all labels, to mimic an unsupervised setting:</p>
+<pre class="code"><code>from tqdm import tqdm
+from datasets import Dataset, load_dataset
+from sentence_transformers.datasets import DenoisingAutoEncoderDataset
+
+<span class="cm"># Create a flat list of sentences</span>
+mnli = load_dataset("glue", "mnli", split="train").select(range(25_000))
+flat_sentences = mnli["premise"] + mnli["hypothesis"]
+
+<span class="cm"># Add noise to our input data</span>
+damaged_data = DenoisingAutoEncoderDataset(list(set(flat_sentences)))
+
+<span class="cm"># Create dataset</span>
+train_dataset = {"damaged_sentence": [], "original_sentence": []}
+for data in tqdm(damaged_data):
+    train_dataset["damaged_sentence"].append(data.texts[0])
+    train_dataset["original_sentence"].append(data.texts[1])
+train_dataset = Dataset.from_dict(train_dataset)</code></pre>
+  <ul class="plain codeexp">
+    <li>25,000 rows × (premise + hypothesis) = up to <b>50,000 sentences</b> (the book says "This creates a dataset of 50,000 sentences"; <code>set()</code> removes exact duplicates, so it may be slightly fewer).</li>
+    <li><code>DenoisingAutoEncoderDataset</code>: for each sentence, returns a pair whose <code>texts[0]</code> is the damaged version and <code>texts[1]</code> the original.</li>
+  </ul>
+<pre class="code"><code>train_dataset[0]
+{'damaged_sentence': 'Grim jaws are.',
+ 'original_sentence': 'Grim faces and hardened jaws are not people-friendly.'}</code></pre>
+  <p>The first sentence is the "noisy" one, the second the original. (8 words → 3 words kept.) The STSB evaluator is defined as before.</p>
+  <h3>[CLS] pooling instead of mean pooling</h3>
+  <p>The model is built from two modules, with the <b>[CLS] token</b> as the pooling strategy instead of mean pooling. The TSDAE paper showed this works better, because <b>mean pooling loses position information</b>, which is not the case with the [CLS] token:</p>
+<pre class="code"><code>from sentence_transformers import models, SentenceTransformer
+
+<span class="cm"># Create your embedding model</span>
+word_embedding_model = models.Transformer("bert-base-uncased")
+pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension(), "cls")
+embedding_model = SentenceTransformer(modules=[word_embedding_model, pooling_model])</code></pre>
+  <ul class="plain codeexp">
+    <li><code>models.Transformer(...)</code>: the BERT that outputs token embeddings.</li>
+    <li><code>models.Pooling(dim, "cls")</code>: take the [CLS] token's vector as the sentence embedding.</li>
+    <li><code>SentenceTransformer(modules=[...])</code>: chain them; this is what <code>SentenceTransformer('bert-base-uncased')</code> did implicitly earlier, but with mean pooling.</li>
+  </ul>
+  <h3>The loss: DenoisingAutoEncoderLoss with tied weights</h3>
+  <p>The loss tries to <b>reconstruct the original sentence from the noisy one</b>: <code>DenoisingAutoEncoderLoss</code>. By doing so the model learns to represent the data accurately. It is similar to masking, but <b>without knowing where the masks are</b> (deleted words leave no placeholder).</p>
+  <p>The parameters of both models are <b>tied</b>: instead of separate weights for the <b>encoder's embedding layer</b> and the <b>decoder's output layer</b>, they <b>share the same weights</b>. Any update to one is reflected in the other.</p>
+<pre class="code"><code>from sentence_transformers import losses
+
+<span class="cm"># Use the denoising auto-encoder loss</span>
+train_loss = losses.DenoisingAutoEncoderLoss(
+    embedding_model, tie_encoder_decoder=True
+)
+train_loss.decoder = train_loss.decoder.to("cuda")</code></pre>
+  <ul class="plain codeexp">
+    <li><code>tie_encoder_decoder=True</code>: share weights as described.</li>
+    <li><code>.decoder.to("cuda")</code>: move the decoder onto the GPU explicitly (it is created inside the loss, not by the trainer).</li>
+  </ul>
+  <p>Training is as before, but with the <b>batch size lowered to 16</b> because memory use increases with this loss:</p>
+<pre class="code"><code>args = SentenceTransformerTrainingArguments(
+    output_dir="tsdae_embedding_model",
+    num_train_epochs=1,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    warmup_steps=100,
+    fp16=True,
+    eval_steps=100,
+    logging_steps=100,
+)
+trainer = SentenceTransformerTrainer(model=embedding_model, args=args,
+    train_dataset=train_dataset, loss=train_loss, evaluator=evaluator)
+trainer.train()
+
+evaluator(embedding_model)
+{'pearson_cosine': 0.6991809700971775,
+ 'spearman_cosine': 0.713693213167873,
+ 'pearson_manhattan': 0.7152343356643568, 'spearman_manhattan': 0.7201441944880915,
+ 'pearson_euclidean': 0.7151142243297436, 'spearman_euclidean': 0.7202291660769805,
+ 'pearson_dot': 0.5198066451871277, 'spearman_dot': 0.5104025515225046,
+ 'pearson_max': 0.7152343356643568, 'spearman_max': 0.7202291660769805}</code></pre>
+  <p>A score of <b>0.70</b>, which the book calls quite impressive considering <b>all training used unlabeled data</b>. It beats the supervised softmax baseline (0.59) and nearly matches cosine loss with 50,000 labels (0.72).</p>
+  <div class="box picture"><b>Picture it</b><p>A telegram with half the words missing ("ARRIVING. TRAIN. FRIDAY") and a clerk who must write the full letter back. To do it, the clerk must truly understand what the sender meant, not copy words. The single-line summary the clerk keeps in their head is the embedding. <i>Where it breaks:</i> a clerk can use common sense about the sender; the decoder only has the vector, which is exactly the point.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The decoder can only attend to the sentence embedding (not to the encoder's token outputs), so the embedding is a bottleneck that must hold enough meaning to rebuild the sentence. Deleting words (instead of masking them) means the encoder can't just copy visible tokens; it must model what the sentence is about. Tying the encoder's input embeddings to the decoder's output layer halves those parameters and keeps the two sides speaking the same vocabulary space.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "You have a large corpus of internal documents and no labels. Can you still improve embeddings?" <q>Yes: unsupervised objectives like TSDAE, which deletes words and trains an encoder whose single sentence vector lets a decoder rebuild the sentence. It needs only raw sentences. It usually trails supervised training, so the best use is as a domain-adaptation step before fine-tuning on whatever pairs I have.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: masked language modeling, TSDAE's close cousin.</li><li><a href="ch03_looking_inside_llms.html">Ch.3</a>: encoders and decoders inside Transformers.</li><li>Plate 19: TSDAE as the first step of domain adaptation.</li></ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · USING TSDAE FOR DOMAIN ADAPTATION</div><h2>Domain adaptation: move a model to new subject matter</h2></div><span class="chip">pdf p342–343 · Fig 10-14, 10-15</span></div>
+  <p>With little or no labeled data, you typically use unsupervised learning. But unsupervised techniques are <b>generally outperformed by supervised ones</b> and <b>struggle to learn domain-specific concepts</b>.</p>
+  <p>That's where <b>domain adaptation</b> comes in: updating an existing embedding model to a specific <b>textual domain</b> whose subjects differ from the <b>source domain</b>. The <b>target domain</b>, or <b>out-domain</b>, generally contains words and subjects not found in the source domain, or <b>in-domain</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-10-14.png" alt="A grid of documents: programming languages SQL Python Scala Rust Java marked in-domain; animation studios, rock bands and countries marked out-domain" loading="lazy"><figcaption>Figure 10-14 (book, pdf p342): In domain adaptation, the aim is to create and generalize an embedding model from one domain to another.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> "Documents about:" placed in an embedding space. Bottom left, pink, labelled <b>In-domain</b>: programming languages (SQL, Python, Scala, Rust, Java), what the model was trained on. The arrows from <b>Out-domain</b> point at three other clusters: animation studios (Disney, Pixar, Studio Ghibli, DreamWorks), rock bands (Queen, The Who, AC/DC) and countries (UK, Belgium, Italy). The question domain adaptation answers: can a model that learned the programming cluster also lay out these new subjects sensibly?</p>
+  <p>One method is <b>adaptive pretraining</b>. First <b>pretrain on your domain-specific corpus</b> using an unsupervised technique such as <b>TSDAE</b> or <b>masked language modeling</b>. Then (Figure 10-15) <b>fine-tune</b> that model with a training dataset that can be <b>outside or inside</b> your target domain. Target-domain data is preferred, but out-domain data also works, because the unsupervised step already happened on the target domain.</p>
+  <figure class="bookfig"><img src="figs/fig-10-15.png" alt="Unsupervised MLM or TSDAE on the target domain, arrow to supervised SBERT on a non-target domain, both inside a dotted box labelled adaptive pre-training" loading="lazy"><figcaption>Figure 10-15 (book, pdf p343): Domain adaptation can be performed with adaptive pretraining and adaptive fine-tuning.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left, blue, <b>Unsupervised</b>: "MLM, TSDAE" run on the <b>target domain</b>. Arrow right to green, <b>Supervised</b>: "SBERT" training on a <b>non-target domain</b> (for example general labeled pairs like MNLI). A dotted bracket under both is labelled <b>Adaptive pre-training</b>. Read it as: learn the vocabulary of your domain without labels, then learn the <i>skill</i> of similarity from whatever labeled pairs exist.</p>
+  <div class="box work"><b>Step through · the pipeline the book says you can now build</b>
+    <div class="stepbar"><button id="w19_prev" type="button">◀ Back</button><button id="w19_next" type="button">Next ▶</button><span id="w19_n"></span></div>
+    <div id="w19_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w19_cap"></div>
+    <p class="note">Steps follow the book's closing paragraph; the legal-contracts scenario is modelled.</p>
+  </div>
+  <p>The book's closing challenge: using everything in this chapter, you can reproduce this pipeline. Start with <b>TSDAE</b> to train an embedding model on your target domain, then fine-tune it with either <b>general supervised training</b> or <b>Augmented SBERT</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>A doctor from Chennai posted to a hospital in rural Punjab. First she listens to patients for weeks to pick up local words for symptoms (unsupervised, target domain). Her medical training (supervised, done elsewhere) still applies; now it works on the local words too. <i>Where it breaks:</i> if the new place has truly new diseases, listening alone won't teach the diagnosis; you'd still want some labeled target-domain cases.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A general model may split your jargon into meaningless word pieces or map distinct domain terms to the same vague region. The unsupervised step reshapes the encoder's representations around your corpus's vocabulary and co-occurrences. The supervised step then teaches "what counts as similar" on top of representations that already understand your words.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Q: "Retrieval quality is poor on our legal / medical / internal docs. What do you try?" <q>Check whether the embedder knows the vocabulary. If not: domain adaptation. Run TSDAE or MLM on our own corpus, then fine-tune with MNR on whatever pairs we can get: real query logs, LLM-generated questions per chunk, or Augmented SBERT silver labels. Measure recall@k on held-out real queries before and after.</q></p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 15 (MLM sidebar), 16 (Augmented SBERT), 18 (TSDAE).</li><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: continued pretraining with MLM; <a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7</a> on adapting models.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>The chapter in plain words</h2></div><span class="chip">pdf p343</span></div>
+  <ul class="plain">
+    <li>The chapter looked at <b>creating and fine-tuning embedding models</b> through various tasks, starting from what embeddings are: a numeric representation of text.</li>
+    <li>It explored the foundational technique behind many embedding models, <b>contrastive learning</b>, which learns mainly from <b>(dis)similar pairs</b> of documents.</li>
+    <li>With the popular <b>sentence-transformers</b> framework it created embedding models from a pretrained BERT, exploring loss functions such as <b>cosine similarity loss</b> and <b>MNR loss</b>. Collecting good (dis)similar pairs or triplets is <b>vital</b> to the resulting model's performance.</li>
+    <li>It then covered <b>fine-tuning</b> techniques, both supervised and unsupervised: <b>Augmented SBERT</b>, and <b>TSDAE</b> for domain adaptation. Compared to creating a model, fine-tuning generally needs <b>less data</b> and is a great way to adapt existing embedding models to your domain.</li>
+    <li>Next chapter: fine-tuning representations for <b>classification</b>, with both BERT models and embedding models and a wide range of fine-tuning techniques.</li>
+  </ul>
+  <h3>All six runs at a glance</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Run</th><th>Base model</th><th>Data</th><th>Loss</th><th>pearson_cosine</th></tr>
+    <tr><td>Train from scratch</td><td>bert-base-uncased</td><td>50,000 MNLI pairs, 3 labels</td><td>SoftmaxLoss</td><td class="num">0.598</td></tr>
+    <tr><td>Better loss</td><td>bert-base-uncased</td><td>50,000 pairs, labels 0/1</td><td>CosineSimilarityLoss</td><td class="num">0.722</td></tr>
+    <tr><td>Best loss</td><td>bert-base-uncased</td><td>16,875 (anchor, positive, soft negative)</td><td>MultipleNegativesRankingLoss</td><td class="num">0.809</td></tr>
+    <tr><td>Supervised fine-tune</td><td>all-MiniLM-L6-v2</td><td>50,000 MNLI rows</td><td>MNR</td><td class="num">0.851</td></tr>
+    <tr><td>Augmented SBERT</td><td>bert-base-uncased (+ cross-encoder teacher)</td><td>10,000 gold + 40,000 silver</td><td>CosineSimilarityLoss</td><td class="num">0.710</td></tr>
+    <tr><td>TSDAE</td><td>bert-base-uncased, [CLS] pooling</td><td>~50,000 unlabeled sentences</td><td>DenoisingAutoEncoderLoss</td><td class="num">0.699</td></tr>
+  </table></div>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td>Embedding / embedding model</td><td>A numeric vector for a piece of text / the model (usually an LLM) that produces it.</td></tr>
+    <tr><td>Semantic similarity</td><td>Texts with similar meaning get nearby vectors.</td></tr>
+    <tr><td>Contrastive learning</td><td>Training with similar and dissimilar examples so similar ones move closer and dissimilar ones apart.</td></tr>
+    <tr><td>Contrastive explanation</td><td>Explaining "why P?" by contrast with an alternative: "why P and not Q?".</td></tr>
+    <tr><td>Cross-encoder</td><td>Feeds both texts together into one Transformer with a classification head; outputs a similarity score, no embeddings; accurate but n² cost.</td></tr>
+    <tr><td>Bi-encoder / SBERT / Siamese network</td><td>Same-weight encoder applied to each text separately, mean pooling into fixed-size embeddings compared by similarity.</td></tr>
+    <tr><td>Mean pooling / [CLS] pooling</td><td>Averaging token embeddings into one vector / using the special [CLS] token's vector instead.</td></tr>
+    <tr><td>NLI (entailment, neutral, contradiction)</td><td>Natural language inference: does a premise imply, contradict, or neither, a hypothesis?</td></tr>
+    <tr><td>GLUE, MNLI</td><td>Benchmark with 9 language tasks; its 392,702-pair multi-genre NLI corpus.</td></tr>
+    <tr><td>STSB</td><td>Semantic Textual Similarity Benchmark: human similarity scores 1–5 for sentence pairs.</td></tr>
+    <tr><td>MTEB</td><td>Massive Text Embedding Benchmark: 8 tasks, 58 datasets, 112 languages, with a leaderboard.</td></tr>
+    <tr><td>Softmax loss</td><td>Classify (u, v, |u−v|) into labels; the original SBERT loss; not advised today.</td></tr>
+    <tr><td>Cosine similarity loss</td><td>Make cos(u, v) match a 0–1 similarity label.</td></tr>
+    <tr><td>MNR loss (InfoNCE, NTXentLoss)</td><td>For each anchor, pick its positive among all candidates in the batch; cross-entropy over cosine scores.</td></tr>
+    <tr><td>In-batch / easy / semi-hard / hard negatives</td><td>Negatives from other pairs in the batch / random / same topic but unrelated / very similar but wrong.</td></tr>
+    <tr><td>MarginMSE</td><td>A loss the book recommends for training cross-encoders.</td></tr>
+    <tr><td>warmup_steps, fp16</td><td>Linear learning-rate ramp from zero; mixed-precision (16-bit) training.</td></tr>
+    <tr><td>Gold / silver dataset</td><td>Human-labeled ground truth / labels predicted by a model (cross-encoder).</td></tr>
+    <tr><td>Augmented SBERT</td><td>Train a cross-encoder on gold, label new pairs as silver, train the bi-encoder on gold + silver.</td></tr>
+    <tr><td>TSDAE</td><td>Delete words, encode to one vector, decode the original sentence; unsupervised.</td></tr>
+    <tr><td>Tied weights</td><td>Encoder embedding layer and decoder output layer share parameters.</td></tr>
+    <tr><td>Domain adaptation, in-domain / out-domain</td><td>Moving a model from its source subjects to a target domain with new words and topics.</td></tr>
+    <tr><td>Adaptive pretraining</td><td>Unsupervised training (TSDAE or MLM) on the target domain, then supervised fine-tuning.</td></tr>
+    <tr><td>VRAM</td><td>GPU memory; cleared by restarting the notebook between runs.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">tools and models named in the chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Name</th><th>What it does in this chapter</th></tr>
+    <tr><td><code>sentence-transformers</code> (SBERT)</td><td>The framework used throughout: <code>SentenceTransformer</code>, <code>losses.*</code> (Softmax, CosineSimilarity, MultipleNegativesRanking, DenoisingAutoEncoder, MarginMSE mentioned), <code>SentenceTransformerTrainer</code> / <code>TrainingArguments</code>, <code>EmbeddingSimilarityEvaluator</code>, <code>CrossEncoder</code>, <code>models.Transformer/Pooling</code>, <code>DenoisingAutoEncoderDataset</code>, <code>NoDuplicatesDataLoader</code>.</td></tr>
+    <tr><td>Hugging Face <code>datasets</code></td><td><code>load_dataset("glue", "mnli")</code> and <code>("glue", "stsb")</code>; <code>Dataset.from_dict</code> / <code>from_pandas</code>.</td></tr>
+    <tr><td>BERT (<code>bert-base-uncased</code>)</td><td>Base model for training from scratch, the cross-encoder in Augmented SBERT, and TSDAE.</td></tr>
+    <tr><td><code>microsoft/mpnet-base</code></td><td>Named as a base model that often gives good results.</td></tr>
+    <tr><td><code>all-MiniLM-L6-v2</code></td><td>Small, fast pretrained sentence-transformer used for supervised fine-tuning (0.85).</td></tr>
+    <tr><td><code>all-mpnet-base-v2</code></td><td>Mentioned as a possibly out-of-domain pretrained embedding model.</td></tr>
+    <tr><td>GloVe</td><td>Averaged GloVe word vectors beat naive BERT sentence embeddings.</td></tr>
+    <tr><td>word2vec</td><td>Early contrastive learning: neighbouring words vs random words.</td></tr>
+    <tr><td>GLUE / MNLI / STSB</td><td>Training data (MNLI) and quick evaluation (STSB).</td></tr>
+    <tr><td><code>mteb</code> (MTEB leaderboard)</td><td>Full benchmark across 8 tasks, 58 datasets, 112 languages; Banking77Classification shown.</td></tr>
+    <tr><td>NLTK (<code>punkt</code>)</td><td>Tokenizer downloaded for TSDAE's word-deletion noise.</td></tr>
+    <tr><td>pandas, NumPy, tqdm</td><td>Data handling for gold/silver sets, argmax of cross-encoder outputs, progress bars.</td></tr>
+    <tr><td>ChatGPT</td><td>Mentioned as a generation model given "memory" via embeddings.</td></tr>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book · where these ideas show up in production</b><p>Vector databases (Qdrant, pgvector, Pinecone, etc.) store bi-encoder embeddings; rerankers such as cross-encoder models sit after retrieval; hosted embedding APIs (OpenAI, Cohere, Voyage) are trained with contrastive objectives and hard negatives; sentence-transformers v3+ is the library version whose trainer API the chapter uses.</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (tap to reveal)</h2></div><span class="chip">14 questions</span></div>
+  <details class="ans"><summary>1. Figures 10-2 and 10-3 show the same six reviews in different places. Why?</summary><p>They come from models trained for different notions of similarity: 10-2 groups by meaning/topic (vacuum, skin care, delivery), 10-3 by sentiment (positive vs negative). What counts as "similar" is decided by the training examples.</p></details>
+  <details class="ans"><summary>2. What is a contrastive explanation, and how does the horse/zebra example relate to embeddings?</summary><p>Explaining "why P?" against an alternative, "why P and not Q?". Comparing horse with zebra cancels shared features (four legs, tail, fur, gallops) and reveals distinctive ones (long manes, ear length, no stripes). Contrastive training does the same: pairs show the model which features separate concepts.</p></details>
+  <details class="ans"><summary>3. How many cross-encoder calls are needed to find the most similar pair among 10,000 sentences? And with a bi-encoder?</summary><p>n·(n−1)/2 = 49,995,000 cross-encoder passes. A bi-encoder needs 10,000 passes (one per sentence) plus cheap vector comparisons.</p></details>
+  <details class="ans"><summary>4. Why not just use BERT's [CLS] token or averaged output as a sentence embedding?</summary><p>The book notes this was shown to be worse than simply averaging GloVe word vectors. Plain BERT wasn't trained to make sentence vectors comparable; SBERT fine-tunes it contrastively in a Siamese setup.</p></details>
+  <details class="ans"><summary>5. In the original SBERT, what goes into the softmax classifier?</summary><p>The concatenation (u, v, |u − v|): both sentence embeddings and their element-wise absolute difference.</p></details>
+  <details class="ans"><summary>6. How do the three NLI labels become cosine-loss targets, and what's lost?</summary><p>Entailment → 1, neutral → 0, contradiction → 0. The difference between "unrelated" (neutral) and "opposite" (contradiction) is lost.</p></details>
+  <details class="ans"><summary>7. Same data, same BERT, only the loss changes: softmax 0.59 → cosine 0.72. Why such a jump?</summary><p>Cosine loss optimises the very quantity used at evaluation and inference time (cosine similarity), while softmax loss trains a side classifier on (u, v, |u−v|) whose decisions don't directly shape cosine distances.</p></details>
+  <details class="ans"><summary>8. MNR loss with only positive pairs: where do the negatives come from?</summary><p>In-batch negatives: every other pair's positive in the same batch is treated as a negative for this anchor. It's then a classification (cross-entropy) over the cosine scores.</p></details>
+  <details class="ans"><summary>9. What would happen if you trained MNR with batch size 2 instead of 32?</summary><p>Each anchor would have only one in-batch negative, so the task is easy (50% by chance) and teaches less. The book says larger batches tend to work better because the model must find the right match among more candidates.</p></details>
+  <details class="ans"><summary>10. Classify: "He was waiting in line for the bus", "The capital of the Netherlands is Amsterdam", "A million people live in Utrecht, which is more than in Amsterdam", for the question "How many people live in Amsterdam?"</summary><p>Easy, semi-hard, hard negative respectively. Easy negatives come from random sampling; semi-hard from embedding similarity; hard ones need manual labeling or a generative model to judge/generate.</p></details>
+  <details class="ans"><summary>11. The fine-tuned all-MiniLM-L6-v2 scored 0.85. Why does the book say not to read too much into it?</summary><p>That model had already been trained on the full MNLI dataset, while the fine-tuning used only 50,000 examples. The example shows the method, not a fair gain.</p></details>
+  <details class="ans"><summary>12. Describe Augmented SBERT's four steps and how to check if the silver data helps.</summary><p>(1) Fine-tune a cross-encoder on the small gold set; (2) create new pairs; (3) label them with the cross-encoder → silver; (4) train the bi-encoder on gold + silver. Train a gold-only bi-encoder too; the score difference shows the silver data's value.</p></details>
+  <details class="ans"><summary>13. In TSDAE, why use [CLS] pooling, and what is the decoder used for after training?</summary><p>The TSDAE paper found [CLS] pooling better because mean pooling loses position information. After training the decoder is thrown away; it only existed to check whether the embedding could reconstruct the sentence. Only the encoder is used to embed text.</p></details>
+  <details class="ans"><summary>14. Interview: your RAG retriever fails on internal jargon and you have only raw documents plus 3,000 labeled Q&amp;A pairs. Plan?</summary><p>Domain adaptation: TSDAE (or MLM) on the raw documents to adapt to the vocabulary, then supervised fine-tuning with MNR on the 3,000 pairs (plus mined hard negatives), or Augmented SBERT to expand them with cross-encoder-labeled silver pairs. Evaluate recall@k on held-out real queries.</p></details>
+</section>
+
+<!-- references -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's references</h2></div><span class="chip">footnotes 1–13</span></div>
+  <details><summary>Footnotes 1–13 (pdf p314–338)</summary>
+    <ol class="refs">
+      <li>Alan Garfinkel. <i>Forms of Explanation: Rethinking the Questions in Social Theory</i>. Yale University Press, 1982.</li>
+      <li>Tim Miller. "Contrastive explanation: A structural-model approach." <i>The Knowledge Engineering Review</i> 36 (2021): e14.</li>
+      <li>Nils Reimers, Iryna Gurevych. "Sentence-BERT: Sentence embeddings using Siamese BERT-networks." arXiv:1908.10084, 2019.</li>
+      <li>Jeffrey Pennington, Richard Socher, Christopher D. Manning. "GloVe: Global vectors for word representation." EMNLP, 2014.</li>
+      <li>Niklas Muennighoff et al. "MTEB: Massive Text Embedding Benchmark." arXiv:2210.07316, 2022.</li>
+      <li>Matthew Henderson et al. "Efficient natural language response suggestion for smart reply." arXiv:1705.00652, 2017.</li>
+      <li>Aaron van den Oord, Yazhe Li, Oriol Vinyals. "Representation learning with contrastive predictive coding." arXiv:1807.03748, 2018.</li>
+      <li>Ting Chen et al. "A simple framework for contrastive learning of visual representations." ICML (PMLR), 2020.</li>
+      <li>Nandan Thakur et al. "Augmented SBERT: Data augmentation method for improving bi-encoders for pairwise sentence scoring tasks." arXiv:2010.08240, 2020.</li>
+      <li>Tianyu Gao, Xingcheng Yao, Danqi Chen. "SimCSE: Simple contrastive learning of sentence embeddings." arXiv:2104.08821, 2021.</li>
+      <li>Fredrik Carlsson et al. "Semantic re-tuning with Contrastive Tension." ICLR, 2021.</li>
+      <li>Kexin Wang, Nils Reimers, Iryna Gurevych. "TSDAE: Using Transformer-based Sequential Denoising Auto-Encoder for unsupervised sentence embedding learning." arXiv:2104.06979, 2021.</li>
+      <li>Kexin Wang et al. "GPL: Generative Pseudo Labeling for unsupervised domain adaptation of dense retrieval." arXiv:2112.07577, 2021.</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Alammar &amp; Grootendorst, O'Reilly 2024), Chapter 10. Book figures are used for personal study. Numbers marked "modelled" are illustrations, not the book's.</footer>
+
+</div>
+<script>
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+function stepper(prefix, count, render) {
+  var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+  function draw() { if (lab) lab.textContent = "step " + (i + 1) + " / " + count(); prev.disabled = i === 0; next.disabled = i >= count() - 1; render(i); }
+  prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+  next.addEventListener("click", function () { if (i < count() - 1) { i++; draw(); } });
+  draw();
+}
+function segButtons(attr, onPick) {
+  var bs = document.querySelectorAll("button[" + attr + "]");
+  Array.prototype.forEach.call(bs, function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(bs, function (x) { x.classList.toggle("on", x === b); });
+      onPick(b.getAttribute(attr));
+    });
+  });
+}
+/* seeded random so demos are repeatable until "new" is pressed */
+var seed = 7;
+function rand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+/* ---------- s2: semantic vs sentiment plane ---------- */
+run("s2", function () {
+  var svg = $("m2_svg"), cap = $("m2_cap"), bSem = $("m2_sem"), bSen = $("m2_sen");
+  var items = [
+    { t: ["This vacuum", "cleans efficiently"], s: "pos", sem: [350, 62], sen: [110, 50] },
+    { t: ["The weak suction", "left dirt behind"], s: "neg", sem: [490, 18], sen: [480, 40] },
+    { t: ["This acne cream", "cleared my skin"], s: "pos", sem: [70, 140], sen: [80, 140] },
+    { t: ["This horrible lotion", "aggravated breakouts"], s: "neg", sem: [100, 220], sen: [480, 140] },
+    { t: ["My order", "was late"], s: "neg", sem: [380, 182], sen: [470, 235] },
+    { t: ["Extremely fast", "shipping"], s: "pos", sem: [490, 230], sen: [100, 235] }
+  ];
+  var g = "";
+  for (var x = 20; x < 640; x += 40) g += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="300" style="stroke:var(--grid)"/>';
+  for (var y = 20; y < 300; y += 40) g += '<line x1="0" y1="' + y + '" x2="640" y2="' + y + '" style="stroke:var(--grid)"/>';
+  items.forEach(function (it, i) {
+    g += '<g class="pt ' + (it.s === "pos" ? "pos" : "neg") + '" id="m2_p' + i + '"><rect x="0" y="0" width="140" height="40" rx="5"/><text x="70" y="17" text-anchor="middle">' + esc(it.t[0]) + '</text><text x="70" y="32" text-anchor="middle">' + esc(it.t[1]) + '</text></g>';
+  });
+  svg.innerHTML = g;
+  function show(mode) {
+    items.forEach(function (it, i) {
+      var p = it[mode], el = $("m2_p" + i);
+      el.setAttribute("transform", "translate(" + p[0] + "," + p[1] + ")");
+      el.style.transform = "translate(" + p[0] + "px," + p[1] + "px)";
+      el.setAttribute("class", "pt " + (mode === "sen" ? (it.s === "pos" ? "pos" : "neg") : "neu"));
+    });
+    bSem.classList.toggle("on", mode === "sem"); bSen.classList.toggle("on", mode === "sen");
+    cap.innerHTML = mode === "sem"
+      ? "<b>Meaning:</b> reviews pair up by <b>product topic</b> (vacuum, skin care, delivery). Each pair holds one happy and one unhappy review; sentiment is ignored."
+      : "<b>Sentiment:</b> the same reviews regroup into <b>positive (green, left)</b> and <b>negative (red, right)</b>. Topic is now ignored: the acne cream sits next to fast shipping.";
+  }
+  bSem.addEventListener("click", function () { show("sem"); });
+  bSen.addEventListener("click", function () { show("sen"); });
+  show("sem");
+});
+
+/* ---------- s3: contrastive features ---------- */
+run("s3", function () {
+  var sel = $("c3_q"), box = $("c3_feat"), cap = $("c3_cap");
+  var all = ["four legs", "tail", "fur", "long manes", "gallops", "ear length"];
+  var data = {
+    none: { shared: [], extra: [], txt: "Without a contrast, every feature looks equally important, including ones a cat, dog or zebra also has." },
+    zebra: { shared: ["four legs", "tail", "fur", "gallops"], extra: ["no stripes"], txt: "Against a zebra, 4 of 6 features are shared and cancel out. What's left (long manes, ear length) plus a new one, <b>no stripes</b>, is what makes it a horse <i>and not a zebra</i>. (Book, Fig 10-5.)" },
+    dog: { shared: ["four legs", "tail", "fur"], extra: ["hooves", "much bigger"], txt: "Against a dog, legs, tail and fur cancel; manes, galloping and ear shape survive, and new distinctions appear (hooves, size). Modelled example." },
+    car: { shared: [], extra: ["is alive", "eats"], txt: "Against a car, nothing cancels; the contrast is so easy it teaches almost nothing specific. This is the 'easy negative' problem of plate 13. Modelled example." }
+  };
+  function draw() {
+    var d = data[sel.value], h = "";
+    all.forEach(function (f) { h += '<span class="' + (d.shared.indexOf(f) >= 0 ? "shared" : (sel.value === "none" ? "" : "dist")) + '">' + esc(f) + "</span>"; });
+    d.extra.forEach(function (f) { h += '<span class="dist">+ ' + esc(f) + "</span>"; });
+    box.innerHTML = h; cap.innerHTML = d.txt;
+  }
+  sel.addEventListener("change", draw); draw();
+});
+
+/* ---------- s4: cross vs bi encoder calls ---------- */
+run("s4", function () {
+  var sl = $("n4"), out = $("n4o"), ms = $("ms4"), sv = $("sv4"), r = $("r4");
+  function human(sec) {
+    if (sec < 60) return sec.toFixed(1) + " s";
+    if (sec < 3600) return (sec / 60).toFixed(1) + " min";
+    if (sec < 86400) return (sec / 3600).toFixed(1) + " h";
+    if (sec < 86400 * 365) return (sec / 86400).toFixed(1) + " days";
+    return (sec / 86400 / 365).toFixed(1) + " years";
+  }
+  function draw() {
+    var n = Math.round(Math.pow(10, +sl.value));
+    if (n >= 10000 && Math.abs(+sl.value - 4) < 0.03) n = 10000;
+    out.textContent = fmt(n);
+    var cross = n * (n - 1) / 2, bi = n, t = Math.max(1, +ms.value || 10) / 1000;
+    var mx = Math.max(cross, bi, 1), L = function (v) { return v <= 1 ? 0 : Math.log10(v) / Math.log10(Math.max(mx, 10)); };
+    var W = 440;
+    var s = '<text x="0" y="30">cross-encoder</text><rect x="130" y="16" height="22" width="' + Math.max(2, L(cross) * W) + '" style="fill:var(--sell);opacity:.75"/><text x="' + (136 + L(cross) * W) + '" y="32" style="font-size:11px">' + fmt(cross) + '</text>';
+    s += '<text x="0" y="80">bi-encoder</text><rect x="130" y="66" height="22" width="' + Math.max(2, L(bi) * W) + '" style="fill:var(--buy);opacity:.8"/><text x="' + (136 + L(bi) * W) + '" y="82" style="font-size:11px">' + fmt(bi) + '</text>';
+    s += '<text x="130" y="118" class="m">bar length on a log scale (each tick ×10)</text>';
+    sv.innerHTML = s;
+    r.innerHTML = "<span>cross-encoder passes: <b>" + fmt(cross) + "</b> ≈ <b class=\"bad\">" + human(cross * t) + "</b></span><span>bi-encoder passes: <b>" + fmt(bi) + "</b> ≈ <b class=\"good\">" + human(bi * t) + "</b></span><span>ratio: <b>" + (bi > 0 ? fmt(Math.max(1, cross / bi)) : "–") + "×</b></span>";
+  }
+  sl.addEventListener("input", draw); ms.addEventListener("input", draw); draw();
+});
+
+/* ---------- s5: bi-encoder stepper ---------- */
+run("s5", function () {
+  var box = $("w5_box"), cap = $("w5_cap");
+  var A = ["My", "dog", "is", "cute"], B = ["I", "have", "a", "dog"];
+  var tokA = [[0.2, 0.5, -0.1, 0.4], [0.9, 0.1, 0.3, 0.0], [0.0, 0.2, 0.1, 0.1], [0.3, 0.8, 0.0, 0.5]];
+  var tokB = [[0.1, 0.4, 0.0, 0.2], [0.2, 0.3, 0.2, 0.1], [0.0, 0.1, 0.0, 0.1], [0.9, 0.2, 0.3, 0.1]];
+  function mean(m) { return [0, 1, 2, 3].map(function (j) { return m.reduce(function (s, r) { return s + r[j]; }, 0) / m.length; }); }
+  var u = mean(tokA), v = mean(tokB), d = u.map(function (x, j) { return Math.abs(x - v[j]); });
+  function vec(x) { return "[" + x.map(function (n) { return n.toFixed(2); }).join(", ") + "]"; }
+  function toks(t, cls) { return '<div class="toks">' + t.map(function (w) { return '<span class="' + cls + '">' + esc(w) + "</span>"; }).join("") + "</div>"; }
+  function cos(a, b) { var s = 0, na = 0, nb = 0; for (var j = 0; j < 4; j++) { s += a[j] * b[j]; na += a[j] * a[j]; nb += b[j] * b[j]; } return s / Math.sqrt(na * nb); }
+  var steps = [
+    function () { return [toks(A, "a") + toks(B, "b"), "<b>Input.</b> A training pair from NLI: sentence A and sentence B, with a label (say <b>entailment</b>). Unlike the cross-encoder, they are <b>not</b> glued together."]; },
+    function () { return ['<div class="formula">BERT("My dog is cute")  → 4 token vectors\nBERT("I have a dog")    → 4 token vectors   (same weights)</div>', "<b>Encode separately.</b> The same BERT (tied weights) runs once per sentence. Each token gets a vector."]; },
+    function () { return ['<div class="formula">A tokens:\n' + tokA.map(function (r, i) { return "  " + (A[i] + "    ").slice(0, 5) + vec(r); }).join("\n") + "\nB tokens:\n" + tokB.map(function (r, i) { return "  " + (B[i] + "    ").slice(0, 5) + vec(r); }).join("\n") + "</div>", "<b>Token embeddings.</b> The grids in Figure 10-7. (4 numbers each here; 768 in BERT-base.)"]; },
+    function () { return ['<div class="formula">u = mean(A tokens) = ' + vec(u) + "\nv = mean(B tokens) = " + vec(v) + "</div>", "<b>Mean pooling.</b> Average each column → one fixed-size sentence embedding per sentence, whatever the length."]; },
+    function () { return ['<div class="formula">(u, v, |u−v|) = ' + vec(u) + " " + vec(v) + " " + vec(d) + "\n→ softmax classifier → P(entailment, neutral, contradiction)</div>", "<b>Training head.</b> Concatenate u, v and |u−v| (12 numbers here, 3×768 in BERT) and classify into the 3 NLI labels. The loss's gradient flows back into BERT."]; },
+    function () { return ['<div class="formula">cos(u, v) = ' + cos(u, v).toFixed(3) + "</div>", "<b>At use time</b> the softmax head is dropped. Embed each text once, store the vectors, compare with cosine similarity."]; }
+  ];
+  stepper("w5", function () { return steps.length; }, function (i) { var r = steps[i](); box.innerHTML = r[0]; cap.innerHTML = r[1]; });
+});
+
+/* ---------- s7: NLI label explorer ---------- */
+run("s7", function () {
+  var box = $("p7_box");
+  var P = "He is in the cinema watching Coco";
+  var d = {
+    "0": ["In the movie theater he is watching the Disney movie Coco", "entailment (label 0)", "good", "Positive pair. Cosine loss target <b>1.0</b>; MNR keeps it as (anchor, positive)."],
+    "1": ["He bought popcorn before the film started", "neutral (label 1)", "warn", "Neither follows nor contradicts. Cosine loss target <b>0.0</b>; MNR drops it."],
+    "2": ["He is watching Frozen at home", "contradiction (label 2)", "bad", "Negative pair. Cosine loss target <b>0.0</b>; MNR drops it (its negatives are random rows instead)."]
+  };
+  function show(k) { var x = d[k]; box.className = "verdict " + x[2]; box.innerHTML = "<b>Premise:</b> " + esc(P) + "<br><b>Hypothesis:</b> " + esc(x[0]) + "<br><b>NLI label:</b> " + x[1] + "<br><b>As training data:</b> " + x[3]; }
+  segButtons("data-p7", show); show("0");
+});
+
+/* ---------- s8: steps + warmup ---------- */
+run("s8", function () {
+  var b = $("b8"), w = $("w8"), sv = $("sv8"), r = $("r8");
+  function draw() {
+    var bs = +b.value, steps = Math.ceil(50000 / bs), wu = Math.min(Math.max(0, +w.value || 0), steps);
+    var x0 = 40, x1 = 620, y0 = 125, y1 = 15;
+    function X(s) { return x0 + s / steps * (x1 - x0); }
+    var pts = [X(0) + "," + y0, X(wu) + "," + y1, X(steps) + "," + y0];
+    var s = '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x1 + '" y2="' + y0 + '"/><line x1="' + x0 + '" y1="' + y0 + '" x2="' + x0 + '" y2="' + y1 + '"/>';
+    s += '<polyline points="' + pts.join(" ") + '" style="stroke:var(--c1);stroke-width:2.4;fill:none"/>';
+    s += '<rect x="' + x0 + '" y="' + y1 + '" width="' + Math.max(0, X(wu) - x0) + '" height="' + (y0 - y1) + '" style="fill:var(--c1);opacity:.10"/>';
+    s += '<text x="' + (x0 + 4) + '" y="12" class="m">learning rate</text><text x="' + x1 + '" y="143" text-anchor="end" class="m">training step → ' + fmt(steps) + '</text>';
+    s += '<text x="' + (X(wu) + 4) + '" y="' + (y1 + 12) + '" style="font-size:11px">warmup ends @ ' + wu + '</text>';
+    for (var e = 100; e < steps; e += 100) { if (steps / 100 > 40) break; s += '<line x1="' + X(e) + '" y1="' + y0 + '" x2="' + X(e) + '" y2="' + (y0 + 4) + '"/>'; }
+    sv.innerHTML = s;
+    r.innerHTML = "<span>steps per epoch: <b>" + fmt(steps) + "</b></span><span>evaluations (every 100 steps): <b>" + Math.floor(steps / 100) + "</b></span><span>warmup share: <b>" + (wu / steps * 100).toFixed(1) + "%</b></span>";
+  }
+  b.addEventListener("change", draw); w.addEventListener("input", draw); draw();
+});
+
+/* ---------- s9: latency budget ---------- */
+run("s9", function () {
+  var sl = $("lat9"), out = $("lat9o"), t = $("t9");
+  var models = [["tiny-6-layer", 0.56, 6, 384], ["small-12-layer", 0.60, 14, 384], ["base-12-layer", 0.63, 30, 768], ["large-24-layer", 0.65, 85, 1024], ["7B LLM-based", 0.68, 400, 4096]];
+  function draw() {
+    var L = +sl.value; out.textContent = L;
+    var best = null;
+    models.forEach(function (m) { if (m[2] <= L && (!best || m[1] > best[1])) best = m; });
+    var h = "<tr><th>Model (modelled)</th><th>avg score</th><th>ms / query</th><th>dims</th><th>fits?</th></tr>";
+    models.forEach(function (m) {
+      var ok = m[2] <= L;
+      h += "<tr" + (best === m ? ' style="background:var(--tint)"' : "") + "><td>" + m[0] + "</td><td class=\"num\">" + m[1].toFixed(2) + "</td><td class=\"num\">" + m[2] + "</td><td class=\"num\">" + m[3] + "</td><td>" + (ok ? '<span class="pill good">yes</span>' : '<span class="pill bad">too slow</span>') + (best === m ? " ← pick" : "") + "</td></tr>";
+    });
+    t.innerHTML = h;
+  }
+  sl.addEventListener("input", draw); draw();
+});
+
+/* ---------- s11: cosine angle ---------- */
+run("s11", function () {
+  var a = $("a11"), ao = $("a11o"), l = $("l11"), sv = $("sv11"), r = $("r11");
+  function draw() {
+    var deg = +a.value, lab = +l.value; ao.textContent = deg + "°";
+    var rad = deg * Math.PI / 180, c = Math.cos(rad), loss = (c - lab) * (c - lab);
+    var ox = 200, oy = 190, R = 150, base = 20 * Math.PI / 180;
+    var x1 = ox + R * Math.cos(base), y1 = oy - R * Math.sin(base);
+    var x2 = ox + R * 0.85 * Math.cos(base + rad), y2 = oy - R * 0.85 * Math.sin(base + rad);
+    var s = '<line x1="20" y1="' + oy + '" x2="380" y2="' + oy + '" style="stroke:var(--rule)"/>';
+    s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + x1 + '" y2="' + y1 + '" style="stroke:var(--c2);stroke-width:3"/><text x="' + (x1 + 4) + '" y="' + y1 + '">S1</text>';
+    s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + x2 + '" y2="' + y2 + '" style="stroke:' + (c > 0.5 ? "var(--buy)" : "var(--sell)") + ';stroke-width:3"/><text x="' + (x2 + (x2 < ox ? -26 : 4)) + '" y="' + (y2 - 4) + '">S2</text>';
+    var ar = 40, steps = 24, p = [];
+    for (var i = 0; i <= steps; i++) { var t = base + rad * i / steps; p.push((ox + ar * Math.cos(t)) + "," + (oy - ar * Math.sin(t))); }
+    s += '<polyline points="' + p.join(" ") + '" style="stroke:var(--c1);stroke-width:2;fill:none;stroke-dasharray:3 2"/>';
+    s += '<text x="420" y="50">cos θ = ' + c.toFixed(3) + '</text><text x="420" y="80">label = ' + lab.toFixed(1) + '</text><text x="420" y="110">error = cos − label = ' + (c - lab).toFixed(3) + '</text><text x="420" y="140" style="font-weight:600">loss = (error)² = ' + loss.toFixed(3) + '</text>';
+    var bw = 190; s += '<rect x="420" y="155" width="' + bw + '" height="12" style="fill:var(--paper);stroke:var(--rule)"/><rect x="420" y="155" width="' + Math.min(bw, loss / 4 * bw) + '" height="12" style="fill:var(--sell)"/>';
+    sv.innerHTML = s;
+    var hint = loss < 0.02 ? "Almost no loss: the angle already matches the label." : (c > lab ? "Too similar for this label: training will <b>open</b> the angle." : "Not similar enough for this label: training will <b>close</b> the angle.");
+    r.innerHTML = "<span>" + hint + "</span>";
+  }
+  a.addEventListener("input", draw); l.addEventListener("change", draw); draw();
+});
+
+/* ---------- s12: MNR matrix ---------- */
+run("s12", function () {
+  var bs = $("bs12"), bso = $("bs12o"), tr = $("tr12"), tro = $("tr12o"), m = $("m12"), r = $("r12"), btn = $("rs12");
+  var Q = ["How many people live in Amsterdam?", "Who wrote Coco?", "Best way to clean a vacuum filter?", "Is the order shipped?", "What does MNR stand for?", "When was GloVe published?", "What is a cross-encoder?", "Why restart the notebook?"];
+  var base = [];
+  function newBatch() { base = []; for (var i = 0; i < 8; i++) { base.push([]); for (var j = 0; j < 8; j++) base[i].push(0.15 + rand() * 0.55); } }
+  newBatch();
+  function draw() {
+    var B = +bs.value, p = +tr.value / 100; bso.textContent = B; tro.textContent = Math.round(p * 100) + "%";
+    var h = "<table><tr><th></th>", totLoss = 0, totP = 0, correct = 0;
+    for (var j = 0; j < B; j++) h += "<th>a" + (j + 1) + "</th>";
+    h += "<th>P(right)</th></tr>";
+    for (var i = 0; i < B; i++) {
+      var row = [], ex = [], z = 0;
+      for (var j2 = 0; j2 < B; j2++) { var target = i === j2 ? 0.92 : 0.05 + base[i][j2] * 0.25; var s = base[i][j2] * (1 - p) + target * p; if (i === j2) s = Math.max(s, base[i][j2]); row.push(s); }
+      row.forEach(function (s) { var e = Math.exp(20 * s); ex.push(e); z += e; });
+      var pr = ex[i] / z, best = row.indexOf(Math.max.apply(null, row));
+      if (best === i) correct++;
+      totLoss += -Math.log(pr); totP += pr;
+      h += '<tr><th title="' + esc(Q[i]) + '">q' + (i + 1) + "</th>";
+      row.forEach(function (s, j3) {
+        var a = Math.round(Math.max(0, Math.min(1, s)) * 70);
+        h += '<td class="cell' + (i === j3 ? " diag" : "") + '" style="background:color-mix(in srgb, var(--c2) ' + a + '%, var(--plate))">' + s.toFixed(2) + "</td>";
+      });
+      h += '<td class="cell">' + (pr * 100).toFixed(0) + "%</td></tr>";
+    }
+    m.innerHTML = h + "</table>";
+    r.innerHTML = "<span>avg P(right answer): <b>" + (totP / B * 100).toFixed(0) + "%</b></span><span>chance level: <b>" + (100 / B).toFixed(0) + "%</b></span><span>avg cross-entropy loss: <b>" + (totLoss / B).toFixed(2) + "</b></span><span>rows where diagonal is top: <b>" + correct + " / " + B + "</b></span><span>negatives per anchor: <b>" + (B - 1) + "</b></span>";
+  }
+  bs.addEventListener("input", draw); tr.addEventListener("input", draw);
+  btn.addEventListener("click", function () { newBatch(); draw(); });
+  draw();
+});
+
+/* ---------- s13: negatives ---------- */
+run("s13", function () {
+  var box = $("n13_box");
+  var Q = "How many people live in Amsterdam?", A = "Almost a million people live in Amsterdam.";
+  var N = { easy: ["He was waiting in line for the bus", 0.05], semi: ["The capital of the Netherlands is Amsterdam", 0.55], hard: ["A million people live in Utrecht, which is more than in Amsterdam", 0.78] };
+  var pos = 0.82;
+  function show(k) {
+    var n = N[k], ep = Math.exp(20 * pos), en = Math.exp(20 * n[1]), pr = ep / (ep + en), share = 1 - pr;
+    box.innerHTML = '<div class="verdict"><b>Q:</b> ' + esc(Q) + "<br><b>Positive:</b> " + esc(A) + " (cos " + pos.toFixed(2) + ")<br><b>Negative (" + k + "):</b> " + esc(n[0]) + " (cos " + n[1].toFixed(2) + ")</div>" +
+      '<div class="readout"><span>P(model picks the right answer) = <b>' + (pr * 100).toFixed(1) + "%</b></span><span>probability stolen by negative = <b class=\"" + (share > 0.2 ? "bad" : "good") + "\">" + (share * 100).toFixed(1) + "%</b></span></div>" +
+      '<p class="small">' + (k === "easy" ? "The negative is far away; the model already wins, so this example produces almost no gradient." : k === "semi" ? "Same topic (Amsterdam) but different question: some signal." : "The negative overlaps on 'million people live' and 'Amsterdam' and steals a big share of the probability: large gradient, the model must learn what actually answers the question.") + "</p>";
+  }
+  segButtons("data-n13", show); show("easy");
+});
+
+/* ---------- s14: decision helper ---------- */
+run("s14", function () {
+  var d = $("d14"), dom = $("dom14"), v = $("v14");
+  function draw() {
+    var a = d.value, b = dom.value, t, cls = "good";
+    if (a === "many") t = "<b>Supervised fine-tuning</b> (plate 15): start from a pretrained sentence-transformer (e.g. all-MiniLM-L6-v2) and train with MNR loss, adding hard negatives if you can.";
+    else if (a === "few") { t = "<b>Augmented SBERT</b> (plate 16): train a cross-encoder on your few thousand gold pairs, label many new pairs as silver, train the bi-encoder on gold + silver."; cls = "warn"; }
+    else { t = "<b>Unsupervised: TSDAE</b> (plate 18) on your raw sentences. Expect lower quality than supervised."; cls = "bad"; }
+    if (b === "diff") t += " Because your domain differs, first do <b>adaptive pretraining</b> (plate 19): TSDAE or MLM on your own corpus, then the step above.";
+    v.className = "verdict " + cls; v.innerHTML = t;
+  }
+  d.addEventListener("change", draw); dom.addEventListener("change", draw); draw();
+});
+
+/* ---------- s16: augmented sbert stepper ---------- */
+run("s16", function () {
+  var box = $("w16_box"), cap = $("w16_cap");
+  function bars(g, s, u) {
+    var tot = 50000, h = '<div class="scores">';
+    h += '<div class="srow"><span class="lbl">gold (human)</span><div class="bar" style="width:' + (g / tot * 100) + '%;background:var(--c1)"></div><span class="v">' + (g / 1000) + "k</span></div>";
+    h += '<div class="srow"><span class="lbl">unlabeled</span><div class="bar base" style="width:' + (u / tot * 100) + '%"></div><span class="v">' + (u / 1000) + "k</span></div>";
+    h += '<div class="srow"><span class="lbl">silver (model)</span><div class="bar" style="width:' + (s / tot * 100) + '%;background:var(--muted);opacity:.5"></div><span class="v">' + (s / 1000) + "k</span></div>";
+    return h + "</div>";
+  }
+  var steps = [
+    [bars(10000, 0, 40000), "<b>Start.</b> Pretend only 10,000 of the 50,000 MNLI pairs are labeled (gold). The other 40,000 are treated as unlabeled."],
+    [bars(10000, 0, 40000) + '<div class="formula">CrossEncoder("bert-base-uncased", num_labels=2).fit(gold, epochs=1)</div>', "<b>Step 1.</b> Fine-tune a cross-encoder on gold, with entailment = 1, neutral/contradiction = 0."],
+    [bars(10000, 0, 40000) + '<div class="formula">pairs = zip(premise[10_000:50_000], hypothesis[10_000:50_000])</div>', "<b>Step 2.</b> Create new sentence pairs. Here: the remaining 40,000 MNLI pairs. Without them: recombine gold sentences, or retrieve top-k neighbours with a pretrained embedder."],
+    [bars(10000, 40000, 0) + '<div class="formula">labels = argmax(cross_encoder.predict(pairs, apply_softmax=True))</div>', "<b>Step 3.</b> The cross-encoder labels the 40,000 pairs → silver dataset (fully labeled, not guaranteed correct)."],
+    [bars(10000, 40000, 0) + '<div class="formula">bi-encoder = SentenceTransformer("bert-base-uncased") + CosineSimilarityLoss\ntrain on gold + silver (duplicates dropped, gold kept)</div>', "<b>Step 4.</b> Train the bi-encoder on gold + silver."],
+    ['<div class="scores"><div class="srow"><span class="lbl">cosine loss, 50k human labels</span><div class="bar" style="width:72.2%"></div><span class="v">0.722</span></div><div class="srow"><span class="lbl">Augmented SBERT, 10k human labels</span><div class="bar alt" style="width:71.0%"></div><span class="v">0.710</span></div></div>', "<b>Result (book).</b> 0.71 vs 0.72 with only 20% of the human labels. Check: train on gold only too, to measure what silver adds."]
+  ];
+  stepper("w16", function () { return steps.length; }, function (i) { box.innerHTML = steps[i][0]; cap.innerHTML = steps[i][1]; });
+});
+
+/* ---------- s18: TSDAE deletion toy ---------- */
+run("s18", function () {
+  var sl = $("r18"), out = $("r18o"), sel = $("sn18"), btn = $("g18"), a = $("t18a"), b = $("t18b"), rd = $("rd18");
+  var S = ["Grim faces and hardened jaws are not people-friendly.", "The capital of the Netherlands is Amsterdam.", "He is in the cinema watching Coco."];
+  var keep = [];
+  function roll() {
+    var words = S[+sel.value].split(" "), ratio = +sl.value / 100, n = words.length;
+    var nDel = Math.min(n - 1, Math.round(n * ratio)), idx = [];
+    for (var i = 0; i < n; i++) idx.push(i);
+    for (var k = n - 1; k > 0; k--) { var j = Math.floor(rand() * (k + 1)); var t = idx[k]; idx[k] = idx[j]; idx[j] = t; }
+    keep = []; for (var q = 0; q < n; q++) keep.push(true);
+    idx.slice(0, nDel).forEach(function (x) { keep[x] = false; });
+    draw();
+  }
+  function draw() {
+    var words = S[+sel.value].split(" "); out.textContent = sl.value + "%";
+    var kept = words.filter(function (w, i) { return keep[i]; });
+    a.innerHTML = "<b style=\"font-family:var(--display);margin-right:6px\">encoder sees:</b>" + kept.map(function (w) { return '<span class="keep">' + esc(w) + "</span>"; }).join("");
+    b.innerHTML = "<b style=\"font-family:var(--display);margin-right:6px\">decoder must output:</b>" + words.map(function (w, i) { return '<span class="' + (keep[i] ? "keep" : "rec") + '">' + esc(w) + "</span>"; }).join("");
+    rd.innerHTML = "<span>words kept: <b>" + kept.length + " / " + words.length + "</b></span><span>green = words the decoder must recover from the embedding alone</span>";
+  }
+  sl.addEventListener("input", roll); sel.addEventListener("change", roll); btn.addEventListener("click", roll);
+  roll();
+});
+
+/* ---------- s19: domain adaptation stepper ---------- */
+run("s19", function () {
+  var box = $("w19_box"), cap = $("w19_cap");
+  var steps = [
+    ['<div class="flow"><div class="row"><span class="node">general model (in-domain: web text)</span><span class="arr">→</span><span class="node">your target domain: legal contracts</span></div></div>', "<b>Problem.</b> The model has never seen phrases like 'indemnification cap' or 'force majeure'; retrieval on contracts is poor. You have lots of raw contracts, few labels."],
+    ['<div class="flow"><div class="row"><span class="node key">TSDAE (or MLM)</span><span class="arr">on</span><span class="node">raw target-domain sentences</span></div></div>', "<b>Step 1 · adaptive pretraining (unsupervised).</b> Delete words from contract sentences and train the encoder so its vector can rebuild them. No labels needed."],
+    ['<div class="flow"><div class="row"><span class="node">adapted encoder</span><span class="arr">→</span><span class="node key">supervised SBERT training</span><span class="arr">on</span><span class="node">general pairs (e.g. MNLI) or your few contract pairs</span></div></div>', "<b>Step 2 · fine-tune (supervised).</b> Use general supervised training (MNR / cosine loss) or Augmented SBERT. Target-domain pairs are preferred; out-domain pairs also work because step 1 already happened on the target domain."],
+    ['<div class="flow"><div class="row"><span class="node">domain-adapted embedding model</span><span class="arr">→</span><span class="node">evaluate on real contract queries</span></div></div>', "<b>Result.</b> A model that knows the domain's words (from step 1) and the skill of similarity (from step 2)."]
+  ];
+  stepper("w19", function () { return steps.length; }, function (i) { box.innerHTML = steps[i][0]; cap.innerHTML = steps[i][1]; });
+});
+
+})();
+</script>
+</body>
+</html>

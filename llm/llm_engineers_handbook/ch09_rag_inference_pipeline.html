@@ -1,0 +1,1552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Handbook Ch.9 RAG Inference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+/* ---- page-specific additions (LLM Engineer's Handbook ch.5 SFT) ---- */
+.box.interview { background: var(--paper); border-left: 4px solid var(--c3); }
+.box.interview > b { color: var(--c3); }
+pre.code code, .formula code { background: none; border: 0; padding: 0; font-size: inherit; }
+.tok { color: var(--c1); font-weight: 600; }
+.tok2 { color: var(--c2); font-weight: 600; }
+.mask { background: var(--paper); opacity: .55; }
+.lossy { background: var(--tint); border-bottom: 2px solid var(--c1); }
+.samp { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 9px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.samp.drop { border-color: var(--sell); color: var(--sell); text-decoration: line-through; opacity: .75; }
+.samp.keep { border-color: var(--buy); }
+.samp .why { font-size: 11px; color: var(--sell); text-decoration: none; display: inline-block; }
+.bar { height: 16px; border-radius: 3px; background: var(--c2); min-width: 2px; }
+.barrow { display: grid; grid-template-columns: 130px minmax(0,1fr) 90px; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+@media (max-width: 480px) { .barrow { grid-template-columns: 92px minmax(0,1fr) 72px; font-size: 11.5px; } }
+.packrow { display: flex; height: 24px; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; background: var(--paper); font-family: var(--mono); font-size: 10.5px; }
+.packrow span { display: flex; align-items: center; justify-content: center; color: var(--plate); border-right: 1px solid var(--plate); overflow: hidden; white-space: nowrap; }
+.flowq { display: grid; gap: 8px; }
+.flowq .q { font-family: var(--display); font-weight: 600; }
+textarea { font-family: var(--mono); font-size: 12.5px; width: 100%; min-height: 70px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 6px; }
+</style>
+<style>
+/* ch09 extras: chunk chips for retrieval demos */
+.cks { display: flex; flex-wrap: wrap; gap: 5px; }
+.ck { font-family: var(--mono); font-size: 12px; border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; background: var(--paper); white-space: nowrap; }
+.ck.a { border-color: var(--c1); } .ck.p { border-color: var(--c2); } .ck.r { border-color: var(--c3); }
+.ck.dup { opacity: .4; text-decoration: line-through; }
+.ck.top { background: var(--tint); font-weight: 600; outline: 2px solid var(--buy); }
+.ck.gone { opacity: .3; }
+.ck { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+.lane { border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); display: grid; gap: 6px; }
+.lane > b { font-family: var(--mono); font-size: 12px; color: var(--muted); font-weight: 600; }
+.kv { font-family: var(--mono); font-size: 13px; display: grid; grid-template-columns: max-content minmax(0,1fr); gap: 3px 12px; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.kv span { overflow-wrap: anywhere; }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch08_inference_optimization.html">← Ch.8 Inference Optimization</a><a href="ch10_inference_pipeline_deployment.html">Ch.10 Inference Pipeline Deployment →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 9 · PDF p346–383</div>
+  <h1>The RAG inference pipeline: <em>find the right chunks</em>, then let the LLM write</h1>
+  <p class="lede">Chapter 4 filled the vector DB (database). This chapter builds the part that runs on <b>every user request</b>: take a question, find the most useful chunks, put them in a prompt, and call the fine-tuned LLM Twin. The authors argue that the <b>retrieval</b> step is where most RAG (retrieval-augmented generation) code and most of the "magic" lives, so they spend the chapter on four advanced retrieval techniques: <b>query expansion</b> (ask the question several ways), <b>self-querying</b> (pull metadata such as the author's name out of the question), <b>filtered vector search</b> (use that metadata as a hard filter), and <b>reranking</b> (score every candidate chunk against the question with a cross-encoder and keep the top K). Each is a small class behind a common interface, and a <code>ContextRetriever</code> glues them together: expand, search all queries in parallel, merge, deduplicate, rerank. Finally a five-line <code>rag()</code> function joins retrieval, a prompt template and the LLM call, and the chapter ends with upgrades you could add next: conversation memory, a router, hybrid (keyword + vector) search and multi-index search.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Read the rows top to bottom. Each orange box is the idea the next row reacts to. One sentence for the whole chapter: <i>one embedding of one question is a weak search, so widen it (expansion), narrow it with hard facts (self-query + filter), then pick the best few with a slower, sharper judge (rerank) before calling the LLM.</i></p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 9">
+    <div class="row"><span class="tag">Start</span><span class="node">Ch.4 filled the vector DB</span><span class="arr">→</span><span class="node">Ch.5–8 made the LLM ready</span><span class="arr">→</span><span class="node key">missing: the per-request RAG flow</span></div>
+    <div class="row"><span class="tag">Design</span><span class="node">RAG = retrieve · augment · generate</span><span class="arr">→</span><span class="node key">build 2 modules: retrieval + LLM call</span><span class="arr">→</span><span class="node">augment = just a prompt template</span></div>
+    <div class="row"><span class="tag">Problem 1</span><span class="node">one query vector covers a tiny area</span><span class="arr">→</span><span class="node key">query expansion: N queries</span><span class="arr">→</span><span class="node">cost: N searches (run in parallel)</span></div>
+    <div class="row"><span class="tag">Problem 2</span><span class="node">embedding may drop "who wrote it"</span><span class="arr">→</span><span class="node key">self-query: LLM extracts author</span><span class="arr">→</span><span class="node key">filtered vector search on author_id</span></div>
+    <div class="row"><span class="tag">Problem 3</span><span class="node">N×K candidates, many noisy</span><span class="arr">→</span><span class="node key">rerank with a cross-encoder</span><span class="arr">→</span><span class="node">keep top K</span></div>
+    <div class="row"><span class="tag">Glue</span><span class="node">ContextRetriever.search()</span><span class="arr">→</span><span class="node">3 categories × K/3 per query</span><span class="arr">→</span><span class="node">merge + dedupe</span><span class="arr">→</span><span class="node">rerank</span></div>
+    <div class="row"><span class="tag">Finish</span><span class="node">chunks → context string</span><span class="arr">→</span><span class="node">prompt template</span><span class="arr">→</span><span class="node key">rag(): call SageMaker LLM</span><span class="arr">→</span><span class="node">Ch.10 deploys it</span></div>
+    <div class="row"><span class="tag">Next ideas</span><span class="node">chat memory (latest K / summary)</span><span class="node">router over collections</span><span class="node">hybrid: vector + BM25</span><span class="node">multi-index (Superlinked)</span></div>
+  </div>
+  <svg viewBox="0 0 660 150" class="dg" role="img" aria-label="Pre-retrieval, retrieval, post-retrieval, then generation" style="width:100%;height:auto;max-width:660px">
+    <rect x="6" y="34" width="140" height="64" rx="6" class="f"/><text x="76" y="56" text-anchor="middle" class="b">Pre-retrieval</text><text x="76" y="74" text-anchor="middle" class="m">query expansion</text><text x="76" y="89" text-anchor="middle" class="m">self-query</text>
+    <rect x="176" y="34" width="140" height="64" rx="6" class="hi"/><text x="246" y="56" text-anchor="middle" class="b">Retrieval</text><text x="246" y="74" text-anchor="middle" class="m">filtered vector</text><text x="246" y="89" text-anchor="middle" class="m">search ×N</text>
+    <rect x="346" y="34" width="140" height="64" rx="6" class="f"/><text x="416" y="56" text-anchor="middle" class="b">Post-retrieval</text><text x="416" y="74" text-anchor="middle" class="m">merge · dedupe</text><text x="416" y="89" text-anchor="middle" class="m">rerank → top K</text>
+    <rect x="516" y="34" width="138" height="64" rx="6" class="s"/><text x="585" y="56" text-anchor="middle" class="b">Generation</text><text x="585" y="74" text-anchor="middle" class="m">prompt + LLM</text><text x="585" y="89" text-anchor="middle" class="m">(SageMaker)</text>
+    <line x1="146" y1="66" x2="176" y2="66" class="on"/><line x1="316" y1="66" x2="346" y2="66" class="on"/><line x1="486" y1="66" x2="516" y2="66" class="on"/>
+    <text x="246" y="20" text-anchor="middle" class="m">← the "retrieval module" (most of this chapter) →</text>
+    <text x="330" y="128" text-anchor="middle" class="m">1 question in → up to N×K chunks considered → K chunks in the prompt → 1 answer out</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening: two modules, not three</a>
+    <a href="#s2"><span>02</span>The inference pipeline architecture</a>
+    <a href="#s3"><span>03</span>The eight steps of one request</a>
+    <a href="#s4"><span>04</span>Advanced RAG techniques + base interfaces</a>
+    <a href="#s5"><span>05</span>The Query and EmbeddedQuery entities</a>
+    <a href="#s6"><span>06</span>Pre-retrieval optimizations (intro)</a>
+    <a href="#s7"><span>07</span>Query expansion: the idea</a>
+    <a href="#s8"><span>08</span>Query expansion: code and run</a>
+    <a href="#s9"><span>09</span>Self-querying: the idea</a>
+    <a href="#s10"><span>10</span>Self-querying: code and run</a>
+    <a href="#s11"><span>11</span>Filtered vector search</a>
+    <a href="#s12"><span>12</span>Reranking: the idea</a>
+    <a href="#s13"><span>13</span>Reranking: code and the cross-encoder singleton</a>
+    <a href="#s14"><span>14</span>Implementing the inference pipeline</a>
+    <a href="#s15"><span>15</span>Retrieval module: search logic (Fig 9.2)</a>
+    <a href="#s16"><span>16</span>Processing the results (Fig 9.3)</a>
+    <a href="#s17"><span>17</span>The ContextRetriever class</a>
+    <a href="#s18"><span>18</span>Running the retriever</a>
+    <a href="#s19"><span>19</span>Bringing it together: rag()</a>
+    <a href="#s20"><span>20</span>Improvement 1: conversation memory</a>
+    <a href="#s21"><span>21</span>Improvement 2: a router</a>
+    <a href="#s22"><span>22</span>Improvement 3: hybrid search</a>
+    <a href="#s23"><span>23</span>Improvement 4: multi-index + iterate fast</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Where we are, and why retrieval gets a whole chapter</h2></div><span class="chip">pdf p346–347</span></div>
+  <p>A quick recap of the story so far. In <a href="ch04_rag_feature_pipeline.html">Chapter 4</a> the <b>RAG feature pipeline</b> took documents from the <b>data warehouse</b>, cleaned them, split them into chunks, turned each chunk into an embedding, and loaded everything into the <b>vector DB</b>. So the vector DB is now full and ready to be searched. In Chapters 5 and 6 the LLM Twin model was fine-tuned, and in Chapter 8 it was optimized for inference. So the model is ready for production too. What is left is the code that runs when a user actually asks something.</p>
+  <p>The RAG method naturally splits into <b>three modules</b>:</p>
+  <ol class="plain">
+    <li><b>Retrieval</b>: query the vector DB for relevant data.</li>
+    <li><b>Augmentation</b>: add that data to the prompt.</li>
+    <li><b>Generation</b>: ask the LLM to write the answer.</li>
+  </ol>
+  <p>The authors build only <b>two</b> Python modules. The retrieval module gets the advanced RAG techniques that improve the search. They deliberately do <i>not</i> build a separate "augmentation" module: that would be <b>overengineering</b>, which they try to avoid. Instead one <b>inference service</b> takes the user query plus the retrieved context, builds the prompt, and calls the LLM. Glue the two together and you have an <b>end-to-end RAG flow</b>.</p>
+  <div class="two">
+    <div class="card"><b>Module 1 · retrieval</b><span>Input: the user's question. Output: the most relevant chunks. Contains query expansion, self-querying, filtered vector search and reranking.</span></div>
+    <div class="card"><b>Module 2 · LLM call</b><span>Input: question + context. Builds the prompt from a template (this is the whole "augment" step) and calls the LLM endpoint.</span></div>
+  </div>
+  <p>Deploying the fine-tuned LLM Twin to <b>AWS SageMaker</b> as an inference endpoint gets the whole of <a href="ch10_inference_pipeline_deployment.html">Chapter 10</a>. So this chapter focuses on the <b>advanced retrieval module</b>. Why give retrieval a whole chapter? Because that is "where the magic happens" in a RAG system. Most of the RAG inference code is written at the retrieval step, not at the LLM call. Retrieval is where you wrangle your data so that the <b>most relevant data points</b> come back from the vector DB, so most advanced RAG logic lives there.</p>
+  <p>The chapter has three topics:</p>
+  <ul class="plain">
+    <li>Understanding the LLM Twin's RAG inference pipeline (plates 2–3).</li>
+    <li>Exploring the LLM Twin's advanced RAG techniques (plates 4–13).</li>
+    <li>Implementing the LLM Twin's RAG inference pipeline (plates 14–23).</li>
+  </ul>
+  <p>By the end you should be able to build an advanced RAG retrieval module, augment a prompt with the retrieved context, and call an LLM for the final answer: a <b>production-ready RAG inference pipeline</b>, end to end.</p>
+  <div class="box picture"><b>Picture it</b><p>A wedding caterer. The kitchen (the LLM) can cook anything, but the dish is only as good as the ingredients the runner brings from the godown (retrieval). Most of the skill is in the runner: knowing which shelf, which brand, which batch is fresh. The "augment" step is just putting the ingredients on the cook's counter in order; nobody hires a separate person for that. <i>Where it breaks:</i> a cook notices a rotten tomato; an LLM often uses whatever context you give it, which is why retrieval quality matters even more.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An LLM answer with RAG can only be as good as the context. If retrieval returns the wrong chunks, the best model writes a fluent wrong answer. The LLM call itself is one HTTP request, so there is little code to write there. Retrieval, on the other hand, involves several model calls, filters, parallel searches and sorting, which is why the code concentrates there.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"In a RAG system, where do you spend your engineering effort?"</i> → "On retrieval. The generator is mostly a prompt template and an API call. Answer quality is bounded by whether the right chunks reach the prompt, so I invest in query rewriting, metadata filters, reranking and retrieval evaluation. In a RAG memory system, that is the difference between the agent remembering the right fact or a nearby wrong one."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_rag_feature_pipeline.html">Ch.4 RAG feature pipeline</a> (the write side; this chapter is the read side) · <a href="ch08_inference_optimization.html">Ch.8</a> · <a href="ch10_inference_pipeline_deployment.html">Ch.10</a>.</li><li>Other books: <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6 RAG and agents</a> · <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs Ch.8 Semantic search and RAG</a>.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · UNDERSTANDING THE LLM TWIN'S RAG INFERENCE PIPELINE</div><h2>The architecture: two independent processes meeting at the vector DB</h2></div><span class="chip">pdf p347–349 · Fig 9-1</span></div>
+  <p>Before writing code, the book lays out the software architecture. The <b>inference pipeline</b> starts with the user's <b>input query</b>, uses the <b>retrieval module</b> to fetch context based on that query, and calls the <b>LLM SageMaker service</b> to generate the final answer.</p>
+  <figure class="bookfig"><img src="figs/fig-9-1.png" alt="Architecture: data warehouse feeds a feature pipeline (clean, chunk, embed) that loads the vector DB; inside the retrieval module a query goes through query expansion and self query, N filtered searches hit the vector DB, N×K results are reranked into K ranked chunks, which become context for a prompt sent to the LLM behind an HTTP API on a SageMaker inference endpoint, which returns the answer" loading="lazy"><figcaption>Figure 9.1 (book, pdf p348): RAG inference pipeline architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two worlds. <b>Top left</b>: the <b>Data Warehouse</b> feeds the <b>Feature Pipeline</b> (Clean → Chunk → Embed), whose output ("RAG &amp; fine-tuning data") drops into the <b>Vector DB</b>. That is Chapter 4, running on its own. <b>The dotted box</b> is the <b>Retrieval Module</b>; follow the circled numbers. ① A query like "Write an article about…" enters at the bottom right. ② <b>Query Expansion</b> (an LLM icon) fans it into Query 1…N. ③ <b>Self Query</b> (another LLM icon) produces <b>Query Metadata</b>; its dotted line joins each search through the ⊕ symbols, meaning "add the metadata as a filter". ④ <b>Filtered Vector Search</b>: Search 1…N go up to the Vector DB ("xN Searches"). ⑤ Each search returns its own top-K list ("Top K results for Search 1", "Search 2 xK results"…), which are gathered into <b>Results N × K</b>. ⑥ <b>Rerank</b> turns that pile into <b>Ranked Chunks × K</b> (a mix of post, code and article chunks). The ranked chunks leave the box as <b>Context</b>, become a ⑦ <b>Prompt</b>, go to the <b>LLM behind an HTTP API</b> on a <b>SageMaker Inference Endpoint</b>, and ⑧ an <b>Answer</b> comes back.</p>
+  <p>The key architectural point: the <b>feature pipeline</b> and the <b>retrieval module</b> are <b>independent processes</b>.</p>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>Feature pipeline (Ch.4)</th><th>Retrieval module (this chapter)</th></tr>
+    <tr><td>Runs where</td><td>On a different machine</td><td>Inside the inference pipeline</td></tr>
+    <tr><td>Runs when</td><td>On a schedule</td><td>On demand, on <b>every</b> user request</td></tr>
+    <tr><td>Job</td><td>Keep the vector DB populated with the latest data</td><td>Read the latest features and return the most relevant, most similar data points for the query</td></tr>
+    <tr><td>Talks to the other via</td><td colspan="2">Only the vector DB (the feature store)</td></tr>
+  </table></div>
+  <p>Separating the two concerns means the vector DB always has the newest data (<b>feature freshness</b>), and the retrieval module sees those newest features on every request. The retrieval module's input is the user's query; its output is the set of data points used to guide the LLM toward the final answer.</p>
+  <div class="box work"><b>Worked example · a fresh post reaching the answer</b>
+    <p>09:00 Paul publishes a LinkedIn post. 09:30 the scheduled feature pipeline crawls, cleans, chunks, embeds and upserts it into Qdrant. 09:31 a user asks the LLM Twin about that topic. The retrieval module, which never stopped serving requests, simply finds the new chunk. Nobody redeployed the inference service.</p>
+    <p class="note">Times are modelled for illustration; the book only says the feature pipeline runs on a schedule.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A railway enquiry counter. Back-office staff update the train-status board every few minutes (feature pipeline). The clerk at the window (retrieval module) never updates the board; he just reads it for every passenger who asks. Either can be slow or restarted without stopping the other. <i>Where it breaks:</i> the clerk can't tell a passenger about a train the board hasn't been updated with yet; freshness is only as good as the schedule.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is the classic <b>write path / read path</b> split, the same idea as CQRS (command query responsibility segregation) in backend systems. Writes are heavy and batchy (crawling, embedding many documents); reads are light and latency-sensitive (one question at a time). Scaling, scheduling and failure handling are completely different for each, so they live in separate processes connected only through the store.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you architect a RAG system for production?"</i> → "Split it into an offline ingestion pipeline and an online retrieval-plus-generation service, connected only through the vector store. Ingestion runs on a schedule or on change-data-capture events and keeps the index fresh; the online path is stateless, scales horizontally and reads whatever is in the index on each request."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 3 (the numbered steps in detail) · <a href="ch04_rag_feature_pipeline.html">Ch.4</a> plates 20–27 (feature pipeline design, batch vs streaming, CDC) · <a href="ch01_llm_twin_concept_and_architecture.html">Ch.1</a> (FTI architecture: feature, training, inference pipelines).</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · THE ARCHITECTURE FLOW, STEP BY STEP</div><h2>The eight steps of one request</h2></div><span class="chip">pdf p349–350 · Fig 9-1</span></div>
+  <p>The book walks Figure 9.1 step by step. In plain words:</p>
+  <ol class="plain">
+    <li><b>User query.</b> The user asks something, for example "Write an article about…".</li>
+    <li><b>Query expansion.</b> Turn the one query into <b>N</b> queries that cover different aspects or interpretations of the original. More varied search terms raise the chance of catching a <b>complete</b> set of relevant data. This matters most when the original query is <b>too narrow or too vague</b>.</li>
+    <li><b>Self-querying.</b> Pull useful <b>metadata</b> out of the original query, such as the <b>author's name</b>. That metadata becomes a <b>filter</b> on the vector search, removing irrelevant points from the search space, so the search is both <b>more accurate and faster</b>.</li>
+    <li><b>Filtered vector search.</b> Embed each query and run a similarity search for each one's <b>top K</b> points. There are <b>N</b> searches, one per expanded query, each using the metadata from step 3 as a filter.</li>
+    <li><b>Collecting results.</b> Each search returns up to K results close to its own interpretation of the question. Put all N searches together and you have up to <b>N × K</b> results, a mix of article, post and repository chunks, which cover the question from several angles.</li>
+    <li><b>Reranking.</b> Keep only the <b>top K</b> of those N × K items. A reranking algorithm scores each chunk for relevance and importance against the <b>original</b> user query. The scorer is a <b>neural cross-encoder</b> that outputs a value between <b>0 and 1</b>, where 1 means fully relevant. Sort by score, take the first K. The output is a ranked list of K chunks with the most relevant on top.</li>
+    <li><b>Build the prompt and call the LLM.</b> Turn the K chunks into one string, fill a <b>prompt template</b> with that context and the user's query, and send the augmented prompt to the LLM hosted on <b>AWS SageMaker</b> behind an API endpoint.</li>
+    <li><b>Answer.</b> Wait for the LLM to generate, then send the response back to the user.</li>
+  </ol>
+  <div class="fig">
+    <h3>Step through one request · N = 3 queries, K = 3 chunks</h3>
+    <p class="small">Follow one real-looking request through all eight steps. Watch how many items are in flight at each step.</p>
+    <div class="stepbar"><button id="s3prev" type="button">◀ Back</button><button id="s3next" type="button">Next ▶</button><span id="s3n"></span></div>
+    <div id="s3box" class="lane" style="min-height:110px"></div>
+    <div class="caption" id="s3cap"></div>
+    <p class="note">The query and chunk names are modelled for this page; the step logic follows the book.</p>
+  </div>
+  <div class="box work"><b>Worked example · counting items</b>
+    <p>With the book's defaults later in the chapter (<code>expand_to_n_queries = 3</code>, <code>k = 3</code>): 1 query → 3 queries → 3 searches → up to 3 × 3 = <b>9</b> candidate chunks → after deduplication maybe 7 → reranked → <b>3</b> chunks go into the prompt. The LLM is called <b>once</b> for the answer, plus once each for expansion and self-query (GPT-4o-mini), so one user request costs <b>3 LLM calls</b> and 1 cross-encoder batch.</p>
+    <p class="note">The "maybe 7" after dedupe is modelled; plate 15 shows why each search really returns ≤ K.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Asking a librarian for help with a school project. She rephrases your request three ways ("history of trains", "Indian Railways 1853", "steam engines"), notes that you only want books by one author (self-query), checks three shelves with that filter, piles up all the books, removes the duplicate copies, skims each one against your actual question, and hands you the best three. Then you write the essay (the LLM). <i>Where it breaks:</i> a librarian reads books slowly but understands them; a cross-encoder is fast but only judges each chunk against the question, not against each other.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>It is a <b>widen-then-narrow</b> funnel. Expansion widens <b>recall</b> (find everything possibly relevant). Filtering and reranking restore <b>precision</b> (keep only what is truly relevant). Cheap operations (vector search) run on many items; the expensive, accurate one (cross-encoder) runs only on the shortlist.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Walk me through what happens when a user query hits your RAG service."</i> → "Rewrite the query into several variants and extract metadata filters with a small LLM; embed each variant and run filtered vector searches in parallel; merge and dedupe the N×K hits; rerank them against the original question with a cross-encoder; keep the top K; render them into a prompt template and call the generator."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Steps 2–3 → plates 7–10 · step 4 → plate 11 · steps 5–6 → plates 12–13, 16 · step 7–8 → plate 19.</li></ul></div>
+</section>
+<script>
+(function(){
+  var b=document.getElementById('s3box'), c=document.getElementById('s3cap'), n=document.getElementById('s3n'); if(!b) return;
+  function ck(t,cls){ return '<span class="ck '+(cls||'')+'">'+t+'</span>'; }
+  var S=[
+    ['<b>input</b><div class="cks">'+ck('"I am Paul Iusztin. Write a post about RAG evaluation."')+'</div>','<b>1 · User query.</b> One string arrives from the user.'],
+    ['<b>queries (N = 3)</b><div class="cks">'+ck('Q1: original')+ck('Q2: "How do you measure RAG quality?"')+ck('Q3: "Metrics for retrieval-augmented generation"')+'</div>','<b>2 · Query expansion.</b> An LLM writes N−1 = 2 extra versions; the original stays as Q1.'],
+    ['<b>metadata</b><div class="cks">'+ck('author_full_name = Paul Iusztin')+ck('author_id = 900f…')+'</div>','<b>3 · Self-query.</b> An LLM reads the original query and extracts the author name; the user table gives the id.'],
+    ['<b>3 searches, each filtered on author_id</b><div class="cks">'+ck('Q1 → vector DB','a')+ck('Q2 → vector DB','p')+ck('Q3 → vector DB','r')+'</div>','<b>4 · Filtered vector search.</b> Each query is embedded and searched with filter author_id = 900f…'],
+    ['<b>collected (≤ N×K = 9)</b><div class="cks">'+ck('art#4','a')+ck('post#10','p')+ck('art#3','a')+ck('art#4','a')+ck('post#10','p')+ck('repo#2','r')+ck('art#7','a')+ck('post#1','p')+ck('repo#2','r')+'</div>','<b>5 · Collect results.</b> 9 hits from 3 angles; some chunks were found by more than one query.'],
+    ['<b>reranked, top K = 3 kept</b><div class="cks">'+ck('art#4 · 0.94','top')+ck('post#10 · 0.88','top')+ck('repo#2 · 0.71','top')+ck('art#3 · 0.40','gone')+ck('art#7 · 0.22','gone')+ck('post#1 · 0.05','gone')+'</div>','<b>6 · Rerank.</b> Duplicates are dropped; a cross-encoder scores each remaining chunk against the original question (0–1); keep the best 3. Scores modelled.'],
+    ['<b>prompt</b><div class="cks">'+ck('template + query + context(art#4, post#10, repo#2)')+'</div>','<b>7 · Build prompt, call LLM.</b> The 3 chunks become one context string; the prompt goes to the SageMaker endpoint.'],
+    ['<b>answer</b><div class="cks">'+ck('"Here is a LinkedIn post on evaluating RAG…"')+'</div>','<b>8 · Answer.</b> The generated text goes back to the user.']
+  ];
+  var i=0;
+  function draw(){ b.innerHTML=S[i][0]; c.innerHTML=S[i][1]; n.textContent='step '+(i+1)+' / '+S.length; }
+  document.getElementById('s3prev').addEventListener('click',function(){ i=Math.max(0,i-1); draw(); });
+  document.getElementById('s3next').addEventListener('click',function(){ i=Math.min(S.length-1,i+1); draw(); });
+  draw();
+})();
+</script>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · EXPLORING THE LLM TWIN'S ADVANCED RAG TECHNIQUES</div><h2>Three stages, and two small interfaces every step plugs into</h2></div><span class="chip">pdf p350–351</span></div>
+  <p>The retrieval module uses advanced RAG techniques at all three stages introduced in <a href="ch04_rag_feature_pipeline.html#s15">Chapter 4's overview of advanced RAG</a>:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Stage</th><th>Technique in the LLM Twin</th><th>What it changes</th></tr>
+    <tr><td><b>Pre-retrieval</b></td><td>Query expansion, self-querying</td><td>The query, before any search</td></tr>
+    <tr><td><b>Retrieval</b></td><td>Filtered vector search</td><td>How the vector DB is searched</td></tr>
+    <tr><td><b>Post-retrieval</b></td><td>Reranking</td><td>Which results survive, and in what order</td></tr>
+  </table></div>
+  <p>Before the techniques, the book sets up the Python <b>interfaces</b> they share (file <code>llm_engineering/application/rag/base.py</code> in the book's repo).</p>
+  <h3>Interface 1 · a prompt template factory</h3>
+  <p>A <b>prompt template factory</b> standardizes how prompt templates are created. It is an abstract class (it inherits from <code>ABC</code>, Python's abstract base class, and from Pydantic's <code>BaseModel</code>) with one method, <code>create_template()</code>, that returns a LangChain <b><code>PromptTemplate</code></b>. The authors mostly avoid leaning on LangChain because they want to build things themselves and understand the engineering underneath. But a few LangChain objects, like <code>PromptTemplate</code>, speed up development without hiding much, so they use them.</p>
+  <h3>Interface 2 · a RAG step</h3>
+  <p>A <b><code>RAGStep</code></b> interface standardizes the advanced steps such as query expansion and self-querying. It has one abstract method, <code>generate(query, …)</code>. Because these steps usually call <b>another LLM</b>, the constructor takes a <b><code>mock</code></b> flag. In mock mode a step skips the paid API call and returns something trivial, which cuts <b>cost</b> and <b>debugging time</b> during development.</p>
+  <pre class="code"><code># sketch with our own names (same shape as the book's base.py)
+from abc import ABC, abstractmethod
+
+class TemplateMaker(ABC):            # book: PromptTemplateFactory (ABC + BaseModel)
+    @abstractmethod
+    def build(self):                 # book: create_template() -> PromptTemplate
+        ...
+
+class PipelineStep(ABC):             # book: RAGStep
+    def __init__(self, fake: bool = False):
+        self._fake = fake            # book: self._mock, skip LLM calls in dev
+    @abstractmethod
+    def run(self, query, *args, **kwargs):   # book: generate(query, ...)
+        ...</code></pre>
+  <p><b>What each part does.</b> The abstract method forces every concrete step to offer the same entry point, so <code>ContextRetriever</code> (plate 17) can call any step the same way. The <code>mock</code>/<code>fake</code> flag is set once in the constructor and checked at the top of <code>generate()</code>.</p>
+  <div class="fig">
+    <h3>Try it · what a step returns with mock on or off</h3>
+    <div class="controls"><label>step <select id="s4step"><option value="0">QueryExpansion (n = 3)</option><option value="1">SelfQuery</option><option value="2">Reranker (keep 2)</option></select></label><label><input type="checkbox" id="s4mock" checked> mock = True</label></div>
+    <div class="verdict" id="s4out"></div>
+    <p class="note">Behaviour per the book's code; example strings modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A dabbawala route. Every dabbawala follows the same handover protocol (the interface): pick up at a fixed point, hand over at a fixed point. Whether the tiffin was cooked at home or bought outside doesn't matter to the next person. The <code>mock</code> flag is a practice run with empty tiffins: you test the route without paying for food. <i>Where it breaks:</i> a practice run with empty tiffins can't tell you whether the food would have spilled; mock mode can't tell you whether the real LLM output parses correctly.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is the <b>strategy pattern</b> plus a <b>test double</b> built into the class. Every step has the same shape, so steps can be swapped, chained or disabled. The mock path also makes the pipeline runnable offline, which is useful in CI (continuous integration) where you don't want API keys or bills.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you keep LLM pipelines testable and cheap during development?"</i> → "Put every LLM-dependent step behind a common interface with a mock mode that returns deterministic outputs without calling the API. Unit tests and local runs use mock mode; integration tests use the real model on a small set. It also lets me swap providers without touching the orchestrator."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 5 (the Query entity these steps pass around) · plates 8, 10, 13 (the three concrete <code>RAGStep</code>s).</li></ul></div>
+</section>
+<script>
+(function(){
+  var s=document.getElementById('s4step'), m=document.getElementById('s4mock'), o=document.getElementById('s4out'); if(!s||!o) return;
+  var D=[
+    ['Returns [original, original, original]: n copies of the input query. No API call.','Calls GPT-4o-mini once; returns [original, variant A, variant B].'],
+    ['Returns the query unchanged (no author fields set). No API call.','Calls GPT-4o-mini; if it finds "Paul Iusztin", sets author_id and author_full_name on the query.'],
+    ['Returns the chunk list as given, in the same order, not cut to 2.','Scores every (query, chunk) pair with the cross-encoder, sorts by score, returns the best 2.']
+  ];
+  function draw(){ var d=D[+s.value]; o.className='verdict'+(m.checked?'':' good'); o.textContent=(m.checked?'mock=True → ':'mock=False → ')+d[m.checked?0:1]; }
+  s.addEventListener('change',draw); m.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · THE QUERY DOMAIN ENTITY</div><h2>Query and EmbeddedQuery: the user's words plus the metadata that travels with them</h2></div><span class="chip">pdf p351–353</span></div>
+  <p>Advanced RAG needs more than the raw text of a question. The book wraps the user's input in a <b>domain entity</b> called <b><code>Query</code></b>. It inherits from <code>VectorBaseDocument</code>, the <b>OVM</b> (object-vector mapping) base class from <a href="ch04_rag_feature_pipeline.html">Chapter 4</a>, so a query can be saved to or loaded from the vector DB like any other document. Its inner <code>Config</code> sets the category to <code>QUERIES</code>.</p>
+  <p>The fields that combine the query with metadata:</p>
+  <ul class="plain">
+    <li><b><code>content</code></b>: the query text.</li>
+    <li><b><code>author_id</code></b>: an optional <b>UUID4</b> (a random unique id) taken from the query. It becomes a <b>filter</b> in the vector search so only chunks by that author are returned.</li>
+    <li><b><code>author_full_name</code></b>: an optional string, used to look up the <code>author_id</code>.</li>
+    <li><b><code>metadata</code></b>: a dictionary for anything else, empty by default.</li>
+  </ul>
+  <p>Two helper methods:</p>
+  <ul class="plain">
+    <li><b><code>from_str()</code></b> (a class method) builds a <code>Query</code> straight from a string and standardizes cleaning: it strips leading and trailing <b>spaces and newlines</b>.</li>
+    <li><b><code>replace_content()</code></b> returns a <b>new</b> <code>Query</code> with different text but the <b>same</b> <code>id</code>, <code>author_id</code>, <code>author_full_name</code> and <code>metadata</code>. Useful whenever you rewrite the text (preprocessing, normalization, or query expansion in plate 8) without losing the identifiers.</li>
+  </ul>
+  <p>Then <b><code>EmbeddedQuery</code></b> extends <code>Query</code> with one more field, <b><code>embedding</code></b> (a list of floats). It holds everything needed to run a vector search on <b>Qdrant</b> or another vector DB.</p>
+  <pre class="code"><code># sketch, our names: a question object that keeps its metadata through rewrites
+class Question(VectorDoc):                 # book: Query(VectorBaseDocument)
+    text: str                              # book: content
+    writer_id: UUID | None = None          # book: author_id
+    writer_name: str | None = None         # book: author_full_name
+    extra: dict = Field(default_factory=dict)
+
+    @classmethod
+    def parse(cls, raw: str) -> "Question":
+        return cls(text=raw.strip("\n "))  # trim spaces/newlines at both ends
+
+    def with_text(self, new_text: str) -> "Question":
+        # same id + writer + extra, only the text changes
+        return Question(id=self.id, text=new_text, writer_id=self.writer_id,
+                        writer_name=self.writer_name, extra=self.extra)
+
+class VectorQuestion(Question):            # book: EmbeddedQuery
+    vector: list[float]</code></pre>
+  <div class="fig">
+    <h3>Try it · from_str, then replace_content</h3>
+    <p class="small">Type a messy query (leading newlines and spaces are kept in the box). See what <code>from_str</code> stores, then what a rewrite keeps.</p>
+    <textarea id="s5in">
+
+   I am Paul Iusztin. Write about RAG.
+</textarea>
+    <div class="controls"><button id="s5go" type="button">from_str → replace_content</button></div>
+    <div class="kv" id="s5out"></div>
+    <p class="note">The id and author values are made up (modelled). Author fields stay empty until self-query fills them (plate 10).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A courier parcel. The contents (query text) may get repacked along the way, but the airway bill (id, sender, notes) stays stuck on the box. <code>replace_content</code> is repacking with the same airway bill. <code>EmbeddedQuery</code> is the parcel after it gets its sorting barcode (the embedding) so the machines can route it. <i>Where it breaks:</i> a repacked parcel is the same parcel; a rewritten query is a new object that only shares the old one's labels.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Query expansion produces several new texts, but the filter from self-query (<code>author_id</code>) must apply to <b>all</b> of them. Copying metadata into every rewritten <code>Query</code> is what lets each of the N searches use the same filter without passing extra arguments around. Making <code>Query</code> a vector document also means queries could be logged into the vector DB later for analytics.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you model a query in a RAG service?"</i> → "As a typed object, not a bare string: text, extracted filters like tenant or author, a free-form metadata dict, and a stable id for tracing. Rewrites create new objects that inherit the filters and id, and an embedded subtype carries the vector. That keeps every downstream step's inputs explicit."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_rag_feature_pipeline.html">Ch.4</a> (the OVM and <code>VectorBaseDocument</code>) · plate 8 (<code>replace_content</code> in query expansion) · plate 17 (<code>EmbeddingDispatcher</code> makes the <code>EmbeddedQuery</code>).</li></ul></div>
+</section>
+<script>
+(function(){
+  var t=document.getElementById('s5in'), g=document.getElementById('s5go'), o=document.getElementById('s5out'); if(!t||!o) return;
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function strip(s){ return s.replace(/^[\n ]+|[\n ]+$/g,''); }
+  function draw(){
+    var c=strip(t.value);
+    o.innerHTML='<span>raw length</span><span>'+t.value.length+' chars</span>'+
+      '<span>from_str → content</span><span>"'+esc(c)+'" ('+c.length+' chars)</span>'+
+      '<span>id</span><span>3f2a…c91 (new)</span><span>author_id</span><span>None</span>'+
+      '<span>replace_content("What is advanced RAG?")</span><span>content changes; id 3f2a…c91, author fields, metadata unchanged</span>';
+  }
+  g.addEventListener('click',draw); draw();
+})();
+</script>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · ADVANCED RAG PRE-RETRIEVAL OPTIMIZATIONS</div><h2>Two pre-retrieval methods, both powered by a small OpenAI model</h2></div><span class="chip">pdf p353</span></div>
+  <p>The <b>pre-retrieval</b> step is optimized with two methods: <b>query expansion</b> and <b>self-querying</b>. Both work hand in hand with the <b>filtered vector search</b> in the retrieval step (plate 11). The book explains query expansion's code first, then self-querying.</p>
+  <p>Both methods call <b>OpenAI's API</b>: query expansion asks it for variations of the question, and self-querying asks it to extract metadata. When the book was written, all examples used <b>GPT-4o-mini</b>. OpenAI's models change quickly and this one may be deprecated, but that's easy to handle: the model name lives in the <code>.env</code> file as the <b><code>OPENAI_MODEL_ID</code></b> environment variable, so you change one line, not the code.</p>
+  <div class="two">
+    <div class="card"><b>Query expansion</b><span>LLM writes <i>more questions</i>. Widens the search. Output: a list of <code>Query</code> objects.</span></div>
+    <div class="card"><b>Self-querying</b><span>LLM pulls out <i>facts</i> (here: the author). Narrows the search. Output: the same <code>Query</code> with author fields filled.</span></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book</b><p>Using a small, cheap model for these helper calls and the expensive (or fine-tuned) model only for the final answer is a common cost pattern. Any model with a chat API would do; the step only needs to follow a short instruction reliably at temperature 0.</p></div>
+  <div class="box picture"><b>Picture it</b><p>Before a chartered accountant files your return, a junior clerk does two quick things: rewrites your messy request into the standard sections, and notes your PAN so only your documents are pulled. Cheap, fast help before the expensive expert. <i>Where it breaks:</i> a clerk who misreads your PAN pulls nobody's documents; a self-query that extracts the wrong name filters out everything.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Both methods are <b>LLM-as-a-function</b>: a fixed prompt in, a string out, parsed into structured data. Setting <code>temperature=0</code> (plates 8 and 10) makes the output as repeatable as possible, which matters when code parses it.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you avoid hard-coding a model that may be deprecated?"</i> → "Model ids are configuration: an env var read by a settings object, never a literal in the code. Then a deprecation is a config change plus a quick eval run, not a code change and redeploy of logic."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 7–8 (expansion) · 9–10 (self-query) · <a href="ch02_tooling_and_installation.html">Ch.2</a> (settings and <code>.env</code> configuration).</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · QUERY EXPANSION · THE IDEA</div><h2>One query vector sees only a small patch of the embedding space</h2></div><span class="chip">pdf p353–354</span></div>
+  <p><b>The problem.</b> A normal retrieval step searches the vector DB with <b>one</b> vector: the embedding of the original question. That vector covers only a <b>small area</b> of the embedding space. If the embedding misses some of the information or nuance in your question, the retrieved context may not be relevant. Documents that are related in meaning but <b>not near the query vector</b> get overlooked.</p>
+  <p><b>The solution: query expansion.</b> Ask an LLM to write <b>several queries</b> based on the original question. Each one captures a different facet. Embedded, they land in <b>other areas</b> of the embedding space that are still relevant to the original question, so the chance of retrieving more relevant documents goes up.</p>
+  <p>It can be as simple as a detailed <b>zero-shot prompt</b> (instructions only, no examples) asking the LLM for alternative queries. After it, you have <b>N</b> queries instead of one, which means <b>N searches</b>.</p>
+  <p><b>The cost.</b> More searches can increase <b>latency</b>. So experiment with how many queries you generate to make sure retrieval still meets your application's requirements. You can also <b>parallelize</b> the searches, which cuts latency drastically; the book does exactly that in <code>ContextRetriever</code> (plate 17).</p>
+  <p>Query expansion is also called <b>multi-query</b>; same principle. LangChain's version is called <b>MultiQueryRetriever</b>.</p>
+  <div class="fig">
+    <h3>Try it · how many relevant documents do N queries reach?</h3>
+    <p class="small">A 2-D cartoon of the embedding space. Green dots are documents relevant to the user's intent; grey dots are not. Each circle is one query's "top-K neighbourhood". Slide N.</p>
+    <div class="controls"><label>N queries <input type="range" id="s7n" min="1" max="5" value="1"><output id="s7nv">1</output></label><label>parallel searches <input type="checkbox" id="s7par" checked></label></div>
+    <svg id="s7svg" viewBox="0 0 520 260" class="dg" role="img" aria-label="Embedding space with query neighbourhoods" style="width:100%;height:auto;max-width:520px"></svg>
+    <div class="readout" id="s7out"></div>
+    <p class="note">Positions, radius and latencies are modelled (40 ms per search sequential; parallel ≈ slowest single search + 10 ms overhead).</p>
+  </div>
+  <div class="box work"><b>Worked example · the latency budget</b>
+    <p>Say one embedding + vector search takes 40 ms and the expansion LLM call takes 600 ms. N = 3 sequential: 600 + 3 × 40 = 720 ms. N = 3 in parallel: 600 + ~50 = 650 ms. N = 5 parallel: still ~650 ms of search time, but 5 × more vector DB load. The expansion LLM call, not the searches, usually dominates.</p>
+    <p class="note">All numbers modelled. The book only says latency grows with N and that parallelizing reduces it drastically.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Searching for a lost phone in a big house. One person standing in the hall with a torch (one query vector) sees one patch of floor. Three people with torches in three rooms (three expanded queries) cover far more ground, and if they search at the same time (parallel) it takes no longer than one. <i>Where it breaks:</i> people searching rooms that don't matter (bad expansions) just add noise, which is why reranking (plate 12) follows.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An embedding squeezes a whole question into one point. A question with several aspects ("best types of advanced RAG methods") ends up at the "average" of those aspects, possibly far from any single document that covers just one aspect in depth. Rephrasings shift the point toward each aspect. Retrieval <b>recall</b> (fraction of relevant documents found) goes up; <b>precision</b> may go down, which the reranker fixes.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your RAG misses obviously relevant documents. What do you try?"</i> → "First check chunking and the embedding model, then add query expansion: generate 2–4 rewrites with a small LLM, search them in parallel, union the results and rerank against the original question. It raises recall at the cost of an extra LLM call and more vector DB queries, so I'd tune N against a latency budget."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_rag_feature_pipeline.html#s17">Ch.4 plate 17</a> (query optimization ideas) · plate 8 (the code) · plate 17 (parallel search).</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a> (query rewriting).</li></ul></div>
+</section>
+<script>
+(function(){
+  var r=document.getElementById('s7n'), v=document.getElementById('s7nv'), p=document.getElementById('s7par'), svg=document.getElementById('s7svg'), o=document.getElementById('s7out'); if(!svg) return;
+  var rel=[[150,120],[175,95],[230,150],[300,70],[330,95],[390,170],[410,190],[260,200],[120,180],[350,140]];
+  var irr=[[60,40],[80,220],[470,40],[480,230],[30,130],[460,120],[200,30],[250,240],[440,80],[100,90],[500,170],[20,200]];
+  var Q=[[180,125],[320,90],[395,175],[250,185],[135,170]];
+  var R=52;
+  function draw(){
+    var n=+r.value; v.textContent=n; var s='', hit={};
+    for(var i=0;i<n;i++){ s+='<circle cx="'+Q[i][0]+'" cy="'+Q[i][1]+'" r="'+R+'" style="fill:var(--c1);fill-opacity:.10;stroke:var(--c1);stroke-width:1.4"/>'; s+='<text x="'+Q[i][0]+'" y="'+(Q[i][1]-R+14)+'" text-anchor="middle" class="b" style="font-size:12px">Q'+(i+1)+'</text>'; }
+    rel.forEach(function(d,j){ var h=false; for(var i=0;i<n;i++){ var dx=d[0]-Q[i][0], dy=d[1]-Q[i][1]; if(dx*dx+dy*dy<=R*R) h=true; } if(h) hit[j]=1; s+='<circle cx="'+d[0]+'" cy="'+d[1]+'" r="6" style="fill:var(--buy);'+(h?'stroke:var(--ink);stroke-width:2':'fill-opacity:.45')+'"/>'; });
+    irr.forEach(function(d){ s+='<circle cx="'+d[0]+'" cy="'+d[1]+'" r="5" style="fill:var(--muted);fill-opacity:.5"/>'; });
+    svg.innerHTML=s;
+    var k=Object.keys(hit).length, lat=p.checked?(40+(n>1?10:0)):40*n;
+    o.innerHTML='<span>relevant docs reached <b>'+k+' / '+rel.length+'</b></span><span>searches <b>'+n+'</b></span><span>search latency <b>'+lat+' ms</b> ('+(p.checked?'parallel':'sequential')+')</span>';
+  }
+  r.addEventListener('input',draw); p.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · QUERY EXPANSION · CODE AND RUN</div><h2>QueryExpansion: one zero-shot prompt, a separator, and a split</h2></div><span class="chip">pdf p354–357</span></div>
+  <p>The class lives in the book's repo at <code>llm_engineering/application/rag/query_expanison.py</code> (that spelling is the repo's). It imports LangChain's <code>ChatOpenAI</code>, the <code>Query</code> entity, the global <code>settings</code>, the <code>RAGStep</code> base and the <code>QueryExpansionTemplate</code>.</p>
+  <h3>The generate() method, part by part</h3>
+  <ol class="plain">
+    <li><b>Guard.</b> Assert that <code>expand_to_n</code> (how many queries you want in total) is greater than 0.</li>
+    <li><b>Mock path.</b> If mock mode is on, return a list of <code>expand_to_n</code> copies of the original query, which simulates expansion without calling the API.</li>
+    <li><b>Prompt + model.</b> Build the prompt from <code>QueryExpansionTemplate</code>, asking for <b><code>expand_to_n − 1</code></b> new queries, because the original will be kept as one of them. Create a <code>ChatOpenAI</code> client with the model id and API key from settings and <b><code>temperature=0</code></b> for deterministic output.</li>
+    <li><b>Chain.</b> Pipe the prompt into the model (<code>prompt | model</code>, LangChain's chain syntax) and invoke it with the user's question. The model's text is in <code>response.content</code>.</li>
+    <li><b>Parse.</b> Strip the text, split it on the template's <b>separator</b>, start a list with the <b>original query first</b>, and add each piece (after trimming whitespace, skipping empty pieces) as a new <code>Query</code> made with <code>replace_content()</code>, so each keeps the original's id and metadata.</li>
+  </ol>
+  <pre class="code"><code># sketch, our names: expand one question into n (original + n-1 rewrites)
+SEP = "#next-question#"
+
+def expand(question, n, llm, fake=False):
+    assert n > 0
+    if fake:
+        return [question] * n                    # no API call in dev
+    prompt = rewrite_prompt(how_many=n - 1, sep=SEP)
+    raw = (prompt | llm).invoke({"question": question}).content
+    out = [question]                             # original always first
+    for piece in raw.strip().split(SEP):
+        if (piece := piece.strip()):             # skip empty pieces
+            out.append(question.with_text(piece))
+    return out</code></pre>
+  <h3>The template</h3>
+  <p><code>QueryExpansionTemplate</code> (in <code>prompt_templates.py</code>) implements the factory interface from plate 4. Its prompt has five parts: (1) a <b>role</b> line (an AI assistant); (2) the <b>ask</b>: produce <code>{expand_to_n}</code> alternative versions of the user's question; (3) the <b>reason</b>, which helps the model aim well: the versions are for retrieving documents from a vector DB and should offer different perspectives, to get around the weaknesses of distance-based similarity search; (4) the <b>output format</b>: versions joined by <code>{separator}</code>; (5) the <b>slot</b> for the original <code>{question}</code>.</p>
+  <ul class="plain">
+    <li>The <b><code>separator</code></b> property returns a unique string, <code>#next-question#</code>, that the code later splits on. A string unlikely to appear inside a real question is what makes the split safe.</li>
+    <li><code>create_template(expand_to_n)</code> returns a LangChain <code>PromptTemplate</code>. It passes <code>separator</code> and <code>expand_to_n</code> as <b>partial variables</b>: they are filled in when the template is built and stay fixed at runtime. Only <code>{question}</code> is an <b>input variable</b> that changes on every call.</li>
+  </ul>
+  <h3>Running it</h3>
+  <p>The book runs the module with <code>python -m llm_engineering.application.rag.query_expansion</code>, using the query "Write an article about the best types of advanced RAG methods." and <code>expand_to_n=3</code>. The log shows three lines: the <b>original</b> query first, then one rewrite asking which advanced RAG methods are most <b>effective</b> and how to apply them, and one asking for an <b>overview</b> of the top advanced retrieval-augmented generation techniques. The rewrites added detail and new angles (effectiveness, overview) to the original request.</p>
+  <div class="fig">
+    <h3>Try it · prompt variables, then parsing the LLM's reply</h3>
+    <div class="controls"><label>expand_to_n <input type="range" id="s8n" min="1" max="5" value="3"><output id="s8nv">3</output></label></div>
+    <div class="readout" id="s8vars"></div>
+    <p class="small">The raw reply below is modelled (notice the stray spaces and the empty piece at the end). Edit it and press parse.</p>
+    <textarea id="s8raw"></textarea>
+    <div class="controls"><button id="s8go" type="button">split on #next-question# and clean</button></div>
+    <div class="lane" id="s8out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A teacher asks a student to "say this question three different ways, one per line, and put a ### between them". The ### is the separator, the teacher's own words are question one, and "three" was decided before class (partial variable) while the question changes each period (input variable). <i>Where it breaks:</i> a student never writes ### inside a sentence by accident; an LLM occasionally ignores the format, so robust code must handle a reply with no separators (it would just yield one extra query).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The LLM returns free text. A unique delimiter is the cheapest way to get a <b>list</b> out of it without JSON mode. <code>temperature=0</code> makes the rewrites mostly repeatable, so the same question gives the same search behaviour (easier to debug and cache). Keeping the original query in the list guarantees the expansion can only <b>add</b> coverage, never lose the user's own wording.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you get structured output from a query-rewriting LLM?"</i> → "Either a unique separator token and a split, as here, or JSON/structured-output mode with a schema. I always keep the original query, strip and drop empty items, cap the number of rewrites, and fall back to the original alone if parsing fails, so the step can't break retrieval."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 5 (<code>replace_content</code>) · plate 17 (called inside <code>ContextRetriever.search</code> with <code>expand_to_n_queries=3</code>).</li><li><a href="../hands_on_llms/ch06_prompt_engineering.html">Hands-On LLMs Ch.6 Prompt engineering</a> (zero-shot vs few-shot prompts).</li></ul></div>
+</section>
+<script>
+(function(){
+  var r=document.getElementById('s8n'), v=document.getElementById('s8nv'), vars=document.getElementById('s8vars'), raw=document.getElementById('s8raw'), go=document.getElementById('s8go'), out=document.getElementById('s8out'); if(!raw) return;
+  var ORIG='Write an article about the best types of advanced RAG methods.';
+  var POOL=['  What are the most effective advanced RAG methods and how are they applied? ','Give an overview of top retrieval-augmented generation techniques.','Which RAG optimizations improve retrieval quality the most?','Compare query expansion, reranking and hybrid search for RAG.'];
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function fill(){ var n=+r.value; v.textContent=n; vars.innerHTML='<span>prompt asks for <b>'+(n-1)+'</b> new versions</span><span>separator <b>#next-question#</b> (partial)</span><span>{question} filled per call</span>'; raw.value=POOL.slice(0,Math.max(0,n-1)).join('#next-question#')+(n>1?'#next-question#  ':''); parse(); }
+  function parse(){
+    var n=+r.value, list=['<span class="ck top">0 · original: '+esc(ORIG)+'</span>'];
+    if(n>=1){ raw.value.trim().split('#next-question#').forEach(function(p){ var s=p.trim(); if(s) list.push('<span class="ck">'+list.length+' · '+esc(s)+'</span>'); }); }
+    out.innerHTML='<b>queries returned: '+list.length+'</b><div class="cks">'+list.join('')+'</div>';
+  }
+  r.addEventListener('input',fill); go.addEventListener('click',parse); fill();
+})();
+</script>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · SELF-QUERYING · THE IDEA</div><h2>Don't hope the embedding remembers the author; pull it out and use it as a hard rule</h2></div><span class="chip">pdf p357–358</span></div>
+  <p><b>The problem.</b> When you embed a query, you can't guarantee that every aspect your use case needs is present in the vector with <b>enough signal</b>. Say retrieval <b>must</b> depend on the tags in the user's input, 100% of the time. You have no control over how much the embedding emphasizes those tags. Embedding the prompt alone, you can never be sure the tags are represented strongly enough to matter when distances to other vectors are computed. The same is true for any metadata you need during search: <b>IDs, names, categories</b>.</p>
+  <p><b>The solution: self-querying.</b> Use an LLM to <b>extract</b> the important metadata from the query, and use it alongside the vector search as <b>filters</b>. Self-querying can extract whatever fields matter to your business: <b>tags, IDs, number of comments, likes, shares</b>, and so on. After extraction you have <b>full control</b> over how that metadata affects retrieval. In the LLM Twin, the extracted field is the <b>author's name</b>, used as a filter. Self-queries work together with <b>filtered vector search</b> (plate 11).</p>
+  <div class="fig">
+    <h3>Try it · does the embedding "carry" the author?</h3>
+    <p class="small">A modelled similarity score is mostly about topic. Add the author's name to the query and see how little the ranking moves, then switch to a hard filter.</p>
+    <div class="controls"><label><input type="checkbox" id="s9name" checked> query mentions "Paul Iusztin"</label><label>mode <select id="s9mode"><option value="v">plain vector search</option><option value="f">self-query + filter</option></select></label></div>
+    <div id="s9out" style="display:grid;gap:5px"></div>
+    <p class="note">Scores are modelled to show the idea: the name shifts similarity only a little, while a filter removes other authors completely.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>On a matrimonial site you type "engineer from Pune, Marathi-speaking, likes cricket". A pure "vibe" match might show a great cricket-loving engineer from Chennai, because most of your words matched. The site instead pulls out "city = Pune" and "language = Marathi" as hard filters and only then matches the vibe. <i>Where it breaks:</i> if the extractor misreads "Pune" as "Pune district" and your data uses "Pune city", the filter silently returns nothing; extracted values must match stored values exactly.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An embedding is a lossy summary weighted toward topic and meaning. A name is a few tokens among many and may move the vector very little; worse, many authors write similar text. Turning it into a <b>structured filter</b> moves the constraint out of fuzzy geometry and into an exact database condition, which is guaranteed to hold.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you enforce constraints like tenant, user or date in vector search?"</i> → "Never rely on the embedding for them. Store them as payload metadata, extract them from the request (from auth context, or with an LLM self-query for free text), and apply them as pre-filters in the vector DB. For multi-tenant RAG memory, the tenant/user filter should come from the authenticated session, not from the LLM."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 10 (the code) · plate 11 (the filter itself) · <a href="ch04_rag_feature_pipeline.html#s17">Ch.4 plate 17</a> (self-query listed among query optimizations).</li></ul></div>
+</section>
+<script>
+(function(){
+  var nm=document.getElementById('s9name'), md=document.getElementById('s9mode'), o=document.getElementById('s9out'); if(!o) return;
+  var D=[['Advanced RAG algorithms (by Alex R.)','alex',0.83,0.84],['4 Advanced RAG Algorithms (by Paul Iusztin)','paul',0.80,0.83],['RAG in production notes (by Maxime L.)','max',0.78,0.78],['Vector DBs explained (by Paul Iusztin)','paul',0.62,0.65],['Fine-tuning Llama (by Paul Iusztin)','paul',0.35,0.38]];
+  function draw(){
+    var useN=nm.checked, f=md.value==='f';
+    var rows=D.map(function(d){return {t:d[0],a:d[1],s:useN?d[3]:d[2]};});
+    if(f) rows=rows.filter(function(r){return r.a==='paul';});
+    rows.sort(function(a,b){return b.s-a.s;});
+    o.innerHTML=rows.map(function(r,i){ return '<div class="barrow"><span>#'+(i+1)+(r.a==='paul'?' ✓':' ✗')+'</span><div class="bar" style="width:'+Math.round(r.s*100)+'%;background:'+(r.a==='paul'?'var(--c2)':'var(--sell)')+'"></div><span>'+r.s.toFixed(2)+'</span></div><div class="small" style="margin:-3px 0 4px">'+r.t+'</div>'; }).join('')+(f?'<div class="verdict good">Filter author_id = Paul: other authors cannot appear, whatever their score.</div>':'<div class="verdict">Top result is by another author: the name barely moved the scores.</div>');
+  }
+  nm.addEventListener('change',draw); md.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · SELF-QUERYING · CODE AND RUN</div><h2>SelfQuery: a few-shot prompt that returns a name, an id, or "none"</h2></div><span class="chip">pdf p358–361</span></div>
+  <p>The class is in <code>llm_engineering/application/rag/self_query.py</code>. Imports: <code>ChatOpenAI</code>, an app <code>utils</code> module, the <code>UserDocument</code> entity, <code>Query</code>, <code>settings</code>, <code>RAGStep</code> and <code>SelfQueryTemplate</code>. <code>SelfQuery</code> inherits from <code>RAGStep</code> and implements <code>generate(query) → Query</code>.</p>
+  <ol class="plain">
+    <li><b>Mock path.</b> If mock mode is on, return the query unchanged; no model call while testing and debugging.</li>
+    <li><b>Prompt + model.</b> Build the prompt from <code>SelfQueryTemplate</code> and a <code>ChatOpenAI</code> model with <code>temperature=0</code>, same as query expansion.</li>
+    <li><b>Chain + clean.</b> Pipe prompt into model, invoke with the user's question, strip newlines and spaces from the reply. That string is <code>user_full_name</code>.</li>
+    <li><b>Nothing found.</b> If the reply is exactly <code>"none"</code>, there was no user in the query; return the original query.</li>
+    <li><b>Look up the user.</b> Otherwise split the full name into first and last name with a utility function (<code>split_user_full_name</code>), then <b>get or create</b> a <code>UserDocument</code> with those names.</li>
+    <li><b>Enrich.</b> Set <code>query.author_id = user.id</code> and <code>query.author_full_name = user.full_name</code>, and return the query. Later steps use these fields.</li>
+  </ol>
+  <pre class="code"><code># sketch, our names
+def extract_author(question, llm, users, fake=False):
+    if fake:
+        return question
+    reply = (author_prompt() | llm).invoke({"question": question}).content
+    name = reply.strip("\n ")
+    if name == "none":                      # the prompt's "nothing found" token
+        return question
+    first, last = split_name(name)          # book: utils.split_user_full_name
+    person = users.get_or_create(first=first, last=last)   # book: UserDocument
+    question.writer_id = person.id          # book: author_id   -> used as filter
+    question.writer_name = person.full_name # book: author_full_name
+    return question</code></pre>
+  <h3>The template: few-shot</h3>
+  <p><code>SelfQueryTemplate</code> tells the model to extract the <b>user name or user id</b> from the question and reply with <b>only</b> that value (a name like "John Doe" or an id like "1345256"), or the token <b>none</b> if neither is present. Unlike the zero-shot expansion prompt, this one uses <b>few-shot learning</b>: it shows three solved examples before the real question:</p>
+  <div class="tablewrap"><table>
+    <tr><th>The three example cases (our own wording)</th><th>Expected reply</th></tr>
+    <tr><td>A question that introduces a person by name, e.g. <i>Hi, Asha Rao here, draft a note on caching</i></td><td>the name only: <code>Asha Rao</code></td></tr>
+    <tr><td>A question with no name or id, e.g. <i>Draft a note on caching</i></td><td><code>none</code></td></tr>
+    <tr><td>A question that gives a numeric user id, e.g. <i>User 9081 here, draft a note on caching</i></td><td>the id only: <code>9081</code></td></tr>
+  </table></div>
+  <p>The <code>{question}</code> placeholder is the only input variable, replaced with the real question on every call. By extracting the metadata explicitly, self-querying overcomes the limits of relying only on embedding semantics.</p>
+  <h3>Running it</h3>
+  <p>With <code>python -m llm_engineering.application.rag.self_query</code> and the query "I am Paul Iusztin. Write an article about the best types of advanced RAG methods.", the log shows the extracted <code>author_id</code> (a UUID beginning <code>900fec95…</code>) and <code>author_full_name</code> = <code>Paul Iusztin</code>: both extracted correctly.</p>
+  <div class="fig">
+    <h3>Try it · self-query metadata extraction</h3>
+    <p class="small">A toy extractor that imitates what the few-shot prompt asks for: a "My name is / I am" name, a "user id is" number, or none. Then it fills the Query fields the way <code>generate()</code> does.</p>
+    <div class="controls"><label>question <select id="s10pick">
+      <option>I am Paul Iusztin. Write an article about the best types of advanced RAG methods.</option>
+      <option>My name is Maxime Labonne and I want a post about model merging.</option>
+      <option>My user id is 1345256 and I want to write a post about vector DBs.</option>
+      <option>I want to write a post about RAG evaluation.</option>
+      <option>Write like Paul Iusztin about MLOps.</option>
+    </select></label></div>
+    <textarea id="s10in"></textarea>
+    <div class="controls"><button id="s10go" type="button">run self-query</button></div>
+    <div class="kv" id="s10out"></div>
+    <p class="note">The toy uses simple patterns, not an LLM; ids are modelled. The last option shows a case a real LLM may catch but a naive pattern misses, which is why the book uses an LLM.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A bank teller's slip: before anything else, she writes your account number in the top box, copied from whatever you said ("I'm Ramesh, account ending 4412…"). If you didn't say it, she writes "none" and helps you generally. <i>Where it breaks:</i> the teller asks you when unsure; this prompt never asks back. It guesses or says none.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Few-shot examples pin down the <b>output format</b> (just the value, nothing else) far better than instructions alone, which is crucial because code compares the reply to the literal string <code>"none"</code>. <code>get_or_create</code> means a name never seen before still produces a user id; the filter then matches no chunks, which is the honest result (no content by that author).</p></div>
+  <div class="box work"><b>Worked example · what the filter becomes</b>
+    <p>Reply <code>Paul Iusztin</code> → split into <code>Paul</code>, <code>Iusztin</code> → users table lookup → id <code>900fec95-…</code> → every later search carries <code>author_id == "900fec95-…"</code>. Reply <code>none</code> → no filter; all authors are searched.</p>
+  </div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you turn free-text constraints into filters?"</i> → "A small LLM with a few-shot or structured-output prompt that returns only the fields I support, with an explicit 'none' value. I validate the result against known values (e.g. look the author up in a users table) before applying it, and fall back to an unfiltered search if extraction fails, so a bad extraction can't zero out recall silently."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11 (how <code>author_id</code> becomes a Qdrant filter) · <a href="ch03_data_engineering.html">Ch.3</a> (the <code>UserDocument</code> entity and the data warehouse).</li></ul></div>
+</section>
+<script>
+(function(){
+  var pk=document.getElementById('s10pick'), t=document.getElementById('s10in'), g=document.getElementById('s10go'), o=document.getElementById('s10out'); if(!o) return;
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function run(){
+    var q=t.value, m, rep='none';
+    if((m=q.match(/user id is\s+(\d+)/i))) rep=m[1];
+    else if((m=q.match(/(?:my name is|i am)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/))) rep=m[1];
+    var rows='<span>LLM reply</span><span><b>'+esc(rep)+'</b></span>';
+    if(rep==='none'){ rows+='<span>result</span><span>query returned unchanged: author_id = None → no filter</span>'; }
+    else if(/^\d+$/.test(rep)){ rows+='<span>note</span><span>an id, not a name: the book\'s code would still pass it to the name splitter; a real system should branch on ids</span>'; }
+    else { var p=rep.split(' '); var id=(rep==='Paul Iusztin')?'900fec95-d621-…':'7c1e…(new)'; rows+='<span>first / last</span><span>'+p[0]+' / '+p[1]+'</span><span>UserDocument.get_or_create</span><span>id '+id+'</span><span>query.author_id</span><span>'+id+'</span><span>query.author_full_name</span><span>'+esc(rep)+'</span>'; }
+    o.innerHTML=rows;
+  }
+  pk.addEventListener('change',function(){ t.value=pk.value; run(); });
+  g.addEventListener('click',run); t.value=pk.value; run();
+})();
+</script>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · ADVANCED RAG RETRIEVAL OPTIMIZATION · FILTERED VECTOR SEARCH</div><h2>Shrink the search space first, then compare vectors</h2></div><span class="chip">pdf p361–363</span></div>
+  <p><b>Vector search</b> retrieves information by <b>semantic similarity</b>. On its own ("plain" vector search) it has problems with both <b>accuracy</b> and <b>latency</b>, because it looks only at how close the numbers are, ignoring contextual or categorical details that may decide relevance.</p>
+  <p><b>Problem 1 · similar but irrelevant.</b> Embeddings capture general meaning, so content that shares wording or topic can score high even when it doesn't fit the query's intent or constraints. The book's example: a search for <b>"Java"</b> may return documents about the <b>programming language</b> or the <b>Indonesian island</b>, depending only on similarity, giving ambiguous or misleading results.</p>
+  <p><b>Problem 2 · scale.</b> As the dataset grows, plain vector search must compare similarity across the <b>whole</b> vector space when nothing is filtered. That raises latency, slows responses and burns more compute, which is bad for real-time or large-scale applications.</p>
+  <p><b>The solution: filtered vector search.</b> Apply extra criteria (metadata tags, categories) to <b>shrink the pool before</b> computing similarities. Results are limited to items that fit the query's intent, which removes irrelevant documents that only matched on meaning: better <b>accuracy</b>. Fewer comparisons also means less compute and faster responses: better <b>latency</b>, crucial for real-time interaction or heavy query loads.</p>
+  <p>The filter metadata usually comes from the user's input, so it must be extracted <b>before</b> querying, which is exactly what self-query did with the author's name. Hence the book's classification: processing the query in self-query counts as <b>pre-retrieval</b> optimization, while using that metadata inside the search counts as <b>retrieval</b> optimization.</p>
+  <p>With <b>Qdrant</b>, a filter that requires a matching <code>author_id</code> in each document's metadata (its <b>payload</b>) is built from three model classes: a <code>Filter</code> whose <code>must</code> list holds a <code>FieldCondition</code> on key <code>author_id</code> with a <code>MatchValue</code>. It is passed as <code>query_filter</code> to the search call along with the collection name, the query vector, a <code>limit</code> and <code>with_payload=True</code>.</p>
+  <pre class="code"><code># sketch: Qdrant search restricted to one author (our variable names)
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+only_this_author = Filter(must=[
+    FieldCondition(key="author_id", match=MatchValue(value=str(writer_id)))
+])
+hits = client.search(
+    collection_name="articles",
+    query_vector=question_vec,
+    limit=3,                     # top-K
+    with_payload=True,           # return metadata with each hit
+    query_filter=only_this_author,
+)</code></pre>
+  <p>In short: plain vector search gives a foundation for semantic retrieval, but its limits slow real applications. Filtered vector search combines embeddings with <b>contextual filtering</b> for more accurate and efficient retrieval in RAG.</p>
+  <div class="fig">
+    <h3>Try it · the "Java" search, with and without a filter</h3>
+    <div class="controls"><label>filter <select id="s11f"><option value="">none (plain vector search)</option><option value="prog">category = programming</option><option value="travel">category = travel</option></select></label><label>collection size <input type="range" id="s11n" min="3" max="7" value="5"><output id="s11nv"></output></label></div>
+    <div id="s11out" style="display:grid;gap:6px"></div>
+    <div class="readout" id="s11rd"></div>
+    <p class="note">Documents, scores and the category share (30% programming, 20% travel) are modelled. Real vector DBs use an index (e.g. HNSW) so the saving is not exactly proportional, but filtering still reduces work and removes off-intent hits.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Looking for "Java" at a big bookshop. Without a filter the assistant brings a Java programming book and a Java travel guide, because both have "Java" on the cover. If you first say "computer section only", she walks straight there, checks far fewer shelves, and every book she brings fits. <i>Where it breaks:</i> if a great programming book was shelved in "general" by mistake (wrong metadata), the filter hides it forever.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A filter is an exact predicate on payload fields; a vector search is approximate ranking. Combining them means "rank only among items where the predicate holds". Vector DBs like Qdrant index payload fields so the filter is cheap and applied during the approximate nearest-neighbour search, rather than throwing away results afterwards (which could leave you with fewer than K).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Pre-filtering vs post-filtering in vector search?"</i> → "Post-filtering searches top-K then drops non-matching hits, so a selective filter can leave you with zero results. Pre-filtering (or filtered ANN, as Qdrant does) restricts candidates during the search, so you still get K matching hits and do less work. For tenant or author constraints, always filter in the engine."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 10 (where <code>author_id</code> comes from) · plate 15 (the same filter inside <code>_search</code>) · <a href="ch04_rag_feature_pipeline.html#s12">Ch.4 plates 12–14</a> (how vector DBs and indexes work).</li></ul></div>
+</section>
+<script>
+(function(){
+  var f=document.getElementById('s11f'), n=document.getElementById('s11n'), nv=document.getElementById('s11nv'), o=document.getElementById('s11out'), rd=document.getElementById('s11rd'); if(!o) return;
+  var D=[['Java streams API tutorial','prog',0.86],['Travel guide: Java island temples','travel',0.84],['Java coffee: a short history','food',0.79],['Spring Boot with Java 21','prog',0.77],['Backpacking Java and Bali','travel',0.74]];
+  function draw(){
+    var N=Math.pow(10,+n.value); nv.textContent=N.toLocaleString('en-IN');
+    var c=f.value, share=c==='prog'?0.3:(c==='travel'?0.2:1);
+    var rows=D.filter(function(d){return !c||d[1]===c;}).slice(0,3);
+    o.innerHTML=rows.map(function(d,i){ var bad=c==='' && d[1]!=='prog'; return '<div class="samp '+(bad?'drop':'keep')+'">#'+(i+1)+' '+d[0]+' <span class="pill">'+d[1]+'</span> '+d[2].toFixed(2)+'</div>'; }).join('');
+    rd.innerHTML='<span>vectors compared ≈ <b>'+Math.round(N*share).toLocaleString('en-IN')+'</b></span><span>'+(c?'filter keeps '+Math.round(share*100)+'% of the collection':'whole collection')+'</span>'+(c===''?'<span class="bad">if the user meant programming, 2 of 3 hits are off-intent</span>':'');
+  }
+  f.addEventListener('change',draw); n.addEventListener('input',draw); draw();
+})();
+</script>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · ADVANCED RAG POST-RETRIEVAL OPTIMIZATION · RERANKING</div><h2>Retrieve wide, then let a sharper judge reorder and cut to K</h2></div><span class="chip">pdf p363–364</span></div>
+  <p><b>The problem.</b> Retrieved context can include irrelevant chunks that only:</p>
+  <ul class="plain">
+    <li><b>Add noise.</b> Irrelevant context clutters the information and can confuse the language model.</li>
+    <li><b>Make the prompt bigger.</b> More chunks means a longer prompt and <b>higher cost</b>. Also, language models tend to be <b>biased toward the first and last pieces</b> of the context; stuff in a lot of context and there's a good chance the model misses the essential part.</li>
+    <li><b>Don't match your question.</b> Chunks are retrieved by similarity between query and chunk embeddings. The embedding model may not be tuned to your kind of question, so chunks that aren't really relevant can still get high similarity scores.</li>
+  </ul>
+  <p><b>The solution: reranking.</b> Order all <b>N × K</b> retrieved chunks by relevance to the <b>original question</b>, most relevant first. <b>N</b> is the number of searches after query expansion; <b>K</b> is the number of chunks per search; so there are N × K chunks in total. Reranking is a key <b>post-retrieval</b> step that refines what the retrieval model returned.</p>
+  <p>Reranking algorithms often use advanced models like <b>neural cross-encoders</b>. They judge the semantic similarity between query and chunk <b>more accurately</b> than the first retrieval, which used embeddings and <b>cosine similarity</b> (explained in <a href="ch04_rag_feature_pipeline.html#s19">Chapter 4's advanced RAG overview</a>). Then keep the <b>top K</b> by reranking score.</p>
+  <div class="two">
+    <div class="card"><b>Reranking without query expansion</b><span>1. <b>Search for &gt; K chunks</b> to get a broader pool.<br>2. <b>Reorder with rerank</b> to judge each chunk's real relevance.<br>3. <b>Take top K</b> as the prompt's context.</span></div>
+    <div class="card"><b>Reranking with query expansion</b><span>1. <b>Search for N × K chunks</b> using the expanded queries.<br>2. <b>Reorder with rerank</b>: all chunks, by relevance.<br>3. <b>Take top K</b> for the final prompt.</span></div>
+  </div>
+  <p>The difference: with expansion you gather candidates from <b>several points in the embedding space</b>, rather than just digging deeper (more than K) around <b>one</b> location. That is why reranking pairs so well with query expansion. Adding reranking improves the quality and relevance of the context and uses compute efficiently.</p>
+  <svg viewBox="0 0 640 210" class="dg" role="img" aria-label="Bi-encoder versus cross-encoder" style="width:100%;height:auto;max-width:640px">
+    <text x="150" y="18" text-anchor="middle" class="b">Retrieval: bi-encoder (fast)</text>
+    <rect x="20" y="34" width="110" height="34" rx="5" class="f"/><text x="75" y="56" text-anchor="middle" class="m">query</text>
+    <rect x="170" y="34" width="110" height="34" rx="5" class="f"/><text x="225" y="56" text-anchor="middle" class="m">chunk (stored)</text>
+    <rect x="20" y="92" width="110" height="30" rx="5" class="s"/><text x="75" y="112" text-anchor="middle" class="m">encoder</text>
+    <rect x="170" y="92" width="110" height="30" rx="5" class="s"/><text x="225" y="112" text-anchor="middle" class="m">encoder (offline)</text>
+    <line x1="75" y1="68" x2="75" y2="92"/><line x1="225" y1="68" x2="225" y2="92"/>
+    <line x1="75" y1="122" x2="140" y2="160"/><line x1="225" y1="122" x2="160" y2="160"/>
+    <rect x="95" y="160" width="110" height="30" rx="5" class="hi"/><text x="150" y="180" text-anchor="middle" class="m">cosine(vq, vc)</text>
+    <text x="480" y="18" text-anchor="middle" class="b">Rerank: cross-encoder (accurate)</text>
+    <rect x="390" y="34" width="180" height="34" rx="5" class="f"/><text x="480" y="56" text-anchor="middle" class="m">[query ‖ chunk] together</text>
+    <rect x="390" y="92" width="180" height="30" rx="5" class="s"/><text x="480" y="112" text-anchor="middle" class="m">one transformer, joint attention</text>
+    <line x1="480" y1="68" x2="480" y2="92"/><line x1="480" y1="122" x2="480" y2="160"/>
+    <rect x="425" y="160" width="110" height="30" rx="5" class="hi"/><text x="480" y="180" text-anchor="middle" class="m">score 0–1</text>
+  </svg>
+  <p class="note">Our diagram. Bi-encoder vectors for chunks are precomputed once, so search is cheap; the cross-encoder must run once per (query, chunk) pair at request time, so it is only affordable on a shortlist.</p>
+  <div class="box picture"><b>Picture it</b><p>IPL auction scouting. A first scout filters thousands of players by stats (vector search: fast, rough). Then the head coach watches video of the shortlisted 30, each one against the team's exact need (cross-encoder: slow, careful), and picks 5. Nobody has time to watch video of thousands. <i>Where it breaks:</i> the coach judges each player alone against the need; he doesn't check whether two picks are redundant, and neither does a cross-encoder reranker.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A <b>bi-encoder</b> embeds query and chunk <b>separately</b>; their only interaction is one dot product, so fine details ("best types of", "in production") are lost. A <b>cross-encoder</b> reads query and chunk <b>together</b> in one transformer pass, so every query token attends to every chunk token, and it outputs a relevance score directly. Better judgement, but no precomputation is possible, so cost grows with the number of candidates.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Why add a reranker if you already have vector search?"</i> → "Vector search is a cheap recall stage; embeddings compress meaning and miss fine query-document interactions. A cross-encoder reranker scores each (query, chunk) pair jointly and is much more precise, but it's O(candidates) at request time. So: retrieve 20–50 candidates, rerank, keep 3–5. Fewer, better chunks also cut prompt cost and the lost-in-the-middle effect."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 13 (the code) · plate 16 (rerank inside the result flow) · <a href="ch04_rag_feature_pipeline.html#s19">Ch.4 plate 19 post-retrieval</a>.</li><li><a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs Ch.8</a> (rerankers, bi- vs cross-encoders) · <a href="../hands_on_llms/ch10_creating_text_embedding_models.html">Ch.10</a> (training bi/cross-encoders).</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · RERANKING · CODE AND THE CROSS-ENCODER SINGLETON</div><h2>Reranker: pair, score, zip, sort, slice</h2></div><span class="chip">pdf p364–367</span></div>
+  <p>The code is in <code>llm_engineering/application/rag/reranking.py</code>. It imports <code>CrossEncoderModelSingleton</code> (from the app's <code>networks</code> module), <code>EmbeddedChunk</code>, <code>Query</code> and <code>RAGStep</code>. The <code>Reranker</code> class's constructor calls the parent (to store the mock flag) and creates the cross-encoder via <code>CrossEncoderModelSingleton()</code>; that model scores each chunk's relevance to the query.</p>
+  <p><code>generate(query, chunks, keep_top_k)</code>: in mock mode it returns the chunks untouched. Otherwise six steps:</p>
+  <ol class="plain">
+    <li>Make <b>pairs</b> of (query text, chunk text), one per chunk.</li>
+    <li>Ask the cross-encoder to <b>score</b> every pair: how well does this chunk match the query?</li>
+    <li><b>Zip</b> scores with their chunks into (score, chunk) tuples.</li>
+    <li><b>Sort</b> the tuples by score, <b>descending</b>.</li>
+    <li>Keep the first <b><code>keep_top_k</code></b>.</li>
+    <li><b>Unpack</b> the chunks from the tuples and return them.</li>
+  </ol>
+  <pre class="code"><code># sketch, our names
+def rerank(question, candidates, keep, scorer, fake=False):
+    if fake:
+        return candidates
+    pairs = [(question.text, c.text) for c in candidates]   # 1
+    scores = scorer(pairs)                                  # 2  one batch call
+    ranked = sorted(zip(scores, candidates),                # 3
+                    key=lambda t: t[0], reverse=True)       # 4
+    return [c for _, c in ranked[:keep]]                    # 5 + 6</code></pre>
+  <h3>The cross-encoder wrapper</h3>
+  <p>The wrapper imports <code>CrossEncoder</code> from the <b>sentence-transformers</b> library (which scores text pairs) and <code>SingletonMeta</code> from the app's base module. <code>SingletonMeta</code> is a <b>metaclass</b> that enforces the <b>singleton pattern</b>: only <b>one instance</b> of the class exists in the whole application.</p>
+  <ul class="plain">
+    <li><b>Constructor.</b> Takes a <code>model_id</code> (default from <code>settings.RERANKING_CROSS_ENCODER_MODEL_ID</code>) and a <code>device</code> (default <code>settings.RAG_MODEL_DEVICE</code>), both loaded from the <code>.env</code> file. It builds the <code>CrossEncoder</code> and calls <code>.model.eval()</code> to put the underlying network in <b>evaluation mode</b>, ready for inference.</li>
+    <li><b><code>__call__(pairs, to_list=True)</code></b>. Makes the object callable like a function. It runs the model's <code>predict()</code> on the list of text pairs and returns the scores as a NumPy float32 array or, by default, a Python list.</li>
+  </ul>
+  <pre class="code"><code># sketch, our names: load the model once, expose a small interface
+class OneInstance(type):                     # book: SingletonMeta
+    _made = {}
+    def __call__(cls, *a, **kw):
+        if cls not in cls._made:
+            cls._made[cls] = super().__call__(*a, **kw)
+        return cls._made[cls]
+
+class PairScorer(metaclass=OneInstance):     # book: CrossEncoderModelSingleton
+    def __init__(self, model_id=CFG.rerank_model, device=CFG.device):
+        self._m = CrossEncoder(model_id, device=device)
+        self._m.model.eval()                 # inference mode
+    def __call__(self, pairs, as_list=True):
+        s = self._m.predict(pairs)
+        return s.tolist() if as_list else s</code></pre>
+  <p class="note">The <code>OneInstance</code> metaclass body is a common way to write a singleton, shown for understanding; the book imports its own <code>SingletonMeta</code> without listing it in this chapter.</p>
+  <p>Why write a wrapper at all? Two reasons the book gives:</p>
+  <ol class="plain">
+    <li><b>Singleton.</b> Any part of the app can get the <b>same</b> loaded model without loading it into memory again each time.</li>
+    <li><b>Own interface.</b> The wrapper defines <b>your</b> interface for a cross-encoder (or any reranking model). If you later want another strategy, for example a reranking <b>API</b>, you write a new wrapper with the same interface and swap it in, without touching the rest of the code. That makes the code future-proof.</li>
+  </ol>
+  <p>That completes all the advanced RAG techniques in the architecture. Next: <code>ContextRetriever</code>, which connects them, and how to use it with an LLM end to end.</p>
+  <div class="fig">
+    <h3>Try it · rerank-score sorter</h3>
+    <p class="small">Query: <i>"How do I add reranking to a RAG pipeline?"</i> The candidates arrive in retrieval order (by cosine). Press the steps; change keep_top_k.</p>
+    <div class="controls"><label>keep_top_k <input type="range" id="s13k" min="1" max="6" value="3"><output id="s13kv">3</output></label><button id="s13pair" type="button">1 · pair</button><button id="s13score" type="button">2 · score</button><button id="s13sort" type="button">3–4 · zip + sort</button><button id="s13cut" type="button">5–6 · slice</button><button id="s13reset" type="button">reset</button></div>
+    <div id="s13out" style="display:grid;gap:5px"></div>
+    <div class="caption" id="s13cap"></div>
+    <p class="note">Chunks, cosine values and cross-encoder scores are modelled. Notice the chunk with the highest cosine is not the most relevant: it shares words, not intent.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A singleton is the one pressure cooker in a joint-family kitchen: everyone uses the same one instead of each person buying their own (loading a model is slow and uses GPU memory). The wrapper is the standard whistle-count recipe: switch to an electric cooker tomorrow and the recipe still says "three whistles". <i>Where it breaks:</i> a shared cooker can only cook one thing at a time; a shared model in a multi-threaded server may need care around concurrent calls.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Scoring all pairs in <b>one</b> <code>predict()</code> call lets the library batch them on the GPU/CPU, much faster than looping. <code>eval()</code> switches off training-only behaviour such as dropout so scores are deterministic. Sorting is O(n log n) on at most N×K items (9 with the book's defaults), so it costs nothing next to the model.</p></div>
+  <div class="box work"><b>Worked example · the numbers</b>
+    <p>9 candidate chunks → 9 (query, chunk) pairs → one batched forward pass → 9 scores, e.g. [0.12, 0.91, 0.05, 0.66, …] → sorted → keep 3. If you doubled N to 6 queries, the reranker would score up to 18 pairs: reranker cost grows linearly with N × K.</p>
+    <p class="note">Score values modelled.</p>
+  </div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you serve a reranker model in a Python API?"</i> → "Load it once per process (singleton or app-startup dependency), set eval mode, score all pairs in a single batched call, and hide it behind a small interface like <code>score(pairs) → list[float]</code> so I can swap in a hosted reranking API or a different model. Cap the candidate count to bound latency."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 12 (why) · plate 17 (<code>ContextRetriever.rerank</code>) · <a href="ch04_rag_feature_pipeline.html">Ch.4</a> (the embedding-model singleton built the same way).</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a> (reranking in RAG).</li></ul></div>
+</section>
+<script>
+(function(){
+  var k=document.getElementById('s13k'), kv=document.getElementById('s13kv'), o=document.getElementById('s13out'), cap=document.getElementById('s13cap'); if(!o) return;
+  var C=[['art#2 "Reranking reranking RAG RAG keywords list"',0.89,0.31],['post#7 "Add a cross-encoder after vector search, keep top 3"',0.84,0.95],['repo#1 "class Reranker: pairs → predict → sort"',0.81,0.88],['art#9 "RAG pipeline overview: ingest, retrieve, generate"',0.80,0.52],['post#3 "Why rerankers cut prompt cost"',0.77,0.71],['art#5 "Fine-tuning Llama with LoRA"',0.70,0.04]];
+  var st=0;
+  function esc(s){ return s.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function draw(){
+    var K=+k.value; kv.textContent=K;
+    var rows=C.map(function(c){return {t:c[0],cos:c[1],ce:c[2]};});
+    if(st>=3) rows.sort(function(a,b){return b.ce-a.ce;});
+    if(st>=4) rows=rows.slice(0,K);
+    o.innerHTML=rows.map(function(r,i){
+      var lab=st>=1?'<span class="pill">(q, '+esc(r.t.split(' ')[0])+')</span>':'';
+      var sc=st>=2?'<div class="barrow"><span>cross-enc</span><div class="bar" style="width:'+Math.round(r.ce*100)+'%"></div><span>'+r.ce.toFixed(2)+'</span></div>':'';
+      return '<div class="samp'+(st>=4?' keep':'')+'"><b>'+(i+1)+'</b> '+esc(r.t)+' <span class="small">cos '+r.cos.toFixed(2)+'</span> '+lab+'<div style="flex-basis:100%">'+sc+'</div></div>';
+    }).join('');
+    cap.innerHTML=['<b>Input.</b> 6 candidates in vector-search order (highest cosine first).','<b>Step 1.</b> Each chunk is paired with the original query text.','<b>Step 2.</b> One batched predict() gives every pair a relevance score.','<b>Steps 3–4.</b> Zip scores with chunks; sort descending. The keyword-stuffed art#2 falls to the bottom half.','<b>Steps 5–6.</b> Keep the first '+K+' and drop the scores: these chunks become the context.'][st];
+  }
+  function go(s){ return function(){ st=s; draw(); }; }
+  document.getElementById('s13pair').addEventListener('click',go(1));
+  document.getElementById('s13score').addEventListener('click',go(2));
+  document.getElementById('s13sort').addEventListener('click',go(3));
+  document.getElementById('s13cut').addEventListener('click',go(4));
+  document.getElementById('s13reset').addEventListener('click',go(0));
+  k.addEventListener('input',draw); draw();
+})();
+</script>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · IMPLEMENTING THE LLM TWIN'S RAG INFERENCE PIPELINE</div><h2>Three parts: retrieve, build the prompt, generate</h2></div><span class="chip">pdf p367</span></div>
+  <p>As said at the start, the RAG inference pipeline divides into three parts: the <b>retrieval module</b>, <b>prompt creation</b>, and <b>answer generation</b> (calling an LLM with the augmented prompt). This section focuses mainly on the retrieval module, where most of the code and logic sits. Then it shows how to build the final prompt from the retrieved context and user query, and finally how retrieval, prompt creation and the LLM combine into an <b>end-to-end RAG workflow</b>.</p>
+  <p>One caveat: you <b>can't test the LLM part yet</b>. The fine-tuned LLM Twin isn't deployed to AWS SageMaker until <a href="ch10_inference_pipeline_deployment.html">Chapter 10</a>. So after this section you will know how to implement the whole pipeline, but you can run it end to end only after finishing Chapter 10. (The retrieval module itself can be run now; plate 18 does exactly that.)</p>
+  <div class="tablewrap"><table>
+    <tr><th>Part</th><th>Where in the code</th><th>Testable in Ch.9?</th></tr>
+    <tr><td>Retrieval module</td><td><code>ContextRetriever</code> (<code>application/rag/retriever.py</code>)</td><td><span class="pill good">yes</span> needs Qdrant + OpenAI key</td></tr>
+    <tr><td>Prompt creation</td><td>template inside the inference executor; <code>EmbeddedChunk.to_context()</code></td><td><span class="pill good">yes</span></td></tr>
+    <tr><td>Generation</td><td><code>call_llm_service()</code> → SageMaker endpoint</td><td><span class="pill bad">no</span> until Ch.10</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>Building a new metro line: tracks, stations and signalling can all be built and tested section by section, but you can't run a passenger train end to end until the rolling stock (the deployed model) arrives. <i>Where it breaks:</i> a metro can run a test engine; here you could point <code>call_llm_service</code> at any hosted model to test the flow early, the book just doesn't.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Because each part has its own interface, they can be developed and tested independently: retrieval against the real vector DB, prompt building as a pure function, generation as an HTTP client. That's the payoff of the modular design in plate 4.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you test a RAG service before the model is deployed?"</i> → "Test retrieval on its own with a labelled set of queries and expected chunks (recall@K; MRR, mean reciprocal rank), unit-test the prompt builder as a pure function, and stub the generator behind its interface. End-to-end tests come once the endpoint exists."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 15–18 (retrieval) · plate 19 (prompt + generation) · <a href="ch07_evaluating_llms.html">Ch.7 Evaluating LLMs</a> (RAG evaluation).</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · IMPLEMENTING THE RETRIEVAL MODULE · SEARCH LOGIC</div><h2>Inside one "search": three collections, K/3 each, author filter on all</h2></div><span class="chip">pdf p368–369 · Fig 9-2</span></div>
+  <p>The <b><code>ContextRetriever</code></b> class (<code>llm_engineering/application/rag/retriever.py</code>) <b>orchestrates</b> the retrieval step by combining every technique so far: query expansion, self-querying, reranking and filtered vector search. Its entry point is the <b><code>search()</code></b> method.</p>
+  <figure class="bookfig"><img src="figs/fig-9-2.png" alt="Search logic: query goes to query expansion (Query 1..N) and self query (Query Metadata: author ID, full name); author details are used as filters on Search 1..N; a zoom on one search shows three searches (articles, posts, repositories, each x K/3) against the vector DB returning results of at most K/3 each, combined into results of at most K; across N searches, N×K results go to rerank and K results become the context" loading="lazy"><figcaption>Figure 9.2 (book, pdf p368): Search logic of the RAG retrieval module</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The bottom half repeats Figure 9.1's left side: ① query → ② <b>Query Expansion</b> (Query 1…N) and ③ <b>Self Query</b> → <b>Query Metadata</b>, listed as <b>Author: ID, Full Name</b>. A dotted arrow labelled "Use author details as filters" points to ④ <b>Filtered Vector Search</b>, where Search 1…N each get the ⊕ filter. The dotted box at the top is a <b>zoom into one "Search"</b>: reading right to left, three green searches (<b>Search Articles</b>, <b>Search Posts</b>, <b>Search Repositories</b>, each asking for <b>x K/3</b>) hit the vector DB; each returns orange results of <b>≤ K/3</b>; together they form <b>Results ≤ K</b>. The very top row is the whole module's output: after "xN Searches", <b>Results N × K</b> → <b>Rerank</b> → <b>Results xK</b> → <b>Context</b>.</p>
+  <p>The figure shows two things clearly. First, the author details from self-query become the filter for the vector search. Second, each query is really <b>three searches</b>, one per data category: <b>articles, posts, repositories</b>. Each of the N searches should return at most <b>K</b> results, so each category gets at most <b>K / 3</b>. Summed, one search gives a list of <b>≤ K</b> chunks.</p>
+  <p>Why "≤ K" and not exactly K? If one or more categories return <b>fewer than K/3</b> items after the author filter (because that author has few or no chunks in that category), the total comes up short.</p>
+  <div class="fig">
+    <h3>Try it · how many chunks does retrieval really produce?</h3>
+    <p class="small">Set K and N, and how many chunks the filtered author actually has in each collection.</p>
+    <div class="controls">
+      <label>K <input type="range" id="s15k" min="3" max="12" step="3" value="3"><output id="s15kv">3</output></label>
+      <label>N queries <input type="range" id="s15n" min="1" max="5" value="3"><output id="s15nv">3</output></label>
+      <label>author's articles <input type="number" id="s15a" min="0" value="40"></label>
+      <label>posts <input type="number" id="s15p" min="0" value="12"></label>
+      <label>repos <input type="number" id="s15r" min="0" value="0"></label>
+    </div>
+    <div class="readout" id="s15out"></div>
+    <p class="note">Modelled: the per-collection counts are invented. The arithmetic (limit = K // 3 per category, ≤ K per search, ≤ N × K before dedupe) follows the book's code. Integer division: K = 4 would give 1 per category, i.e. ≤ 3 per search.</p>
+  </div>
+  <div class="box work"><b>Worked example · the author with no repositories</b>
+    <p>K = 3, N = 3. Per category limit = 3 // 3 = <b>1</b>. Paul has articles and posts but (say) no repositories. Each search returns 1 article + 1 post + 0 repos = <b>2</b> chunks (≤ K = 3). Three searches → at most <b>6</b> chunks before dedupe, not 9.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A thali with three katoris: dal, sabzi, raita. The rule is "at most one scoop per katori", so at most three scoops per thali. If the kitchen has run out of raita, your thali has two scoops: still a valid thali, just short. <i>Where it breaks:</i> a fixed split guarantees variety but can waste a slot on a weak category while a strong one is capped; plate 21's router addresses that.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The three content types live in <b>separate Qdrant collections</b> (one per <code>EmbeddedChunk</code> subclass from Chapter 4), so one query can't search them all at once. Splitting K evenly guarantees each type a chance to appear in the candidate pool; the reranker then decides which actually make the final K, regardless of type.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your knowledge base has several collections. How do you search them?"</i> → "Fan out one query to each collection with a per-collection limit (here K/3), apply the same metadata filter to all, union the results and let a reranker decide globally. If latency or noise is a problem, add a router that picks which collections to hit per query."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 16 (what happens to these results) · plate 17 (the <code>_search</code> code) · <a href="ch04_rag_feature_pipeline.html#s33">Ch.4 plate 33</a> (loading chunks into per-category collections).</li></ul></div>
+</section>
+<script>
+(function(){
+  var ids=['s15k','s15n','s15a','s15p','s15r'], el={}; ids.forEach(function(i){ el[i]=document.getElementById(i); }); if(!el.s15k) return;
+  function draw(){
+    var K=+el.s15k.value, N=+el.s15n.value; document.getElementById('s15kv').textContent=K; document.getElementById('s15nv').textContent=N;
+    var lim=Math.floor(K/3), a=Math.min(lim,Math.max(0,+el.s15a.value||0)), p=Math.min(lim,Math.max(0,+el.s15p.value||0)), r=Math.min(lim,Math.max(0,+el.s15r.value||0));
+    var per=a+p+r;
+    document.getElementById('s15out').innerHTML='<span>limit per category <b>'+lim+'</b></span><span>per search: '+a+' art + '+p+' post + '+r+' repo = <b>'+per+'</b> (≤ K='+K+')</span><span>vector DB calls <b>'+(3*N)+'</b></span><span>before dedupe ≤ <b>'+(per*N)+'</b> (max N×K = '+(N*K)+')</span><span>after rerank ≤ <b>'+Math.min(K,per*N)+'</b></span>';
+  }
+  ids.forEach(function(i){ el[i].addEventListener('input',draw); }); draw();
+})();
+</script>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · PROCESSING THE RESULTS</div><h2>Aggregate, deduplicate, rerank, keep top K</h2></div><span class="chip">pdf p369–370 · Fig 9-3</span></div>
+  <p>Each of the N searches returns <b>≤ K</b> items, so together you get <b>≤ N × K</b> chunks, gathered into <b>one list</b>. Different searches can return the <b>same</b> chunk (the expanded queries are related, after all), so the aggregated list must be <b>deduplicated</b> so every chunk is unique. Then the results go to the <b>rerank model</b>, are ordered by reranking score, and the most relevant <b>top K</b> become the context for RAG.</p>
+  <figure class="bookfig"><img src="figs/fig-9-3.png" alt="Results flow: vector DB returns N×K results across Search 1..N (each a list of article, post and code chunks); step 2 aggregates and deduplicates into Results N×K; step 3 reranks against the query into Ranked Results N×K; step 4 takes Top K, for example Article Chunk 4, Post Chunk 10 and Article Chunk K" loading="lazy"><figcaption>Figure 9.3 (book, pdf p369): Processing the results flow of the RAG retrieval module</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> ① Top left: "xN Searches" against the <b>Vector DB</b> return <b>Results N × K</b>, drawn as separate lists: <b>Search 1</b> (Article Chunk 1, Article Chunk 2 … Code Chunk K), <b>Search 2</b> (Post Chunk 1, Code Chunk 2 … ), <b>Search N</b> (Article Chunk 1, Post Chunk 2 …). Note "Article Chunk 1" appears in both Search 1 and Search N: that's the overlap. ② The lists hit a grey bar and go through <b>Aggregate &amp; Deduplicate</b> into one <b>Results N × K</b> box (Post Chunk 1, Code Chunk 2, Article Chunk 3, Article Chunk 4 … Article Chunk N × K). ③ That list, together with the <b>Query</b>, goes into <b>Rerank</b>, giving <b>Ranked Results N × K</b> in a new order (Article Chunk 4 first, Post Chunk 10 second … Post Chunk 1 last). ④ <b>Top K</b> cuts it to Article Chunk 4, Post Chunk 10 … Article Chunk K. Colours mark chunk types; the order change between ② and ③ is the whole point of reranking.</p>
+  <div class="fig">
+    <h3>Step through · query-expansion merge, dedupe, rerank</h3>
+    <p class="small">Three expanded queries, K = 3. Watch the lists merge, duplicates collapse, and the reranker reorder them.</p>
+    <div class="stepbar"><button id="s16prev" type="button">◀ Back</button><button id="s16next" type="button">Next ▶</button><span id="s16n"></span></div>
+    <div id="s16box" style="display:grid;gap:8px"></div>
+    <div class="caption" id="s16cap"></div>
+    <p class="note">Chunk ids and scores are modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Three friends each bring their shortlist of restaurants for Saturday dinner. You merge the lists, strike out repeats ("Vidyarthi Bhavan" was on two lists), then the one friend who knows everyone's taste ranks the remaining places, and you pick the top three to book. <i>Where it breaks:</i> a restaurant that appears on all three lists is a strong signal, but simple dedupe throws that "vote count" away; fusion methods like RRF (reciprocal rank fusion, beyond the book) keep it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Dedupe matters for two reasons: the reranker would waste work scoring the same chunk twice, and duplicates could fill several of the K slots with the same text, crowding out other useful context. The book dedupes with a Python <code>set</code>, which relies on the chunk objects comparing equal by identity/id (plate 17).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You run several queries per request. How do you merge the results?"</i> → "Flatten, dedupe by chunk id, then either rerank the union against the original question with a cross-encoder (what the LLM Twin does) or, cheaper, fuse ranks with reciprocal rank fusion. Reranking the union is more precise; RRF needs no model."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 13 (the reranker) · plate 17 (the <code>flatten</code> + <code>set</code> code) · plate 22 (hybrid search merges results from two retrievers).</li></ul></div>
+</section>
+<script>
+(function(){
+  var b=document.getElementById('s16box'), c=document.getElementById('s16cap'), n=document.getElementById('s16n'); if(!b) return;
+  function ck(t,cls){ return '<span class="ck '+(cls||'')+'">'+t+'</span>'; }
+  function lane(t,inner){ return '<div class="lane"><b>'+t+'</b><div class="cks">'+inner+'</div></div>'; }
+  var Q1=ck('art#4','a')+ck('post#10','p')+ck('repo#2','r'), Q2=ck('art#4','a')+ck('post#1','p')+ck('repo#2','r'), Q3=ck('art#3','a')+ck('post#10','p'), sc={'art#4':0.94,'post#10':0.88,'repo#2':0.61,'art#3':0.72,'post#1':0.10};
+  var S=[
+    [lane('Search 1 (original query)',Q1)+lane('Search 2 (rewrite A)',Q2)+lane('Search 3 (rewrite B)',Q3),'<b>① xN searches.</b> Each search returns ≤ K = 3 chunks (1 per category). Search 3 found no repo for this author: only 2.'],
+    [lane('aggregated (flatten): 8 items',Q1+Q2+Q3),'<b>② Aggregate.</b> Flatten the three lists into one: 8 items, ≤ N×K = 9.'],
+    [lane('deduplicated: 5 unique',ck('art#4','a')+ck('post#10','p')+ck('repo#2','r')+ck('art#4','a dup')+ck('post#1','p')+ck('repo#2','r dup')+ck('art#3','a')+ck('post#10','p dup')),'<b>② Deduplicate.</b> art#4, repo#2 and post#10 were found twice. list(set(...)) keeps one copy each: 5 unique chunks.'],
+    [lane('reranked against the original query',['art#4','post#10','art#3','repo#2','post#1'].map(function(k){ return ck(k+' · '+sc[k].toFixed(2), k[0]==='a'?'a':(k[0]==='p'?'p':'r')); }).join('')),'<b>③ Rerank.</b> The cross-encoder scores each of the 5 against the original question; sorted high to low. art#3 (found only by rewrite B) beats repo#2.'],
+    [lane('top K = 3 → context',ck('art#4 · 0.94','top')+ck('post#10 · 0.88','top')+ck('art#3 · 0.72','top')+ck('repo#2 · 0.61','gone')+ck('post#1 · 0.10','gone')),'<b>④ Top K.</b> Keep the first 3. Note art#3 came from an expanded query: without expansion it would never have been a candidate.']
+  ];
+  var i=0;
+  function draw(){ b.innerHTML=S[i][0]; c.innerHTML=S[i][1]; n.textContent='step '+(i+1)+' / '+S.length; }
+  document.getElementById('s16prev').addEventListener('click',function(){ i=Math.max(0,i-1); draw(); });
+  document.getElementById('s16next').addEventListener('click',function(){ i=Math.min(S.length-1,i+1); draw(); });
+  draw();
+})();
+</script>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · THE CONTEXTRETRIEVER CLASS</div><h2>search(): self-query → expand → parallel filtered searches → flatten + dedupe → rerank</h2></div><span class="chip">pdf p370–373</span></div>
+  <h3>Construction</h3>
+  <p>The constructor creates the three helpers, passing the same <code>mock</code> flag to each: a <code>QueryExpansion</code>, a <code>SelfQuery</code> (stored as the "metadata extractor") and a <code>Reranker</code>.</p>
+  <h3>search(query, k=3, expand_to_n_queries=3)</h3>
+  <ol class="plain">
+    <li><b>Wrap and self-query.</b> Turn the input string into a <code>Query</code> with <code>from_str</code>, then run self-query to fill <code>author_id</code> and <code>author_full_name</code>. Log the extracted author id. (Note the order in the code: self-query runs <b>before</b> expansion, so every expanded query inherits the author fields through <code>replace_content</code>.)</li>
+    <li><b>Expand.</b> Generate <code>expand_to_n_queries</code> queries; log how many.</li>
+    <li><b>Search in parallel.</b> Open a <b><code>ThreadPoolExecutor</code></b>, submit one <code>_search(query, k)</code> task per expanded query, and collect results with <code>as_completed</code> (in whatever order they finish).</li>
+    <li><b>Flatten and dedupe.</b> Flatten the list of lists with a utility, then <code>list(set(...))</code> to remove duplicates. Log the number of documents.</li>
+    <li><b>Rerank.</b> If anything was found, call <code>rerank(query, chunks, keep_top_k=k)</code>; otherwise return an empty list.</li>
+  </ol>
+  <pre class="code"><code># sketch, our names
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def find_context(self, text, k=3, n_queries=3):
+    q = Question.parse(text)
+    q = self.author_finder.run(q)                 # self-query first
+    variants = self.expander.run(q, n=n_queries)  # each keeps the author fields
+    with ThreadPoolExecutor() as pool:
+        jobs = [pool.submit(self._one_search, v, k) for v in variants]
+        lists = [j.result() for j in as_completed(jobs)]
+    pool_of_chunks = list(set(flatten(lists)))     # merge + dedupe
+    if not pool_of_chunks:
+        return []
+    return self.rerank(text, pool_of_chunks, keep=k)</code></pre>
+  <p><b>Why threads?</b> Each search is mostly waiting on network I/O (the embedding call is local, but the vector DB queries are remote), so Python threads can overlap the waiting even with the GIL (global interpreter lock). This is the parallelization promised in plate 7.</p>
+  <h3>_search(query, k=3): the filtered search for one query</h3>
+  <ul class="plain">
+    <li><b>Guard:</b> assert <code>k &gt;= 3</code>; with three categories, a smaller K would give <code>k // 3 = 0</code> per category.</li>
+    <li><b>Embed:</b> <code>EmbeddingDispatcher.dispatch(query)</code> turns the <code>Query</code> into an <code>EmbeddedQuery</code> (vector + metadata). It is the <b>same dispatcher</b> the feature pipeline used to embed the chunks, which guarantees the <b>same embedding model at ingestion and query time</b>. The book calls this critical for retrieval: vectors from two different models live in different spaces and can't be compared.</li>
+    <li><b>Inner helper <code>_search_data_category(chunk_class, embedded_query)</code>:</b> if the query has an <code>author_id</code>, build the Qdrant <code>Filter</code>/<code>FieldCondition</code>/<code>MatchValue</code> filter on it (plate 11); otherwise no filter. Then call that chunk class's <code>search()</code> with the query vector, <code>limit = k // 3</code> and the filter.</li>
+    <li><b>Three calls:</b> one each for <code>EmbeddedPostChunk</code>, <code>EmbeddedArticleChunk</code>, <code>EmbeddedRepositoryChunk</code>; concatenate posts + articles + repositories and return.</li>
+  </ul>
+  <pre class="code"><code># sketch, our names
+def _one_search(self, q, k=3):
+    assert k >= 3
+    vq = Embedder.dispatch(q)                     # same model as ingestion!
+    def in_collection(chunk_cls):
+        flt = author_filter(vq.writer_id) if vq.writer_id else None
+        return chunk_cls.search(query_vector=vq.vector, limit=k // 3, query_filter=flt)
+    return (in_collection(PostChunk) + in_collection(ArticleChunk)
+            + in_collection(RepoChunk))</code></pre>
+  <h3>rerank(query, chunks, keep_top_k)</h3>
+  <p>Accepts either a string or a <code>Query</code> (it converts a string with <code>from_str</code>), calls the <code>Reranker</code>'s <code>generate()</code>, logs how many documents were kept, and returns them. Being a public method, it can also be reused on its own.</p>
+  <div class="fig">
+    <h3>Try it · sequential vs thread-pool searches</h3>
+    <div class="controls"><label>N queries <input type="range" id="s17n" min="1" max="6" value="3"><output id="s17nv">3</output></label><label><input type="checkbox" id="s17p" checked> ThreadPoolExecutor</label></div>
+    <svg id="s17svg" viewBox="0 0 520 170" class="dg" role="img" aria-label="Timeline of searches" style="width:100%;height:auto;max-width:520px"></svg>
+    <div class="readout" id="s17out"></div>
+    <p class="note">Modelled timings: each _search = embed 15 ms + 3 collection calls of 25 ms each = 90 ms; the three category calls inside one _search are sequential, as in the book's code.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding planner (ContextRetriever) doesn't cook, decorate or play music. She checks the guest list for the family name (self-query), sends three assistants to three markets at the same time (thread pool), merges their shopping, throws out duplicate items, and has the head cook pick the best (rerank). <i>Where it breaks:</i> if the assistants all go to the same overloaded market (one vector DB), "parallel" stops being free.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The orchestrator only knows the interfaces of its helpers. It never calls OpenAI or the cross-encoder directly, so swapping a helper (different expansion prompt, API reranker) doesn't touch it. The single <code>mock</code> flag passed down means the whole retriever can run without any LLM cost.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's the single most common silent bug in RAG retrieval?"</i> → "Embedding queries with a different model, version or preprocessing than the documents. Everything still returns results, just bad ones. Route both ingestion and query embedding through one shared component, and store the model id in each chunk's metadata so you can detect mismatches."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 5 (<code>Query</code>), 8 (expansion), 10 (self-query), 11 (filter), 13 (reranker) · <a href="ch04_rag_feature_pipeline.html#s32">Ch.4 plate 32</a> (the <code>EmbeddingDispatcher</code>).</li></ul></div>
+</section>
+<script>
+(function(){
+  var r=document.getElementById('s17n'), v=document.getElementById('s17nv'), p=document.getElementById('s17p'), svg=document.getElementById('s17svg'), o=document.getElementById('s17out'); if(!svg) return;
+  function draw(){
+    var n=+r.value; v.textContent=n; var par=p.checked, T=90, w=79, s='', y0=14;
+    for(var i=0;i<n;i++){ var x=10+(par?i*2:i*w); var yy=y0+i*24;
+      s+='<rect x="'+x+'" y="'+yy+'" width="'+w+'" height="18" rx="3" class="hi"/><text x="'+(x+6)+'" y="'+(yy+13)+'" style="font-size:11px">Q'+(i+1)+' _search</text>'; }
+    svg.setAttribute('viewBox','0 0 520 '+(y0+n*24+14));
+    svg.innerHTML=s;
+    var total=par?T+5:T*n;
+    o.innerHTML='<span>search phase ≈ <b>'+total+' ms</b></span><span>'+(par?'threads overlap the waiting':'one after another')+'</span><span>vector DB calls <b>'+(3*n)+'</b></span>';
+  }
+  r.addEventListener('input',draw); p.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · RUNNING THE RETRIEVER</div><h2>One call, three chunks, and all the metadata you need for citations</h2></div><span class="chip">pdf p373–375</span></div>
+  <p>With <code>ContextRetriever</code>, the whole advanced RAG retrieval is a few lines: create the retriever with <code>mock=False</code>, call <code>search(query, k=3)</code>, and log each returned document with its rank. The book's test query is a multi-line request: the user introduces himself as Paul Iusztin and asks for a <b>LinkedIn post about RAG systems</b>, focusing on <b>how RAG works</b> and <b>how it integrates with vector DBs and LLMs</b>. It is run with the Poe the Poet task <code>poetry poe call-rag-retrieval-module</code>.</p>
+  <p>The output: three ranked documents, all by <b>Paul Iusztin</b> (the self-query filter worked):</p>
+  <ol class="plain">
+    <li>A chunk from his <b>Decoding ML Substack</b> article on four advanced RAG algorithms.</li>
+    <li>A chunk from a <b>Medium</b> article giving an overview of advanced RAG optimization (a production RAG system split into ingestion, retrieval and generation).</li>
+    <li>A chunk from a Medium article introducing the LLM Twin course lessons (end-to-end framework, data pipelines, change data capture).</li>
+  </ol>
+  <p>Each printed result is a full chunk object with fields such as <code>id</code>, <code>content</code>, <code>platform</code>, <code>document_id</code>, <code>author_id</code>, <code>author_full_name</code>, <code>link</code>, and a <code>metadata</code> dict recording the embedding model <b><code>sentence-transformers/all-MiniLM-L6-v2</code></b>, <b>embedding size 384</b> and <b>max input length 256</b>. Notice results 2 and 3 share the same <code>document_id</code>: two different chunks of the same article.</p>
+  <p>The point the book draws: alongside the content, you get metadata like the <b>embedding model</b> used and the <b>link</b> the chunk came from. Links can easily become a <b>list of references</b> in the generated answer, which <b>increases trust</b> in the result.</p>
+  <div class="fig">
+    <h3>Try it · from retrieved chunk to citation</h3>
+    <div class="controls"><label>result <select id="s18r"><option value="0">#1 Substack article</option><option value="1">#2 Medium overview</option><option value="2">#3 Medium course intro</option></select></label></div>
+    <div class="kv" id="s18kv"></div>
+    <div class="verdict good" id="s18cite"></div>
+    <p class="note">Field names and embedding metadata follow the book's printed output; ids are shortened and titles paraphrased.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A good news anchor reads the story and then says "according to PTI". The chunk's <code>link</code> and <code>platform</code> are the PTI line: the viewer can go and check. <i>Where it breaks:</i> the anchor knows which wire each sentence came from; an LLM blending three chunks may attribute a sentence to the wrong one unless you ask it to cite per claim.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Qdrant stores each vector with a <b>payload</b> (everything except the vector). Because the search uses <code>with_payload</code>, the full chunk comes back, so the retriever never needs a second lookup in the data warehouse to know where a chunk came from. Storing the embedding model id per chunk also documents which model produced the vectors (plate 17's consistency rule).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you make RAG answers trustworthy?"</i> → "Store source metadata (URL, title, document id, timestamp) in the payload of every chunk, return it with the hits, pass it into the prompt, and ask the model to cite. The UI shows the links. It also lets users and evaluators verify that each claim is grounded."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_rag_feature_pipeline.html">Ch.4</a> (chunk metadata and the all-MiniLM-L6-v2 embedding model) · plate 19 (how the chunks become context).</li></ul></div>
+</section>
+<script>
+(function(){
+  var s=document.getElementById('s18r'), kv=document.getElementById('s18kv'), c=document.getElementById('s18cite'); if(!s) return;
+  var D=[['541d…a330','Advanced RAG algorithms you must know…','decodingml.substack.com','3264…2392','decodingml.substack.com/p/the-4-advanced-rag-algorithms-you'],
+         ['5ce7…cb21','Overview of advanced RAG optimization techniques…','medium','bd90…b6bf','medium.com/decodingml/the-4-advanced-rag-algorithms-you-must-know-to-implement-…'],
+         ['0405…46ff','Every Medium article will be its own lesson…','medium','bd90…b6bf','medium.com/decodingml/the-4-advanced-rag-algorithms-you-must-know-to-implement-…']];
+  function draw(){ var d=D[+s.value];
+    kv.innerHTML='<span>id</span><span>'+d[0]+'</span><span>content</span><span>"'+d[1]+'"</span><span>platform</span><span>'+d[2]+'</span><span>document_id</span><span>'+d[3]+'</span><span>author_full_name</span><span>Paul Iusztin</span><span>metadata</span><span>embedding_model_id: all-MiniLM-L6-v2 · embedding_size: 384 · max_input_length: 256</span><span>link</span><span>'+d[4]+'</span>';
+    c.textContent='Reference ['+(+s.value+1)+']: Paul Iusztin, '+d[2]+', '+d[4];
+  }
+  s.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · BRINGING EVERYTHING TOGETHER INTO THE RAG INFERENCE PIPELINE</div><h2>call_llm_service + a prompt template + rag(): five lines on top of everything</h2></div><span class="chip">pdf p375–376</span></div>
+  <p>Two steps remain: <b>build the prompt</b> from the retrieved context and <b>call the LLM</b>. Both get wrapped into one <code>rag()</code> function (book repo: <code>llm_engineering/infrastructure/inference_pipeline_api.py</code>).</p>
+  <h3>call_llm_service(query, context)</h3>
+  <p>It takes the user's query and an <b>optional</b> context. It sets up the LLM endpoint object (<code>LLMInferenceSagemakerEndpoint</code>, pointed at the endpoint name from settings), runs inference through an <code>InferenceExecutor</code> with the LLM, query and context, and returns the answer. The context is optional, so you can also call the LLM <b>without</b> RAG, like any chat model. Under the hood it makes an <b>HTTP request</b> to the fine-tuned LLM Twin hosted as an <b>AWS SageMaker inference endpoint</b>. Both SageMaker classes are explained in <a href="ch10_inference_pipeline_deployment.html">Chapter 10</a>.</p>
+  <h3>The prompt template</h3>
+  <p>Inside the executor, query and context become the final prompt through a simple <b>f-string template</b>. Its meaning: <i>you are a content creator; write what the user asked for, using the provided context as the <b>primary source</b> of information</i>, followed by a "User query:" line and a "Context:" line.</p>
+  <pre class="code"><code># sketch, our wording (same structure as the book's template)
+def make_prompt(user_ask: str, context: str) -> str:
+    return (
+        "You write content for the user. Rely mainly on the context below.\n"
+        f"User request: {user_ask}\n"
+        f"Context: {context}\n"
+    )</code></pre>
+  <h3>rag(query)</h3>
+  <ol class="plain">
+    <li>Create a <code>ContextRetriever(mock=False)</code>.</li>
+    <li><code>search(query, k=3)</code> for the documents.</li>
+    <li><code>EmbeddedChunk.to_context(documents)</code> maps the chunks to one context string.</li>
+    <li><code>call_llm_service(query, context)</code> gets the answer.</li>
+    <li>Return the answer.</li>
+  </ol>
+  <pre class="code"><code># sketch, our names
+def answer(user_ask: str) -> str:
+    chunks = Retriever(fake=False).find_context(user_ask, k=3)
+    context = Chunk.join_as_context(chunks)     # book: EmbeddedChunk.to_context
+    return ask_llm(user_ask, context)           # book: call_llm_service</code></pre>
+  <p>Because every RAG step was put in its own class, the top-level function shrinks to <b>five lines</b> that hide the whole system's complexity, much like the high-level APIs of <b>LangChain</b>, <b>LlamaIndex</b> or <b>Haystack</b>. The difference: you built the advanced RAG service <b>from scratch</b> instead of using theirs. Clear responsibilities also mean the classes work like <b>LEGO</b> blocks: you can call the LLM alone without context, or use the retrieval module alone as a <b>query engine</b> over your vector DB. <code>rag()</code> runs for real in Chapter 10, after the fine-tuned LLM is deployed.</p>
+  <div class="fig">
+    <h3>Try it · see the final prompt being built</h3>
+    <div class="controls"><label><input type="checkbox" id="s19ctx" checked> pass context (RAG)</label><label>chunks K <input type="range" id="s19k" min="0" max="3" value="3"><output id="s19kv">3</output></label></div>
+    <pre class="code"><code id="s19out"></code></pre>
+    <div class="readout" id="s19rd"></div>
+    <p class="note">Chunk texts are modelled; token counts are rough (≈ 4 characters per token, modelled).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A newspaper columnist with a research assistant. The assistant (retriever) drops three clippings on the desk; the editor's note on top (template) says "write the column, base it on these clippings"; the columnist (LLM) writes. On a slow day the columnist can write from memory with no clippings (context optional), and the assistant can also fetch clippings for someone else (retriever as query engine). <i>Where it breaks:</i> a columnist knows which clipping is reliable; the template only says "primary source", so the model may still mix in its own memory.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>"Augmentation" really is just string formatting: chunks → text → slots in a template. That's why it didn't deserve its own module (plate 1). The real design choices are elsewhere: how many chunks (K), in what order (rerank puts the best first, which helps given the first/last bias from plate 12), and what instruction tells the model how to use them.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you structure the code of a RAG service?"</i> → "Small single-purpose components behind interfaces (query rewriter, metadata extractor, retriever, reranker, prompt builder, LLM client) and a thin orchestration function that wires them. Each piece is testable and reusable on its own, for example the retriever as a search API, or the LLM client without RAG."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 17 (<code>ContextRetriever</code>) · <a href="ch10_inference_pipeline_deployment.html">Ch.10</a> (SageMaker endpoint, <code>InferenceExecutor</code>, FastAPI) · <a href="../ai_engineering/ch05_prompt_engineering.html">AI Engineering Ch.5 Prompt engineering</a>.</li></ul></div>
+</section>
+<script>
+(function(){
+  var c=document.getElementById('s19ctx'), k=document.getElementById('s19k'), kv=document.getElementById('s19kv'), o=document.getElementById('s19out'), rd=document.getElementById('s19rd'); if(!o) return;
+  var CH=['[1] (substack) Four advanced RAG algorithms: query expansion, self-query, filtered search, rerank…','[2] (medium) A production RAG system has ingestion, retrieval and generation…','[3] (linkedin) Vector DBs store embeddings; the LLM reads retrieved chunks as context…'];
+  var Q='Draft a LinkedIn post on how RAG works with vector DBs and LLMs.';
+  function draw(){
+    var K=+k.value; kv.textContent=K; var use=c.checked;
+    var ctx=use?CH.slice(0,K).join('\n'):'None';
+    var txt='You write content for the user. Rely mainly on the context below.\nUser request: '+Q+'\nContext: '+ctx;
+    o.textContent=txt;
+    rd.innerHTML='<span>prompt ≈ <b>'+Math.round(txt.length/4)+'</b> tokens</span><span>'+(use?(K?'RAG on: '+K+' chunk(s)':'RAG on but nothing retrieved'):'plain LLM call (context optional)')+'</span>';
+  }
+  c.addEventListener('change',draw); k.addEventListener('input',draw); draw();
+})();
+</script>
+
+<!-- 20 -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · POSSIBLE IMPROVEMENTS · CONVERSATION MEMORY</div><h2>Memory for a chatbot: keep the latest K turns, or a summary plus the latest K</h2></div><span class="chip">pdf p376–377 · Fig 9-4</span></div>
+  <p>Before closing, the book lists improvements you could add. The first, since this is a chatbot: <b>conversation memory</b>. Store all user prompts and generated answers. When prompting the LLM, pass the <b>conversation history</b> along with the new input and the context, so the bot knows the whole conversation, not just the latest message.</p>
+  <p>History grows, and a long history can <b>overflow the context window</b> or raise <b>costs</b>. So you need a way to <b>shrink</b> the memory:</p>
+  <ul class="plain">
+    <li><b>Option 1 · keep only the latest K items.</b> The simplest. The downside: the LLM will <b>never</b> be aware of the whole conversation; anything older than K is gone.</li>
+    <li><b>Option 2 · a summary plus the latest K replies.</b> Keep a running <b>summary</b> of the conversation along with the latest K turns. There are many ways to compute the summary (beyond the book's scope); the simplest is to <b>update the summary on every user prompt</b> and generated answer.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-9-4.png" alt="Top: Routing, where a router reads the query and picks one of search articles, posts or repositories, and the picked search goes to the vector DB. Bottom: Memory, a long conversation history of alternating user prompts and generated answers reduced either to Option 1, keep only the latest K, or Option 2, a conversation summary plus the latest K" loading="lazy"><figcaption>Figure 9.4 (book, pdf p377): Routing and memory examples</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two separate ideas, split by a dotted line. <b>Top, "Routing"</b> (read right to left): a <b>Query</b> enters a <b>Router</b>, which fans out to three possible searches, <b>Search Articles</b>, <b>Search Posts</b>, <b>Search Repositories</b>; only the <b>Picked Search</b> goes to the <b>Vector DB</b>. That's plate 21. <b>Bottom, "Memory"</b>: on the left the full <b>Conversation History</b>, alternating <b>User Prompt</b> / <b>Generated Answer</b> pills that go on and on ("…"). The thick arrow leads to <b>Option 1: Keep only the latest K</b>, just the last two exchanges. On the right, <b>Option 2: Summary + latest K</b>: a green <b>Conversation Summary</b> box on top of the same latest exchanges. Option 2 costs a few more tokens but keeps the gist of everything earlier.</p>
+  <div class="fig">
+    <h3>Try it · what the LLM remembers</h3>
+    <p class="small">A 10-turn chat. The key fact ("my audience is backend engineers") was said in turn 2. Change K and the strategy.</p>
+    <div class="controls"><label>strategy <select id="s20s"><option value="all">full history</option><option value="k">option 1 · latest K</option><option value="sk">option 2 · summary + latest K</option></select></label><label>K turns <input type="range" id="s20k" min="1" max="10" value="3"><output id="s20kv">3</output></label></div>
+    <div id="s20out" class="cks"></div>
+    <div class="readout" id="s20rd"></div>
+    <p class="note">Turn texts and token counts (≈ 120 tokens per turn, summary ≈ 80 tokens) are modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A chai stall owner with regulars. Option 1: he remembers only the last three things you said today, so he forgets you take less sugar. Option 2: he keeps a little notebook line per customer ("Ravi: less sugar, no ginger, pays monthly") plus today's chat. <i>Where it breaks:</i> the notebook is only as good as what he chose to write; a summary written by an LLM can drop a detail that later turns out to matter.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every LLM call is stateless: the model only knows what is in the prompt. "Memory" is just you deciding what past text to resend each time, under a token budget. A rolling summary turns O(n) history into roughly constant size, at the cost of an extra LLM call per turn and possible loss of details.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you give a chatbot long-term memory?"</i> → "Short-term: a sliding window of the last K turns plus a rolling summary updated each turn. Long-term: write important facts or whole turns into a vector store and retrieve them like any RAG context, filtered by user id. The prompt then has summary + recent turns + retrieved memories + retrieved documents, all under a token budget." That is exactly the shape of a RAG memory system for voice or chat agents.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 21 (routing, the top half of Fig 9.4) · <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a> (agent memory) · <a href="../hands_on_llms/ch07_advanced_text_generation.html">Hands-On LLMs Ch.7</a> (conversation buffer and summary memory).</li></ul></div>
+</section>
+<script>
+(function(){
+  var s=document.getElementById('s20s'), k=document.getElementById('s20k'), kv=document.getElementById('s20kv'), o=document.getElementById('s20out'), rd=document.getElementById('s20rd'); if(!o) return;
+  var T=['1 user: hi','2 user: my audience is backend engineers','3 bot: noted','4 user: topic is RAG','5 bot: outline…','6 user: shorter intro','7 bot: revised…','8 user: add a code example','9 bot: added…','10 user: final version please'];
+  function draw(){
+    var K=+k.value; kv.textContent=K; var m=s.value, keep=T.map(function(_,i){ return m==='all'||i>=T.length-K; });
+    var html=(m==='sk'?'<span class="ck top">summary: audience = backend engineers; topic = RAG; wants short intro + code</span>':'');
+    html+=T.map(function(t,i){ return '<span class="ck '+(keep[i]?'':'gone')+'">'+t+'</span>'; }).join('');
+    o.innerHTML=html;
+    var n=keep.filter(Boolean).length, tok=n*120+(m==='sk'?80:0), knows=keep[1]||m==='sk';
+    rd.innerHTML='<span>turns sent <b>'+n+'</b></span><span>memory ≈ <b>'+tok+'</b> tokens</span><span class="'+(knows?'good':'bad')+'">'+(knows?'knows the audience':'forgot the audience (turn 2)')+'</span>';
+  }
+  s.addEventListener('change',draw); k.addEventListener('input',draw); draw();
+})();
+</script>
+
+<!-- 21 -->
+<section class="plate" id="s21">
+  <div class="plate-head"><div><div class="secno">21 · POSSIBLE IMPROVEMENTS · A ROUTER</div><h2>Ask "which collections does this question need?" before searching</h2></div><span class="chip">pdf p377–378 · Fig 9-4</span></div>
+  <p>Each search currently sends <b>three</b> queries to the vector DB, one per data category. The second improvement: put a <b>router</b> between the query and the search. The router is a <b>multi-category classifier</b> that predicts which data categories this particular query needs. Instead of three requests per search you often need only <b>one or two</b> (the top half of Figure 9.4, shown in plate 20).</p>
+  <ul class="plain">
+    <li>The user wants a <b>theoretical paragraph about RAG for an article</b> → probably only the <b>articles</b> collection is worth querying. The router predicts "article", and that decides which collection to hit.</li>
+    <li>The user wants to <b>illustrate a piece of code</b> that builds a RAG pipeline → the router should predict <b>article and repository</b>, because examples are needed from both for a complete context.</li>
+  </ul>
+  <p>Usually a <b>router</b> decides which <b>model</b> to call for a given input, for example <b>GPT-4</b> or a <b>self-hosted Llama 3.1</b> for that query. In the LLM Twin you can adapt the same idea to optimize the retrieval step.</p>
+  <div class="fig">
+    <h3>Try it · a toy keyword router</h3>
+    <div class="controls"><label>query <select id="s21q">
+      <option>Write a theoretical paragraph about RAG for my article</option>
+      <option>Show a code snippet that builds a RAG pipeline</option>
+      <option>Draft a short LinkedIn post about vector DBs</option>
+      <option>Tell me about RAG</option>
+    </select></label></div>
+    <div class="cks" id="s21out"></div>
+    <div class="readout" id="s21rd"></div>
+    <p class="note">A toy rule-based classifier (modelled). A real router would be a trained multi-label classifier or a small LLM call.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>The reception desk at a big government hospital. Instead of sending every patient to all three OPDs (general medicine, cardiology, ortho), the receptionist reads the slip and sends you to one or two. Fewer queues, faster service. <i>Where it breaks:</i> a wrong referral costs you a wasted trip; a wrong route means the right collection was never searched, which reranking can't fix.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The router trades a cheap prediction for fewer, more focused searches. With the fixed K/3 split from plate 15, routing to one collection also lets you give it the whole K budget, so the right category isn't capped at K/3.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's a router in an LLM system?"</i> → "A classifier, often a small model or embedding-similarity match, that sends each request to the right downstream: a cheaper vs stronger model, a tool, or a subset of indexes. It cuts cost and latency, but needs a fallback (e.g. search all) for low-confidence predictions."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 15 (three searches per query) · <a href="../ai_engineering/ch10_architecture_and_user_feedback.html">AI Engineering Ch.10</a> (routers and gateways in AI architecture).</li></ul></div>
+</section>
+<script>
+(function(){
+  var q=document.getElementById('s21q'), o=document.getElementById('s21out'), rd=document.getElementById('s21rd'); if(!q) return;
+  function route(t){ t=t.toLowerCase(); var c=[];
+    if(/article|theoretical|paragraph/.test(t)) c.push('articles');
+    if(/code|snippet|pipeline|repo/.test(t)) { if(c.indexOf('articles')<0) c.push('articles'); c.push('repositories'); }
+    if(/linkedin|post/.test(t)) c.push('posts');
+    return c.length?c:['articles','posts','repositories']; }
+  function draw(){ var c=route(q.value);
+    o.innerHTML=['articles','posts','repositories'].map(function(x){ return '<span class="ck '+(c.indexOf(x)>=0?'top':'gone')+'">search '+x+'</span>'; }).join('');
+    rd.innerHTML='<span>vector DB calls per query <b>'+c.length+'</b> (was 3)</span>'+(c.length===3?'<span>low confidence → fallback: search all</span>':'');
+  }
+  q.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 22 -->
+<section class="plate" id="s22">
+  <div class="plate-head"><div><div class="secno">22 · POSSIBLE IMPROVEMENTS · HYBRID SEARCH</div><h2>Vector search for meaning, BM25 for exact words, merged by normalized scores</h2></div><span class="chip">pdf p378</span></div>
+  <p>Retrieval can be improved further with <b>hybrid search</b>: combine vector search (embeddings) with a <b>keyword search</b> algorithm such as <b>BM25</b> (Best Match 25, a classic term-frequency ranking formula). Before vector search became popular, search systems used BM25 or similar methods to find matching items. Merging both, hybrid search finds results that match <b>exact terms</b> (like <i>RAG</i>, <i>LLM</i> or <i>SageMaker</i>) <b>and</b> the query's meaning, so results are more accurate and relevant.</p>
+  <p>The mechanics, in three steps:</p>
+  <ol class="plain">
+    <li><b>Parallel processing.</b> The query goes through vector search and BM25 at the same time; each returns its own set of relevant documents.</li>
+    <li><b>Score normalization.</b> Both result sets have relevance scores, but on <b>different scales</b>, so they can't be compared or merged directly. Normalize them first.</li>
+    <li><b>Result merging.</b> Combine the normalized scores, often with a <b>weighted sum</b>, into a final ranking. Changing the weights shifts emphasis between semantic and keyword search.</li>
+  </ol>
+  <p>Why it works: vector search recognizes <b>synonyms and related concepts</b>, so relevant information isn't missed because of different wording. Keyword search makes sure documents with <b>critical keywords</b> get proper weight, especially in technical fields with specific terminology.</p>
+  <div class="fig">
+    <h3>Try it · normalize, then weight</h3>
+    <p class="small">Query: <i>"SageMaker endpoint autoscaling"</i>. Raw BM25 scores are unbounded; cosine scores are 0–1. Toggle normalization and move α (weight on the vector score).</p>
+    <div class="controls"><label>α vector weight <input type="range" id="s22a" min="0" max="100" value="50"><output id="s22av">0.50</output></label><label><input type="checkbox" id="s22norm" checked> min-max normalize</label></div>
+    <div id="s22out" style="display:grid;gap:5px"></div>
+    <p class="note">Documents and scores are modelled. Min-max: (s − min) / (max − min) per retriever. Final = α·vector + (1−α)·keyword. Without normalization the raw BM25 numbers swamp the cosine values.</p>
+  </div>
+  <div class="box work"><b>Worked example · one document</b>
+    <p>Doc "Autoscaling SageMaker endpoints": BM25 = 14.2 (range in this result set 2.1–14.2) → normalized 1.00. Cosine = 0.71 (range 0.55–0.83) → normalized 0.57. With α = 0.5: 0.5 × 0.57 + 0.5 × 1.00 = <b>0.79</b>. Without normalization: 0.5 × 0.71 + 0.5 × 14.2 = 7.46, almost all from BM25.</p>
+    <p class="note">Modelled numbers.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Finding a train on the IRCTC app: typing the exact train number "12951" (keyword) is perfect when you know it; typing "overnight Mumbai to Delhi" (meaning) helps when you don't. Hybrid search lets one search box do both. <i>Where it breaks:</i> the two scores are like marks out of 100 and grades out of 10: add them without converting and one dominates, which is why normalization is step 2.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Dense embeddings blur rare tokens: product names, error codes and acronyms barely move a vector, and an embedding model may never have seen "SageMaker". BM25 scores exact token overlap weighted by rarity (IDF, inverse document frequency), so rare exact matches stand out. The two fail in different cases, so combining them covers each other's blind spots.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"When does pure vector search fail, and what do you do?"</i> → "On exact identifiers: SKUs, error codes, names, acronyms. I add BM25 in parallel, normalize both score lists (min-max or z-score) and combine with a tunable weight, or use rank-based fusion like RRF. Many vector DBs (Qdrant, Weaviate) support hybrid queries natively."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 16 (merging result lists) · <a href="ch04_rag_feature_pipeline.html#s18">Ch.4 plate 18</a> (hybrid search in the advanced RAG overview) · <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs Ch.8</a> (keyword vs dense retrieval).</li></ul></div>
+</section>
+<script>
+(function(){
+  var a=document.getElementById('s22a'), av=document.getElementById('s22av'), nm=document.getElementById('s22norm'), o=document.getElementById('s22out'); if(!o) return;
+  var D=[['Autoscaling SageMaker endpoints',14.2,0.71],['Scaling ML inference under load spikes',2.1,0.83],['SageMaker pricing FAQ',9.8,0.55],['Kubernetes HPA for model servers',3.0,0.79]];
+  function mm(arr){ var lo=Math.min.apply(null,arr), hi=Math.max.apply(null,arr); return arr.map(function(x){ return hi===lo?1:(x-lo)/(hi-lo); }); }
+  function draw(){
+    var al=+a.value/100; av.textContent=al.toFixed(2);
+    var kw=D.map(function(d){return d[1];}), ve=D.map(function(d){return d[2];});
+    if(nm.checked){ kw=mm(kw); ve=mm(ve); }
+    var rows=D.map(function(d,i){ return {t:d[0],s:al*ve[i]+(1-al)*kw[i],k:kw[i],v:ve[i]}; }).sort(function(x,y){return y.s-x.s;});
+    var mx=Math.max.apply(null,rows.map(function(r){return r.s;}))||1;
+    o.innerHTML=rows.map(function(r,i){ return '<div class="barrow"><span>#'+(i+1)+' '+r.s.toFixed(2)+'</span><div class="bar" style="width:'+Math.round(r.s/mx*100)+'%"></div><span>kw '+r.k.toFixed(2)+' · vec '+r.v.toFixed(2)+'</span></div><div class="small" style="margin:-3px 0 4px">'+r.t+'</div>'; }).join('');
+  }
+  a.addEventListener('input',draw); nm.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- 23 -->
+<section class="plate" id="s23">
+  <div class="plate-head"><div><div class="secno">23 · POSSIBLE IMPROVEMENTS · MULTI-INDEX VECTOR STRUCTURES</div><h2>Search on more than the content: platform, date, and other fields</h2></div><span class="chip">pdf p378–380</span></div>
+  <p>The last improvement: <b>multi-index vector structures</b>. Instead of indexing and searching on the embedding of a <b>single field</b>, a multi-index combines <b>several fields</b>. The LLM Twin used only the <code>content</code> field of articles, posts and repositories. With a multi-index you could also index embeddings of the <b>platform</b> where content was posted, or <b>when</b> it was published. That can change retrieval accuracy: different platforms host different kinds of content, and more recent content is usually more relevant.</p>
+  <p>Frameworks like <b>Superlinked</b> make multi-indexing easy. The book's snippet defines a multi-index on <b>content and platform</b> for the article collection in a few lines:</p>
+  <ul class="plain">
+    <li>A <b>schema</b> class for articles with an <code>id</code> field, a <code>platform</code> string and a <code>content</code> string.</li>
+    <li>A <b>text similarity space</b> over the article content, chunked with <b>chunk size 500</b> and <b>overlap 50</b>, using the embedding model from settings.</li>
+    <li>A <b>categorical similarity space</b> over <code>platform</code> with the categories <b>medium, substack, wordpress</b>, and a <code>negative_filter</code> of <b>−5.0</b> (a score penalty for non-matching categories).</li>
+    <li>An <b>index</b> that combines both spaces, with <code>author_id</code> as a field (so it can still be filtered on).</li>
+  </ul>
+  <pre class="code"><code># sketch of the idea in pseudo-code (not Superlinked's exact API)
+schema   Post(id, platform, text, author_id)
+space_1  = text_similarity(Post.text, chunk=500, overlap=50, model=EMBED_MODEL)
+space_2  = category_similarity(Post.platform, ["medium", "substack", "wordpress"],
+                               mismatch_penalty=-5.0)
+index    = combine([space_1, space_2], filterable=[Post.author_id])
+# a query can now weight "about RAG" AND "from substack" together</code></pre>
+  <p>Superlinked is a Python tool for anything involving <b>vector computing</b>: RAG, <b>recommender systems</b>, semantic search. It lets you ingest data into a vector DB, write complex queries on top, and deploy the service as a <b>RESTful API</b>.</p>
+  <h3>The closing advice: ship, then iterate</h3>
+  <p>LLMs and RAG are <b>experimental</b>, like any AI field. When building real products, first build an <b>end-to-end solution that works</b>, even if it isn't the best. Then iterate with experiments until it is optimized for your use case. This is standard industry practice: you move fast, deliver value to the business, and collect <b>user feedback</b> as early as possible in the product's life.</p>
+  <div class="fig">
+    <h3>Try it · one field vs several fields</h3>
+    <p class="small">Query: "recent RAG article from Substack". Turn the extra signals on.</p>
+    <div class="controls"><label><input type="checkbox" id="s23p"> platform space</label><label><input type="checkbox" id="s23d"> recency space</label></div>
+    <div id="s23out" style="display:grid;gap:5px"></div>
+    <p class="note">Scores and weights are modelled (content 1.0; platform match +0.3 / mismatch −0.3; recency up to +0.2). They illustrate combining spaces, not Superlinked's real scoring.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Picking a restaurant on a food app. Content-only search is "biryani". Multi-index is "biryani" plus "delivers to my area" plus "opened recently", all weighed together into one ranking rather than applied one by one. <i>Where it breaks:</i> weights are a judgement call; overweight "recent" and a classic article from two years ago never shows up.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each field is turned into its own vector (text into a semantic embedding, a category into a one-hot-like vector, a date into a recency score). These are combined into one vector per item and one per query, with weights, so a single nearest-neighbour search balances all signals. Unlike a hard filter (plate 11), a non-matching platform is penalized, not excluded.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you make retrieval prefer recent or source-specific content without hard filters?"</i> → "Encode those attributes as additional, weighted vector spaces (multi-attribute or multi-index search), or add them as boosts in a reranking score. Hard filters are for constraints that must hold; soft signals like recency or platform are better as weighted scores so good older items can still win."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11 (hard filters vs soft signals) · <a href="ch11_mlops_and_llmops.html">Ch.11 MLOps and LLMOps</a> (iterating with experiments and feedback).</li></ul></div>
+</section>
+<script>
+(function(){
+  var p=document.getElementById('s23p'), d=document.getElementById('s23d'), o=document.getElementById('s23out'); if(!o) return;
+  var D=[['RAG deep-dive (medium, 2022)',0.82,'medium',0.0],['RAG in 10 minutes (substack, 2024)',0.74,'substack',0.2],['Advanced RAG notes (substack, 2023)',0.78,'substack',0.1],['RAG on WordPress blog (wordpress, 2024)',0.70,'wordpress',0.2]];
+  function draw(){
+    var rows=D.map(function(x){ var s=x[1]; if(p.checked) s+=(x[2]==='substack'?0.3:-0.3); if(d.checked) s+=x[3]; return {t:x[0],s:s}; }).sort(function(a,b){return b.s-a.s;});
+    o.innerHTML=rows.map(function(r,i){ return '<div class="samp'+(i===0?' keep':'')+'">#'+(i+1)+' '+r.t+' <b>'+r.s.toFixed(2)+'</b></div>'; }).join('');
+  }
+  p.addEventListener('change',draw); d.addEventListener('change',draw); draw();
+})();
+</script>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>What the chapter did, in plain words</h2></div><span class="chip">pdf p380</span></div>
+  <p>The chapter built an <b>advanced RAG inference pipeline</b>. It started with the <b>software architecture</b> of the RAG system: an offline feature pipeline and an on-demand retrieval module meeting at the vector DB. It then zoomed into the advanced methods inside the retrieval module: <b>query expansion</b>, <b>self-querying</b>, <b>filtered vector search</b> and <b>reranking</b>, each with its own small class.</p>
+  <p>Next it wrote a modular <b><code>ContextRetriever</code></b> class that glues all of these behind one <code>search()</code> interface, so finding relevant documents becomes one call. Finally it connected the remaining dots, <b>retrieval, prompt augmentation and the LLM call</b>, in a single <b><code>rag()</code></b> function that serves as the RAG inference pipeline, and listed improvements: conversation memory, a router, hybrid search and multi-indexing.</p>
+  <p>The fine-tuned LLM couldn't be tested yet because it isn't deployed. <a href="ch10_inference_pipeline_deployment.html">Chapter 10</a> deploys it to <b>AWS SageMaker</b> as an inference endpoint, writes an inference interface to call it, and adds a <b>FastAPI</b> web server as the business layer.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning in one line</th></tr>
+    <tr><td><b>RAG inference pipeline</b></td><td>The per-request flow: query → retrieve → build prompt → LLM → answer.</td></tr>
+    <tr><td><b>Retrieval module</b></td><td>The part that turns a query into the K most relevant chunks; holds most of the advanced RAG logic.</td></tr>
+    <tr><td><b>Feature freshness</b></td><td>The vector DB always holds the latest data because the feature pipeline runs independently on a schedule.</td></tr>
+    <tr><td><b>Pre-retrieval / retrieval / post-retrieval</b></td><td>Optimize the query / the search itself / the results after the search.</td></tr>
+    <tr><td><b>PromptTemplateFactory</b></td><td>Interface whose <code>create_template()</code> returns a LangChain <code>PromptTemplate</code>.</td></tr>
+    <tr><td><b>RAGStep · mock mode</b></td><td>Common interface (<code>generate()</code>) for advanced RAG steps; mock skips LLM calls to save cost and debug time.</td></tr>
+    <tr><td><b>Query / EmbeddedQuery</b></td><td>Domain entity: query text + author_id + author_full_name + metadata; the embedded version adds the vector.</td></tr>
+    <tr><td><b>Query expansion (multi-query)</b></td><td>LLM writes N−1 rewrites; with the original, N queries hit different parts of the embedding space.</td></tr>
+    <tr><td><b>Separator · partial variables</b></td><td>Unique split string (<code>#next-question#</code>); template values fixed at build time vs <code>{question}</code> per call.</td></tr>
+    <tr><td><b>Self-querying</b></td><td>LLM extracts metadata (here the author name/id, or "none") from the query for use as a filter.</td></tr>
+    <tr><td><b>Zero-shot vs few-shot prompt</b></td><td>Instructions only (expansion) vs instructions plus solved examples (self-query).</td></tr>
+    <tr><td><b>Filtered vector search</b></td><td>Vector search restricted by metadata (Qdrant <code>Filter</code> / <code>FieldCondition</code> / <code>MatchValue</code>): more accurate and faster.</td></tr>
+    <tr><td><b>Reranking · cross-encoder</b></td><td>Score each (query, chunk) pair jointly (0–1), sort, keep top K of the N × K candidates.</td></tr>
+    <tr><td><b>Singleton (SingletonMeta)</b></td><td>One shared instance of the cross-encoder per process; the wrapper also defines a swappable interface.</td></tr>
+    <tr><td><b>ContextRetriever</b></td><td>Orchestrator: self-query → expand → parallel filtered searches → flatten + dedupe → rerank.</td></tr>
+    <tr><td><b>K / 3 per category</b></td><td>Each search asks articles, posts and repositories for <code>k // 3</code> each, so ≤ K per search.</td></tr>
+    <tr><td><b>EmbeddingDispatcher</b></td><td>Same embedding path for chunks (ingestion) and queries (inference): critical for comparable vectors.</td></tr>
+    <tr><td><b>call_llm_service · rag()</b></td><td>HTTP call to the SageMaker endpoint with optional context · the five-line end-to-end function.</td></tr>
+    <tr><td><b>Conversation memory</b></td><td>Resend history; trim with latest-K, or summary + latest-K.</td></tr>
+    <tr><td><b>Router</b></td><td>Multi-category classifier picking which collections (or which model) a query needs.</td></tr>
+    <tr><td><b>Hybrid search · BM25</b></td><td>Vector + keyword search in parallel, scores normalized then merged by weighted sum.</td></tr>
+    <tr><td><b>Multi-index</b></td><td>Index several fields (content, platform, date) together, e.g. with Superlinked.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · WHERE YOU MEET THIS IN REAL SYSTEMS</div><h2>Tools and companies the chapter names</h2></div><span class="chip">whole chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Name</th><th>What it does with the idea</th></tr>
+    <tr><td><b>OpenAI GPT-4o-mini</b></td><td>The small model used for query expansion and self-querying; model id set by <code>OPENAI_MODEL_ID</code>.</td></tr>
+    <tr><td><b>LangChain</b></td><td><code>PromptTemplate</code>, <code>ChatOpenAI</code> and the <code>prompt | model</code> chain; also has MultiQueryRetriever, self-query retrieval, routing and chat memory guides.</td></tr>
+    <tr><td><b>LlamaIndex · Haystack</b></td><td>High-level RAG frameworks the five-line <code>rag()</code> resembles; LlamaIndex also documents routers and LLM reranking.</td></tr>
+    <tr><td><b>Qdrant</b></td><td>The vector DB: one collection per content type, payload filters on <code>author_id</code>.</td></tr>
+    <tr><td><b>sentence-transformers</b></td><td><code>CrossEncoder</code> for reranking; all-MiniLM-L6-v2 (384-dim, 256-token input) for embeddings.</td></tr>
+    <tr><td><b>AWS SageMaker</b></td><td>Hosts the fine-tuned LLM Twin as an HTTP inference endpoint (Chapter 10).</td></tr>
+    <tr><td><b>Superlinked</b></td><td>Python framework for vector computing: multi-index / multi-attribute search, ingestion, querying, REST deployment.</td></tr>
+    <tr><td><b>Weaviate</b></td><td>Cited for its explanation of hybrid search (BM25 + vector).</td></tr>
+    <tr><td><b>BM25</b></td><td>Classic keyword ranking function, the keyword half of hybrid search.</td></tr>
+    <tr><td><b>GPT-4 vs self-hosted Llama 3.1</b></td><td>The book's example of what a model router usually chooses between.</td></tr>
+    <tr><td><b>Ragas</b> (in references)</td><td>Library for evaluating and visualizing RAG retrieval.</td></tr>
+    <tr><td><b>Decoding ML (Substack, Medium)</b></td><td>The authors' publications; their articles are the chunks retrieved in the test run.</td></tr>
+  </table></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions to test the chapter</h2></div><span class="chip">whole chapter</span></div>
+  <details class="ans"><summary>1. Why does the LLM Twin build two modules, not three, for retrieve / augment / generate?</summary><p>Augmentation is just filling a prompt template with the query and context; a separate module would be overengineering. So there's a retrieval module and an inference service that builds the prompt and calls the LLM.</p></details>
+  <details class="ans"><summary>2. Why are the feature pipeline and the retrieval module separate processes, and what does that buy?</summary><p>The feature pipeline runs on a schedule on another machine; retrieval runs on demand per request. The vector DB stays fresh and every request reads the latest features; each side scales and fails independently.</p></details>
+  <details class="ans"><summary>3. With expand_to_n = 3, how many new queries does the prompt ask for, and why?</summary><p>Two (expand_to_n − 1). The original query is always kept as the first element, so the total is 3.</p></details>
+  <details class="ans"><summary>4. What happens if query expansion makes the latency too high?</summary><p>Reduce the number of generated queries (experiment to fit your requirements) and run the searches in parallel; the book uses a ThreadPoolExecutor in ContextRetriever.</p></details>
+  <details class="ans"><summary>5. Why can't you just put the author's name in the query and trust the embedding?</summary><p>You can't control how much signal the name leaves in the vector; topic dominates. Self-query extracts it and a filter enforces it exactly.</p></details>
+  <details class="ans"><summary>6. What does SelfQuery return when the model replies "none", and when it replies a name?</summary><p>"none": the original query, unchanged. A name: split into first/last, get-or-create a UserDocument, then set author_id and author_full_name on the query.</p></details>
+  <details class="ans"><summary>7. Is self-querying pre-retrieval or retrieval optimization? And filtered vector search?</summary><p>Extracting metadata from the query is pre-retrieval; using it as a filter during search is retrieval optimization.</p></details>
+  <details class="ans"><summary>8. Give the three problems reranking solves.</summary><p>Noise from irrelevant chunks; bigger, costlier prompts where the model may miss the essence (bias toward first and last pieces); chunks scored high by an embedding model not tuned to your question.</p></details>
+  <details class="ans"><summary>9. Why is a cross-encoder used for reranking but not for the first retrieval?</summary><p>It reads query and chunk together, so it's more accurate, but it can't precompute chunk vectors; it must run per pair at request time. Affordable on N×K candidates, not the whole DB.</p></details>
+  <details class="ans"><summary>10. Two reasons for wrapping the CrossEncoder in CrossEncoderModelSingleton?</summary><p>Load the model once and share it everywhere (singleton); define your own reranker interface so you can swap in another model or an API without touching the rest of the code.</p></details>
+  <details class="ans"><summary>11. With k = 3 and three categories, how many chunks can one search return? Why might it be fewer?</summary><p>k // 3 = 1 per category, so ≤ 3. Fewer if, after the author filter, a category has no (or too few) chunks for that author.</p></details>
+  <details class="ans"><summary>12. What would happen if queries were embedded with a different model than the chunks?</summary><p>Vectors would be in different spaces; similarity scores would be meaningless and retrieval would silently return poor results. That's why the same EmbeddingDispatcher is used at ingestion and query time.</p></details>
+  <details class="ans"><summary>13. Why is deduplication needed after the parallel searches?</summary><p>Expanded queries are related, so several searches return the same chunk. Without dedupe the reranker repeats work and duplicates could fill several of the K slots.</p></details>
+  <details class="ans"><summary>14. Compare the two memory options in Figure 9.4.</summary><p>Latest-K is simplest but forgets everything older. Summary + latest-K keeps the gist of the whole conversation within a bounded size; the simplest version updates the summary on every turn.</p></details>
+  <details class="ans"><summary>15. Interview: why normalize scores in hybrid search, and how do you merge them?</summary><p>BM25 and vector similarity use different scales; without normalization one dominates. Normalize each list (e.g. min-max), then combine with a weighted sum whose weight sets the semantic vs keyword emphasis.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's reading list</h2></div><span class="chip">pdf p380–383</span></div>
+  <details><summary>14 references (author · title · year)</summary>
+    <ol class="refs">
+      <li>Superlinked VectorHub · A real-time retrieval system for social media data · n.d.</li>
+      <li>LlamaIndex · Building a Router from Scratch · n.d.</li>
+      <li>LangChain · How to add memory to chatbots · n.d.</li>
+      <li>LangChain · How to do "self-querying" retrieval · n.d.</li>
+      <li>LangChain · How to route between sub-chains · n.d.</li>
+      <li>LangChain · How to use the MultiQueryRetriever · n.d.</li>
+      <li>Weaviate · Hybrid Search explained · 2023</li>
+      <li>Iusztin, P. · 4 Advanced RAG Algorithms You Must Know (Decoding ML, Medium) · 2024</li>
+      <li>Monigatti, L. · Advanced Retrieval-Augmented Generation: From Theory to LlamaIndex Implementation · 2024</li>
+      <li>Superlinked VectorHub · Multi-attribute search with vector embeddings · n.d.</li>
+      <li>Superlinked VectorHub · Optimizing RAG with Hybrid Search &amp; Reranking · n.d.</li>
+      <li>Refactoring.Guru · Singleton · 2024</li>
+      <li>Stoll, M. · Visualize your RAG Data: Evaluate your Retrieval-Augmented Generation System with Ragas · 2024</li>
+      <li>LlamaIndex · Using LLMs for retrieval and reranking · n.d.</li>
+    </ol>
+    <p class="note">The chapter ends with an invitation to the book's Discord community (pdf p382); p383 is blank.</p>
+  </details>
+</section>
+
+<footer>Study page for <i>LLM Engineer's Handbook</i> (Iusztin &amp; Labonne, Packt 2024), Chapter 9, pdf p346–383. Explanations, code snippets and interactive toys are paraphrased or written for this page; numbers marked "modelled" are illustrative. <a href="index.html">← All chapters</a> · <a href="ch08_inference_optimization.html">← Ch.8</a> · <a href="ch10_inference_pipeline_deployment.html">Ch.10 →</a></footer>
+
+</div></body></html>

@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hands-On LLMs Ch.7 Advanced Generation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.7) ---- */
+.box.interview { background: var(--paper); border-left: 4px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+.tk { display: inline-block; font-family: var(--mono); font-size: 12.5px; border-radius: 4px; padding: 1px 6px; margin: 1px; border: 1px solid var(--rule); }
+.tk.bos { background: #efe4dc; color: #3a2a20; } .tk.usr { background: #fff2a8; color: #3a3200; } .tk.ast { background: #ead6f5; color: #3a1d4a; }
+.tk.end { background: #ffe3c4; color: #4a2a00; } .tk.txt { background: #cdebd8; color: #123b22; } .tk.out { background: #f6cfd0; color: #4a1214; } .tk.hist { background: #cfe3f3; color: #0f2c44; }
+.rawprompt { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.bits { display: flex; flex-wrap: wrap; gap: 2px; font-family: var(--mono); font-size: 11px; }
+.bits span { width: 16px; text-align: center; border: 1px solid var(--rule); border-radius: 2px; padding: 1px 0; }
+.bits span.s { background: #cdebd8; color: #123b22; } .bits span.e { background: #f6cfd0; color: #4a1214; } .bits span.m { background: #cfe3f3; color: #0f2c44; }
+.bar { height: 14px; border-radius: 3px; background: var(--c2); min-width: 2px; }
+.barrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) 90px; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+.chat { display: grid; gap: 6px; font-size: 15px; }
+.chat .u { justify-self: start; background: var(--paper); border: 1px solid var(--rule); border-radius: 10px 10px 10px 2px; padding: 5px 10px; max-width: 90%; }
+.chat .a { justify-self: end; background: var(--tint2); border: 1px solid var(--rule); border-radius: 10px 10px 2px 10px; padding: 5px 10px; max-width: 90%; }
+.chat .forgot { opacity: .4; text-decoration: line-through; }
+.kv { font-family: var(--mono); font-size: 12.5px; display: grid; gap: 4px; }
+.kv div { border: 1px solid var(--rule); border-radius: 4px; padding: 4px 8px; background: var(--paper); overflow-wrap: anywhere; }
+.kv div.new { border-color: var(--buy); box-shadow: 0 0 0 2px var(--buy) inset; }
+.kv div b { color: var(--c3); }
+.rx { font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; line-height: 1.5; min-height: 6em; }
+.rx .th { color: var(--sell); } .rx .ac { color: var(--c3); } .rx .ob { color: var(--c1); } .rx .fa { color: var(--buy); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch06_prompt_engineering.html">← Ch.6 Prompt Engineering</a><a href="ch08_semantic_search_and_rag.html">Ch.8 Semantic Search and RAG →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 7 · PDF p221–246</div>
+  <h1>Beyond one prompt: <em>chains, memory and agents</em> around an LLM</h1>
+  <p class="lede">Chapter 6 showed that a better prompt gives a better answer without touching the model's weights. This chapter keeps going in that direction: what else can we wrap <b>around</b> an unchanged LLM to make it more useful? Using the <b>LangChain</b> framework, the authors first load a small, <b>quantized</b> (compressed) Phi-3 model. They then build <b>chains</b>: a prompt template glued to the model, and several prompts run one after another. Next they give the stateless model <b>memory</b> in three ways (the full chat history, only the last <i>k</i> turns, or a running summary) and compare the trade-offs. Finally they build an <b>agent</b>: an LLM that decides for itself which tools to use (a web search and a calculator) by looping through <b>Thought → Action → Observation</b>, the <b>ReAct</b> pattern.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Read the rows top to bottom. Each row is a problem the authors hit, and the orange box is the fix. Every fix is a <b>modular component</b> that gets chained onto the LLM, so by the end the "system" is much more than the model.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 7">
+    <div class="row"><span class="tag">Goal</span><span class="node">better output</span><span class="arr">→</span><span class="node">without fine-tuning</span><span class="arr">→</span><span class="node key">add components around the LLM (LangChain)</span></div>
+    <div class="row"><span class="tag">Step 0</span><span class="node">need a model that fits our GPU</span><span class="arr">→</span><span class="node key">quantized GGUF Phi-3</span><span class="arr">→</span><span class="node">fewer bits, a little less precision</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">model returns nothing ('')</span><span class="arr">→</span><span class="node">it needs its prompt template</span><span class="arr">→</span><span class="node key">chain: template | llm</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">one prompt is too big/complex</span><span class="arr">→</span><span class="node key">sequential chain</span><span class="arr">→</span><span class="node">title → character → story</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">LLM is stateless, forgets your name</span><span class="arr">→</span><span class="node key">memory</span><span class="arr">→</span><span class="node">buffer</span><span class="node">window k</span><span class="node">summary</span><span class="arr">→</span><span class="node">speed · tokens · accuracy trade-off</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">steps are fixed by us; LLM bad at maths</span><span class="arr">→</span><span class="node key">agent + tools</span><span class="arr">→</span><span class="node key">ReAct: Thought → Action → Observation</span><span class="arr">→</span><span class="node">no human in the loop: design for reliability</span></div>
+    <div class="row"><span class="tag">Next</span><span class="node">retrieval (Ch.8)</span></div>
+  </div>
+  <svg viewBox="0 0 640 150" class="dg" role="img" aria-label="An LLM wrapped by template, memory and tools" style="width:100%;height:auto;max-width:640px">
+    <rect x="250" y="50" width="140" height="50" rx="6" class="hi"/><text x="320" y="80" text-anchor="middle" class="b">LLM (unchanged)</text>
+    <rect x="20" y="20" width="160" height="34" rx="4" class="f"/><text x="100" y="42" text-anchor="middle">prompt template</text>
+    <rect x="20" y="96" width="160" height="34" rx="4" class="f"/><text x="100" y="118" text-anchor="middle">memory (history)</text>
+    <rect x="460" y="20" width="160" height="34" rx="4" class="f"/><text x="540" y="42" text-anchor="middle">tools: search, calc</text>
+    <rect x="460" y="96" width="160" height="34" rx="4" class="f"/><text x="540" y="118" text-anchor="middle">agent loop (ReAct)</text>
+    <line x1="180" y1="37" x2="250" y2="62" class="on"/><line x1="180" y1="113" x2="250" y2="88" class="on"/>
+    <line x1="390" y1="62" x2="460" y2="37" class="on"/><line x1="390" y1="88" x2="460" y2="113" class="on"/>
+    <text x="320" y="140" text-anchor="middle" class="m">each box is a "link" chained to the model</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opener and LangChain</a>
+    <a href="#s2"><span>02</span>Model I/O: quantized models</a>
+    <a href="#s3"><span>03</span>Chains: extending LLMs</a>
+    <a href="#s4"><span>04</span>A single link: prompt template</a>
+    <a href="#s5"><span>05</span>A chain with multiple prompts</a>
+    <a href="#s6"><span>06</span>Memory: LLMs are stateless</a>
+    <a href="#s7"><span>07</span>Conversation buffer</a>
+    <a href="#s8"><span>08</span>Windowed conversation buffer</a>
+    <a href="#s9"><span>09</span>Conversation summary + Table 7-1</a>
+    <a href="#s10"><span>10</span>Agents: a system of LLMs</a>
+    <a href="#s11"><span>11</span>ReAct: step-by-step reasoning</a>
+    <a href="#s12"><span>12</span>ReAct in LangChain</a>
+    <a href="#summary"><span>13</span>Summary and key terms</a>
+    <a href="#real"><span>14</span>Where you meet this</a>
+    <a href="#quiz"><span>15</span>Check yourself</a>
+    <a href="#refs"><span>16</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENER</div><h2>More from the same model, still without fine-tuning</h2></div><span class="chip">pdf p221–222 · Fig 7-1</span></div>
+  <p>Chapter 6 showed that <b>prompt engineering</b> can do wonders for the accuracy of a text-generation LLM (large language model). A few small tweaks guide the model to more purposeful, accurate answers. The important point: none of this <b>fine-tunes</b> the model (changes its weights). It simply uses the model more efficiently.</p>
+  <p>This chapter continues that line of thought: <i>what else can we do to improve the experience and the output we get from the LLM without fine-tuning it?</i> Luckily, many methods exist. These advanced techniques sit at the foundation of many LLM-based systems and are, the authors argue, among the <b>first things people build</b> when they design such a system.</p>
+  <p>The chapter covers four methods for improving the quality of generated text:</p>
+  <div class="grid2">
+    <div class="card"><b>Model I/O</b><span>Loading and working with LLMs (I/O = input/output).</span></div>
+    <div class="card"><b>Memory</b><span>Helping LLMs to remember.</span></div>
+    <div class="card"><b>Agents</b><span>Combining complex behaviour with external tools.</span></div>
+    <div class="card"><b>Chains</b><span>Connecting methods and modules.</span></div>
+  </div>
+  <p>All four are integrated in the <b>LangChain</b> framework, which the chapter uses throughout. LangChain is one of the earlier frameworks that make working with LLMs simpler through useful <b>abstractions</b> (ready-made building blocks that hide the plumbing). Newer frameworks worth knowing are <b>DSPy</b> and <b>Haystack</b>. Some of LangChain's abstractions are shown in Figure 7-1. <b>Retrieval</b> also appears in the figure, but it is covered in the next chapter.</p>
+  <figure class="bookfig"><img src="figs/fig-7-1.png" alt="LangChain: four module groups chained together: Model I/O (prompts, LLMs, output parser), Memory (conversation memory, summarization), Retrieval (embeddings, documents, vector database), Agents (autonomous, ReAct, conversation)" loading="lazy"><figcaption>Figure 7-1 (book, pdf p222): LangChain is a complete framework for using LLMs. It has modular components that can be chained together to allow for complex LLM systems.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The big box is LangChain, "modules <b>chained</b> together". Inside are four groups joined by little chain links, left to right: <b>Model I/O</b> (prompts, LLMs, output parser), <b>Memory</b> (conversation memory, summarization), <b>Retrieval</b> (embeddings, documents, vector database) and <b>Agents</b> (autonomous, ReAct, conversation). The chain links are the point: each group is a separate piece you can plug into the others. This chapter covers every group except Retrieval (Chapter 8).</p>
+  <p>Each technique is strong on its own, but the real value is <b>not in isolation</b>. When you <b>combine</b> all of them you get an LLM-based system with very good performance. The combination is where LLMs truly shine.</p>
+  <div class="box picture"><b>Picture it</b><p>The LLM is a talented cook in a dhaba kitchen. Model I/O is getting the cook hired and set up at the stove. A prompt template is the standard order slip ("table 4, 2 paneer, less spicy") so the cook always gets orders in the format he understands. Memory is the order book that reminds him what table 4 already ate. Tools are the helpers: someone to fetch vegetables from the market (search) and a cashier with a calculator. The agent is the cook deciding on his own, "I need tomatoes, send the boy to the market". <i>Where it breaks:</i> a real cook remembers on his own; an LLM remembers nothing unless you hand it the order book every single time.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An LLM is a pure function: text in, text out. It has no state, no tools and no way to act. Everything in this chapter is ordinary software around that function: code that builds the input string (templates, memory), code that calls the model several times (chains), and code that reads the model's output, runs something, and feeds the result back in (agents). LangChain packages these patterns so you write less glue code.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you improve an LLM app without fine-tuning?"</i> Say: "Fine-tuning is the last resort. First I fix the prompt and template, then split complex tasks into a chain of smaller prompts, add memory so the conversation has context, add retrieval for facts, and add tools via an agent loop for things the model can't do, like maths or live data. All of these are cheaper, faster to iterate and easier to debug than retraining."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6 Prompt Engineering</a>: the starting point this chapter builds on.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: the Retrieval box in Figure 7-1.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6 RAG and Agents</a>: the same building blocks from a system-design angle.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · MODEL I/O: LOADING QUANTIZED MODELS WITH LANGCHAIN</div><h2>First load the model, a compressed one</h2></div><span class="chip">pdf p222–224 · Fig 7-2</span></div>
+  <p>Before we can use LangChain's features, we need to <b>load an LLM</b>. As in earlier chapters the model is <b>Phi-3</b>, but with a twist: a <b>GGUF</b> variant. A GGUF model is a <b>compressed</b> version of the original model, made with a method called <b>quantization</b>. Quantization reduces the number of <b>bits</b> needed to store each of the LLM's parameters (its weights).</p>
+  <p><b>Bits</b> are 0s and 1s; they encode values in binary. More bits can represent a wider range of values (and more precise values), but they need more memory to store. Figure 7-2 shows this with the number π.</p>
+  <figure class="bookfig"><img src="figs/fig-7-2.png" alt="Pi stored as float32: sign 0, exponent 10000000, 23 mantissa bits, giving 3.1415927 (high precision). As float16 in the figure: sign 0, the same 8 exponent bits 10000000 and only 10 mantissa bits, giving 1.571 x 2 = 3.141 (low precision)" loading="lazy"><figcaption>Figure 7-2 (book, pdf p223): Attempting to represent pi with float 32-bit and float 16-bit representations. Notice the lowered accuracy when we halve the number of bits.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A floating-point number is split into three coloured parts. Green: the <b>sign</b> bit (0 = positive, so (−1)<sup>0</sup> = +1). Pink: the <b>exponent</b> bits, which pick the power of two (here 2<sup>1</sup> = 2). Blue: the <b>mantissa</b> (fraction) bits, which give the digits (here 1.5707964). Multiply them: +1 × 2 × 1.5707964 = <b>3.1415927</b>, "high precision" with 32 bits. The arrow "1 bit" points at the last blue box to show how small one bit's contribution is. The 16-bit version has far fewer blue boxes, so the mantissa can only be 1.571 and π comes out as <b>3.141</b>: "low precision". Same idea, half the storage, fewer correct digits. (Two simplifications in the figure: its 16-bit row keeps the 8 pink exponent bits and only shortens the mantissa, whereas real IEEE float16 has 5 exponent and 10 mantissa bits; and 3.141 is rounded for display, the exact float16 value is 3.140625. The widget below uses the real formats.)</p>
+  <p>Quantization reduces the bits per parameter while trying to keep <b>most of the original information</b>. You lose some precision, but usually it is worth it: the model <b>runs much faster</b>, needs <b>less VRAM</b> (video RAM, the GPU's memory), and is often <b>almost as accurate</b> as the original.</p>
+  <p>The book's analogy: if someone asks the time, you might say "<b>14:16</b>". That is correct but not fully precise; "14:16 and 12 seconds" would be more accurate. But seconds are seldom useful, so we round to whole minutes. Quantization does the same: it drops precision (the seconds) without dropping vital information (the hours and minutes).</p>
+  <p>Chapter 12 explains how quantization works under the hood; Maarten Grootendorst's "<b>A Visual Guide to Quantization</b>" is a full visual guide. For now, the book says it will use an <b>8-bit</b> variant of Phi-3 instead of the original <b>16-bit</b> one, "cutting the memory requirements almost in half".</p>
+  <div class="box work"><b>Rule of thumb (book's tip)</b><p>Look for models quantized to <b>at least 4 bits</b>; they balance compression and accuracy well. 3-bit or even 2-bit models exist, but the quality drop becomes noticeable. At that point it is better to pick a <b>smaller model at higher precision</b>.</p></div>
+  <div class="fig">
+    <h3>Try it: how many bits does π get?</h3>
+    <div class="controls"><label for="pi_fmt">Format <select id="pi_fmt"><option value="32">float32 (1 + 8 + 23 bits)</option><option value="16" selected>float16 (1 + 5 + 10 bits)</option><option value="8">8-bit int, scale 0.05 (modelled)</option><option value="4">4-bit int, scale 0.5 (modelled)</option></select></label></div>
+    <div class="bits" id="pi_bits" aria-label="bit pattern"></div>
+    <div class="readout" id="pi_out"></div>
+    <p class="note">float32 and float16 are computed exactly in your browser. The 8-bit and 4-bit rows use a simple "integer × scale" scheme with a scale picked by hand (modelled) to show the idea that integers with a shared scale lose even more digits; real quantizers choose scales per block of weights (Ch.12).</p>
+  </div>
+  <h3>Downloading and loading the model</h3>
+  <p>First download the model. The link holds several files with different bit-variants; the book picks <b>FP16</b>, "the 16-bit variant":</p>
+  <pre class="code"><code>!wget https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-fp16.gguf</code></pre>
+  <p class="note">Note the mismatch in the book: p223 says it will use an 8-bit variant, but p224 downloads the <code>fp16</code> file and calls FP16 "the model we choose". The code uses the 16-bit file. If you want the 8-bit saving, pick a <code>q8</code>/<code>q4</code> file from the same repository instead.</p>
+  <p>The GGUF file is loaded with <b>llama-cpp-python</b> (Python bindings for the llama.cpp inference engine) through LangChain:</p>
+  <pre class="code"><code>from langchain import LlamaCpp
+
+# Make sure the model path is correct for your system!
+llm = LlamaCpp(
+    model_path="Phi-3-mini-4k-instruct-fp16.gguf",
+    n_gpu_layers=-1,
+    max_tokens=500,
+    n_ctx=2048,
+    seed=42,
+    verbose=False
+)</code></pre>
+  <ul class="plain">
+    <li><code>model_path</code>: where the GGUF file is on disk.</li>
+    <li><code>n_gpu_layers=-1</code>: put <b>all</b> layers of the model on the GPU (−1 means "every layer"); a positive number would offload only that many and run the rest on the CPU.</li>
+    <li><code>max_tokens=500</code>: generate at most 500 new tokens per call.</li>
+    <li><code>n_ctx=2048</code>: the context window: prompt plus output may be at most 2,048 tokens. This matters later, when memory makes prompts grow.</li>
+    <li><code>seed=42</code>: fixes the random seed so sampling is repeatable.</li>
+    <li><code>verbose=False</code>: hide llama.cpp's loading logs.</li>
+  </ul>
+  <p>In LangChain you generate text with the <b>invoke</b> function:</p>
+  <pre class="code"><code>llm.invoke("Hi! My name is Maarten. What is 1 + 1?")
+''</code></pre>
+  <p>We get <b>no output</b>, an empty string. As earlier chapters showed, Phi-3 needs a <b>specific prompt template</b>. With <code>transformers</code> that was applied for us; here we must apply it <b>explicitly</b>. Instead of copy-pasting the template every time, we will use one of LangChain's core features: <b>chains</b> (next plate).</p>
+  <div class="box work"><b>Book sidebar: use any LLM</b><p>Every example in the chapter works with any LLM: Phi-3, ChatGPT, Llama 3 or anything else. Phi-3 is the default, but the state of the art moves fast, so consider a newer model. The <b>Open LLM Leaderboard</b> (a ranking of open-source LLMs) helps you choose one for your use case. If you can't run LLMs locally, use ChatGPT instead:</p>
+  <pre class="code"><code>from langchain.chat_models import ChatOpenAI
+
+# Create a chat-based LLM
+chat_model = ChatOpenAI(openai_api_key="MY_KEY")</code></pre></div>
+  <div class="fig">
+    <h3>Calculator: how much memory do the weights need?</h3>
+    <div class="controls">
+      <label for="qm_p">Parameters (billions) <input type="range" id="qm_p" min="0.5" max="70" step="0.1" value="3.8"><output id="qm_pv">3.8</output></label>
+    </div>
+    <div id="qm_bars" style="display:grid;gap:6px"></div>
+    <p class="note">Weights only: parameters × bits ÷ 8 bytes. Real use needs extra memory for the KV cache and activations, so leave headroom. <b>Beyond the book:</b> Phi-3-mini has about 3.8 billion parameters (Microsoft's model card), which is the default here.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Your phone's photo gallery. A RAW photo is huge; a JPEG of the same picture is a fraction of the size and looks almost the same on screen. Squeeze it into a tiny WhatsApp thumbnail and faces start to blur. 16-bit is RAW, 8-bit and 4-bit are good JPEGs, 2-bit is the blurry thumbnail. <i>Where it breaks:</i> JPEG throws away detail your eye can't see; quantization throws away digits of numbers that are multiplied billions of times, so small errors can add up in ways a picture never shows.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Generating each token means reading <b>every weight</b> from memory. So the model's size in bytes decides two things: whether it fits in VRAM at all, and how fast tokens come out (moving fewer bytes is faster). Halving the bits halves both. Neural networks tolerate small rounding errors in individual weights well, which is why 8-bit and 4-bit models stay "almost as accurate".</p></div>
+  <div class="box work"><b>Worked example</b><p>Take a 3.8-billion-parameter model (beyond the book). At 16 bits = 2 bytes per weight: 3.8 × 2 = <b>7.6 GB</b>. At 8 bits: <b>3.8 GB</b> ("almost half", as the book says). At 4 bits: <b>1.9 GB</b>, small enough for a laptop GPU. A 2-bit version (0.95 GB) would fit even more easily, but the book's tip says you'd do better with a smaller model at 4 bits.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your model doesn't fit on the GPU. What do you do?"</i> Say: "Quantize it. Going from FP16 to 8-bit halves weight memory, 4-bit quarters it, usually with a small accuracy drop, and generation gets faster because decoding is memory-bandwidth bound. I'd stay at 4 bits or above; below that I'd rather use a smaller model at higher precision. Then I'd check the KV cache budget, since long contexts also eat memory." For a realtime voice stack, the speed gain from quantization directly cuts time-to-first-token.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>In current LangChain versions <code>LlamaCpp</code> lives in <code>langchain_community.llms</code> and <code>ChatOpenAI</code> in <code>langchain_openai</code>. GGUF files usually name their scheme, e.g. <code>Q4_K_M</code> or <code>Q8_0</code>.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: how quantization works under the hood (and QLoRA).</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a> and <a href="../llm_engineers_handbook/ch08_inference_optimization.html">LLM Engineer's Handbook Ch.8</a>: quantization as an inference optimization.</li><li>Plate 4: the fix for the empty <code>''</code> output.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · CHAINS: EXTENDING THE CAPABILITIES OF LLMS</div><h2>A chain = the LLM plus one more component</h2></div><span class="chip">pdf p224–225 · Fig 7-3</span></div>
+  <p>LangChain is <b>named after</b> one of its main methods, <b>chains</b>. You can run an LLM on its own, but its power shows when it is used <b>with additional components</b>, or even <b>with other LLM calls</b>. Chains extend what an LLM can do, and several chains can be connected together.</p>
+  <p>The most basic form is a <b>single chain</b>. Chains can take many forms of different complexity, but generally a chain connects an LLM with some additional <b>tool, prompt or feature</b>. Figure 7-3 shows the idea.</p>
+  <figure class="bookfig"><img src="figs/fig-7-3.png" alt="Single chain: Input goes into a box holding a modular component chained to an LLM, then Output" loading="lazy"><figcaption>Figure 7-3 (book, pdf p225): A single chain connects some modular component, like a prompt template or external memory, to the LLM.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Input enters from the left into a rounded box labelled "Single chain". Inside, a blue "Modular component" (for example a prompt template or external memory) is joined by a chain link to the pink "LLM". Output leaves on the right. From outside, the whole box behaves like one thing: input in, output out.</p>
+  <p>In practice chains get complex fast. You can extend the prompt template however you like, and combine several chains into intricate systems. To really understand what happens inside a chain, the book starts with the simplest useful one: adding Phi-3's prompt template to the LLM.</p>
+  <div class="box picture"><b>Picture it</b><p>A chain is like a <b>pipe fitting</b> in a plumber's kit: the LLM is the tap, and you screw a filter, a meter or an extension onto it. Each fitting has the same thread on both ends, so you can screw them together in any order. <i>Where it breaks:</i> water flows the same way through any pipe; text from one link must actually match what the next link expects (variable names, formats), or the chain fails.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In code, a chain is <b>function composition</b>: <code>output = llm(component(input))</code>. LangChain gives every component the same interface (<code>invoke</code>), so the composition of two components is itself a component, and you can keep composing. That uniform interface is the whole trick.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's a chain in LangChain?"</i> Say: "A composable pipeline step. Each piece, a prompt template, a model, a parser, a memory, exposes the same invoke interface, so you pipe them together and the result is again invokable. It's function composition for LLM calls, which makes pipelines easy to rearrange and test step by step."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 4 (one link), plate 5 (many links), plates 7–9 (memory as a link), plate 12 (the agent executor as a loop rather than a straight chain).</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · A SINGLE LINK IN THE CHAIN: PROMPT TEMPLATE</div><h2>Glue Phi-3's template to the model once, then forget about it</h2></div><span class="chip">pdf p225–227 · Fig 7-4 · 7-5 · 7-6</span></div>
+  <p>The first chain is the <b>prompt template that Phi-3 expects</b>. In Chapter 6, <code>transformers.pipeline</code> applied the chat template <b>automatically</b>. Other packages don't always do that; they may need the template <b>written out explicitly</b>. With LangChain we will use a chain to create and apply a default template, which is also good hands-on practice with prompt templates.</p>
+  <p>The idea (Figure 7-4): chain the template together with the LLM. Then, instead of copy-pasting the template each time, we only define the <b>user</b> and <b>system</b> prompts.</p>
+  <figure class="bookfig"><img src="figs/fig-7-4.png" alt="User prompt goes into a prompt template box (several coloured blocks) chained to the LLM, then output" loading="lazy"><figcaption>Figure 7-4 (book, pdf p225): By chaining a prompt template with an LLM, we only need to define the input prompts. The template will be constructed for you.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> It is Figure 7-3 with the "modular component" filled in: the component is now a <b>prompt template</b>, drawn as a grey box of coloured blocks (each block is one piece of the template: special tokens and the slot for your text). The green "User prompt" on the left is the only thing you supply; the template wraps it and passes the full string to the LLM.</p>
+  <p>Phi-3's template has <b>four main components</b>:</p>
+  <ul class="plain">
+    <li><span class="tk bos">&lt;s&gt;</span> marks where the prompt <b>starts</b>.</li>
+    <li><span class="tk usr">&lt;|user|&gt;</span> marks the start of the <b>user's prompt</b>.</li>
+    <li><span class="tk ast">&lt;|assistant|&gt;</span> marks the start of the <b>model's output</b>.</li>
+    <li><span class="tk end">&lt;|end|&gt;</span> marks the <b>end</b> of either the prompt or the model's output.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-7-5.png" alt="Phi-3 template: <s> beginning of sentence token, <|user|> start of prompt, the prompt What is 1+1, <|end|> end of prompt, <|assistant|> start of output, the output The answer to 1+1 is 2!, <|end|> end of output" loading="lazy"><figcaption>Figure 7-5 (book, pdf p226): The prompt template Phi-3 expects.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Inside the grey "Phi-3 template" box, the blocks are in the order the model sees them, and lines on the right label each one. <code>&lt;s&gt;</code> is the <b>BOS (beginning of sentence) token</b>. <code>&lt;|user|&gt;</code> = "start of prompt", then the green prompt "What is 1 + 1", then <code>&lt;|end|&gt;</code> = "end of prompt"; these three are bracketed as <b>User</b>. Below, <code>&lt;|assistant|&gt;</code> = "start of output", the red output "The answer to 1+1 is 2!", then <code>&lt;|end|&gt;</code> = "end of output"; bracketed as <b>Model</b>. When we call the model we stop right after <code>&lt;|assistant|&gt;</code>; the model writes the rest.</p>
+  <p>To build the chain, first create a template that follows Phi-3's format. The book describes the model as taking a <b>system_prompt</b> (what we generally expect from the LLM) and an <b>input_prompt</b> (the specific question); the code below uses just the <code>input_prompt</code> variable:</p>
+  <pre class="code"><code>from langchain import PromptTemplate
+
+# Create a prompt template with the "input_prompt" variable
+template = """&lt;s&gt;&lt;|user|&gt;
+{input_prompt}&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+prompt = PromptTemplate(
+    template=template,
+    input_variables=["input_prompt"]
+)</code></pre>
+  <p><code>{input_prompt}</code> is a <b>placeholder</b>; <code>input_variables</code> tells LangChain which placeholders must be filled. Now chain the prompt and the LLM with the <b>pipe operator</b> <code>|</code> ("feed the left side's output into the right side"):</p>
+  <pre class="code"><code>basic_chain = prompt | llm
+
+# Use the chain
+basic_chain.invoke(
+    {
+        "input_prompt": "Hi! My name is Maarten. What is 1 + 1?",
+    }
+)</code></pre>
+  <pre class="code"><code>The answer to 1 + 1 is 2. It's a basic arithmetic operation where you add one
+unit to another, resulting in two units altogether.</code></pre>
+  <p>We pass a <b>dictionary</b> whose key matches the variable name. The output is the answer <b>without any unnecessary tokens</b>. From now on we never build the template by hand. The book notes that sampling was <b>not disabled</b> as before, so your output may differ. Figure 7-6 shows the whole single chain.</p>
+  <figure class="bookfig"><img src="figs/fig-7-6.png" alt="&quot;What is 1 + 1?&quot; flows into the template slot {user_prompt}, the template is chained to the LLM, output &quot;The answer to 1 + 1 is 2!&quot;" loading="lazy"><figcaption>Figure 7-6 (book, pdf p227): An example of a single chain using Phi-3's template.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same picture as Figure 7-4, now with real data. The green question "What is 1 + 1?" drops into the green <code>{ user_prompt }</code> slot of the template; the other coloured blocks are the fixed special tokens from Figure 7-5. The filled template goes through the chain link into the LLM, and out comes "The answer to 1 + 1 is 2!".</p>
+  <div class="fig">
+    <h3>Try it: what string does the model really receive?</h3>
+    <div class="controls"><label for="tp_in">Your prompt <input type="text" id="tp_in" value="Hi! My name is Maarten. What is 1 + 1?" style="width:min(320px,70vw)"></label><label><input type="checkbox" id="tp_on" checked> apply the template (prompt | llm)</label></div>
+    <div class="rawprompt" id="tp_raw" aria-live="polite"></div>
+    <div class="verdict" id="tp_v"></div>
+    <p class="note">The model's behaviour shown is the book's result for Phi-3 (empty output without the template); the explanation of why is ours.</p>
+  </div>
+  <div class="box work"><b>Book notes on templates</b><ul>
+    <li>The example assumes the LLM needs a specific template. That is <b>not always</b> the case: with OpenAI's <b>GPT-3.5</b>, the API handles the underlying template for you.</li>
+    <li>Templates can hold <b>other variables</b> too. If you want funny business names for many products, retyping the question each time is slow. Make it reusable:</li></ul>
+  <pre class="code"><code># Create a Chain that creates our business' name
+template = "Create a funny name for a business that sells {product}."
+name_prompt = PromptTemplate(
+    template=template,
+    input_variables=["product"]
+)</code></pre>
+  <p>Adding a prompt template is just the <b>very first step</b>. The rest of the chapter adds more modular components to chains, starting with memory (the book says memory, though the next section it presents is sequential chains).</p></div>
+  <div class="box picture"><b>Picture it</b><p>A railway reservation form. The clerk's computer only accepts the form with the train number box, the date box and the passenger boxes in the right order. If you hand over a plain note saying "two tickets to Pune tomorrow", nothing happens. The template is the printed form; you only fill the blanks. <i>Where it breaks:</i> the clerk would at least tell you "wrong form"; Phi-3 just returns an empty string, which is much harder to debug.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Chat models are fine-tuned on conversations written in one exact format with special tokens. Those tokens are how the model learned "now it's my turn to speak" (<code>&lt;|assistant|&gt;</code>) and "stop here" (<code>&lt;|end|&gt;</code>). Without them the raw text looks like nothing from training, so the most likely next token can be an end-of-text token straight away, which is why the output was empty. Each model family has its own tokens, so templates are model-specific.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You swapped in a new open-source model and outputs became empty or rambling. Why?"</i> Say: "Most likely the chat template. Instruct models expect their own special tokens marking user and assistant turns. Hosted APIs like OpenAI apply them for you; with raw llama.cpp or a completion endpoint you must apply them yourself, ideally from the tokenizer's chat template rather than hand-written strings." In an LLM gateway that routes between models, applying the right template per model is a classic source of bugs.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>The <code>prompt | llm</code> syntax is LangChain's LCEL (LangChain Expression Language). Hugging Face tokenizers expose <code>apply_chat_template()</code>, which builds the exact string for any model from its own template.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: chat templates and system/user roles.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: special tokens in the tokenizer.</li><li>Plate 7: the same template grows a <code>{chat_history}</code> slot.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · A CHAIN WITH MULTIPLE PROMPTS</div><h2>Split one big prompt into a relay of small ones</h2></div><span class="chip">pdf p228–231 · Fig 7-7 · 7-8</span></div>
+  <p>The single chain worked because the task was simple. Some applications are more involved and need <b>long or complex prompts</b> to capture all the details. Instead, we can break the complex prompt into <b>smaller subtasks run in sequence</b>. That takes <b>multiple calls</b> to the LLM, but each call has a <b>smaller prompt</b>, and we get <b>intermediate outputs</b> along the way (Figure 7-7).</p>
+  <figure class="bookfig"><img src="figs/fig-7-7.png" alt="Multiple prompts: input goes to Prompt 1, chained to Prompt 2, then output; each prompt sends to and receives from the same LLM below" loading="lazy"><figcaption>Figure 7-7 (book, pdf p228): With sequential chains, the output of a prompt is used as the input for the next prompt.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Inside the "Multiple prompts" box are two blue prompts joined by a chain link. Under each prompt is a pair of arrows to and from one shared pink LLM: each prompt is <b>a separate call</b> to the same model. The input enters Prompt 1; its answer flows (through the chain link) into Prompt 2; Prompt 2's answer is the final output.</p>
+  <p>This is an extension of the previous example: instead of one chain, we <b>link chains</b>, and each link handles one specific subtask.</p>
+  <p>Example: <b>generating a story</b>. We could ask the LLM for a story with a title, a summary, character descriptions and so on, all in one prompt. Or we can cut it into manageable pieces. The book's story has three components:</p>
+  <ul class="plain"><li>A <b>title</b></li><li>A <b>description of the main character</b></li><li>A <b>summary of the story</b></li></ul>
+  <p>The chain needs <b>only one input</b> from the user and then generates the three components one after another (Figure 7-8).</p>
+  <figure class="bookfig"><img src="figs/fig-7-8.png" alt="Three chained prompts: Title prompt, Character prompt, Story prompt, each calling the shared LLM; input on the left, output on the right" loading="lazy"><figcaption>Figure 7-8 (book, pdf p229): The output of the title prompt is used as the input of the character prompt. To generate the story, the output of all previous prompts is used.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same layout as Figure 7-7 with three links: <b>Title</b> prompt → <b>Character</b> prompt → <b>Story</b> prompt, each calling the same LLM. The caption adds what the picture can't show: the character prompt uses the title, and the story prompt uses <b>everything</b> produced before it (summary, title and character).</p>
+  <h3>Link 1: the title</h3>
+  <p>This is the only link that needs input from the user. Its input variable is <code>"summary"</code> and its output is stored under <code>"title"</code>. The prompt is "Create a title for a story about {summary}", where {summary} is our input:</p>
+  <pre class="code"><code>from langchain import LLMChain
+
+# Create a chain for the title of our story
+template = """&lt;s&gt;&lt;|user|&gt;
+Create a title for a story about {summary}. Only return the title.&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+title_prompt = PromptTemplate(template=template, input_variables=["summary"])
+title = LLMChain(llm=llm, prompt=title_prompt, output_key="title")
+
+title.invoke({"summary": "a girl that lost her mother"})</code></pre>
+  <pre class="code"><code>{'summary': 'a girl that lost her mother',
+ 'title': ' "Whispers of Loss: A Journey Through Grief"'}</code></pre>
+  <p><code>LLMChain</code> bundles a prompt and an LLM; <code>output_key="title"</code> names the slot where the answer is stored. Note that the result shows <b>both</b> the input (<code>"summary"</code>) and the output (<code>"title"</code>): the chain passes a growing dictionary along.</p>
+  <h3>Link 2: the character, using summary and title</h3>
+  <pre class="code"><code># Create a chain for the character description using the summary and title
+template = """&lt;s&gt;&lt;|user|&gt;
+Describe the main character of a story about {summary} with the title {title}.
+Use only two sentences.&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+character_prompt = PromptTemplate(
+    template=template, input_variables=["summary", "title"]
+)
+character = LLMChain(llm=llm, prompt=character_prompt, output_key="character")</code></pre>
+  <p>We could run this by hand, but it will be used inside the automated chain instead.</p>
+  <h3>Link 3: the story, using all three</h3>
+  <pre class="code"><code># Create a chain for the story using the summary, title, and character description
+template = """&lt;s&gt;&lt;|user|&gt;
+Create a story about {summary} with the title {title}. The main character is:
+{character}. Only return the story and it cannot be longer than one paragraph.
+&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+story_prompt = PromptTemplate(
+    template=template, input_variables=["summary", "title", "character"]
+)
+story = LLMChain(llm=llm, prompt=story_prompt, output_key="story")
+
+# Combine all three components to create the full chain
+llm_chain = title | character | story
+
+llm_chain.invoke("a girl that lost her mother")</code></pre>
+  <pre class="code"><code>{'summary': 'a girl that lost her mother',
+ 'title': ' "In Loving Memory: A Journey Through Grief"',
+ 'character': ' The protagonist, Emily, is a resilient young girl who struggles to cope
+   with her overwhelming grief after losing her beloved and caring mother at an early
+   age. As she embarks on a journey of self-discovery and healing, she learns valuable
+   life lessons from the memories and wisdom shared by those around her.',
+ 'story': " In Loving Memory: A Journey Through Grief revolves around Emily, a resilient
+   young girl who loses her beloved mother at an early age. ... ultimately finding solace
+   in honoring her mother's legacy while embracing a newfound sense of inner peace
+   amidst the painful loss."}</code></pre>
+  <p class="note">Story text shortened here. Notice the title changed between the two runs ("Whispers of Loss" vs "In Loving Memory"): sampling is on, so each run differs.</p>
+  <p>Running the chain gives all three components from a <b>single short input</b>, the summary. Another advantage of splitting the task: we get <b>access to the individual components</b>. We can easily pull out just the title, which might not have been possible with one big prompt.</p>
+  <div class="fig">
+    <h3>Step through: the dictionary that flows down the chain</h3>
+    <div class="stepbar"><button id="sc_prev" type="button">◀ Back</button><button id="sc_next" type="button">Next ▶</button><span id="sc_n"></span></div>
+    <div id="sc_box" style="display:grid;gap:8px"></div>
+    <div class="caption" id="sc_cap"></div>
+    <p class="note">Values are the book's outputs (p230), shortened. Token counts are modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding card printer in Sivakasi. One worker sets the names, the next picks the design that matches, the last prints the full card using both. Each worker sees what the previous ones did and adds one thing. Asking one worker to do all of it in one go means more mistakes. <i>Where it breaks:</i> the workers can talk to each other; LLM links only see what you explicitly pass in the dictionary.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each link is a separate forward pass with a short, focused prompt. The model does better on one clear instruction than on five mixed ones, and each output can be checked or parsed on its own. The cost is <b>latency</b> and <b>tokens</b>: three calls instead of one, run strictly one after another because each needs the previous output.</p></div>
+  <div class="box work"><b>Worked example (modelled numbers)</b><p>Say each call takes 1.5 s on the local Phi-3. The three-link chain takes about 4.5 s, against maybe 2.5 s for one long prompt that writes everything at once. In exchange you get the title as a clean field (no regex over a long answer), and if the story is bad you can rerun only link 3 with the same title and character.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"When would you use a chain of prompts instead of one prompt?"</i> Say: "When the task has distinct steps, when later steps depend on earlier outputs, or when I need the intermediate results as structured fields. Each prompt is simpler, so quality and debuggability go up; the price is more calls and more latency. If latency matters, I'd run independent steps in parallel and only chain the dependent ones." In a voice agent you'd keep the user-facing path to one call and push extra chained steps into the background.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p><code>LLMChain</code> is deprecated in newer LangChain releases; the same thing is written as <code>prompt | llm | parser</code> runnables, with <code>RunnablePassthrough.assign(...)</code> to keep earlier keys in the dictionary.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: prompt chaining and chain-of-thought.</li><li>Plate 10: the difference between a chain (we fix the steps) and an agent (the LLM picks the steps).</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · MEMORY: HELPING LLMS TO REMEMBER CONVERSATIONS</div><h2>Out of the box, an LLM forgets you between messages</h2></div><span class="chip">pdf p231–232 · Fig 7-9</span></div>
+  <p>Used out of the box, LLMs <b>don't remember</b> what was said in a conversation. You can share your name in one prompt and it is forgotten by the next. Using the <code>basic_chain</code> from before:</p>
+  <pre class="code"><code># Let's give the LLM our name
+basic_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})
+# Hello Maarten! The answer to 1 + 1 is 2.
+
+# Next, we ask the LLM to reproduce the name
+basic_chain.invoke({"input_prompt": "What is my name?"})
+# I'm sorry, but as a language model, I don't have the ability to know personal
+# information about individuals. You can provide the name you'd like to know
+# more about, and I can help you with information or general inquiries related to it.</code></pre>
+  <p>The LLM doesn't know the name we just gave it. The reason: these models are <b>stateless</b>. They have <b>no memory of any previous conversation</b>. Each call is completely independent. As Figure 7-9 shows, chatting with an LLM that has no memory is not a great experience.</p>
+  <figure class="bookfig"><img src="figs/fig-7-9.png" alt="Left, without memory: two independent conversations; the bot says it has no access to personal information such as your name. Right, with memory: conversation history flows down; the bot answers Your name is Maarten" loading="lazy"><figcaption>Figure 7-9 (book, pdf p232): An example of a conversation between an LLM with memory and without memory.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two panels with the same chat. <b>Left, "Without memory"</b>: the first exchange (name + 1 + 1) is faded and separated from the second by a dotted line labelled "Independent conversations"; asked "What was my name again?", the bot says it doesn't have access to <b>personal information</b> such as your name. <b>Right, "With memory"</b>: a solid arrow labelled "Conversation history" carries the first exchange into the second, and the bot answers "Your name is <b>Maarten</b>."</p>
+  <p>To make the model <b>stateful</b>, we add a type of <b>memory</b> to the chain. The book says it covers two common methods:</p>
+  <ul class="plain"><li><b>Conversation buffer</b> (plus its variant, the <b>windowed</b> buffer, plate 8)</li><li><b>Conversation summary</b></li></ul>
+  <p class="note">The section list says "two" but the chapter actually walks through three (buffer, windowed buffer, summary), and the chapter summary says "three different methods".</p>
+  <div class="box picture"><b>Picture it</b><p>A government office where a different clerk serves you at every visit and nobody keeps a file. Each time you must explain your case from the start. "Memory" is you carrying your own file folder and putting it on the desk every visit. <i>Where it breaks:</i> a clerk can skim a thick folder; the LLM must read every word of it every time, and the folder can only be so thick (the context window).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The model's weights never change during a chat, and nothing is stored between API calls. The only thing the model "knows" about the conversation is what is in the current prompt. So "memory" in LLM apps always means <b>your code storing past turns and putting (some form of) them back into the next prompt</b>. The three methods differ only in what they put back.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How does ChatGPT remember what I said earlier?"</i> Say: "The model itself is stateless. The application stores the conversation and resends it, or a compressed version of it, with every request. So memory is an application-layer concern: you choose how much history to send, trading token cost and latency against how much the model can recall."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch03_looking_inside_llms.html">Ch.3</a>: the context window and why a longer prompt costs more compute.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: memory for agents (short-term vs long-term).</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · CONVERSATION BUFFER</div><h2>Paste the whole chat history into every prompt</h2></div><span class="chip">pdf p232–234 · Fig 7-10 · 7-11</span></div>
+  <p>The most intuitive way to give an LLM memory: <b>remind it exactly what happened</b>. Copy the full conversation history and paste it into the prompt (Figure 7-10).</p>
+  <figure class="bookfig"><img src="figs/fig-7-10.png" alt="Conversation history (Hi I'm Maarten, what is 1+1; Hello Maarten, the answer is 2) and the new prompt (What is my name?) both flow into the prompt template under a Conversation history: label, as Human: and AI: lines" loading="lazy"><figcaption>Figure 7-10 (book, pdf p232): We can remind an LLM of what previously happened by simply appending the entire conversation history to the input prompt.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left top: the earlier exchange ("Conversation history"). Left bottom: the new "Prompt", "What is my name?". Both arrows point into the grey prompt template on the right, which now reads, top to bottom: <code>&lt;s&gt;</code> <code>&lt;|user|&gt;</code>, a blue label "Conversation history:", a red block with the history rewritten as <b>Human:</b> … / <b>AI:</b> … lines, then the new question with <code>&lt;|end|&gt;</code>, then <code>&lt;|assistant|&gt;</code>. The model reads its own earlier answer and finds the name.</p>
+  <p>In LangChain this is called <b>ConversationBufferMemory</b>. To use it, first update the prompt so it has a slot for the history:</p>
+  <pre class="code"><code># Create an updated prompt template to include a chat history
+template = """&lt;s&gt;&lt;|user|&gt;Current conversation:{chat_history}
+
+{input_prompt}&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+prompt = PromptTemplate(
+    template=template,
+    input_variables=["input_prompt", "chat_history"]
+)</code></pre>
+  <p>The new input variable <code>chat_history</code> is where the conversation history goes, before our question. Next, create the memory and link it to that variable with <code>memory_key</code>. The memory <b>stores all the conversations</b> we've had with the LLM so far. Then chain LLM, memory and prompt together:</p>
+  <pre class="code"><code>from langchain.memory import ConversationBufferMemory
+
+# Define the type of memory we will use
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+# Chain the LLM, prompt, and memory together
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)
+
+# Generate a conversation and ask a basic question
+llm_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})</code></pre>
+  <pre class="code"><code>{'input_prompt': 'Hi! My name is Maarten. What is 1 + 1?',
+ 'chat_history': '',
+ 'text': " Hello Maarten! The answer to 1 + 1 is 2. Hope you're having a great day!"}</code></pre>
+  <p>The answer is under <code>'text'</code>, the question under <code>'input_prompt'</code>, the history under <code>'chat_history'</code>. Since this is the first call, the history is <b>empty</b>. Now the follow-up:</p>
+  <pre class="code"><code># Does the LLM remember the name we gave it?
+llm_chain.invoke({"input_prompt": "What is my name?"})</code></pre>
+  <pre class="code"><code>{'input_prompt': 'What is my name?',
+ 'chat_history': "Human: Hi! My name is Maarten. What is 1 + 1?\nAI: Hello
+   Maarten! The answer to 1 + 1 is 2. Hope you're having a great day!",
+ 'text': ' Your name is Maarten.'}</code></pre>
+  <p>With memory added to the chain, the LLM uses the history to find the name. Figure 7-11 gives the overview.</p>
+  <figure class="bookfig"><img src="figs/fig-7-11.png" alt="Human: I'm Maarten. AI: Hi Maarten! flows into the {conversation_history} slot, &quot;What is my name?&quot; into the {user_prompt} slot, the template is chained to the LLM which answers &quot;Your name is Maarten.&quot;" loading="lazy"><figcaption>Figure 7-11 (book, pdf p234): We extend the LLM chain with memory by appending the entire conversation history to the input prompt.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> This is Figure 7-6 with one extra slot. The template now has a blue <code>{ conversation_history }</code> slot above the green <code>{ user_prompt }</code> slot. Two arrows fill them: the past turns (Human / AI) and the new question. The chained LLM answers "Your name is Maarten."</p>
+  <div class="fig">
+    <h3>Step through: the prompt grows every turn</h3>
+    <div class="stepbar"><button id="cb_prev" type="button">◀ Back</button><button id="cb_next" type="button">Next ▶</button><span id="cb_n"></span></div>
+    <div id="cb_box" style="display:grid;gap:8px"></div>
+    <div class="caption" id="cb_cap"></div>
+    <p class="note">Turns 1–2 are the book's; turns 3–4 and all token counts are modelled (about 1 token per 4 characters).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A cricket commentator who, before every ball, re-reads the full ball-by-ball log of the match from the first over. Early in the innings that's quick. By the 45th over he is reading for ages before each ball, and in a Test match the log won't fit on his desk. <i>Where it breaks:</i> a commentator would skim; the LLM processes every token of the history at full cost.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The memory object simply keeps a list of (human, AI) messages. Before each call it formats them as <code>Human: …\nAI: …</code> text and drops that into <code>{chat_history}</code>; after the call it appends the new pair. Nothing is lost while it fits, but the prompt length is the sum of all past turns, so cost and prefill time grow with every message.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's wrong with just sending the full chat history?"</i> Say: "It's the simplest and loses nothing, but the prompt grows linearly, so each turn gets slower and more expensive and you eventually hit the context limit. Very long histories also make it harder for the model to find the relevant fact. It's fine for short sessions; for long ones I'd window it, summarize it or retrieve from it."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 8 and 9: two fixes for the growing prompt.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: retrieval, another way to bring back only the relevant past.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · WINDOWED CONVERSATION BUFFER</div><h2>Keep only the last k exchanges</h2></div><span class="chip">pdf p234–236</span></div>
+  <p>The previous example is basically a <b>chatbot</b>: you talk, it remembers. But as the conversation grows, so does the prompt, until it <b>exceeds the token limit</b>.</p>
+  <p>One way to keep the context small: use only the <b>last k conversations</b> (exchanges) instead of the full history. In LangChain this is <b>ConversationBufferWindowMemory</b>, where <code>k</code> decides how many are passed into the prompt:</p>
+  <pre class="code"><code>from langchain.memory import ConversationBufferWindowMemory
+
+# Retain only the last 2 conversations in memory
+memory = ConversationBufferWindowMemory(k=2, memory_key="chat_history")
+
+# Chain the LLM, prompt, and memory together
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)</code></pre>
+  <p>The book then runs four questions to show what is remembered. Note it calls <code>predict(...)</code> for the first two and <code>invoke({...})</code> later. <code>predict</code> normally returns just the text, yet the book prints a full dictionary after it, so that printout probably came from an <code>invoke</code> run.</p>
+  <pre class="code"><code># Ask two questions and generate two conversations in its memory
+llm_chain.predict(input_prompt="Hi! My name is Maarten and I am 33 years old. What is 1 + 1?")
+llm_chain.predict(input_prompt="What is 3 + 3?")</code></pre>
+  <pre class="code"><code>{'input_prompt': 'What is 3 + 3?',
+ 'chat_history': "Human: Hi! My name is Maarten and I am 33 years old. What is 1 + 1?\nAI:
+   Hello Maarten! It's nice to meet you. Regarding your question, 1 + 1 equals 2. ...
+   (Note: This response answers the provided mathematical query while maintaining
+   politeness and openness for additional inquiries.)",
+ 'text': " Hello Maarten! It's nice to meet you as well. Regarding your new question,
+   3 + 3 equals 6. ..."}</code></pre>
+  <p>The history so far is in <code>"chat_history"</code>. Under the hood LangChain saves it as an exchange between you (labelled <b>Human</b>) and the LLM (labelled <b>AI</b>). (Phi-3 even added a chatty "(Note: …)" to its own answer, which now sits in memory too.)</p>
+  <pre class="code"><code># Check whether it knows the name we gave it
+llm_chain.invoke({"input_prompt":"What is my name?"})
+# 'text': ' Your name is Maarten, as mentioned at the beginning of our conversation. ...'</code></pre>
+  <p>It remembers the name: turn 1 is still inside the window of 2. The history now holds both previous exchanges. But with this question we are at <b>three</b> exchanges, and the memory keeps only the last two, so the <b>very first one drops out</b>. That first one held the age:</p>
+  <pre class="code"><code># Check whether it knows the age we gave it
+llm_chain.invoke({"input_prompt":"What is my age?"})</code></pre>
+  <pre class="code"><code>{'input_prompt': 'What is my age?',
+ 'chat_history': "Human: What is 3 + 3?\nAI: Hello again! 3 + 3 equals 6. ...
+   \nHuman: What is my name?\nAI: Your name is Maarten.",
+ 'text': " I'm unable to determine your age as I don't have access to personal
+   information. Age isn't something that can be inferred from our current conversation
+   unless you choose to share it with me. How else may I assist you today?"}</code></pre>
+  <p>The LLM has <b>no access to the age</b>, because that exchange is no longer in the history. (The AI wording in this history differs slightly from the earlier printout; the book's examples were evidently run separately.)</p>
+  <p>So this method <b>reduces the size of the history</b>, but keeps only the last few exchanges, which is <b>not ideal for long conversations</b>. Next: summarize the history instead.</p>
+  <div class="fig">
+    <h3>Try it: slide the window</h3>
+    <div class="controls"><label for="wk_k">k (exchanges kept) <input type="range" id="wk_k" min="1" max="4" step="1" value="2"><output id="wk_kv">2</output></label></div>
+    <div class="stepbar"><button id="wk_prev" type="button">◀ Back</button><button id="wk_next" type="button">Next ▶</button><span id="wk_n"></span></div>
+    <div class="chat" id="wk_box"></div>
+    <div class="verdict" id="wk_v"></div>
+    <p class="note">With k = 2 this replays the book's run exactly (p234–235). Other k values show what would have happened (modelled).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A WhatsApp group where you only ever scroll up two messages. You see what was just said, but you've no idea someone mentioned the venue an hour ago. <i>Where it breaks:</i> you could scroll further if you wanted; the windowed LLM literally never receives the older messages.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The memory still stores everything (or at least enough), but when building the prompt it slices the list to the last <code>k</code> human/AI pairs. Prompt size becomes roughly constant (k × average exchange length), so cost stops growing. The price is a hard cut-off: anything older than k exchanges is gone, regardless of how important it was. The name survived only because it was recent, not because it mattered.</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>Average exchange = 120 tokens. After 30 exchanges a full buffer sends 3,600 tokens of history, more than Phi-3's <code>n_ctx=2048</code> allows. A window of k = 5 sends about 600 tokens every time, no matter how long the chat runs.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you cap memory cost in a long-running chatbot?"</i> Say: "Simplest is a sliding window of the last k turns: constant prompt size, zero extra calls, but hard forgetting. I usually pin key facts (user name, task goal) in the system prompt or a profile store so they survive the window, and add a summary or retrieval for older context." In a realtime voice agent a short window keeps latency predictable, which is often worth more than perfect recall.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 9: Table 7-1 compares this with the other two methods.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · CONVERSATION SUMMARY</div><h2>Let a second LLM call squeeze the history into a summary</h2></div><span class="chip">pdf p236–239 · Fig 7-12 · 7-13 · Table 7-1</span></div>
+  <p>Memory is vital for a good interactive experience. But with <b>ConversationBufferMemory</b> the history keeps growing toward your token limit, and <b>ConversationBufferWindowMemory</b> solves that only partly, because just the last k exchanges are kept.</p>
+  <p>You could use an LLM with a <b>larger context window</b>, but those tokens still have to be <b>processed before any output is generated</b>, which increases compute time. The more sophisticated option is <b>ConversationSummaryMemory</b>: as the name says, it <b>summarizes the whole conversation history</b> down to the main points.</p>
+  <p>The summarizing is done by <b>another LLM call</b>: an LLM is given the history and asked for a concise summary. A nice advantage of using a separate LLM is that it <b>doesn't have to be the same model</b> you chat with. Figure 7-12 shows the process.</p>
+  <figure class="bookfig"><img src="figs/fig-7-12.png" alt="Conversation history goes through a Summarize LLM which writes &quot;Maarten asked what 1 + 1 is and I told him 2.&quot; into the prompt template's history slot, followed by the new prompt What is my name?" loading="lazy"><figcaption>Figure 7-12 (book, pdf p236): Instead of passing the conversation history directly to the prompt, we use another LLM to summarize it first.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Compare with Figure 7-10. The history (with a playful "The answer to 1 + 1 is… (drumroll) …2.") no longer goes straight into the template. It passes through a small pink <b>Summarize LLM</b> box first, and what lands in the "Conversation history:" slot is a short line: "<b>Maarten asked what 1 + 1 is and I told him 2.</b>" The new prompt still goes in unchanged. The drumroll is gone: summaries drop detail.</p>
+  <p>So every question now costs <b>two calls</b>:</p>
+  <ul class="plain"><li>The <b>user prompt</b></li><li>The <b>summarization prompt</b></li></ul>
+  <p>First prepare the summarization template:</p>
+  <pre class="code"><code># Create a summary prompt template
+summary_prompt_template = """&lt;s&gt;&lt;|user|&gt;Summarize the conversations and update
+with the new lines.
+
+Current summary:
+{summary}
+
+new lines of conversation:
+{new_lines}
+
+New summary:&lt;|end|&gt;
+&lt;|assistant|&gt;"""
+summary_prompt = PromptTemplate(
+    input_variables=["new_lines", "summary"],
+    template=summary_prompt_template
+)</code></pre>
+  <p>Two variables: <code>{summary}</code> is the summary so far, <code>{new_lines}</code> is the latest exchange. The model writes an <b>updated</b> summary, so the summary is rolled forward turn by turn rather than rebuilt from scratch.</p>
+  <p>Using <b>ConversationSummaryMemory</b> is like before; the difference is that we must also give it <b>an LLM for the summarizing</b>. The book uses the same LLM for both jobs, but you could use a <b>smaller LLM</b> for summarizing to speed things up:</p>
+  <pre class="code"><code>from langchain.memory import ConversationSummaryMemory
+
+# Define the type of memory we will use
+memory = ConversationSummaryMemory(
+    llm=llm,
+    memory_key="chat_history",
+    prompt=summary_prompt
+)
+
+# Chain the LLM, prompt, and memory together
+llm_chain = LLMChain(
+    prompt=prompt,
+    llm=llm,
+    memory=memory
+)
+
+# Generate a conversation and ask for the name
+llm_chain.invoke({"input_prompt": "Hi! My name is Maarten. What is 1 + 1?"})
+llm_chain.invoke({"input_prompt": "What is my name?"})</code></pre>
+  <pre class="code"><code>{'input_prompt': 'What is my name?',
+ 'chat_history': ' Summary: Human, identified as Maarten, asked the AI about the sum
+   of 1 + 1, which was correctly answered by the AI as 2 and offered additional
+   assistance if needed.',
+ 'text': ' Your name in this context was referred to as "Maarten". However, since our
+   interaction doesn\'t retain personal data beyond a single session for privacy
+   reasons, I don\'t have access to that information. How can I assist you further today?'}</code></pre>
+  <p>After each step the chain summarizes the conversation so far; here the first exchange became a one-sentence description in <code>'chat_history'</code>. (Note the model's odd answer: it gives the name <b>and</b> claims it can't retain it "for privacy reasons". The summary worked; the small model's reply is just muddled.)</p>
+  <pre class="code"><code># Check whether it has summarized everything thus far
+llm_chain.invoke({"input_prompt": "What was the first question I asked?"})</code></pre>
+  <pre class="code"><code>{'input_prompt': 'What was the first question I asked?',
+ 'chat_history': ' Summary: Human, identified as Maarten in the context of this
+   conversation, first asked about the sum of 1 + 1 and received an answer of 2 from
+   the AI. Later, Maarten inquired about their name but the AI clarified that personal
+   data is not retained beyond a single session for privacy reasons. The AI offered
+   further assistance if needed.',
+ 'text': ' The first question you asked was "what\'s 1 + 1?"'}</code></pre>
+  <p>The summary was updated with the previous exchange, and the model correctly <b>inferred</b> the original question. To see the latest summary, read the memory directly:</p>
+  <pre class="code"><code># Check what the summary is thus far
+memory.load_memory_variables({})</code></pre>
+  <pre class="code"><code>{'chat_history': ' Maarten, identified in this conversation, initially asked about the
+   sum of 1+1 which resulted in an answer from the AI being 2. Subsequently, he sought
+   clarification on his name but the AI informed him that no personal data is retained
+   beyond a single session due to privacy reasons. The AI then offered further
+   assistance if required. Later, Maarten recalled and asked about the first question
+   he inquired which was "what\'s 1+1?"'}</code></pre>
+  <figure class="bookfig"><img src="figs/fig-7-13.png" alt="Human: I'm Maarten. AI: Hi Maarten! goes through a Summarize LLM into the {conversation_history} slot; &quot;What is my name?&quot; into {user_prompt}; template chained to LLM answering Your name is Maarten" loading="lazy"><figcaption>Figure 7-13 (book, pdf p239): We extend the LLM chain with memory by summarizing the entire conversation history before giving it to the input prompt.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Figure 7-11 again, with one addition on the left: the Human/AI history passes through a separate pink <b>LLM</b> labelled "Summarize" before it reaches the <code>{ conversation_history }</code> slot. Count the pink LLM boxes: <b>two</b>. That is the two-calls-per-turn cost made visible.</p>
+  <p>Summaries keep the history <b>relatively small</b> without using many tokens at inference. But the original question was <b>not saved word for word</b>; the model had to <b>infer</b> it from the summary. That is a disadvantage when specific information must be kept exactly. And it needs <b>multiple LLM calls</b> (one for the prompt, one for the summary), which can <b>slow down</b> computing time.</p>
+  <p>Often it is a <b>trade-off between speed, memory and accuracy</b>. ConversationBufferMemory is <b>instant but hogs tokens</b>; ConversationSummaryMemory is <b>slow but frees up tokens</b>. Table 7-1 lists more pros and cons.</p>
+  <div class="tablewrap"><table>
+    <caption style="text-align:left;font-family:var(--mono);font-size:12.5px;color:var(--muted);padding-bottom:6px">Table 7-1 (book, pdf p239): The pros and cons of different memory types.</caption>
+    <thead><tr><th>Memory type</th><th>Pros</th><th>Cons</th></tr></thead>
+    <tbody>
+      <tr><td><b>Conversation Buffer</b></td><td><ul class="plain"><li>Easiest implementation</li><li>Ensures no information loss within context window</li></ul></td><td><ul class="plain"><li>Slower generation speed as more tokens are needed</li><li>Only suitable for large-context LLMs</li><li>Larger chat histories make information retrieval difficult</li></ul></td></tr>
+      <tr><td><b>Windowed Conversation Buffer</b></td><td><ul class="plain"><li>Large-context LLMs are not needed unless chat history is large</li><li>No information loss over the last k interactions</li></ul></td><td><ul class="plain"><li>Only captures the last k interactions</li><li>No compression of the last k interactions</li></ul></td></tr>
+      <tr><td><b>Conversation Summary</b></td><td><ul class="plain"><li>Captures the full history</li><li>Enables long conversations</li><li>Reduces tokens needed to capture full history</li></ul></td><td><ul class="plain"><li>An additional call is necessary for each interaction</li><li>Quality is reliant on the LLM's summarization capabilities</li></ul></td></tr>
+    </tbody>
+  </table></div>
+  <div class="fig">
+    <h3>Simulator: the three memories over a long chat</h3>
+    <div class="controls">
+      <label for="ms_t">Turns so far <input type="range" id="ms_t" min="1" max="60" step="1" value="12"><output id="ms_tv">12</output></label>
+      <label for="ms_e">Tokens per exchange <input type="range" id="ms_e" min="40" max="400" step="10" value="120"><output id="ms_ev">120</output></label>
+      <label for="ms_k">Window k <input type="range" id="ms_k" min="1" max="10" step="1" value="3"><output id="ms_kv">3</output></label>
+      <label for="ms_s">Summary size <input type="range" id="ms_s" min="40" max="400" step="10" value="150"><output id="ms_sv">150</output></label>
+    </div>
+    <div class="tablewrap"><table id="ms_tab"></table></div>
+    <div class="verdict" id="ms_v"></div>
+    <p class="note">All numbers modelled. Context limit = 2,048 tokens (the book's <code>n_ctx</code>). "Remembers turn 1 exactly?" asks whether the first exchange is still in the prompt word for word. Summary call cost = current summary + newest exchange + ~40 tokens of instructions.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Minutes of a society committee meeting. Nobody re-reads every word said in the last ten meetings; the secretary keeps running minutes and updates them after each meeting. Cheap to read, covers the whole history. But if someone asks "what exactly did Sharma-ji say about the parking fee?", the minutes only say "parking discussed". <i>Where it breaks:</i> a human secretary knows what matters to the committee; the summarizing LLM decides on its own what to drop, and its own slips (like the "privacy" remark here) get written into the minutes permanently.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The summary is a <b>lossy, rolling compression</b>: new_summary = LLM(old_summary + newest exchange). Prompt size stays near the summary length, so the main call stays fast. But every turn adds a second call whose output quality depends on the summarizer, and errors compound because each summary is built from the previous one, not from the original text.</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>30 turns × 120 tokens. Buffer: 3,600 history tokens per call (over the 2,048 limit). Window k = 3: 360 tokens, but turn 1 is gone. Summary of ~150 tokens: 150 tokens in the main call, plus a second call of about 150 + 120 + 40 = 310 tokens. Total tokens are low, but you pay two round trips of latency per turn.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Buffer, window or summary memory: which would you pick?"</i> Say: "It's a speed / memory / accuracy trade-off. Buffer is exact but grows without bound. Window is constant-size and free but forgets hard. Summary covers the whole history in few tokens but costs an extra LLM call per turn and loses exact wording. In practice I combine them: last few turns verbatim, a rolling summary of older turns updated asynchronously off the hot path, and important facts stored as structured data or retrievable memories." For a voice agent, never put the summary call in the response path; do it after the turn is spoken.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>LangChain also ships <code>ConversationSummaryBufferMemory</code> (recent turns verbatim + summary of older ones), and newer versions move memory to <code>RunnableWithMessageHistory</code> and LangGraph checkpointers.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: retrieving relevant old turns by embedding similarity (vector memory).</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: memory management strategies for agents.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · AGENTS: CREATING A SYSTEM OF LLMS</div><h2>Let the LLM decide which steps to take</h2></div><span class="chip">pdf p240–241 · Fig 7-14</span></div>
+  <p>So far every system followed a <b>user-defined set of steps</b>: we decided title → character → story. One of the most promising ideas in LLMs is letting the model <b>decide its own actions</b>. This is usually called an <b>agent</b>: a system that uses a language model to determine <b>which actions to take and in what order</b>.</p>
+  <p>Agents can use everything seen so far (model I/O, chains, memory) and add <b>two vital components</b>:</p>
+  <ul class="plain">
+    <li><b>Tools</b> the agent can use to do things it could not do itself.</li>
+    <li>The <b>agent type</b>, which <b>plans</b> the actions to take or tools to use.</li>
+  </ul>
+  <p>Unlike chains, agents can show more advanced behaviour, like <b>creating and self-correcting a roadmap</b> to reach a goal. Through tools they can <b>interact with the real world</b>. So they can do many tasks beyond what an LLM can do on its own.</p>
+  <p>Example: LLMs are <b>notoriously bad at maths</b> and often fail simple maths tasks, but they could do far more with access to a <b>calculator</b>. As Figure 7-14 shows, the core idea is that the LLM is used not only to understand the query but also to <b>decide which tool to use and when</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-7-14.png" alt="Without tools: What is 47 / 12 x 3.14? The bot answers 7.34, incorrect. With tools: the bot says let me use a calculator, the calculator gives 12.2983, the bot answers 12.2983, correct" loading="lazy"><figcaption>Figure 7-14 (book, pdf p240): Giving LLMs the ability to choose which tools they use for a particular problem results in more complex and accurate behavior.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same question in both panels: "What is 47 / 12 × 3.14?". <b>Without tools</b> (left), the bot answers <b>7.34</b>, marked "Incorrect answer" in red: it guessed digits. <b>With tools</b> (right), the bot first says "Let me use a <b>calculator</b>", the calculator computes 47 / 12 × 3.14 = <b>12.2983</b>, and the bot returns that, marked "Correct answer" in green. The LLM's job changed from <i>computing</i> to <i>deciding to compute</i>.</p>
+  <p>Here we'd expect the LLM to pick the calculator for a maths task. Now imagine dozens of tools, like a <b>search engine</b> or a <b>weather API</b>: suddenly the LLM's capabilities grow a lot. Agents built on LLMs can be powerful <b>general problem solvers</b>. The tools matter, but the driving force behind many agent systems is a framework called <b>ReAct</b> (Reasoning and Acting).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Chain (plates 3–9)</th><th>Agent (plates 10–12)</th></tr></thead>
+    <tbody>
+      <tr><td><b>Who picks the steps?</b></td><td>The developer, in code (title → character → story)</td><td>The LLM, at runtime, from a list of tools</td></tr>
+      <tr><td><b>Number of LLM calls</b></td><td>Fixed and known in advance</td><td>Varies per question (loops until "Final Answer")</td></tr>
+      <tr><td><b>Can it touch the outside world?</b></td><td>Only if you wired a step for it</td><td>Yes, through tools (search, calculator, APIs)</td></tr>
+      <tr><td><b>Self-correction</b></td><td>No</td><td>Yes: can revise its roadmap after each observation</td></tr>
+      <tr><td><b>Predictability / debugging</b></td><td>High</td><td>Lower; you need the intermediate-step log</td></tr>
+      <tr><td><b>Model needed</b></td><td>Small model is fine (Phi-3 in the book)</td><td>Must follow complex formats (book switches to GPT-3.5)</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Comparison table is ours, built from the chapter's statements.</p>
+  <div class="fig">
+    <h3>Try it: guess vs tool</h3>
+    <div class="controls"><label for="ag_q">Expression <input type="text" id="ag_q" value="47 / 12 * 3.14" style="width:min(220px,60vw)"></label><button id="ag_go" type="button">Ask</button></div>
+    <div class="two"><div class="card"><b>Without tools (modelled guess)</b><span id="ag_a"></span></div><div class="card"><b>With a calculator tool</b><span id="ag_b"></span></div></div>
+    <p class="note">The "guess" is simulated by deliberately wrong digit-juggling (modelled), to stand in for how an LLM predicts number tokens instead of computing. The calculator side computes for real (only + − × ÷ and brackets allowed).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A sharp kirana shop owner who chats easily with every customer but is shaky at long multiplication. He doesn't try mental maths for a ₹3,847 × 12 bill; he reaches for the calculator, and for stock prices he calls the wholesaler. His skill is knowing <b>when</b> to reach for which helper. <i>Where it breaks:</i> the shopkeeper can see the calculator's display himself; the LLM only "sees" whatever text your code feeds back as the tool result.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An LLM predicts tokens; "12.2983" is just a likely-looking string to it, so arithmetic is unreliable. A tool moves the exact work to deterministic code. The agent's control loop is ordinary software: show the LLM a list of tools, read which tool it asked for, run that tool, paste the result back, repeat. "Agent type" in LangChain is the policy that decides how that prompting and parsing works (ReAct is one type).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's the difference between a chain and an agent?"</i> Say: "In a chain the developer fixes the steps in code. In an agent the LLM chooses the next step at runtime from a set of tools, looping until it decides it's done. Agents handle open-ended tasks, but they are less predictable, cost more calls and need guardrails: step limits, tool validation, and logging every step." Tool-calling agents in production are exactly this loop with structured tool calls.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11: ReAct, the loop that drives the agent.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: tools, planning and agent failure modes in depth.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · THE DRIVING POWER BEHIND AGENTS: STEP-BY-STEP REASONING</div><h2>ReAct: think, act, look at the result, repeat</h2></div><span class="chip">pdf p241–243 · Fig 7-15 · 7-16</span></div>
+  <p><b>ReAct</b> (Yao et al., 2022) combines two important ideas in behaviour: <b>reasoning</b> and <b>acting</b>. LLMs are very good at reasoning; the book says this was explored in detail "in Chapter 5", though the reasoning techniques (chain-of-thought and friends) are in <a href="ch06_prompt_engineering.html">Chapter 6, Prompt Engineering</a>.</p>
+  <p><b>Acting</b> is a different story. LLMs can't act like you and me. To give them that ability we can tell an LLM it may use certain tools, such as a weather-forecast API. But LLMs can <b>only generate text</b>, so they have to be told to write <b>specific queries</b> that trigger the API.</p>
+  <p>ReAct merges the two: <b>reasoning affects acting</b> and <b>actions affect reasoning</b>. In practice it repeats three steps:</p>
+  <div class="grid2">
+    <div class="card"><b style="color:var(--sell)">Thought</b><span>The LLM writes a "thought" about the input: what it thinks it should do next, and why.</span></div>
+    <div class="card"><b style="color:var(--c3)">Action</b><span>Based on the thought, an action is triggered: usually an external tool like a calculator or a search engine.</span></div>
+    <div class="card"><b style="color:var(--c1)">Observation</b><span>The tool's result goes back to the LLM, which "observes" it; often a summary of whatever was retrieved.</span></div>
+  </div>
+  <figure class="bookfig"><img src="figs/fig-7-15.png" alt="ReAct prompt template: Instruction: Solve the question from the user. ReAct steps: Use the following interleaving steps: Thought, Action, Observation. Step descriptions: a thought can reason about the current situation; an action can be one of two types: Search[entity], Calculator[formula]; an observation is the result of an action" loading="lazy"><figcaption>Figure 7-15 (book, pdf p242): An example of a ReAct prompt template.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> It's one prompt, labelled in three parts on the left. <b>Instruction</b>: "Solve the <b>question</b> from the user." <b>ReAct steps</b>: "Use the following interleaving steps: Thought, Action, Observation." <b>Step descriptions</b>, one coloured box each: "A <b>thought</b> can reason about the current situation."; "An <b>action</b> can be one of two types: (1) <i>Search</i>[entity] (2) <i>Calculator</i>[formula]"; "An <b>observation</b> is the result of an action." So the whole "agent" is set up by a carefully written prompt that tells the model the format and the tools.</p>
+  <p>The book's example: you're on holiday in the <b>United States</b> and want to buy a <b>MacBook Pro</b>. You want the price, but converted to <b>EUR</b>, since you live in Europe and are more comfortable with those prices. As Figure 7-16 shows, the agent first <b>searches the web</b> for current prices (it might find one or several, depending on the search engine). Then it uses a <b>calculator</b> to convert USD to EUR, assuming we know the exchange rate.</p>
+  <figure class="bookfig"><img src="figs/fig-7-16.png" alt="Initial prompt asks the MacBook Pro price in USD and EUR at 0.85. ReAct cycle 1: Thought I should search the web; Action Google[price MacBook Pro]; tool Google; Observation The price is $1,299. ReAct cycle 2: Thought I need to use a calculator; Action Calculator[1,299 x .85]; tool Calculator 1,299 x .85 = 1104.15; Observation A MacBook Pro would cost 1104.15 euros" loading="lazy"><figcaption>Figure 7-16 (book, pdf p242): An example of two cycles in a ReAct pipeline.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: the user's initial prompt: "What is the current price of a MacBook Pro in USD? How much would it cost in EUR if the exchange rate is 0.85 EUR for 1 USD?" Below are two dotted boxes, one per cycle. Blue parts are written by the <b>LLM</b>, green parts are the <b>Tool</b>. <b>Cycle 1</b>: Thought "I should <b>search</b> the web" → Action "Google [price MacBook Pro]" → (perform action) the Google tool runs → (show results) Observation "The price is $1,299,-". An arrow carries this into <b>cycle 2</b>: Thought "I need to use a calculator to do the calculation" → Action "Calculator [1,299 × .85]" → the Calculator tool computes 1,299 × .85 = 1104.15 → Observation "A MacBook Pro would cost <b>€1104.15</b>". The $1,299 figure is illustrative; the real LangChain run in plate 12 found $2,249.00.</p>
+  <p>Throughout, the agent describes its <b>thoughts</b> (what it should do), its <b>actions</b> (what it will do) and its <b>observations</b> (the results of the action). This <b>cycle of thoughts, actions and observations</b> produces the agent's output.</p>
+  <div class="fig">
+    <h3>Step through: the ReAct loop on the book's question</h3>
+    <div class="stepbar"><button id="ra_prev" type="button">◀ Back</button><button id="ra_next" type="button">Next ▶</button><span id="ra_n"></span></div>
+    <div class="rx" id="ra_box" aria-live="polite"></div>
+    <div class="caption" id="ra_cap"></div>
+    <p class="note">Text follows Figure 7-16 (the illustrative $1,299 run).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A detective in a Byomkesh Bakshi story: "The servant was out at 9 (thought). Let me check the railway register (action). The register shows he bought a ticket at 8:50 (observation). So he wasn't in the house; next I should question the cook (thought)…" Each clue changes the next move. <i>Where it breaks:</i> the detective remembers everything; the LLM's "memory" of earlier cycles is only the scratchpad text pasted back into its prompt each time.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Writing the thought first is chain-of-thought prompting: the model reasons in text before committing to an action, which makes the action choice better. Making the model write the action in a fixed format (<code>Action: tool</code> / <code>Action Input: …</code>) lets plain code parse it, stop generation, run the tool, and append <code>Observation: …</code>. Then the model is called again with everything so far. The model never runs anything itself; it only writes text that your code acts on.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Explain ReAct."</i> Say: "ReAct interleaves reasoning and acting. The model writes a Thought, then an Action with an input in a fixed format; the runtime parses that, executes the tool, and appends the Observation; the model continues until it writes a Final Answer. Reasoning picks better actions, and observations ground the reasoning in real data, which cuts hallucination." Mention that modern function calling replaces the text parsing with structured tool calls, but the loop is the same.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: chain-of-thought, the "reasoning" half.</li><li>Plate 12: the full ReAct template in code.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · REACT IN LANGCHAIN</div><h2>Building a web-search + calculator agent</h2></div><span class="chip">pdf p243–245 · Fig 7-17</span></div>
+  <p>The book now builds a pipeline that can <b>search the web</b> and <b>use a calculator</b>. Such autonomous processes generally need an LLM <b>powerful enough to follow complex instructions</b> closely. The small Phi-3 used so far isn't sufficient, so the example uses <b>OpenAI's GPT-3.5</b>:</p>
+  <pre class="code"><code>import os
+from langchain_openai import ChatOpenAI
+
+# Load OpenAI's LLMs with LangChain
+os.environ["OPENAI_API_KEY"] = "MY_KEY"
+openai_llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)</code></pre>
+  <p><code>temperature=0</code> makes the model pick its most likely token every time, so the agent's format-following is as steady as possible.</p>
+  <div class="box work"><b>Book sidebar: it's not only OpenAI</b><p>That Phi-3 is too small here doesn't mean only OpenAI's models can do it. Larger capable LLMs exist, but they need much more compute and VRAM. Local LLMs often come in several sizes, and within a model family <b>a bigger model performs better</b>. The chapter used a small model to keep compute low. As the field moves, small models improve too; the authors "would be anything but surprised" if small LLMs like the one in this chapter could eventually run this example.</p></div>
+  <h3>The ReAct template</h3>
+  <p>Next, the agent's template. It spells out the ReAct steps the model must follow:</p>
+  <pre class="code"><code># Create the ReAct template
+react_template = """Answer the following questions as best you can. You have
+access to the following tools:
+
+{tools}
+
+Use the following format:
+
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
+
+Begin!
+
+Question: {input}
+Thought:{agent_scratchpad}"""
+
+prompt = PromptTemplate(
+    template=react_template,
+    input_variables=["tools", "tool_names", "input", "agent_scratchpad"]
+)</code></pre>
+  <ul class="plain">
+    <li><code>{tools}</code>: the name and description of every tool, filled in by LangChain.</li>
+    <li><code>{tool_names}</code>: just the names, so the model knows the allowed values for <code>Action:</code>.</li>
+    <li><code>{input}</code>: the user's question.</li>
+    <li><code>{agent_scratchpad}</code>: everything the agent has written and observed so far in this run (earlier Thought / Action / Observation lines). It grows each cycle; it is the agent's short-term memory.</li>
+  </ul>
+  <p>The template shows the flow: start with a question, generate intermediate thoughts, actions and observations, end with a final answer.</p>
+  <h3>The tools</h3>
+  <pre class="code"><code>from langchain.agents import load_tools, Tool
+from langchain.tools import DuckDuckGoSearchResults
+
+# You can create the tool to pass to an agent
+search = DuckDuckGoSearchResults()
+search_tool = Tool(
+    name="duckduck",
+    description="A web search engine. Use this to as a search engine for general queries.",
+    func=search.run,
+)
+
+# Prepare tools
+tools = load_tools(["llm-math"], llm=openai_llm)
+tools.append(search_tool)</code></pre>
+  <p>Two tools: the <b>DuckDuckGo</b> search engine, wrapped as a <code>Tool</code> with a <code>name</code> ("duckduck"), a <code>description</code> (the LLM reads this to decide when to use it) and a <code>func</code> (the Python function to run); and <code>llm-math</code>, a math tool that gives access to a basic <b>calculator</b>. (It is loaded with <code>llm=openai_llm</code> because LangChain's math tool uses the LLM to turn the question into an expression before evaluating it.)</p>
+  <h3>The agent and the executor</h3>
+  <pre class="code"><code>from langchain.agents import AgentExecutor, create_react_agent
+
+# Construct the ReAct agent
+agent = create_react_agent(openai_llm, tools, prompt)
+agent_executor = AgentExecutor(
+    agent=agent, tools=tools, verbose=True, handle_parsing_errors=True
+)</code></pre>
+  <p><code>create_react_agent</code> combines model, tools and template into the "decide the next step" part. The <b>AgentExecutor</b> handles <b>executing the steps</b>: it runs the loop, calls the tools, and feeds observations back. <code>verbose=True</code> prints each intermediate step; <code>handle_parsing_errors=True</code> means that if the model writes something that doesn't match the format, the error is sent back to the model to fix instead of crashing the run.</p>
+  <pre class="code"><code># What is the price of a MacBook Pro?
+agent_executor.invoke(
+    {
+        "input": "What is the current price of a MacBook Pro in USD? How much would it cost in EUR if the exchange rate is 0.85 EUR for 1 USD."
+    }
+)</code></pre>
+  <p>While running, the model produces intermediate steps like Figure 7-17.</p>
+  <figure class="bookfig"><img src="figs/fig-7-17.png" alt="Verbose log: Entering new AgentExecutor chain; I need to find the current price of a MacBook Pro in USD first before converting it to EUR; Action: duckduck; Action Input: current price of MacBook Pro in USD, snippet from Best Buy; Action: Calculator; Action Input: $2,249.00 * 0.85; Answer: 1911.6499999999999; I now know the final answer; Final Answer" loading="lazy"><figcaption>Figure 7-17 (book, pdf p245): An example of the ReAct process in LangChain.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> This is the real <code>verbose=True</code> log. Green lines are the model's own text; yellow and blue are tool results. Line by line: "Entering new AgentExecutor chain…"; the thought "I need to find the current price of a MacBook Pro in USD first before converting it to EUR."; <code>Action: duckduck</code> with input "current price of MacBook Pro in USD"; the yellow search snippet (from Best Buy, cut off); <code>Action: Calculator</code> with input <code>$2,249.00 * 0.85</code>; the blue result <code>Answer: 1911.6499999999999</code>; "I now know the final answer"; and the Final Answer. Note the <b>1911.6499999999999</b>: floating-point rounding again (plate 2), since 0.85 can't be stored exactly in binary.</p>
+  <p>These intermediate steps show how the model works through the ReAct template and which tools it uses, which lets us <b>debug</b> and check whether the agent uses its tools correctly. When finished, the output is:</p>
+  <pre class="code"><code>{'input': 'What is the current price of a MacBook Pro in USD? How much would it cost
+   in EUR if the exchange rate is 0.85 EUR for 1 USD?',
+ 'output': 'The current price of a MacBook Pro in USD is $2,249.00. It would cost
+   approximately 1911.65 EUR with an exchange rate of 0.85 EUR for 1 USD.'}</code></pre>
+  <p>With only a search engine and a calculator, that's impressive. But <b>whether the answer is actually correct</b> must be considered. Because the behaviour is fairly autonomous, we're not involved in the intermediate steps: there is <b>no human in the loop</b> to judge the quality of the output or the reasoning.</p>
+  <p>This <b>double-edged sword</b> needs careful system design to improve reliability. For example, the agent could <b>return the website's URL</b> where it found the price, or we could <b>ask whether the output is correct at each step</b>.</p>
+  <div class="fig">
+    <h3>Toy agent: a ReAct loop you can run</h3>
+    <div class="controls">
+      <label for="ta_item">Product <select id="ta_item"><option value="macbook">MacBook Pro</option><option value="iphone">iPhone</option><option value="kindle">Kindle</option><option value="unknown">Flying car</option></select></label>
+      <label for="ta_rate">EUR per USD <input type="number" id="ta_rate" value="0.85" step="0.01" min="0.01"></label>
+      <label><input type="checkbox" id="ta_bad"> model writes a malformed action once</label>
+    </div>
+    <div class="stepbar"><button id="ta_prev" type="button">◀ Back</button><button id="ta_next" type="button">Next ▶</button><span id="ta_n"></span></div>
+    <div class="rx" id="ta_box" aria-live="polite"></div>
+    <div class="caption" id="ta_cap"></div>
+    <p class="note">The "search" tool is a fake lookup table (prices modelled; the MacBook one matches the book's $2,249.00). The calculator really runs in your browser. The LLM's lines are scripted, but the loop (scratchpad, parse, tool, observe) is the real structure.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Sending a new office boy to buy something with your card and a list of rules. He comes back with the item and a total. Fast, but you weren't there: did he check two shops, or pay double at the first one? Asking him to bring the <b>receipt</b> (the URL) or to <b>call you before paying</b> (a check at each step) makes it safe. <i>Where it breaks:</i> the office boy has common sense; an agent will confidently return a wrong price from a stale snippet unless your design makes it show its sources.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The executor loop: build the prompt (template + tools + question + scratchpad) → call the LLM, stopping at "Observation:" → parse <code>Action</code> / <code>Action Input</code> → run the tool → append "Observation: result" to the scratchpad → repeat until the text contains "Final Answer:". The model sees its whole history each cycle, so the prompt grows, like the buffer memory of plate 7. Parsing is the fragile part, which is why <code>handle_parsing_errors</code> exists and why a model that follows formats well (GPT-3.5 here) is required.</p></div>
+  <div class="box work"><b>Worked example</b><p>Book's numbers: $2,249.00 × 0.85 = 1,911.65 EUR (the calculator printed 1911.6499999999999, the final answer rounded). Figure 7-16's illustrative run: $1,299 × 0.85 = 1,104.15 EUR. Two LLM cycles plus a final one means about <b>three LLM calls and two tool calls</b> for one user question: a useful number to have in mind when estimating agent latency and cost.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you make an agent reliable in production?"</i> Say: "Constrain and observe it. Few, well-described tools; structured tool-call outputs validated against a schema; a cap on steps and tokens; temperature 0; log every thought, action and observation for debugging; make it cite sources; and put a human or a verifier check before any irreversible action. Then evaluate on a fixed task set, because the agent's path changes from run to run." This maps directly onto tool-calling agents behind an LLM gateway.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Most current APIs (OpenAI, Anthropic, Gemini, many open models) support native <b>tool / function calling</b>, so the model returns a structured JSON tool call instead of <code>Action:</code> text, which removes most parsing errors. LangChain now steers agent building toward LangGraph. GPT-3.5 has been superseded by newer models.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 7: the scratchpad grows like a conversation buffer.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: search as a tool becomes retrieval-augmented generation.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: agent evaluation and failure modes.</li><li><a href="../llm_engineers_handbook/ch09_rag_inference_pipeline.html">LLM Engineer's Handbook Ch.9</a>: a production retrieval pipeline.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">13 · SUMMARY</div><h2>What the chapter did, in plain words</h2></div><span class="chip">pdf p246</span></div>
+  <p>The chapter extended LLMs by <b>adding modular components</b>. It started with a simple, reusable <b>chain</b> that connected the LLM to a <b>prompt template</b>. It then added <b>memory</b> to the chain so the LLM could remember conversations, exploring <b>three methods</b> (buffer, windowed buffer, summary) and their strengths and weaknesses.</p>
+  <p>Next came <b>agents</b>, which use LLMs to decide on their own actions. The <b>ReAct</b> framework uses an intuitive prompting format so an agent can reason in thoughts, take actions and observe the results. That led to an agent that freely uses its tools (web search and a calculator), showing how powerful agents can be.</p>
+  <p>With this foundation, the next chapter looks at how LLMs can improve existing <b>search systems</b> and even become the core of new, more powerful ones.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><b>LangChain</b></td><td>Framework with modular abstractions (model I/O, memory, retrieval, agents) that can be chained together. Alternatives named: DSPy, Haystack.</td></tr>
+      <tr><td><b>Model I/O</b></td><td>Loading and working with LLMs: prompts, models, output parsers.</td></tr>
+      <tr><td><b>Quantization</b></td><td>Storing parameters with fewer bits; less precision, much less memory, faster, usually almost as accurate.</td></tr>
+      <tr><td><b>GGUF</b></td><td>File format for (often quantized) models used by llama.cpp / llama-cpp-python.</td></tr>
+      <tr><td><b>VRAM</b></td><td>The GPU's memory; the model's weights must fit here.</td></tr>
+      <tr><td><b>FP16 / 8-bit / 4-bit</b></td><td>Bits per parameter. Rule of thumb: stay at 4-bit or above.</td></tr>
+      <tr><td><b>Chain</b></td><td>An LLM connected to another component (prompt, memory, tool) or to other chains.</td></tr>
+      <tr><td><b>Prompt template</b></td><td>A reusable prompt with placeholders like <code>{input_prompt}</code>; for Phi-3 it holds the special tokens.</td></tr>
+      <tr><td><b>&lt;s&gt;, &lt;|user|&gt;, &lt;|assistant|&gt;, &lt;|end|&gt;</b></td><td>Phi-3's special tokens: start (BOS), user turn, model turn, end of turn.</td></tr>
+      <tr><td><b>Sequential chain</b></td><td>Several prompts run in order, each using earlier outputs (title → character → story).</td></tr>
+      <tr><td><b>Stateless</b></td><td>The model keeps nothing between calls; memory must be added by the application.</td></tr>
+      <tr><td><b>ConversationBufferMemory</b></td><td>Pastes the full chat history into every prompt.</td></tr>
+      <tr><td><b>ConversationBufferWindowMemory</b></td><td>Pastes only the last k exchanges.</td></tr>
+      <tr><td><b>ConversationSummaryMemory</b></td><td>A second LLM call keeps a rolling summary of the chat; the summary goes into the prompt.</td></tr>
+      <tr><td><b>Agent</b></td><td>A system where an LLM decides which actions to take and in what order.</td></tr>
+      <tr><td><b>Tool</b></td><td>Something the agent can call to do what the LLM can't (calculator, search, weather API).</td></tr>
+      <tr><td><b>Agent type</b></td><td>The planning strategy that decides actions/tools (e.g. ReAct).</td></tr>
+      <tr><td><b>ReAct</b></td><td>Reasoning + Acting: repeat Thought → Action → Observation until a Final Answer.</td></tr>
+      <tr><td><b>agent_scratchpad</b></td><td>Template slot holding the agent's previous thoughts, actions and observations in this run.</td></tr>
+      <tr><td><b>AgentExecutor</b></td><td>LangChain's runner that executes the agent's steps and calls the tools.</td></tr>
+      <tr><td><b>Human in the loop</b></td><td>A person checking intermediate steps or outputs; absent in the autonomous agent, hence the need for careful design.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- real systems -->
+<section class="plate" id="real">
+  <div class="plate-head"><h2>Where you meet this in real systems</h2><span class="chip">named in the chapter</span></div>
+  <div class="grid2">
+    <div class="card"><b>LangChain</b><span>The chapter's framework: prompt templates, <code>|</code> chaining, <code>LLMChain</code>, memory classes, tools, <code>create_react_agent</code>, <code>AgentExecutor</code>.</span></div>
+    <div class="card"><b>DSPy, Haystack</b><span>Named as newer frameworks for building LLM pipelines.</span></div>
+    <div class="card"><b>Hugging Face</b><span>Hosts <code>microsoft/Phi-3-mini-4k-instruct-gguf</code>, the GGUF files at several bit-widths.</span></div>
+    <div class="card"><b>Microsoft Phi-3</b><span>The small default model (mini, 4k context, instruct version) with its own chat template.</span></div>
+    <div class="card"><b>llama-cpp-python (llama.cpp)</b><span>Runs GGUF models locally, CPU or GPU (<code>n_gpu_layers</code>); wrapped by LangChain's <code>LlamaCpp</code>.</span></div>
+    <div class="card"><b>OpenAI GPT-3.5 / ChatGPT</b><span>Hosted model used for the agent (follows complex formats better); its API applies the chat template for you.</span></div>
+    <div class="card"><b>Llama 3</b><span>Named as an alternative model you can use for all examples.</span></div>
+    <div class="card"><b>Open LLM Leaderboard</b><span>Ranking of open-source LLMs to pick a current model.</span></div>
+    <div class="card"><b>DuckDuckGo search</b><span>The agent's web-search tool via <code>DuckDuckGoSearchResults</code>.</span></div>
+    <div class="card"><b>llm-math</b><span>LangChain's calculator tool, loaded with <code>load_tools</code>.</span></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book</b><p>Same ideas elsewhere: LlamaIndex (pipelines and memory), Ollama and vLLM (serving quantized/open models), OpenAI/Anthropic tool calling and the Model Context Protocol (structured tools for agents), LangGraph (agent loops as graphs with checkpointed memory).</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. What does quantization trade, and what does it gain?</summary><p>It gives up some precision of each parameter (fewer bits) and gains much lower memory (less VRAM) and faster running, while usually staying almost as accurate as the original.</p></details>
+  <details class="ans"><summary>2. What's the book's rule of thumb on bit-width?</summary><p>Use at least 4-bit models. At 3 or 2 bits the quality loss becomes noticeable, and a smaller model at higher precision is the better choice.</p></details>
+  <details class="ans"><summary>3. Why did <code>llm.invoke("Hi! My name is Maarten…")</code> return <code>''</code>?</summary><p>Phi-3 expects its specific prompt template (<code>&lt;s&gt;&lt;|user|&gt; … &lt;|end|&gt;&lt;|assistant|&gt;</code>). Unlike <code>transformers.pipeline</code>, LlamaCpp doesn't apply it automatically, so it must be added, here with a prompt-template chain.</p></details>
+  <details class="ans"><summary>4. Name Phi-3's four template components and their jobs.</summary><p><code>&lt;s&gt;</code> start of prompt (BOS token); <code>&lt;|user|&gt;</code> start of the user's prompt; <code>&lt;|assistant|&gt;</code> start of the model's output; <code>&lt;|end|&gt;</code> end of either the prompt or the output.</p></details>
+  <details class="ans"><summary>5. Give two advantages of splitting the story prompt into title → character → story.</summary><p>Each prompt is smaller and simpler, and you get access to each intermediate component (e.g. the title) as its own field. Also only one user input (the summary) is needed.</p></details>
+  <details class="ans"><summary>6. What would happen if the character link were run before the title link?</summary><p>Its template needs <code>{title}</code>, which wouldn't exist yet in the dictionary, so the chain would fail with a missing-variable error. Order matters because later links depend on earlier outputs.</p></details>
+  <details class="ans"><summary>7. Why does an LLM forget your name between two calls?</summary><p>LLMs are stateless: each call is independent and the model only sees the current prompt. Memory has to be added by putting past conversation into the prompt.</p></details>
+  <details class="ans"><summary>8. With <code>ConversationBufferWindowMemory(k=2)</code>, why did the model know the name but not the age?</summary><p>When the name question was asked, the first exchange (name + age) was still among the last two. By the age question there had been three exchanges, so the first one, holding the age, had dropped out.</p></details>
+  <details class="ans"><summary>9. How many LLM calls does ConversationSummaryMemory make per user message, and why?</summary><p>Two: one for the user prompt and one to update the summary with the newest lines. The summary could use a smaller, faster LLM.</p></details>
+  <details class="ans"><summary>10. Give one con of each memory type from Table 7-1.</summary><p>Buffer: slower generation as tokens grow (also only for large-context LLMs; long histories hurt retrieval). Window: only the last k interactions are captured (and they aren't compressed). Summary: an extra call per interaction, and quality depends on the LLM's summarizing.</p></details>
+  <details class="ans"><summary>11. "Just use a model with a bigger context window." What does the book say against this?</summary><p>Those tokens still have to be processed before generation starts, so compute time goes up.</p></details>
+  <details class="ans"><summary>12. What two components do agents add on top of chains and memory?</summary><p>Tools (to do things the LLM can't) and the agent type (which plans which actions or tools to use).</p></details>
+  <details class="ans"><summary>13. In ReAct, what is the Thought, the Action and the Observation?</summary><p>Thought: the LLM's reasoning about what to do next and why. Action: the external tool it triggers (search, calculator) with an input. Observation: the tool's result fed back, often summarized, which drives the next thought.</p></details>
+  <details class="ans"><summary>14. Why did the book switch from Phi-3 to GPT-3.5 for the agent, and what does <code>handle_parsing_errors=True</code> do?</summary><p>The agent needs a model strong enough to follow the complex ReAct format closely; the small Phi-3 wasn't. <code>handle_parsing_errors=True</code> lets the executor send malformed outputs back to the model to correct instead of crashing.</p></details>
+  <details class="ans"><summary>15. Interview: the agent answered "$2,249.00 → 1911.65 EUR". How would you make such answers trustworthy?</summary><p>There is no human in the loop, so design for it: make the agent return its source URL, check outputs at each step (by a human or a verifier), log the intermediate steps for debugging, limit and validate tools, and evaluate on known questions.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><h2>References</h2><span class="chip">pdf p223, p241</span></div>
+  <details><summary>Works cited in the chapter</summary>
+    <ol class="refs">
+      <li>Shunyu Yao et al. "ReAct: Synergizing reasoning and acting in language models." arXiv preprint arXiv:2210.03629 (2022). (footnote 1, p241)</li>
+      <li>Maarten Grootendorst. "A Visual Guide to Quantization." (mentioned on p223)</li>
+      <li>Open LLM Leaderboard (ranking of open-source LLMs, mentioned on p224).</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Alammar &amp; Grootendorst, O'Reilly 2024), Chapter 7. Figures are the book's, cropped from the PDF for personal study. Numbers marked "modelled" are illustrative, not from the book.</footer>
+
+</div>
+<script>
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+function tok(s) { return Math.max(1, Math.round(String(s).length / 4)); }
+
+/* generic Back/Next stepper; count is a function so step lists can change */
+function stepper(prefix, count, render) {
+  var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+  function draw() { if (i > count() - 1) i = count() - 1; if (lab) lab.textContent = "step " + (i + 1) + " / " + count(); prev.disabled = i === 0; next.disabled = i >= count() - 1; render(i); }
+  prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+  next.addEventListener("click", function () { if (i < count() - 1) { i++; draw(); } });
+  draw();
+  return { reset: function () { i = 0; draw(); }, redraw: draw };
+}
+function htmlWalk(key, steps) {
+  return stepper(key, function () { return steps.length; }, function (k) { $(key + "_box").innerHTML = steps[k][0]; $(key + "_cap").innerHTML = steps[k][1]; });
+}
+
+/* ---------- plate 2: pi in different formats ---------- */
+run("pi", function () {
+  var PI = Math.PI;
+  function f32parts(v) {
+    var f = new Float32Array(1), u = new Uint32Array(f.buffer); f[0] = v; var x = u[0];
+    return { s: (x >>> 31) & 1, e: (x >>> 23) & 0xff, m: x & 0x7fffff, val: f[0] };
+  }
+  function f16parts(v) {
+    var p = f32parts(v), he = p.e - 127 + 15, hm = p.m >>> 13, rem = p.m & 0x1fff;
+    if (rem > 0x1000 || (rem === 0x1000 && (hm & 1))) { hm++; if (hm === 0x400) { hm = 0; he++; } }
+    return { s: p.s, e: he, m: hm, val: (p.s ? -1 : 1) * Math.pow(2, he - 15) * (1 + hm / 1024) };
+  }
+  function bitsOf(n, w) { var s = ""; for (var i = w - 1; i >= 0; i--) s += (Math.floor(n / Math.pow(2, i)) % 2); return s; }
+  function spans(str, cls) { return str.split("").map(function (b) { return '<span class="' + cls + '">' + b + '</span>'; }).join(""); }
+  function draw() {
+    var f = $("pi_fmt").value, html = "", val, nbits, desc;
+    if (f === "32") { var p = f32parts(PI); html = spans(String(p.s), "s") + spans(bitsOf(p.e, 8), "e") + spans(bitsOf(p.m, 23), "m"); val = p.val; nbits = 32;
+      desc = "(−1)^" + p.s + " × 2^" + (p.e - 127) + " × " + (1 + p.m / 8388608).toFixed(7); }
+    else if (f === "16") { var h = f16parts(PI); html = spans(String(h.s), "s") + spans(bitsOf(h.e, 5), "e") + spans(bitsOf(h.m, 10), "m"); val = h.val; nbits = 16;
+      desc = "(−1)^" + h.s + " × 2^" + (h.e - 15) + " × " + (1 + h.m / 1024).toFixed(4); }
+    else { var bitsN = f === "8" ? 8 : 4, scale = f === "8" ? 0.05 : 0.5, q = Math.round(PI / scale), lim = Math.pow(2, bitsN - 1) - 1; q = Math.min(lim, q);
+      html = spans(bitsOf(q < 0 ? q + Math.pow(2, bitsN) : q, bitsN), "m"); val = q * scale; nbits = bitsN; desc = "integer " + q + " × scale " + scale; }
+    $("pi_bits").innerHTML = html;
+    var err = Math.abs(val - PI);
+    $("pi_out").innerHTML = "<span>bits: <b>" + nbits + "</b></span><span>decoded: <b>" + desc + "</b></span><span>stored π ≈ <b>" + val.toPrecision(10) + "</b></span><span>error: <b class='" + (err < 1e-6 ? "good" : "bad") + "'>" + err.toExponential(2) + "</b></span><span>memory vs float32: <b>" + (nbits / 32 * 100) + "%</b></span>";
+  }
+  $("pi_fmt").addEventListener("change", draw); draw();
+});
+
+/* ---------- plate 2: weight memory calculator ---------- */
+run("qm", function () {
+  var rows = [["FP32", 32], ["FP16", 16], ["8-bit", 8], ["4-bit", 4], ["2-bit", 2]];
+  function draw() {
+    var p = parseFloat($("qm_p").value); $("qm_pv").textContent = p.toFixed(1) + "B";
+    var max = p * 4, h = "";
+    rows.forEach(function (r) {
+      var gb = p * r[1] / 8, w = Math.max(1, gb / max * 100);
+      var warn = r[1] < 4 ? ' <span class="pill bad">quality drop</span>' : (r[1] === 4 ? ' <span class="pill good">rule-of-thumb floor</span>' : "");
+      h += '<div class="barrow"><span>' + r[0] + warn + '</span><div class="bar" style="width:' + w + '%"></div><span>' + gb.toFixed(2) + ' GB</span></div>';
+    });
+    $("qm_bars").innerHTML = h;
+  }
+  $("qm_p").addEventListener("input", draw); draw();
+});
+
+/* ---------- plate 4: template filler ---------- */
+run("tp", function () {
+  function draw() {
+    var t = $("tp_in").value, on = $("tp_on").checked;
+    if (on) {
+      $("tp_raw").innerHTML = '<span class="tk bos">&lt;s&gt;</span><span class="tk usr">&lt;|user|&gt;</span>\n<span class="tk txt">' + esc(t) + '</span><span class="tk end">&lt;|end|&gt;</span>\n<span class="tk ast">&lt;|assistant|&gt;</span><span class="note"> ← the model writes from here, then emits &lt;|end|&gt;</span>';
+      $("tp_v").className = "verdict good";
+      $("tp_v").innerHTML = "Template applied (" + tok(t) + " text tokens + 4 special tokens, modelled count). The model sees its familiar \"assistant's turn\" marker and answers, e.g. the book's \"The answer to 1 + 1 is 2. …\".";
+    } else {
+      $("tp_raw").innerHTML = '<span class="tk txt">' + esc(t) + '</span>';
+      $("tp_v").className = "verdict bad";
+      $("tp_v").innerHTML = "Raw text only. No &lt;|assistant|&gt; marker tells Phi-3 it's its turn, so in the book's run it returned an empty string: <code>''</code>.";
+    }
+  }
+  $("tp_in").addEventListener("input", draw); $("tp_on").addEventListener("change", draw); draw();
+});
+
+/* ---------- plate 5: sequential chain dictionary ---------- */
+run("sc", function () {
+  var S = "a girl that lost her mother", T = '"In Loving Memory: A Journey Through Grief"',
+      C = "The protagonist, Emily, is a resilient young girl who struggles to cope with her overwhelming grief…",
+      ST = "In Loving Memory: A Journey Through Grief revolves around Emily, a resilient young girl who loses her beloved mother…";
+  function kv(list, newKey) { return '<div class="kv">' + list.map(function (p) { return '<div class="' + (p[0] === newKey ? "new" : "") + '"><b>' + p[0] + ':</b> ' + esc(p[1]) + '</div>'; }).join("") + '</div>'; }
+  htmlWalk("sc", [
+    [kv([["summary", S]], "summary"), "<b>Input.</b> The user gives one value: <code>summary</code>. That's all the chain needs."],
+    [kv([["summary", S], ["title", T]], "title"), "<b>Link 1 (title).</b> Prompt: \"Create a title for a story about {summary}. Only return the title.\" LLM call #1 (~25 prompt tokens, modelled). Answer stored under <code>output_key=\"title\"</code>."],
+    [kv([["summary", S], ["title", T], ["character", C]], "character"), "<b>Link 2 (character).</b> Prompt uses {summary} <b>and</b> {title}: \"Describe the main character … Use only two sentences.\" LLM call #2. Stored as <code>character</code>."],
+    [kv([["summary", S], ["title", T], ["character", C], ["story", ST]], "story"), "<b>Link 3 (story).</b> Prompt uses {summary}, {title} and {character}; at most one paragraph. LLM call #3. The final dictionary has all four keys, so you can grab <code>result[\"title\"]</code> directly."]
+  ]);
+});
+
+/* ---------- plate 7: buffer grows ---------- */
+run("cb", function () {
+  var ex = [
+    ["Hi! My name is Maarten. What is 1 + 1?", "Hello Maarten! The answer to 1 + 1 is 2. Hope you're having a great day!"],
+    ["What is my name?", "Your name is Maarten."],
+    ["What is 3 + 3?", "3 + 3 equals 6."],
+    ["Which city should I visit in India?", "Jaipur is a great choice for history and food."]
+  ];
+  var steps = ex.map(function (e, i) {
+    var hist = ex.slice(0, i).map(function (p) { return "Human: " + p[0] + "\nAI: " + p[1]; }).join("\n");
+    var full = "<s><|user|>Current conversation:" + hist + "\n\n" + e[0] + "<|end|>\n<|assistant|>";
+    var box = '<div class="rawprompt"><span class="tk bos">&lt;s&gt;</span><span class="tk usr">&lt;|user|&gt;</span>Current conversation:' + (hist ? '<span class="tk hist">' + esc(hist).replace(/\n/g, "<br>") + '</span>' : '<i class="note">(empty)</i>') + '<br><br><span class="tk txt">' + esc(e[0]) + '</span><span class="tk end">&lt;|end|&gt;</span><br><span class="tk ast">&lt;|assistant|&gt;</span></div>';
+    var cap = "<b>Turn " + (i + 1) + ".</b> Prompt ≈ " + tok(full) + " tokens (history ≈ " + tok(hist || " ") * (hist ? 1 : 0) + "). Answer: \"" + esc(e[1]) + "\"" + (i < 2 ? " (book's output)" : " (modelled)") + ". After the call, this exchange is appended to the buffer.";
+    return [box, cap];
+  });
+  htmlWalk("cb", steps);
+});
+
+/* ---------- plate 8: sliding window ---------- */
+run("wk", function () {
+  var turns = [
+    ["Hi! My name is Maarten and I am 33 years old. What is 1 + 1?", "Hello Maarten! It's nice to meet you. … 1 + 1 equals 2."],
+    ["What is 3 + 3?", "Hello Maarten! … 3 + 3 equals 6."],
+    ["What is my name?", null],
+    ["What is my age?", null]
+  ];
+  var st;
+  function render(i) {
+    var k = parseInt($("wk_k").value, 10); $("wk_kv").textContent = k;
+    var h = "";
+    for (var j = 0; j < i; j++) {
+      var inWin = j >= i - k;
+      h += '<div class="u ' + (inWin ? "" : "forgot") + '">Human: ' + esc(turns[j][0]) + '</div>';
+      var a = turns[j][1] || answer(j, k);
+      h += '<div class="a ' + (inWin ? "" : "forgot") + '">AI: ' + esc(a) + '</div>';
+    }
+    h += '<div class="u" style="border-color:var(--c1)"><b>Now asking:</b> ' + esc(turns[i][0]) + '</div>';
+    $("wk_box").innerHTML = h;
+    var a2 = turns[i][1] || answer(i, k), knows = i < 2 ? null : (i - 0 <= k);
+    var v = $("wk_v");
+    v.className = "verdict " + (knows === null ? "" : (knows ? "good" : "bad"));
+    v.innerHTML = "Window k = " + k + " → prompt contains " + Math.min(i, k) + " of " + i + " earlier exchanges. " + (knows === null ? "Answer: \"" + esc(a2) + "\"" : (knows ? "Turn 1 is still inside the window, so: \"" + esc(a2) + "\"" : "Turn 1 has slid out (struck through), so: \"" + esc(a2) + "\""));
+  }
+  function answer(i, k) {
+    if (i === 2) return k >= 2 ? "Your name is Maarten." : "I'm sorry, I don't know your name.";
+    if (i === 3) return k >= 3 ? "You are 33 years old." : "I'm unable to determine your age as I don't have access to personal information.";
+    return "";
+  }
+  st = stepper("wk", function () { return turns.length; }, render);
+  $("wk_k").addEventListener("input", function () { st.redraw(); });
+});
+
+/* ---------- plate 9: memory simulator ---------- */
+run("ms", function () {
+  var LIMIT = 2048, TPL = 20;
+  function draw() {
+    var t = +$("ms_t").value, e = +$("ms_e").value, k = +$("ms_k").value, s = +$("ms_s").value;
+    $("ms_tv").textContent = t; $("ms_ev").textContent = e; $("ms_kv").textContent = k; $("ms_sv").textContent = s;
+    var prev = t - 1, q = Math.round(e / 2);
+    var buf = prev * e, win = Math.min(prev, k) * e, sum = prev > 0 ? s : 0;
+    var rows = [
+      ["Buffer", buf, 1, buf + q + TPL, prev >= 1 ? (buf + q + TPL <= LIMIT ? "yes" : "no (overflow)") : "n/a"],
+      ["Window k=" + k, win, 1, win + q + TPL, prev >= 1 ? (prev <= k ? "yes" : "no") : "n/a"],
+      ["Summary", sum, prev > 0 ? 2 : 1, sum + q + TPL + (prev > 0 ? s + e + 40 : 0), prev >= 1 ? "gist only" : "n/a"]
+    ];
+    var h = "<thead><tr><th>Memory</th><th>History tokens in prompt</th><th>LLM calls this turn</th><th>Tokens processed this turn</th><th>Fits 2,048?</th><th>Remembers turn 1 exactly?</th></tr></thead><tbody>";
+    rows.forEach(function (r) {
+      var mainPrompt = r[1] + q + TPL, fits = mainPrompt <= LIMIT;
+      h += "<tr><td><b>" + r[0] + "</b></td><td class='num'>" + r[1] + "</td><td class='num'>" + r[2] + "</td><td class='num'>" + r[3] + "</td><td>" + (fits ? '<span class="pill good">yes</span>' : '<span class="pill bad">no</span>') + "</td><td>" + r[4] + "</td></tr>";
+    });
+    $("ms_tab").innerHTML = h + "</tbody>";
+    var over = Math.ceil((LIMIT - q - TPL) / e) + 1;
+    $("ms_v").className = "verdict " + (buf + q + TPL > LIMIT ? "bad" : "warn");
+    $("ms_v").innerHTML = buf + q + TPL > LIMIT ? "The full buffer no longer fits Phi-3's 2,048-token window at turn " + t + ": you must window or summarize." : "The buffer still fits, but at this exchange size it overflows around turn " + over + ". Summary keeps the main prompt small at the price of a second call each turn.";
+  }
+  ["ms_t", "ms_e", "ms_k", "ms_s"].forEach(function (id) { $(id).addEventListener("input", draw); });
+  draw();
+});
+
+/* ---------- safe calculator used by plates 10 and 12 ---------- */
+function calc(expr) {
+  var e = String(expr).replace(/×/g, "*").replace(/÷/g, "/").replace(/[$,]/g, "");
+  if (!/^[\d\s+\-*/().]+$/.test(e)) throw new Error("only numbers and + − × ÷ ( ) allowed");
+  var v = Function('"use strict"; return (' + e + ');')();
+  if (typeof v !== "number" || !isFinite(v)) throw new Error("not a finite number");
+  return v;
+}
+
+/* ---------- plate 10: guess vs tool ---------- */
+run("ag", function () {
+  function go() {
+    var q = $("ag_q").value;
+    try {
+      var v = calc(q), g = (v * 0.597);
+      var book = /^\s*47\s*\/\s*12\s*[*×]\s*3\.14\s*$/.test(q);
+      $("ag_a").innerHTML = 'LLM writes likely-looking digits: <b style="color:var(--sell)">' + (book ? "7.34" : g.toFixed(2)) + '</b>' + (book ? " (the book's wrong answer)" : " (modelled wrong guess)");
+      $("ag_b").innerHTML = 'Thought: "Let me use a calculator." → Calculator[' + esc(q) + '] → <b style="color:var(--buy)">' + (Math.round(v * 10000) / 10000) + '</b>' + (book ? " (book: 12.2983)" : "");
+    } catch (err) {
+      $("ag_a").textContent = "—"; $("ag_b").innerHTML = '<span style="color:var(--sell)">Tool error: ' + esc(err.message) + '</span>';
+    }
+  }
+  $("ag_go").addEventListener("click", go);
+  $("ag_q").addEventListener("keydown", function (ev) { if (ev.key === "Enter") go(); });
+  go();
+});
+
+/* ---------- plate 11: ReAct loop (Figure 7-16) ---------- */
+run("ra", function () {
+  var Q = "What is the current price of a MacBook Pro in USD? How much would it cost in EUR if the exchange rate is 0.85 EUR for 1 USD?";
+  var L = [
+    ['<span>Question: ' + esc(Q) + '</span>', "<b>Start.</b> The prompt holds the instruction, the step descriptions and the tools (Search[entity], Calculator[formula]), then the question."],
+    ['<span class="th">Thought: I should search the web.</span>', "<b>Cycle 1, Thought.</b> The LLM reasons: it doesn't know today's price, so it needs a search."],
+    ['<span class="ac">Action: Google [price MacBook Pro]</span>', "<b>Cycle 1, Action.</b> Written in the agreed format so code can parse it. Generation stops here; the program runs the search tool."],
+    ['<span class="ob">Observation: The price is $1,299,-</span>', "<b>Cycle 1, Observation.</b> The tool's result is pasted back into the prompt. The LLM is called again with everything so far."],
+    ['<span class="th">Thought: I need to use a calculator to do the calculation.</span>', "<b>Cycle 2, Thought.</b> The observation changed the plan: now it has a USD price and needs arithmetic."],
+    ['<span class="ac">Action: Calculator [1,299 × .85]</span>', "<b>Cycle 2, Action.</b> The calculator tool runs: 1,299 × 0.85 = " + (1299 * 0.85).toFixed(2) + "."],
+    ['<span class="ob">Observation: A MacBook Pro would cost €1104.15</span>', "<b>Cycle 2, Observation.</b> Result fed back."],
+    ['<span class="fa">Final answer: about $1,299, which is €1104.15 at 0.85.</span>', "<b>Done.</b> The LLM decides it knows enough and stops looping. Two cycles, three LLM calls (modelled count), two tool calls."]
+  ];
+  stepper("ra", function () { return L.length; }, function (k) {
+    $("ra_box").innerHTML = L.slice(0, k + 1).map(function (x) { return x[0]; }).join("\n");
+    $("ra_cap").innerHTML = L[k][1];
+  });
+});
+
+/* ---------- plate 12: toy ReAct agent ---------- */
+run("ta", function () {
+  var DB = { macbook: ["MacBook Pro", 2249.00, "View at Best Buy. The best MacBook Pro … $2,249.00"], iphone: ["iPhone", 799.00, "Buy iPhone … From $799.00"], kindle: ["Kindle", 109.99, "Kindle … $109.99"], unknown: ["Flying car", null, ""] };
+  var steps = [];
+  function build() {
+    var it = DB[$("ta_item").value], rate = parseFloat($("ta_rate").value), bad = $("ta_bad").checked;
+    if (!(rate > 0)) rate = 0.85;
+    var q = "What is the current price of a " + it[0] + " in USD? How much would it cost in EUR if the exchange rate is " + rate + " EUR for 1 USD?";
+    steps = [];
+    steps.push(['<span>Question: ' + esc(q) + '</span>\n<span>Thought:</span>', "<b>Prompt built.</b> Template + {tools} (duckduck, Calculator) + {tool_names} + {input}. <code>{agent_scratchpad}</code> is still empty."]);
+    if (bad) {
+      steps.push(['<span class="th"> I should look up the price.</span>\n<span class="ac">Action duckduck price of ' + esc(it[0]) + '</span>', "<b>LLM call 1.</b> Oops: \"Action\" without the colon and no \"Action Input:\" line. The parser can't read it."]);
+      steps.push(['<span class="ob">Observation: Invalid Format: Missing \'Action:\' after \'Thought:\'</span>', "<b>handle_parsing_errors=True.</b> Instead of crashing, the executor writes the error into the scratchpad as an observation, and the model tries again."]);
+    }
+    steps.push(['<span class="th">Thought: I need to find the current price of a ' + esc(it[0]) + ' in USD first before converting it to EUR.</span>\n<span class="ac">Action: duckduck\nAction Input: "current price of ' + esc(it[0]) + ' in USD"</span>', "<b>LLM call " + (bad ? 2 : 1) + ".</b> The executor parses tool = duckduck, input = the query, and stops generation before the model can invent an observation."]);
+    if (it[1] === null) {
+      steps.push(['<span class="ob">Observation: [no relevant results]</span>', "<b>Tool runs.</b> The fake search table has no price for this item."]);
+      steps.push(['<span class="th">Thought: I could not find a reliable current price.</span>\n<span class="fa">Final Answer: I couldn\'t find a current USD price for a ' + esc(it[0]) + ', so I can\'t convert it to EUR.</span>', "<b>Done.</b> A well-behaved agent admits it. A weaker one might invent a price, and with no human in the loop nobody would notice: the book's \"double-edged sword\"."]);
+      return;
+    }
+    steps.push(['<span class="ob">Observation: [snippet: ' + esc(it[2]) + ']</span>', "<b>Tool runs.</b> The (fake) search returns a snippet; it is appended to the scratchpad."]);
+    var expr = it[1].toFixed(2) + " * " + rate, val = calc(expr);
+    steps.push(['<span class="th">Thought: Now I convert the price to EUR.</span>\n<span class="ac">Action: Calculator\nAction Input: $' + it[1].toFixed(2) + ' * ' + rate + '</span>', "<b>Next LLM call.</b> The model now sees its earlier thought, action and observation, and picks the calculator."]);
+    steps.push(['<span class="ob">Answer: ' + val + '</span>', "<b>Calculator runs in your browser.</b> Raw float result" + (String(val).length > 10 ? " (see the long tail of digits, like the book's 1911.6499999999999)" : "") + "."]);
+    steps.push(['<span class="th">Thought: I now know the final answer</span>\n<span class="fa">Final Answer: The current price of a ' + esc(it[0]) + ' in USD is $' + it[1].toFixed(2) + '. It would cost approximately ' + val.toFixed(2) + ' EUR with an exchange rate of ' + rate + ' EUR for 1 USD.</span>', "<b>Done.</b> The executor sees \"Final Answer:\" and returns <code>{'input': …, 'output': …}</code>. Better design: also return the source URL of the price."]);
+  }
+  build();
+  var st = stepper("ta", function () { return steps.length; }, function (k) {
+    $("ta_box").innerHTML = steps.slice(0, k + 1).map(function (x) { return x[0]; }).join("\n");
+    $("ta_cap").innerHTML = steps[k][1];
+  });
+  ["ta_item", "ta_rate", "ta_bad"].forEach(function (id) { $(id).addEventListener("change", function () { build(); st.reset(); }); });
+});
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Handbook Ch.6 DPO</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+/* ---- page-specific additions (LLM Engineer's Handbook ch.5 SFT) ---- */
+.box.interview { background: var(--paper); border-left: 4px solid var(--c3); }
+.box.interview > b { color: var(--c3); }
+pre.code code, .formula code { background: none; border: 0; padding: 0; font-size: inherit; }
+.tok { color: var(--c1); font-weight: 600; }
+.tok2 { color: var(--c2); font-weight: 600; }
+.mask { background: var(--paper); opacity: .55; }
+.lossy { background: var(--tint); border-bottom: 2px solid var(--c1); }
+.samp { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 9px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.samp.drop { border-color: var(--sell); color: var(--sell); text-decoration: line-through; opacity: .75; }
+.samp.keep { border-color: var(--buy); }
+.samp .why { font-size: 11px; color: var(--sell); text-decoration: none; display: inline-block; }
+.bar { height: 16px; border-radius: 3px; background: var(--c2); min-width: 2px; }
+.barrow { display: grid; grid-template-columns: 130px minmax(0,1fr) 90px; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+@media (max-width: 480px) { .barrow { grid-template-columns: 92px minmax(0,1fr) 72px; font-size: 11.5px; } }
+.packrow { display: flex; height: 24px; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; background: var(--paper); font-family: var(--mono); font-size: 10.5px; }
+.packrow span { display: flex; align-items: center; justify-content: center; color: var(--plate); border-right: 1px solid var(--plate); overflow: hidden; white-space: nowrap; }
+.flowq { display: grid; gap: 8px; }
+.flowq .q { font-family: var(--display); font-weight: 600; }
+textarea { font-family: var(--mono); font-size: 12.5px; width: 100%; min-height: 70px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 6px; }
+</style>
+<style>
+/* ---- page-specific additions (LLM Engineer's Handbook ch.6 Preference alignment) ---- */
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .pair { grid-template-columns: 1fr; } }
+.cand { border: 1.5px solid var(--rule); border-radius: 6px; padding: 9px 11px; background: var(--paper); font-size: 15px; display: grid; gap: 4px; cursor: pointer; }
+.cand b { font-family: var(--display); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.cand.ch { border-color: var(--buy); box-shadow: inset 4px 0 0 var(--buy); }
+.cand.rj { border-color: var(--sell); box-shadow: inset 4px 0 0 var(--sell); opacity: .85; }
+.quad { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px; font-size: 14.5px; }
+.quad .hd { font-family: var(--display); font-weight: 600; font-size: 13px; color: var(--muted); align-self: end; }
+.quad .cell { border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); cursor: pointer; display: grid; gap: 3px; }
+.quad .cell.on { border-color: var(--c1); background: var(--tint); }
+@media (max-width: 520px) { .quad { grid-template-columns: 64px 1fr 1fr; font-size: 13px; } }
+.meter { height: 10px; border-radius: 99px; background: var(--grid); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--c2); border-radius: 99px; }
+.ladder { display: grid; gap: 6px; }
+.ladder .rung { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 10px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+@media (max-width: 480px) { .ladder .rung { grid-template-columns: 100px minmax(0,1fr); font-size: 11.5px; } }
+.ladder .rung .span { height: 18px; border-radius: 3px; background: var(--c2); opacity: .8; position: relative; }
+.ladder .rung.on .span { background: var(--c1); opacity: 1; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.steps span { font-family: var(--mono); font-size: 12px; border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; background: var(--paper); }
+.steps span.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.steps span.done { border-color: var(--buy); color: var(--buy); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch05_supervised_fine_tuning.html">← Ch.5 Supervised Fine-Tuning</a><a href="ch07_evaluating_llms.html">Ch.7 Evaluating LLMs →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 6 · PDF p258–289</div>
+  <h1>Preference alignment: teaching a model <em>which of two answers is better</em>, not just one right answer</h1>
+  <p class="lede">After <b>SFT (supervised fine-tuning)</b> in Chapter 5 the TwinLlama model can answer instructions, but it still sounds like a polite, slightly stiff AI rather than the authors' blog voice. SFT only ever shows the model good answers, so it cannot learn the fine shades of "this is nicer than that". <b>Preference alignment</b> fixes this by training on <i>pairs</i>: for each instruction, one <b>chosen</b> answer and one <b>rejected</b> answer. The chapter first explains what such datasets look like, how big they must be, and how to generate and judge them (with humans or with LLM judges and their biases). Then it builds the LLM Twin's own preference dataset, where the chosen answer is a verbatim extract of the real article and the rejected answer is GPT-4o-mini's rewrite. It walks from <b>RLHF (reinforcement learning from human feedback)</b> with <b>PPO</b> to the simpler <b>DPO (Direct Preference Optimization)</b>, and finally trains TwinLlama-3.1-8B with DPO in Unsloth, explaining <code>beta</code>, the very low learning rate and the new reward/margin/accuracy metrics in Comet ML.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Read the rows top to bottom. Each orange box is the idea the next row builds on. The whole chapter is one argument: <i>SFT copies good answers but cannot express "better vs worse", so collect pairs of answers, then use the simplest algorithm (DPO) that pushes the model toward the chosen one while staying close to the SFT model.</i></p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 6">
+    <div class="row"><span class="tag">Problem</span><span class="node">SFT only sees good answers</span><span class="arr">→</span><span class="node">misses nuance and the long tail of situations</span><span class="arr">→</span><span class="node key">show the model what to prefer AND what to avoid</span></div>
+    <div class="row"><span class="tag">Data shape</span><span class="node">instruction</span><span class="arr">+</span><span class="node key">chosen answer</span><span class="arr">+</span><span class="node">rejected answer</span><span class="arr">→</span><span class="node">no standard format; mostly single-turn</span></div>
+    <div class="row"><span class="tag">How much</span><span class="node">general alignment: millions</span><span class="node">open-source: 10k–100k</span><span class="node key">task-specific: 100–10k (identity: 200–500)</span></div>
+    <div class="row"><span class="tag">Make data</span><span class="node">human or LLM writes</span><span class="arr">×</span><span class="node">human or LLM judges</span><span class="arr">→</span><span class="node key">pairwise LLM judge + fix position / length / family bias</span></div>
+    <div class="row"><span class="tag">Practice</span><span class="node">articles → clean → 1–2k char chunks</span><span class="arr">→</span><span class="node key">GPT-4o-mini triples: generated = rejected, extracted = chosen</span><span class="arr">→</span><span class="node">filters: 2,970 → 1,467</span></div>
+    <div class="row"><span class="tag">Algorithms</span><span class="node">RLHF: reward model + PPO + KL to frozen model</span><span class="arr">→</span><span class="node">powerful but complex, unstable</span><span class="arr">→</span><span class="node key">DPO: one classification-style loss, no reward model</span></div>
+    <div class="row"><span class="tag">Run</span><span class="node">TwinLlama-3.1-8B + Unsloth LoRA</span><span class="arr">→</span><span class="node key">beta 0.5 · LR 2e-6 · 1 epoch</span><span class="arr">→</span><span class="node">less formal, more accurate answer</span><span class="arr">→</span><span class="node">watch rewards · margins · accuracies</span></div>
+  </div>
+  <svg viewBox="0 0 640 120" class="dg" role="img" aria-label="Pre-training then SFT then preference alignment" style="width:100%;height:auto;max-width:640px">
+    <rect x="8" y="30" width="170" height="54" rx="6" class="f"/><text x="93" y="52" text-anchor="middle" class="b">Pre-training</text><text x="93" y="70" text-anchor="middle" class="m">raw text, next token</text>
+    <rect x="234" y="30" width="170" height="54" rx="6" class="f"/><text x="319" y="52" text-anchor="middle" class="b">SFT (Ch.5)</text><text x="319" y="70" text-anchor="middle" class="m">instruction → answer</text>
+    <rect x="460" y="30" width="172" height="54" rx="6" class="hi"/><text x="546" y="52" text-anchor="middle" class="b">Preference alignment</text><text x="546" y="70" text-anchor="middle" class="m">chosen vs rejected</text>
+    <line x1="178" y1="57" x2="234" y2="57" class="on"/><line x1="404" y1="57" x2="460" y2="57" class="on"/>
+    <text x="93" y="104" text-anchor="middle" class="m">"base model"</text><text x="319" y="104" text-anchor="middle" class="m">TwinLlama-3.1-8B</text><text x="546" y="104" text-anchor="middle" class="m">TwinLlama-3.1-8B-DPO</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Why go beyond SFT (opening)</a>
+    <a href="#s2"><span>02</span>Understanding preference datasets</a>
+    <a href="#s3"><span>03</span>Preference data</a>
+    <a href="#s4"><span>04</span>Data quantity</a>
+    <a href="#s5"><span>05</span>Generating preferences</a>
+    <a href="#s6"><span>06</span>Tips for data generation</a>
+    <a href="#s7"><span>07</span>Evaluating preferences</a>
+    <a href="#s8"><span>08</span>Our own preference dataset: the plan</a>
+    <a href="#s9"><span>09</span>Our own preference dataset: the code</a>
+    <a href="#s10"><span>10</span>The resulting dataset</a>
+    <a href="#s11"><span>11</span>Preference alignment + RLHF</a>
+    <a href="#s12"><span>12</span>Direct Preference Optimization</a>
+    <a href="#s13"><span>13</span>Implementing DPO: setup</a>
+    <a href="#s14"><span>14</span>Data formatting + DPOTrainer</a>
+    <a href="#s15"><span>15</span>Sanity check + saving</a>
+    <a href="#s16"><span>16</span>Reading the DPO metrics</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><h2><span class="secno">01</span> Why go beyond SFT (chapter opening)</h2><span class="chip">pdf p258–259</span></div>
+  <p><b>Supervised Fine-Tuning (SFT)</b> was the workhorse of Chapter 5: show the model an instruction and one good answer, and train it to reproduce that answer. It works well for teaching a task and a chat format. But the book points at two things SFT handles badly:</p>
+  <ul class="plain">
+    <li><b>Nuance of human preferences.</b> Two answers can both be "correct", yet people clearly like one more (tone, length, warmth, clarity). SFT has no way to say "this one is better than that one"; it only has one target per instruction.</li>
+    <li><b>The long tail of interactions.</b> Real users ask an endless variety of odd things. SFT data can never cover them all, so the model needs a more general sense of what "good" looks like.</li>
+  </ul>
+  <p>The family of methods that addresses this is called <b>preference alignment</b>. Its key move: put <b>direct feedback</b>, from humans or from AI, into training. Instead of "copy this answer", the signal is "prefer this answer over that one". This gives a richer picture of what people want, especially in complex cases where plain supervised learning falls short.</p>
+  <p>Many preference-alignment techniques exist. This chapter mostly uses <b>Direct Preference Optimization (DPO)</b> because it is simple and efficient. The plan of the chapter:</p>
+  <ul class="plain">
+    <li>Understanding <b>preference datasets</b>: what data DPO-style algorithms need (plates 2–7).</li>
+    <li>Creating <b>our own preference dataset</b> to change the model's writing style: less artificial, more like the authors (plates 8–10).</li>
+    <li><b>Direct preference optimization</b>, introduced after a tour of RLHF (plates 11–12).</li>
+    <li><b>Implementing DPO</b> in practice to align the TwinLlama model trained in Chapter 5 (plates 13–16).</li>
+  </ul>
+  <p>By the end you should be able to build your own preference datasets and align models with several techniques. All the chapter's code is in the book's GitHub repository (<code>PacktPublishing/LLM-Engineering</code>).</p>
+  <div class="box picture"><b>Picture it</b><p>A new cook at a dhaba learns dal by watching the head cook make it once (that is SFT: copy one good example). The food is edible but bland. Then the owner starts tasting two bowls side by side, "this one, not that one: less salt, more tadka". After a few weeks of side-by-side tastings the cook's dal matches the house style. That side-by-side tasting is preference alignment. <i>Where it breaks:</i> the owner tastes real bowls the cook made; in DPO the pairs are usually prepared in advance and the model never "cooks" during training.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>SFT's loss raises the probability of the target tokens and nothing else. It never explicitly <i>lowers</i> the probability of bad answers. A preference loss uses two answers at once, so it can push one up and the other down. That "push away from" signal is what SFT lacks, and it is why a small preference dataset can change style or refusals that SFT struggles to fix.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Why isn't SFT enough? Why do labs do RLHF or DPO after it?"</i> → "SFT is imitation: it only learns from positive examples and has one target per prompt, so it can't encode 'A is better than B'. Preference alignment trains on comparisons, which carry the nuance (tone, helpfulness, safety) and also tells the model what to avoid. Typically you SFT for format and skills, then align with preferences for quality and style."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5 SFT</a> (the model we start from) · plate 12 (DPO) · <a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a> (post-training: SFT then preference finetuning) · <a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs Ch.12</a> (preference tuning with DPO).</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><h2><span class="secno">02</span> Understanding preference datasets</h2><span class="chip">pdf p259 · Fig 6.1</span></div>
+  <p>Good news first: the rules for building a high-quality preference dataset are the <b>same</b> as for the instruction datasets of Chapter 5. You still want to maximise three things in your samples:</p>
+  <ul class="plain">
+    <li><b>Accuracy</b>: the answers (especially the chosen ones) are correct and well written.</li>
+    <li><b>Diversity</b>: many topics, styles and kinds of instructions.</li>
+    <li><b>Complexity</b>: not only trivial prompts; some that need reasoning or care.</li>
+  </ul>
+  <p>And you go through the same stages: <b>data curation</b>, <b>deduplication</b>, <b>decontamination</b> (removing samples that overlap with evaluation benchmarks), <b>quality evaluation</b>, <b>exploration</b>, <b>generation</b> and <b>augmentation</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-6-1.png" alt="Loop diagram: data curation (with data augmentation stacked under it), deduplication, decontamination, quality evaluation diamond, exploration, and a return arrow labelled data generation" loading="lazy"><figcaption>Figure 6.1 (book, pdf p259): Overview of the post-training data pipeline covered in this chapter</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Follow the arrows left to right: curated data (the stacked pink cards; augmentation creates extra copies or variants of them) goes through deduplication, then decontamination, then a quality check (the diamond is a decision: keep or drop), then exploration (looking at the data's topics and lengths). The long arrow at the bottom, labelled <i>data generation</i>, loops back to the start: when exploration shows gaps, you generate more data and run it through the same pipeline again. It is a cycle, not a one-way street.</p>
+  <p>To avoid repeating Chapter 5, the book focuses only on <b>what is different</b> for preference data:</p>
+  <ul class="plain">
+    <li>the <b>structure</b> of a preference sample (plate 3),</li>
+    <li>the ideal <b>size</b> of a preference dataset (plate 4),</li>
+    <li>the two stages that differ the most from instruction data: <b>data generation</b> and <b>evaluation</b> (plates 5–7).</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A kirana shop restocking: check what came in (curate), remove double entries in the register (dedup), set aside items reserved for a customer's order so you don't sell them (decontaminate: keep test data out of training), discard spoiled packets (quality), look at which shelves are empty (explore), then order more (generate) and the cycle starts again. <i>Where it breaks:</i> here each "item" is a pair of answers, so quality checks must judge both sides and the gap between them.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The pipeline is the same because the same failure modes exist: duplicates make the model over-weight some examples; benchmark leakage inflates scores; low-quality samples teach bad habits. What changes is <i>what</i> each step looks at: in a preference sample, a weak chosen answer or a rejected answer that is actually better both corrupt the signal.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you build a preference dataset?"</i> → "Same pipeline as SFT data: curate, dedupe, decontaminate against eval sets, score quality, explore distributions, generate to fill gaps, augment. The differences are in generation (you need two answers per prompt that differ in a meaningful way) and evaluation (deciding which is chosen, usually with pairwise LLM judging)."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a> (each pipeline stage in detail) · plates 5–7 · <a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a> (data curation, dedup, synthesis).</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><h2><span class="secno">03</span> Preference data</h2><span class="chip">pdf p259–261 · Table 6.1</span></div>
+  <p>Instruction datasets have standard formats (Alpaca, ShareGPT). Preference datasets <b>do not</b>, because each training algorithm wants slightly different data. In general, <b>preference data</b> is a set of responses to one instruction, <b>ranked</b> by humans or by language models. Since the chapter uses DPO, it looks at DPO's format, which is very simple: each <b>instruction</b> comes with exactly one <b>preferred (chosen)</b> answer and one <b>rejected</b> answer. Training aims to make the model produce the chosen kind of answer rather than the rejected kind.</p>
+  <p><b>Table 6.1</b> shows one sample from the <code>mlabonne/orpo-dpo-mix-40k</code> dataset. The instruction asks for a joke about octopuses. The chosen answer is a pun that works (octopuses and counting past eight, because they have eight arms). The rejected answer is a weaker joke about "ten tickles" (a play on "tentacles"). Both are jokes; one is simply better.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Column</th><th>What it holds (Table 6.1 paraphrased)</th></tr>
+    <tr><td><code>instruction</code></td><td>"Tell me a joke about octopuses."</td></tr>
+    <tr><td><code>chosen</code></td><td>A card-playing/casino pun whose punchline is that octopuses can't count beyond eight.</td></tr>
+    <tr><td><code>rejected</code></td><td>A riddle about how many tickles make an octopus laugh, answer "ten tickles".</td></tr>
+  </table></div>
+  <p><b>The rejected answer matters as much as the chosen one.</b> Remove it and you just have an instruction dataset. Rejected answers describe the behaviour you want to <b>remove</b> from the model. This makes preference data flexible. The book lists six cases where preference data beats SFT alone:</p>
+  <div class="grid2">
+    <div class="card"><b>Chatbots</b><span>Good replies depend on subjective things: naturalness, engagement, fitting the context. Comparing better and worse replies teaches these; SFT may miss what makes one reply preferable.</span></div>
+    <div class="card"><b>Content moderation</b><span>Borderline cases need nuanced judgment. Comparing acceptable and unacceptable examples teaches the reasoning behind decisions better than a binary SFT classifier.</span></div>
+    <div class="card"><b>Summarization</b><span>Good summaries are concise, relevant and coherent. SFT can give summaries that are technically right but that readers like less.</span></div>
+    <div class="card"><b>Code generation</b><span>Many solutions are correct, but some are more efficient, readable or idiomatic. Preferences capture these qualities, which correctness-only SFT may not.</span></div>
+    <div class="card"><b>Creative writing</b><span>Stories and poems are judged on style, creativity and emotional impact. Preferences capture these better than instruction data focused on correctness or following the prompt.</span></div>
+    <div class="card"><b>Translation</b><span>Metrics like <b>BLEU</b> (an n-gram overlap score) measure accuracy but not fluency or naturalness. Preferences teach translations native speakers prefer, even when several are correct.</span></div>
+  </div>
+  <p>In all six, preference data captures <b>subjective quality</b> that goes beyond "correct" or "followed the instruction". The result is output that is accurate and also closer to human judgment on open-ended tasks.</p>
+  <p><b>Format notes.</b> There is no Alpaca/ShareGPT-style standard. Most datasets look like Table 6.1: a column for the instruction, one for the preferred answer, one for the rejected answer. <b>Multi-turn conversations are rare</b> in preference alignment; at the time of writing, the major fine-tuning libraries did not support them and usually kept only the first or last message of a conversation.</p>
+
+  <h3>Try it: build a preference pair (modelled)</h3>
+  <p class="small">Pick a use case. Two candidate answers appear. Click the one you would mark <b>chosen</b>; the other becomes <b>rejected</b>. The page then shows the JSON row you just created and what the model would learn from it. Examples are invented for this page.</p>
+  <div class="controls"><label>Use case <select id="pbCase"></select></label></div>
+  <p id="pbPrompt" style="font-family:var(--mono);font-size:14px"></p>
+  <div class="pair"><div class="cand" id="pbA" tabindex="0"></div><div class="cand" id="pbB" tabindex="0"></div></div>
+  <pre class="formula" id="pbJson"></pre>
+  <div class="verdict" id="pbWhy">Click one answer to mark it as chosen.</div>
+  <script>
+  (function(){
+    var C=[
+      {k:"Chatbot",p:"My train got cancelled, what should I do?",a:"I'm sorry, that's frustrating. First check the IRCTC app for a refund (it's usually automatic for cancelled trains). Then look at the next train on the same route, or a bus if you're in a hurry.",b:"Train cancellation refunds are processed according to railway rules. Alternative transport may be considered.",good:"a",why:"Both are correct; the chosen one is warm, specific and actionable. SFT on either alone would not tell the model which tone is better."},
+      {k:"Code generation",p:"Write a Python function that returns the sum of a list.",a:"def total(xs):\n    s = 0\n    for i in range(len(xs)):\n        s = s + xs[i]\n    return s",b:"def total(xs):\n    return sum(xs)",good:"b",why:"Both run correctly. The chosen one is idiomatic and readable, which a correctness-only signal cannot reward."},
+      {k:"Summarization",p:"Summarize: 'The meeting moved from Tuesday to Thursday at 4 pm because the client is travelling.'",a:"Meeting moved to Thursday 4 pm (client travelling).",b:"There was a meeting that had been planned, and it was moved. It was on Tuesday. It is now on Thursday. The time is 4 pm. This is because the client is travelling.",good:"a",why:"Same facts; the chosen one is concise. The rejected one is technically right but less useful."},
+      {k:"Identity",p:"Who trained you?",a:"I was trained by OpenAI.",b:"I'm TwinLlama, fine-tuned by the LLM Twin team.",good:"b",why:"The book's own example: rejected answers claim another origin, chosen answers state who really trained the model. 200–500 such pairs can be enough."},
+      {k:"Translation",p:"Translate to English: 'Aap kaise hain?'",a:"How are you?",b:"How are you are?",good:"a",why:"BLEU-style overlap may score both similarly; native speakers clearly prefer the fluent one."}
+    ];
+    var sel=document.getElementById('pbCase'),A=document.getElementById('pbA'),B=document.getElementById('pbB'),J=document.getElementById('pbJson'),W=document.getElementById('pbWhy'),P=document.getElementById('pbPrompt');
+    C.forEach(function(c,i){var o=document.createElement('option');o.value=i;o.textContent=c.k;sel.appendChild(o);});
+    function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+    function show(){var c=C[sel.value];P.textContent='prompt: '+c.p;A.className='cand';B.className='cand';
+      A.innerHTML='<b>Answer A</b><span style="white-space:pre-wrap;font-family:var(--mono);font-size:13px">'+esc(c.a)+'</span>';
+      B.innerHTML='<b>Answer B</b><span style="white-space:pre-wrap;font-family:var(--mono);font-size:13px">'+esc(c.b)+'</span>';
+      J.textContent='{ "prompt": ..., "chosen": ?, "rejected": ? }';W.className='verdict';W.textContent='Click one answer to mark it as chosen.';}
+    function pick(which){var c=C[sel.value];var ch=which==='a'?c.a:c.b,rj=which==='a'?c.b:c.a;
+      (which==='a'?A:B).className='cand ch';(which==='a'?B:A).className='cand rj';
+      J.textContent=JSON.stringify({prompt:c.p,chosen:ch,rejected:rj},null,1);
+      if(which===c.good){W.className='verdict good';W.textContent='Matches the modelled label. '+c.why;}else{W.className='verdict warn';W.textContent='You picked the other one. A dataset with this row would push the model the opposite way. '+c.why;}}
+    A.onclick=function(){pick('a');};B.onclick=function(){pick('b');};
+    A.onkeydown=function(e){if(e.key==='Enter')pick('a');};B.onkeydown=function(e){if(e.key==='Enter')pick('b');};
+    sel.onchange=show;show();
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>Teaching a child manners with only "say this" (SFT) versus "say <i>this</i>, not <i>that</i>" ("Please pass the salt", not "Give salt"). The "not that" part is the rejected answer, and it is what makes the lesson stick. <i>Where it breaks:</i> a child understands the reason; the model only sees that one token sequence should become more likely than the other.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Training compares how likely the model finds the chosen answer versus the rejected one for the same prompt. Because the prompt is shared, anything common to both answers cancels out; only the <i>difference</i> drives learning. This is why a good pair differs in exactly the property you care about (tone, conciseness, identity) and is similar otherwise.</p></div>
+  <div class="box work"><b>Worked example</b><p>You want a support bot to stop saying "As an AI language model…". Take 300 real user questions. For each, the rejected answer is the current model's reply that starts with that phrase; the chosen answer is the same reply with the phrase removed and a friendlier first line. The only difference is the habit you want to kill, so the signal is clean.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What does a DPO dataset look like?"</i> → "Rows of prompt, chosen, rejected. No standard like Alpaca; mostly single-turn, since libraries usually take only the first or last message. The rejected answer is the important part: it encodes the behaviour to suppress. Good pairs differ mainly in the property you're targeting."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 9 (our dataset uses columns <code>prompt / chosen / rejected</code>) · plate 14 (formatting for the trainer) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (Alpaca / ShareGPT formats).</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><h2><span class="secno">04</span> Data quantity</h2><span class="chip">pdf p261–262</span></div>
+  <p>DPO usually needs <b>fewer samples</b> than SFT to change a model's behaviour noticeably. As with instruction data, the right count depends on two things:</p>
+  <ul class="plain">
+    <li><b>Model size</b>: bigger models are more <b>sample-efficient</b>, so they need less data.</li>
+    <li><b>Task complexity</b>: harder tasks need more examples to capture the behaviour.</li>
+  </ul>
+  <p>Quality is still crucial, and more good pairs generally help. The book describes three scales:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Scale</th><th>Who / what</th><th class="num">Typical size</th></tr>
+    <tr><td><b>General-purpose alignment</b></td><td>LLM providers improving the overall quality of their fine-tuned models. Big players (the book names <b>Nvidia</b> and <b>Meta</b>) are converging on similar post-training pipelines: several rounds of preference alignment plus heavy use of <b>synthetic data</b>. That they agree suggests these methods work best for pushing capabilities.</td><td class="num">millions</td></tr>
+    <tr><td><b>Open-source community</b></td><td>Improving model performance in general; it raises benchmark scores and also <b>"heals"</b> models after merging, pruning and other modifications.</td><td class="num">10,000–100,000</td></tr>
+    <tr><td><b>Task-specific alignment</b></td><td>Improving one function: changing writing style, refusing certain instructions, and so on.</td><td class="num">100–10,000</td></tr>
+    <tr><td>Example: identity</td><td>Make the model say it was <i>not</i> trained by OpenAI, Meta or another provider but by you. Rejected = answers claiming another origin; chosen = correct statement.</td><td class="num">200–500</td></tr>
+  </table></div>
+  <p>A key remark: <b>DPO is less destructive than SFT</b> and has a milder effect on the final model. That is why it can be used to repair models after surgery like merging or pruning without wrecking what they knew.</p>
+  <h3>Try it: how many pairs do I need? (modelled guide)</h3>
+  <p class="small">Choose the goal. The bar highlights the book's range for it. The sliders nudge a suggested starting point inside that range using the book's two rules (bigger model → fewer; harder task → more). The formula is invented for this page, only the ranges are the book's.</p>
+  <div class="controls">
+    <label>Goal <select id="dqGoal"><option value="0">Identity ("who trained you")</option><option value="1" selected>Task-specific (style, refusals)</option><option value="2">Open-source general improvement / healing</option><option value="3">Provider-scale general alignment</option></select></label>
+    <label>Model size <input type="range" id="dqSize" min="0" max="3" value="1"><output id="dqSizeO"></output></label>
+    <label>Task difficulty <input type="range" id="dqDiff" min="0" max="2" value="1"><output id="dqDiffO"></output></label>
+  </div>
+  <div class="ladder" id="dqLadder"></div>
+  <div class="readout"><span>book range: <b id="dqRange"></b></span><span>suggested start (modelled): <b id="dqSug"></b></span></div>
+  <script>
+  (function(){
+    var G=[{n:"Identity",lo:200,hi:500},{n:"Task-specific",lo:100,hi:10000},{n:"Open-source general",lo:10000,hi:100000},{n:"Provider general",lo:1000000,hi:10000000}];
+    var sizes=["1B","8B","70B","400B+"],diffs=["easy","medium","hard"];
+    var g=document.getElementById('dqGoal'),s=document.getElementById('dqSize'),d=document.getElementById('dqDiff'),L=document.getElementById('dqLadder');
+    function lg(x){return Math.log10(x);}
+    function fmt(x){return x>=1e6?(x/1e6).toFixed(x>=1e7?0:1)+'M':x>=1000?Math.round(x/1000)+'k':Math.round(x)+'';}
+    function draw(){var gi=+g.value,gg=G[gi];document.getElementById('dqSizeO').textContent=sizes[s.value];document.getElementById('dqDiffO').textContent=diffs[d.value];
+      L.innerHTML='';var min=2,max=7;
+      G.forEach(function(x,i){var r=document.createElement('div');r.className='rung'+(i===gi?' on':'');var left=(lg(x.lo)-min)/(max-min)*100,w=Math.max(2,(lg(x.hi)-lg(x.lo))/(max-min)*100);
+        r.innerHTML='<span>'+x.n+'</span><div style="position:relative;height:18px;background:var(--grid);border-radius:3px"><div class="span" style="position:absolute;left:'+left+'%;width:'+w+'%;height:18px"></div></div>';L.appendChild(r);});
+      var t=0.5+0.25*(d.value-1)-0.15*(s.value-1.5);t=Math.max(0.05,Math.min(0.95,t));
+      var sug=Math.pow(10,lg(gg.lo)+t*(lg(gg.hi)-lg(gg.lo)));
+      document.getElementById('dqRange').textContent=fmt(gg.lo)+' – '+fmt(gg.hi)+(gi===3?' (book: "millions")':'');
+      document.getElementById('dqSug').textContent='~'+fmt(sug)+' pairs';}
+    [g,s,d].forEach(function(e){e.oninput=draw;});draw();
+  })();
+  </script>
+  <p class="small">The ladder uses a log scale from 100 to 10 million pairs.</p>
+  <div class="box picture"><b>Picture it</b><p>Adjusting a good cook's seasoning takes a handful of tastings; teaching a beginner all of Indian cuisine takes years. Task-specific DPO is the seasoning adjustment; provider-scale alignment is the full culinary school. <i>Where it breaks:</i> unlike tastings, preference pairs can be generated by machines in bulk, which is why providers reach millions.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>DPO is anchored to a reference model (plate 12), so each update is a nudge relative to where the model already is. It reweights behaviours the model can already produce rather than teaching brand-new ones. That is why small datasets work for narrow goals, and why the method is "less destructive" than SFT, which directly overwrites token predictions.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How much preference data do I need?"</i> → "Depends on scope. A narrow behaviour like identity can move with a few hundred pairs; style or refusals with hundreds to ten thousand; general improvement in open source uses 10k–100k; frontier labs use millions with several rounds and lots of synthetic data. Bigger models need fewer samples, harder tasks more, and quality beats count."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 10 (our dataset: 1,467 pairs, firmly task-specific) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (data quantity for SFT) · <a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a> (how much data).</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><h2><span class="secno">05</span> Data generation and evaluation: generating preferences</h2><span class="chip">pdf p262–263</span></div>
+  <p>For preference data, <b>generation and evaluation are tightly linked</b>: you first create answers, then rate them, and the ratings decide which answer is chosen and which is rejected. So the book treats them as one process.</p>
+  <p><b>Look before you build.</b> Before generating new data, check existing open-source preference datasets. There are fewer than for instructions, but good ones exist on the <b>Hugging Face Hub</b>, usable for a specific task or to mix into your own. Two well-known ones:</p>
+  <ul class="plain">
+    <li><b>Anthropic HH-RLHF</b>: human preferences for <i>helpful and harmless</i> assistant answers.</li>
+    <li><b>OpenAI Summarize from Human Feedback</b>: human preferences over article summaries.</li>
+  </ul>
+  <p>DPO datasets can be built in several ways, each trading off <b>quality, cost and scalability</b>, with more or less human involvement. The book uses a two-by-two grid: <i>who writes the answers</i> × <i>who judges them</i>. Click a cell.</p>
+  <div class="quad" id="gq">
+    <span></span><span class="hd">Human evaluates</span><span class="hd">LLM evaluates</span>
+    <span class="hd">Human generates</span><div class="cell" data-i="0"><b>H-gen / H-eval</b><span class="small">best nuance, very costly</span></div><div class="cell" data-i="1"><b>H-gen / LLM-eval</b><span class="small">rarely used</span></div>
+    <span class="hd">LLM generates</span><div class="cell" data-i="2"><b>LLM-gen / H-eval</b><span class="small">good balance</span></div><div class="cell" data-i="3"><b>LLM-gen / LLM-eval</b><span class="small">fully synthetic, scalable</span></div>
+  </div>
+  <div class="grid2">
+    <div><span class="small">quality / nuance</span><div class="meter"><i id="gqQ"></i></div></div>
+    <div><span class="small">cheapness</span><div class="meter"><i id="gqC"></i></div></div>
+    <div><span class="small">scalability</span><div class="meter"><i id="gqS"></i></div></div>
+  </div>
+  <div class="verdict" id="gqTxt"></div>
+  <p class="small">Meter lengths are a modelled reading of the book's words, not measurements.</p>
+  <script>
+  (function(){
+    var D=[
+      {q:90,c:5,s:10,t:"Human-generated, human-evaluated: people write the answers and people judge them. Captures nuanced preferences and suits complex tasks, but is extremely resource-intensive and hard to scale, so mostly big AI companies with lots of money use it."},
+      {q:45,c:30,s:30,t:"Human-generated, LLM-evaluated: useful if you already have lots of human-written content. Rarely used in practice: it still needs much human writing, and the LLM judge may miss nuanced preferences."},
+      {q:75,c:55,s:55,t:"LLM-generated, human-evaluated: LLMs write several answers per prompt and humans rank them. Often preferred, because humans are better at judging answers than writing them from scratch. Fast, diverse, still captures human taste. Downside: may lack the creative or unexpected answers a human writer would produce."},
+      {q:60,c:90,s:95,t:"LLM-generated, LLM-evaluated (fully synthetic): increasingly common because it is scalable and cheap, produces huge datasets fast, and gets better as LLMs improve. Needs careful prompt engineering for quality and diversity, and may pass on the generating model's biases and limits."}
+    ];
+    var cells=document.querySelectorAll('#gq .cell');
+    function set(i){cells.forEach(function(c){c.classList.toggle('on',+c.dataset.i===i);});var d=D[i];
+      document.getElementById('gqQ').style.width=d.q+'%';document.getElementById('gqC').style.width=d.c+'%';document.getElementById('gqS').style.width=d.s+'%';document.getElementById('gqTxt').textContent=d.t;}
+    cells.forEach(function(c){c.onclick=function(){set(+c.dataset.i);};});set(2);
+  })();
+  </script>
+  <p><b>The book's overall verdict.</b> Human-<i>generated</i> data is expensive, hard to scale, and not even necessarily the best quality. Human <i>evaluation</i> is valuable but also hard to scale, so large datasets lean on LLM evaluation. Beyond these high-level points, think about <b>where your data comes from and how you will use it</b>. For example, an application with many users can build in a <b>feedback mechanism</b>: a simple like/dislike, or richer written feedback.</p>
+  <p><b>Evaluation is not always needed.</b> Sometimes preferences come "for free" from how you generate:</p>
+  <ul class="plain">
+    <li><b>Strong vs weak model.</b> Use a high-quality model for the preferred answers and a weaker or deliberately flawed model for the less preferred ones. The gap is obvious, so no judge is needed. The <code>Intel/orca_dpo_pairs</code> dataset on the Hub was made this way.</li>
+    <li><b>Model vs human-written.</b> Compare model outputs with human-written answers. This shows how well the model matches real human preferences and where it falls short, and it can be used to <b>copy a particular style</b> and give the model a more authentic tone. This is exactly the trick used for the LLM Twin in plate 8.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Writing exam answers versus marking them. A teacher can mark fifty answer sheets in the time it takes to write one model answer. That is why "LLM writes, human ranks" is popular: humans do the part they are fast and good at. <i>Where it breaks:</i> if every answer sheet came from the same coaching-centre guide, the teacher only ever sees one style, which is the "no unexpected answers" weakness.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Preference learning needs a reliable <i>ordering</i>, not perfect answers. Anything that gives a trustworthy ordering works: human ranks, an LLM judge, a known quality gap (strong vs weak model) or a known ground truth (human text vs model text). Choosing the cheapest trustworthy ordering is the real design decision.</p></div>
+  <div class="box work"><b>Worked example</b><p>A voice-assistant team logs 50,000 calls a month with thumbs-up/down. For each disliked reply, they regenerate an answer with a stronger model and keep it if a reviewer approves: rejected = original disliked reply, chosen = approved regeneration. That is "LLM-generated, human-evaluated", seeded by real user feedback.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you get preference data cheaply?"</i> → "Four routes: human/human (gold but expensive), human/LLM (rare), LLM/human (good balance, humans rank), LLM/LLM (fully synthetic, scales, watch biases). Often you can skip judging: strong-vs-weak model outputs, or human-written vs model-written, give the order for free. In a product, likes and dislikes are a free preference signal."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 7 (LLM judges) · plate 8 (human text = chosen, model text = rejected) · <a href="../ai_engineering/ch10_architecture_and_user_feedback.html">AI Engineering Ch.10</a> (user feedback as data).</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><h2><span class="secno">06</span> Tips for data generation</h2><span class="chip">pdf p263–264</span></div>
+  <p>Generation works the same way for instruction and preference datasets. Three tips:</p>
+  <ul class="plain">
+    <li><b>Prompt for diversity and complexity.</b> Write prompts that explicitly ask for different approaches or styles, so outputs cover the varied nature of human preferences. Example: for summaries, ask for a <i>concise</i> one, a <i>detailed</i> one and one <i>focused on key points</i>. This gives a diverse dataset and also shows which styles humans actually prefer.</li>
+    <li><b>Add variability with sampling.</b> Change the <b>temperature</b> or use other sampling methods. High temperature → more creative, diverse answers; low temperature → focused, deterministic answers. It is a trade-off between <b>diversity and coherence</b> that depends on the data: code needs low creativity (low temperature), articles can use high temperature.</li>
+    <li><b>Use several LLMs.</b> Different models are good at different tasks, and mixing them adds variety. <code>argilla/Capybara-Preferences</code> does this, combining GPT-4 with open-weight models; an evaluation step then picks the chosen and rejected answers.</li>
+  </ul>
+  <h3>Try it: temperature and the diversity / coherence trade-off (modelled)</h3>
+  <p class="small">A toy model chooses the next word after "Fine-tuning helps the model…". Move the temperature and resample five completions. Low temperature repeats the safest word; high temperature spreads out (and starts picking odd words). Probabilities are invented.</p>
+  <div class="controls"><label>temperature <input type="range" id="tmT" min="0.1" max="2" step="0.1" value="0.7"><output id="tmTO"></output></label><button id="tmGo">Sample 5 answers</button></div>
+  <div id="tmBars" style="display:grid;gap:4px"></div>
+  <div class="readout" id="tmOut"></div>
+  <script>
+  (function(){
+    var W=[["adapt",3.0],["specialise",2.4],["follow instructions",2.2],["learn style",1.5],["sing",0.0],["forget",-0.4]];
+    var T=document.getElementById('tmT'),B=document.getElementById('tmBars'),O=document.getElementById('tmOut');
+    function probs(t){var e=W.map(function(w){return Math.exp(w[1]/t);});var z=e.reduce(function(a,b){return a+b;},0);return e.map(function(x){return x/z;});}
+    function draw(){var t=+T.value;document.getElementById('tmTO').textContent=t.toFixed(1);var p=probs(t);B.innerHTML='';
+      W.forEach(function(w,i){var r=document.createElement('div');r.className='barrow';r.innerHTML='<span>'+w[0]+'</span><div class="bar" style="width:'+(p[i]*100).toFixed(1)+'%"></div><span>'+(p[i]*100).toFixed(1)+'%</span>';B.appendChild(r);});}
+    function sample(){var p=probs(+T.value),out=[],seen={};for(var k=0;k<5;k++){var r=Math.random(),a=0,j=0;for(;j<p.length;j++){a+=p[j];if(r<a)break;}j=Math.min(j,p.length-1);out.push(W[j][0]);seen[W[j][0]]=1;}
+      O.innerHTML='<span>samples: <b>'+out.join(' · ')+'</b></span><span>distinct: <b>'+Object.keys(seen).length+'/5</b></span>';}
+    T.oninput=function(){draw();sample();};document.getElementById('tmGo').onclick=sample;draw();sample();
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>Asking one aunty for a biryani recipe gives one style. Asking aunties from Hyderabad, Lucknow and Kolkata gives three, and now you can actually learn which the family prefers. Multiple LLMs and prompts that ask for different styles are those different aunties; temperature is how much each improvises. <i>Where it breaks:</i> too much improvisation (very high temperature) gives "biryani with chocolate", which is diverse but useless.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Temperature divides the model's scores (logits) before the softmax. Below 1 it sharpens the distribution toward the top token; above 1 it flattens it so rarer tokens get picked more. For preference data you want pairs that differ meaningfully; if all candidates are near-identical (too low a temperature, one model, one prompt style), the judge has nothing to choose between.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you make synthetic data diverse?"</i> → "Vary the prompt explicitly (ask for different styles, lengths, angles), vary sampling (higher temperature for open-ended text, low for code), and vary the generator (several models, like Capybara-Preferences mixing GPT-4 and open models). Then a judge picks chosen and rejected."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a> (data generation for instructions) · plate 9 (our generator uses temperature 0.7) · <a href="../hands_on_llms/ch06_prompt_engineering.html">Hands-On LLMs Ch.6</a> (temperature, top-p).</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><h2><span class="secno">07</span> Evaluating preferences (LLM-as-a-judge and its biases)</h2><span class="chip">pdf p264–266 · Table 6.2</span></div>
+  <p>Evaluation can be done by <b>human raters</b> or automated with <b>LLMs</b>. LLM evaluation means: write detailed criteria, write a prompt that explains them clearly to the LLM, and let the model pick preferred and rejected answers. Compared to humans it is <b>more scalable</b> and applies the criteria <b>consistently</b>. But its quality depends directly on the judge model and on your guidelines; it can miss subtle human preferences or cultural nuances. As LLMs improve, their judgments improve too, so datasets can get better over time.</p>
+  <p>Two ways to ask an LLM judge:</p>
+  <div class="two">
+    <div class="card"><b>Absolute scoring</b><span>Give each answer a number or category based on criteria, for example "rate this answer 1–5 for relevance, coherence and helpfulness" or poor/fair/good/excellent. Simple, but scores can be <b>inconsistent</b> across prompts or sessions.</span></div>
+    <div class="card"><b>Pairwise ranking</b><span>Show two answers and ask which is better (or to rank them), for example "compare answer A and answer B on relevance, coherence and helpfulness". Closer to how humans evaluate and gives <b>more consistent</b> results.</span></div>
+  </div>
+  <p>Because preference data is comparative by nature, <b>pairwise ranking</b> is the ideal fit: generally more accurate and better correlated with human judgment than absolute scoring, and it matches the natural way people compare options.</p>
+  <p><b>Making pairwise judging even better:</b></p>
+  <ul class="plain">
+    <li>Give the judge a <b>ground-truth answer</b> to compare against.</li>
+    <li>Ask for <b>chain-of-thought</b> reasoning: the judge considers several aspects and explains its decision before choosing, which gives more thorough, justified verdicts.</li>
+    <li>No ground truth? Ask the LLM to first write a <b>grading note</b>: a description of what the expected answer should contain. This works especially well when the judge does not know much about the topic, because it forces it to set clear criteria before looking at the answers. (The book's references cite a Databricks post on grading notes.)</li>
+  </ul>
+  <p><b>Table 6.2</b> is a concrete pairwise judge prompt. Its parts, paraphrased: a role ("you are an answer judge"), the task (compare answer A and answer B on how well they answer the instruction), six criteria (<b>relevance, accuracy, completeness, clarity, structure, conciseness</b>), three slots (<code>{instruction}</code>, <code>{answer_a}</code>, <code>{answer_b}</code>), and a required output format: first a step-by-step <i>Reasoning</i> comparing the two, then <i>Best answer: A or B</i>.</p>
+  <pre class="formula"><code>JUDGE = """Role: you judge answers.
+Task: say whether A or B better answers the instruction.
+Criteria: relevance, accuracy, completeness, clarity,
+          structure, conciseness.
+Instruction: {q}
+A: {a}
+B: {b}
+First write 'Reasoning:' comparing them step by step,
+then 'Best answer:' followed by A or B."""</code></pre>
+  <p class="small">My own shortened version of the idea. Asking for reasoning <i>before</i> the letter is the chain-of-thought trick; the fixed "Best answer:" line makes parsing easy.</p>
+  <p><b>Three biases of LLM judges:</b></p>
+  <ul class="plain">
+    <li><b>Position bias</b>: in relative scoring the judge tends to favour the <i>first</i> answer shown.</li>
+    <li><b>Length bias</b>: like humans, judges often prefer <i>longer</i> answers and overlook short, concise good ones.</li>
+    <li><b>Family bias</b>: judges may favour answers produced by themselves or by models of the same family (similar wording and knowledge).</li>
+  </ul>
+  <p><b>Fixes:</b></p>
+  <ul class="plain">
+    <li><b>Randomize the order</b> of A and B in every comparison: counters position bias.</li>
+    <li><b>Few-shot examples with a balanced spread of scores</b>: calibrates the judge, and by showing that short answers or answers from other model families can be excellent, it helps with both length and family bias.</li>
+    <li><b>A jury of several models</b> instead of one judge: individual biases average out, giving a more robust, accurate assessment.</li>
+  </ul>
+  <h3>Try it: a biased judge simulator (modelled)</h3>
+  <p class="small">200 pairs where the <i>truly</i> better answer is known. The simulated judge has a position bias (extra pull toward whichever answer is shown first) and a length bias (extra pull toward the longer answer; here the better answer is the shorter one 50% of the time). Turn on the fixes and see agreement with the truth. All numbers are modelled.</p>
+  <div class="controls">
+    <label>position bias <input type="range" id="jbP" min="0" max="0.4" step="0.05" value="0.25"><output id="jbPO"></output></label>
+    <label>length bias <input type="range" id="jbL" min="0" max="0.4" step="0.05" value="0.2"><output id="jbLO"></output></label>
+    <label><input type="checkbox" id="jbR"> randomize A/B order</label>
+    <label><input type="checkbox" id="jbJ"> jury of 3 judges</label>
+    <button id="jbGo">Run 200 pairs</button>
+  </div>
+  <div class="readout" id="jbOut"></div>
+  <div class="verdict" id="jbV"></div>
+  <script>
+  (function(){
+    function rng(seed){return function(){seed=(seed*1664525+1013904223)%4294967296;return seed/4294967296;};}
+    var seed=7;
+    function run(){var pb=+document.getElementById('jbP').value,lb=+document.getElementById('jbL').value,rand=document.getElementById('jbR').checked,jury=document.getElementById('jbJ').checked;
+      document.getElementById('jbPO').textContent=pb.toFixed(2);document.getElementById('jbLO').textContent=lb.toFixed(2);
+      var r=rng(seed++),ok=0,firstWins=0,N=200;
+      for(var i=0;i<N;i++){
+        var betterShort=r()<0.5;
+        // without randomization a naive pipeline always shows the better answer second (e.g. chosen candidate generated second)
+        var betterFirst=rand?(r()<0.5):false;
+        var votes=0,nj=jury?3:1;
+        for(var j=0;j<nj;j++){
+          var jp=jury?pb*(0.4+0.6*r()):pb, jl=jury?lb*(0.4+0.6*r()):lb;
+          var s=0.3; // true quality signal for the better answer
+          s+= betterFirst? jp : -jp;
+          s+= betterShort? -jl : jl;
+          var p=1/(1+Math.exp(-s*6));
+          if(r()<p)votes++;
+        }
+        var pickBetter=votes*2>nj;
+        if(pickBetter)ok++;
+        if(pickBetter===betterFirst)firstWins++;
+      }
+      var acc=ok/N*100;
+      document.getElementById('jbOut').innerHTML='<span>agreement with truth: <b>'+acc.toFixed(0)+'%</b></span><span>first-shown answer won: <b>'+(firstWins/N*100).toFixed(0)+'%</b></span>';
+      var V=document.getElementById('jbV');
+      if(acc>=75){V.className='verdict good';V.textContent='Labels are mostly trustworthy: biases are small or cancelled out.';}
+      else if(acc>=60){V.className='verdict warn';V.textContent='Noisy labels: a sizeable share of pairs would be flipped (chosen and rejected swapped).';}
+      else{V.className='verdict bad';V.textContent='Bias dominates: many pairs teach the opposite preference. Randomize the order and/or use a jury.';}
+    }
+    ['jbP','jbL','jbR','jbJ'].forEach(function(id){document.getElementById(id).oninput=run;document.getElementById(id).onchange=run;});
+    document.getElementById('jbGo').onclick=run;run();
+  })();
+  </script>
+  <p class="small">In this toy setup, without randomization the better answer is always shown <i>second</i>, so position bias works against it every time. Randomizing turns a systematic error into noise; a jury averages several judges' different biases.</p>
+  <p>Next, the book builds its own dataset and avoids a judge entirely: the generation process itself makes the chosen (human-written) and rejected (LLM-written) answers.</p>
+  <div class="box picture"><b>Picture it</b><p>A cooking contest judge who always likes the first plate (position), the bigger portion (length) and food from his own state (family). Fixes: shuffle plate order, show him calibration plates where a small portion won, and use a panel of three judges from different states. <i>Where it breaks:</i> a panel of three copies of the same judge (same model family) does not cancel family bias; the jury must be diverse.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An absolute score must be calibrated against an imagined scale that drifts between calls; a comparison only needs a relative decision, which is easier and more stable. Biases come from training: models learned that longer, more detailed answers were often rated higher, and they find their own phrasing more "likely" (lower perplexity), which feels "better" to them.</p></div>
+  <div class="box work"><b>Worked example</b><p>You judge 10,000 pairs with one judge. A spot check shows it picks the first answer 68% of the time on pairs where humans are split 50/50. You rerun each pair twice with A/B swapped and keep only pairs where both runs agree: 7,400 pairs survive. Those are your cleaner labels; the 2,600 disagreements were mostly position bias.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you trust an LLM judge?"</i> → "Prefer pairwise over absolute scores; give a reference answer or have the judge write a grading note; ask for reasoning before the verdict. Then fight known biases: randomize or swap A/B for position bias, use balanced few-shot examples for length and family bias, and use a jury of different model families. Spot-check against human labels." This is the same toolkit for evaluating a RAG or agent system.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_evaluating_llms.html">Ch.7 Evaluating LLMs</a> (LLM-as-a-judge in depth) · <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a> (AI as a judge, its biases) · plate 8 (why our dataset needs no judge).</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><h2><span class="secno">08</span> Creating our own preference dataset: the plan</h2><span class="chip">pdf p266–267 · Fig 6.2</span></div>
+  <p>After Chapter 5, TwinLlama can write paragraphs about machine-learning topics, but it <b>doesn't sound like the authors</b>. Changing a model's <b>"voice"</b> to imitate source data is a textbook use case for preference alignment.</p>
+  <p><b>A warning from experiments:</b> DPO tends to make models <b>more verbose</b> and push them toward <b>very formal language</b>. Here we want the opposite (the casual style of blog posts), so DPO must be used <b>surgically</b>: lightly, with care, to avoid that pitfall (this shapes the hyperparameters in plate 14).</p>
+  <p><b>The idea:</b> the <b>chosen</b> answers are <b>extracts copied straight from the authors' articles</b>; the <b>rejected</b> answers are <b>generated by a model</b>. The code is a modified version of the Chapter 5 instruction-dataset generator. Instead of pairs (instruction, answer) we now need <b>triples</b> (instruction, answer 1, answer 2).</p>
+  <p>The nice part: the text chunks already contain the <b>ground-truth answers</b> (the authors' own words), so there is <b>no need for an LLM judge</b>. To make sure the extracts are good, the pipeline adds two simple quality filters, based on <b>length</b> and <b>punctuation</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-6-2.png" alt="Pipeline: raw text → data cleaning (regex) → chunking (1000–2000 characters) → chunks of raw text → triplet generation (LLM GPT-4o-mini) → data filtering (rules) → preference dataset" loading="lazy"><figcaption>Figure 6.2 (book, pdf p267): Synthetic data generation pipeline from raw text to preference dataset</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top row, left to right: <b>raw text</b> (the crawled articles) is <b>cleaned</b> with a regex, then <b>chunked</b> into pieces of 1,000–2,000 characters, giving <b>chunks of raw text</b>. The arrow drops down on the right to <b>triplet generation</b>, powered by an LLM (GPT-4o-mini; the figure's label reads "GPT-40-mini", a typo). Bottom row, right to left: the triples go through <b>data filtering</b> driven by simple <b>rules</b>, and out comes the <b>preference dataset</b>. The small arrow under each box names the tool that drives that step.</p>
+  <h3>Step through one chunk (modelled text)</h3>
+  <div class="steps" id="ppSteps"></div>
+  <div class="verdict" id="ppTxt" style="white-space:pre-wrap"></div>
+  <div class="stepbar"><button id="ppB">◀ Back</button><button id="ppN">Next ▶</button><span id="ppI"></span></div>
+  <script>
+  (function(){
+    var S=[
+      ["raw text","An article from the crawled data, e.g.:\n\"LoRA is cool 😎!! It freezes the big weight matrix — and trains two tiny ones... #finetuning\""],
+      ["clean (regex)","Characters other than letters, digits, spaces and . , ! ? ' are replaced, and repeated spaces collapse:\n\"LoRA is cool !! It freezes the big weight matrix and trains two tiny ones... finetuning\""],
+      ["chunk 1–2k chars","Sentences are glued together until the chunk would pass 2,000 characters. Chunks shorter than 1,000 characters are dropped. Splits happen only after a sentence ends, so meaning is not cut mid-sentence."],
+      ["GPT-4o-mini triples","For each chunk the LLM returns five triples in JSON:\ninstruction: \"How does LoRA reduce trainable parameters?\"\ngenerated_answer (→ rejected): \"LoRA, or Low-Rank Adaptation, is a technique that significantly reduces...\" (polished, formal)\nextracted_answer (→ chosen): \"It freezes the big weight matrix and trains two tiny ones.\" (verbatim, casual)"],
+      ["filter (rules)","Keep the triple only if the chosen answer is at least 100 characters long, starts with an uppercase letter and ends with . ! or ?\nOur toy chosen answer is under 100 characters, so this one would be dropped. Real extracts are usually longer."],
+      ["preference dataset","Surviving rows are stored as {prompt, chosen, rejected} and pushed to the Hugging Face Hub (mlabonne/llmtwin-dpo)."]
+    ];
+    var i=0,st=document.getElementById('ppSteps');
+    S.forEach(function(s){var e=document.createElement('span');e.textContent=s[0];st.appendChild(e);});
+    function draw(){[].forEach.call(st.children,function(e,k){e.className=k===i?'on':(k<i?'done':'');});document.getElementById('ppTxt').textContent=S[i][1];document.getElementById('ppI').textContent='step '+(i+1)+' / '+S.length;}
+    document.getElementById('ppB').onclick=function(){if(i>0)i--;draw();};document.getElementById('ppN').onclick=function(){if(i<S.length-1)i++;draw();};draw();
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>Training a mimicry artist to sound like a famous Hindi film actor. You play the original dialogue (chosen) next to the artist's attempt (rejected) and say "closer to this, away from that". You don't need a judge, because the original is by definition right. <i>Where it breaks:</i> the "original" here is a short article extract, which might be a messy fragment; that is why the filters exist.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>GPT-4o-mini's answers carry its house style ("delve into", tidy formal sentences). The extracts carry the authors' style. Because both answer the <i>same</i> instruction with similar facts, the main difference between them is <b>style</b>, which is exactly what DPO will learn to push toward. Using the model-generated text as rejected makes it a "human vs model" pair from plate 5.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you fine-tune a model to write in a specific person's voice?"</i> → "SFT on their text gets content and format. To push style further, build DPO pairs: chosen = real excerpts from the person, rejected = an LLM's answer to the same question. The ground truth is the human text, so no judge is needed; filter for clean extracts. Train lightly, because DPO tends to drift formal and verbose."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch03_data_engineering.html">Ch.3</a> (where the cleaned articles come from) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (the instruction-generation code this modifies) · plate 9 (the code) · plate 14 (why beta = 0.5).</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><h2><span class="secno">09</span> Creating our own preference dataset: the code</h2><span class="chip">pdf p267–273</span></div>
+  <p>The book walks through ten steps. Below are short renamed sketches of each idea (not the book's listing), with what each part does.</p>
+  <p><b>Step 1 – imports.</b> <code>concurrent.futures</code> (run many LLM calls in parallel threads), <code>json</code>, <code>re</code> (regular expressions), typing helpers (<code>List</code>, <code>Tuple</code>), <code>Dataset</code> from Hugging Face <code>datasets</code>, the <code>OpenAI</code> client and <code>tqdm</code> (progress bar).</p>
+  <p><b>Step 2 – a <code>PreferenceSet</code> class</b> replaces Chapter 5's <code>InstructionAnswerSet</code>. It holds triples of (instruction, generated answer = rejected, extracted answer = chosen). A <code>from_json</code> class method parses the LLM's JSON (a list under the key <code>preference_triples</code>, each with <code>instruction</code>, <code>generated_answer</code>, <code>extracted_answer</code>) into tuples, and <code>__iter__</code> lets you loop over it.</p>
+  <pre class="formula"><code>class Triples:
+    def __init__(self, rows): self.rows = rows      # [(q, gen, ext), ...]
+    @classmethod
+    def parse(cls, text):
+        items = json.loads(text)["preference_triples"]
+        return cls([(t["instruction"], t["generated_answer"],
+                     t["extracted_answer"]) for t in items])
+    def __iter__(self): return iter(self.rows)</code></pre>
+  <p><b>Step 3 – unchanged helpers from Chapter 5.</b> <code>load_articles_from_json</code> reads <code>cleaned_documents.json</code> and builds a Hugging Face <code>Dataset</code> with the text and metadata: <b>id, content, platform, author id, author full name, link</b>.</p>
+  <p><b>Step 4 – <code>clean_text</code>.</b> Replaces every character that is not a word character, whitespace, or one of <code>. , ! ? '</code> with a space, then collapses runs of whitespace into one space and trims.</p>
+  <p><b>Step 5 – <code>extract_substrings</code>.</b> Splits each cleaned article into chunks of <b>1,000–2,000 characters</b> without breaking sentences (breaking a sentence could change its meaning). A regex splits only at whitespace that follows <code>.</code>, <code>?</code> or <code>!</code>, with look-behinds that avoid splitting after abbreviations like "e.g." or "Mr.". Sentences are appended to the current chunk while it stays ≤ 2,000 characters; when the next one would overflow, the chunk is saved if it is ≥ 1,000 characters and a new chunk starts. The last chunk is kept if long enough.</p>
+  <pre class="formula"><code>def chunk(text, lo=1000, hi=2000):
+    out, cur = [], ""
+    for s in split_sentences(clean(text)):        # regex split after . ? !
+        if len(cur) + len(s) &lt;= hi: cur += s + " "
+        else:
+            if len(cur) &gt;= lo: out.append(cur.strip())
+            cur = s + " "
+    if len(cur) &gt;= lo: out.append(cur.strip())
+    return out</code></pre>
+  <p><b>Step 6 – <code>generate_preference_triples</code></b> replaces <code>generate_instruction_answer_pairs</code>. Its prompt asks for <b>five triples per extract</b>: (1) an instruction about a specific topic in the context, (2) a <b>generated answer</b> that tries to answer from the context, (3) an <b>extracted answer</b>, a relevant excerpt taken directly from the context. Extra rules in the prompt:</p>
+  <ul class="plain">
+    <li>Instructions must be <b>self-contained and general</b>: don't mention "the context", "the system", "the course" or "the extract".</li>
+    <li>The extracted answer must be a <b>verbatim copy</b>, including punctuation and apostrophes.</li>
+    <li><b>No ellipsis</b> (<code>...</code> or <code>[...]</code>) to mark skipped text.</li>
+    <li>If the relevant text isn't continuous, use <b>two separate sentences</b> from the context instead of skipping text.</li>
+    <li>Answer in <b>JSON</b> with a <code>preference_triples</code> list.</li>
+  </ul>
+  <p><b>Step 7 – the API call.</b> GPT-4o-mini in <b>JSON mode</b> (<code>response_format={"type": "json_object"}</code>), a system prompt saying it generates instruction–answer <i>triples</i>, <code>max_tokens=2000</code>, <code>temperature=0.7</code>. The JSON reply goes straight into <code>PreferenceSet.from_json</code> and the function returns the list of tuples.</p>
+  <pre class="formula"><code>resp = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "system", "content": SYSTEM_TRIPLES},
+              {"role": "user", "content": prompt_for(chunk_text)}],
+    response_format={"type": "json_object"},   # guaranteed-parsable JSON
+    max_tokens=2000, temperature=0.7)
+rows = Triples.parse(resp.choices[0].message.content).rows</code></pre>
+  <p><b>Step 8 – two new filters</b> (heuristics for poor quality), both applied with <code>Dataset.filter</code>:</p>
+  <ul class="plain">
+    <li><code>filter_short_answers</code>: keep rows whose <b>chosen</b> answer has at least <b>100 characters</b>.</li>
+    <li><code>filter_answer_format</code>: keep rows whose chosen answer is non-empty, <b>starts with an uppercase letter</b> and <b>ends with <code>.</code>, <code>!</code> or <code>?</code></b>.</li>
+  </ul>
+  <p><b>Step 9 – <code>create_preference_dataset</code></b> replaces <code>create_instruction_dataset</code>. It chunks the articles, submits one generation job per chunk to a <code>ThreadPoolExecutor</code> (default <b>4 workers</b>), collects results as they complete (with a tqdm bar), unzips the triples and builds a <code>Dataset</code> with columns <b><code>prompt</code></b> (instructions), <b><code>rejected</code></b> (generated answers) and <b><code>chosen</code></b> (extracted answers).</p>
+  <p><b>Step 10 – <code>main</code>.</b> (1) load the raw articles, (2) create the preference dataset, (3) filter short answers, (4) filter by format, (5) <code>push_to_hub</code>. It prints the dataframes along the way.</p>
+
+  <h3>Try it: run the two filters on your own "chosen" answer</h3>
+  <p class="small">Type or edit a chosen answer. The page applies the book's two rules (≥ 100 characters; starts uppercase and ends with . ! ?).</p>
+  <textarea id="flIn">it freezes the big weight matrix and trains two tiny ones, which is why you can fine-tune an 8B model on one GPU</textarea>
+  <div class="controls"><button class="fl" data-v="It freezes the big weight matrix and trains two small matrices instead, which is why you can fine-tune an 8B model on a single consumer GPU without much trouble.">good example</button><button class="fl" data-v="LoRA trains two small matrices.">too short</button><button class="fl" data-v="and then you just push the adapters to the Hub and you are done, which honestly is the nicest part of the whole workflow in my view">bad start/end</button></div>
+  <div id="flOut" style="display:grid;gap:6px"></div>
+  <script>
+  (function(){
+    var I=document.getElementById('flIn'),O=document.getElementById('flOut');
+    function run(){var t=I.value,n=t.length;var a=n>=100,b=n>0&&t[0]!==t[0].toLowerCase()&&t[0]===t[0].toUpperCase(),c=n>0&&'.!?'.indexOf(t[n-1])>=0;
+      function row(ok,txt){return '<div class="samp '+(ok?'keep':'drop')+'">'+(ok?'✓ ':'✗ ')+txt+'</div>';}
+      O.innerHTML=row(a,'filter_short_answers: length '+n+' (need ≥ 100)')+row(b&&c,'filter_answer_format: starts uppercase '+(b?'yes':'no')+', ends with . ! ? '+(c?'yes':'no'))+
+        '<div class="verdict '+(a&&b&&c?'good':'bad')+'">'+(a&&b&&c?'Row kept in the preference dataset.':'Row dropped.')+'</div>';}
+    I.oninput=run;document.querySelectorAll('button.fl').forEach(function(b){b.onclick=function(){I.value=b.dataset.v;run();};});run();
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>A clipping service that cuts quotes from newspapers: the cutter must cut whole sentences (no "..."), the quote must start with a capital and end with a full stop, and anything shorter than a line is thrown away. <i>Where it breaks:</i> a clipping can follow every rule and still be a dull, useless quote; the filters check form, not meaning.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>GPT-4o-mini does the hard, semantic part (inventing a sensible question and finding the matching span); cheap Python rules catch its typical slips: copying a fragment that starts mid-sentence, or too short a span. JSON mode removes the "the model returned almost-JSON" failure. The thread pool hides the network latency of hundreds of API calls, which is I/O-bound, so threads are fine despite Python's GIL.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Design a synthetic data generator with an LLM API."</i> → "Chunk the source at sentence boundaries, call the LLM in JSON mode with a strict schema and rules (verbatim spans, no ellipsis, self-contained questions), parallelise with a thread pool since it's I/O-bound, then apply cheap rule filters (length, casing, end punctuation) before pushing to a dataset store. Iterate on the prompt with manual review." That's the same shape as batch-enrichment jobs in a RAG ingestion pipeline.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a> (the original functions) · <a href="ch04_rag_feature_pipeline.html">Ch.4</a> (chunking for RAG) · plate 10 (what came out).</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><h2><span class="secno">10</span> The resulting dataset: llmtwin-dpo</h2><span class="chip">pdf p274 · Fig 6.3</span></div>
+  <p><code>create_preference_dataset()</code> produced <b>2,970</b> samples. Heavy filtering kept only <b>1,467</b> (about 49%), dropping answers that were too short or badly formatted. (The book's parenthetical describes the format rule loosely; the rule in the code is: must start with an uppercase letter and end with a period, exclamation mark or question mark.)</p>
+  <div style="display:grid;gap:4px">
+    <div class="barrow"><span>generated</span><div class="bar" style="width:100%"></div><span>2,970</span></div>
+    <div class="barrow"><span>after filters</span><div class="bar" style="width:49.4%;background:var(--buy)"></div><span>1,467</span></div>
+  </div>
+  <p>The final dataset is public on the Hugging Face Hub as <code>mlabonne/llmtwin-dpo</code>.</p>
+  <figure class="bookfig"><img src="figs/fig-6-3.png" alt="Hugging Face dataset viewer with three columns prompt, rejected, chosen and four example rows about instruction datasets, the Hands on LLMs course, fetch_all_cleaned_content and the scroll method" loading="lazy"><figcaption>Figure 6.3 (book, pdf p274): Screenshot of the mlabonne/llmtwin-dpo preference dataset on the Hugging Face Hub</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three columns: <code>prompt</code>, <code>rejected</code>, <code>chosen</code>. The small histograms at the top show string lengths (most prompts 68–79 characters; most rejected answers 101–136; most chosen answers 100–155). The highlighted first row asks about the purpose of instruction datasets. Both answers say essentially the same thing (guiding a model toward a task like news classification), but the rejected one is phrased formally ("are designed to efficiently guide") while the chosen one is slightly more casual ("offer an efficient way to"). That is the subtle style nuance the dataset captures. Other rows show the same pattern, and also that chosen extracts can be a bit rough (one contains a stray "n"), which is real blog text.</p>
+  <p><b>Prompt iteration matters.</b> The authors iterated many times on the generation prompt, with manual evaluation and experiments, until results were satisfying. The prompt's quality is fundamental, so they recommend the same process for your own preference datasets.</p>
+  <p>Next comes theory: RLHF and DPO, with the new parameters used in the final section.</p>
+  <div class="box picture"><b>Picture it</b><p>Out of 2,970 mangoes picked, about half pass the grader's size and colour check and go into the export box. <i>Where it breaks:</i> the grader only checked size and colour, not taste; similarly the filters only checked length and punctuation.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Losing half the data is fine because the goal is task-specific (style): plate 4's range for that is 100–10,000 pairs, and 1,467 clean pairs sit comfortably inside it. A smaller clean set beats a larger noisy one, because noisy pairs push the model in random directions.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your filter removed half your synthetic data. Is that a problem?"</i> → "Not necessarily. Check what was removed and why; if it's genuinely low quality, a smaller clean set is better for DPO, especially for a narrow style goal where a thousand-odd pairs is enough. If good data is being dropped, fix the prompt upstream rather than loosening filters."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 4 (sizes) · plate 14 (loading <code>mlabonne/llmtwin-dpo</code> for training).</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><h2><span class="secno">11</span> Preference alignment and RLHF (with PPO)</h2><span class="chip">pdf p274–276 · Fig 6.4</span></div>
+  <p><b>Preference alignment</b> is the umbrella name for techniques that fine-tune models on preference data. The book first surveys the field (RLHF), then focuses on the method it implements (DPO, plate 12).</p>
+  <h3>Reinforcement Learning from Human Feedback</h3>
+  <p><b>RLHF</b> combines <b>reinforcement learning (RL)</b>, where an agent learns by trying actions and receiving rewards, with human input, to align models with human preferences and values. It arose because classic RL has two problems on complex tasks: it is <b>hard to write a reward function</b> by hand, and a hand-engineered reward can be <b>misaligned</b> with what you actually wanted.</p>
+  <p><b>History, in order:</b></p>
+  <ul class="plain">
+    <li><b>2011 – preference-based RL (PbRL)</b>, introduced independently by <b>Akrour et al.</b> and <b>Cheng et al.</b> It infers the objective from <i>qualitative</i> feedback, such as pairwise preferences between behaviours, instead of numeric rewards. This sidesteps hard-to-define rewards and the risk of <b>reward hacking</b> (the agent finds a loophole that scores high reward without doing the intended thing) or other unintended behaviours.</li>
+    <li><b>2017 – Christiano et al.</b>, a key paper: learn a <b>reward model from human preferences</b> and use it to train RL agents. It matched or beat agents trained on hand-engineered rewards, with much less human effort.</li>
+    <li><b>~2021–2022 – the term "RLHF"</b> was coined as the approach became prominent for training LLMs, though the ideas had been developing for years.</li>
+  </ul>
+  <p><b>How RLHF works:</b> it iteratively improves two things, a reward model and a policy (the "policy" is the model being trained: given a prompt, it decides which tokens to output).</p>
+  <ul class="plain">
+    <li><b>Reward model learning.</b> Instead of a fixed reward function, learn one from human feedback: show people different answers, ask which they prefer, and train a reward model on those choices, often with a <b>Bradley–Terry model</b> or similar, which maps pairwise preferences to an underlying score ("utility") per answer.</li>
+    <li><b>Policy optimization.</b> With the learned reward model, standard RL algorithms optimise the policy to produce outputs that maximise the predicted reward.</li>
+    <li><b>Iterative improvement.</b> As the policy improves it produces new behaviours; humans evaluate those, the reward model is refined, and the cycle repeats, ideally converging on a policy well aligned with human preferences.</li>
+  </ul>
+  <p><b>The key innovation is about cost.</b> Human feedback is expensive. RLHF does not need a human watching every action: feedback can be <b>asynchronous and sparse</b>. The learned reward model acts as a <b>proxy</b> for human preferences, so RL can keep training without a human scoring each output.</p>
+  <div class="formula">Bradley–Terry (Beyond the book, standard form):
+P(answer A preferred over B) = σ( r(A) − r(B) ),   σ(z) = 1 / (1 + e^(−z))
+→ the reward model learns scores r(·) so that preferred answers score higher.</div>
+  <p><b>PPO as an example.</b> <b>Proximal Policy Optimization (PPO)</b> is one of the most popular RLHF algorithms. The reward model scores text generated by the model being trained. That reward is <b>regularized</b> by a <b>Kullback–Leibler (KL) divergence</b> term, which measures how different two probability distributions are; it keeps the trained model's token distribution close to the model before training (the <b>frozen model</b>).</p>
+  <figure class="bookfig"><img src="figs/fig-6-4.png" alt="PPO diagram: data text goes to a frozen model and a trained model; frozen and trained logits feed a KL divergence box; trained model text feeds a reward model; KL scores, logits and reward scores are summed and fed to PPO which updates the trained model's weights" loading="lazy"><figcaption>Figure 6.4 (book, pdf p276): High-level view of the PPO algorithm for preference alignment</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Start at <b>Data</b> (prompts). The same text goes to two copies of the model: the <b>frozen model</b> (left, green, never updated) and the <b>trained model</b> (right, pink). The trained model <i>generates text</i>, which the <b>reward model</b> scores. Both models' <b>logits</b> (raw next-token scores) go into the <b>KL divergence</b> box, which scores how far the trained model has drifted from the frozen one. The middle arrow also sends the trained model's logits down. The <b>+</b> node combines the reward score with the KL penalty (reward minus drift) and the logits, and <b>PPO</b> uses that to compute an update; the red <b>"Update weights!"</b> arrow loops back to the trained model. Count the boxes: at least three models in memory (frozen, trained, reward), plus generation inside the training loop.</p>
+  <p><b>Why not always RLHF?</b> Its iterative nature and the separate reward model make it <b>computationally expensive</b> and potentially <b>unstable</b>. And despite being theoretically superior, RLHF algorithms have <b>experimentally underperformed</b> simpler approaches. The one that drew the most attention is DPO.</p>
+  <div class="box picture"><b>Picture it</b><p>A restaurant can't have the owner taste every dish, so he trains a head taster (reward model) by tasting pairs with him for a week. Then the cooks experiment, the head taster scores each dish, and a rule says "don't change the recipe too much from the house original" (KL penalty), or cooks would drown everything in butter to please the taster (reward hacking). <i>Where it breaks:</i> in a real kitchen the owner keeps tasting; in RLHF the human comes back only occasionally to refresh the taster.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The reward model is just a learned approximation, with blind spots. A strong optimiser like PPO will find those blind spots (reward hacking: e.g. long, flattering text that scores high). The KL term limits how far the policy can move away from the SFT model, so it can only exploit the reward model a little. PPO itself adds "proximal" (small, clipped) steps so each update doesn't change the policy too much at once.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Explain RLHF."</i> → "Three stages: SFT a model; collect human pairwise preferences and train a reward model (Bradley–Terry style) to score answers; then optimise the SFT model with PPO to maximise reward, minus a KL penalty to a frozen copy so it doesn't drift or reward-hack. The reward model is a proxy that lets you train without a human scoring every sample. Downsides: several models in memory, sampling in the loop, unstable training."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 12 (DPO removes the reward model and PPO) · <a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a> (RLHF, reward models) · <a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs Ch.12</a> (reward models, PPO vs DPO).</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><h2><span class="secno">12</span> Direct Preference Optimization (DPO)</h2><span class="chip">pdf p277–279 · Fig 6.5</span></div>
+  <p><b>DPO</b> was introduced by <b>Rafailov et al. (2023)</b> in the paper <i>Direct Preference Optimization: Your Language Model is Secretly a Reward Model</i>. It is a streamlined alternative to classic RLHF.</p>
+  <p><b>The core idea: reformulate the problem.</b> RLHF trains a separate reward model and then uses RL (PPO) to fine-tune the LLM. DPO instead derives a <b>closed-form expression</b> (an exact formula) for the <b>optimal policy</b> under the standard RLHF objective: <i>maximise expected reward while staying close, in KL divergence, to a reference policy</i>. With that formula, the preference learning problem can be written <b>directly in terms of the policy</b>, so there is no separate reward model and no complex RL algorithm.</p>
+  <p><b>In practice</b> DPO is a simple <b>binary cross-entropy loss</b> computed on the language model's output probabilities. The loss:</p>
+  <ul class="plain">
+    <li>raises the probability of <b>preferred</b> responses,</li>
+    <li>lowers the probability of <b>non-preferred</b> responses,</li>
+    <li>while keeping the model close to a <b>reference (frozen) model</b>.</li>
+  </ul>
+  <p>How much the reference model matters is controlled by a parameter <b>beta (β), between 0 and 1</b>. With β = 0 the reference model is ignored, so the trained model may end up very different from the SFT model. In practice <b>0.1</b> is the most popular value, and it can be tuned (the book uses 0.5, plate 14).</p>
+  <p>Because it is just a loss, DPO trains with <b>ordinary gradient descent</b>: no sampling from the model during training and no RL machinery.</p>
+  <div class="formula">DPO loss (Beyond the book: the formula from Rafailov et al., which the book cites but does not print)
+for one triple (x = prompt, y_w = chosen, y_l = rejected):
+
+  Δ_w = log π_θ(y_w|x) − log π_ref(y_w|x)     how much MORE likely the trained model makes the chosen answer
+  Δ_l = log π_θ(y_l|x) − log π_ref(y_l|x)     same for the rejected answer
+  loss = − log σ( β · (Δ_w − Δ_l) )
+
+β·Δ_w and β·Δ_l are the "implicit rewards" that TRL logs as rewards/chosen and rewards/rejected (plate 16).</div>
+  <h3>Try it: DPO loss and beta explorer (modelled numbers)</h3>
+  <p class="small">Slide how far the trained model has moved from the reference on the chosen and rejected answers (in log-probability units, "nats"). Positive Δ = the trained model now likes that answer more than the reference did. Watch the rewards, the margin, the loss and the gradient weight. The last line shows how far the model must drift to reach a low loss of 0.1 for the current β.</p>
+  <div class="controls">
+    <label>Δ chosen <input type="range" id="dpW" min="-6" max="6" step="0.1" value="1"><output id="dpWO"></output></label>
+    <label>Δ rejected <input type="range" id="dpL" min="-6" max="6" step="0.1" value="-1"><output id="dpLO"></output></label>
+    <label>β <input type="range" id="dpB" min="0" max="1" step="0.05" value="0.1"><output id="dpBO"></output></label>
+  </div>
+  <div class="readout" id="dpOut"></div>
+  <svg viewBox="0 0 600 170" class="dg" id="dpSvg" role="img" aria-label="DPO loss curve versus margin" style="width:100%;height:auto;max-width:600px"></svg>
+  <div class="verdict" id="dpV"></div>
+  <script>
+  (function(){
+    var W=document.getElementById('dpW'),L=document.getElementById('dpL'),B=document.getElementById('dpB'),svg=document.getElementById('dpSvg');
+    function sig(z){return 1/(1+Math.exp(-z));}
+    function draw(){var w=+W.value,l=+L.value,b=+B.value;document.getElementById('dpWO').textContent=w.toFixed(1);document.getElementById('dpLO').textContent=l.toFixed(1);document.getElementById('dpBO').textContent=b.toFixed(2);
+      var rc=b*w,rr=b*l,m=rc-rr,loss=-Math.log(sig(m)),gw=sig(-m);
+      var need=Math.log(Math.exp(-0.1)/(1-Math.exp(-0.1)));
+      document.getElementById('dpOut').innerHTML='<span>reward chosen β·Δw: <b>'+rc.toFixed(2)+'</b></span><span>reward rejected β·Δl: <b>'+rr.toFixed(2)+'</b></span><span>margin: <b>'+m.toFixed(2)+'</b></span><span>loss: <b>'+loss.toFixed(3)+'</b></span><span>gradient weight σ(−margin): <b>'+gw.toFixed(2)+'</b></span>'+
+        '<span>log-ratio gap Δw−Δl needed for loss 0.1: <b>'+(b>0?(need/b).toFixed(1)+' nats':'∞ (β = 0: loss stuck at 0.693)')+'</b></span>';
+      // curve: loss vs margin from -4..6
+      var x0=50,x1=580,y0=140,y1=15,mn=-4,mx=6,lm=4.1;function X(v){return x0+(v-mn)/(mx-mn)*(x1-x0);}function Y(v){return y0-(Math.min(v,lm))/lm*(y0-y1);}
+      var p='';for(var v=mn;v<=mx+1e-9;v+=0.1){var yy=-Math.log(sig(v));p+=(p?'L':'M')+X(v).toFixed(1)+' '+Y(yy).toFixed(1);}
+      var mc=Math.max(mn,Math.min(mx,m));
+      svg.innerHTML='<line x1="'+x0+'" y1="'+y0+'" x2="'+x1+'" y2="'+y0+'"/><line x1="'+X(0)+'" y1="'+y1+'" x2="'+X(0)+'" y2="'+y0+'" style="stroke-dasharray:3 3"/>'+
+        '<path d="'+p+'" class="on"/><circle cx="'+X(mc)+'" cy="'+Y(-Math.log(sig(mc)))+'" r="6" style="fill:var(--c2)"/>'+
+        '<text x="'+x1+'" y="160" text-anchor="end" class="m">margin β(Δw−Δl) →</text><text x="'+x0+'" y="160" class="m">-4</text><text x="'+X(0)+'" y="160" text-anchor="middle" class="m">0</text>'+
+        '<text x="8" y="'+(y1+10)+'" class="m">loss</text><text x="'+(X(0)+6)+'" y="'+(Y(Math.log(2))-6)+'" class="m">0.693 = log 2</text>';
+      var V=document.getElementById('dpV');
+      if(b===0){V.className='verdict warn';V.textContent='β = 0: the margin is always 0, so the loss is stuck at log 2 and the gradient carries no preference signal. The book describes this end of the dial as "the reference model is ignored". In practice tiny β (not exactly 0) means the model must move very far from the reference to satisfy the loss, which is that drift.';}
+      else if(m<0){V.className='verdict bad';V.textContent='Negative margin: the model currently prefers the rejected answer relative to the reference. Loss is high and the gradient weight is large: this pair will push hard.';}
+      else if(gw<0.15){V.className='verdict good';V.textContent='Pair already well separated: loss is small and the gradient weight is tiny, so DPO barely pushes on this pair any more (it focuses on pairs it still gets wrong).';}
+      else {V.className='verdict warn';V.textContent='Positive but small margin: the model leans the right way; DPO keeps pushing chosen up and rejected down.';}}
+    [W,L,B].forEach(function(e){e.oninput=draw;});draw();
+  })();
+  </script>
+  <p class="small">Try β = 0.1 and β = 0.5 with the same Δ values: at 0.5 the same drift gives a bigger margin and a lower loss, so the model reaches a "good" loss after moving <b>less</b> from the reference. That is why the authors raised β to keep the DPO model closer to the SFT model's style (plate 14).</p>
+  <figure class="bookfig"><img src="figs/fig-6-5.png" alt="DPO diagram: data text goes to a frozen model and a trained model; both output scores into a DPO node, which updates the trained model's weights" loading="lazy"><figcaption>Figure 6.5 (book, pdf p278): High-level view of the DPO algorithm for preference alignment</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Compare it with Figure 6.4. The data still feeds a <b>frozen model</b> and a <b>trained model</b>, but there is no reward model, no KL box, no generated text and no "+" node. Each model simply produces <b>scores</b> (the log-probabilities of the chosen and rejected answers already in the dataset), and the <b>DPO</b> node turns them into a loss that updates the trained model. Two models, one loss, no sampling.</p>
+  <h3>Step through: one PPO step vs one DPO step</h3>
+  <div class="controls"><span class="seg"><button id="sxP" class="on">PPO (RLHF)</button><button id="sxD">DPO</button></span></div>
+  <div class="steps" id="sxSteps"></div>
+  <div class="verdict" id="sxTxt"></div>
+  <div class="stepbar"><button id="sxB">◀ Back</button><button id="sxN">Next ▶</button><span id="sxI"></span></div>
+  <script>
+  (function(){
+    var M={ppo:[
+      ["0. before","Train a reward model on human pairwise preferences (Bradley–Terry). Keep a frozen copy of the SFT model. Models in memory: trained + frozen + reward (+ in full PPO a value/critic model, beyond the book)."],
+      ["1. sample prompt","Take a prompt from the data, e.g. 'Explain LoRA'."],
+      ["2. generate","The trained model WRITES a fresh answer token by token. Generation inside the training loop is slow."],
+      ["3. reward","The reward model scores the generated answer, e.g. 0.8."],
+      ["4. KL penalty","Compare trained vs frozen logits. If the trained model drifted a lot (KL = 3), subtract β·KL from the reward."],
+      ["5. PPO update","PPO turns the penalised reward into a small, clipped policy update. Repeat thousands of times; refresh the reward model with new human feedback over time."]],
+     dpo:[
+      ["0. before","No reward model. The frozen reference can simply be the base model under LoRA adapters, so only one model is loaded (book, plate 12)."],
+      ["1. read a triple","Take (prompt, chosen, rejected) from the dataset. Both answers already exist; nothing is generated."],
+      ["2. score 4 numbers","Compute log-prob of chosen and rejected under the trained model and under the reference: 4 forward passes worth of numbers, no sampling."],
+      ["3. margin","margin = β·[(trained−ref on chosen) − (trained−ref on rejected)]."],
+      ["4. loss","loss = −log σ(margin): a binary cross-entropy that says 'the chosen answer should win'."],
+      ["5. gradient step","Ordinary backprop and optimizer step on the adapters. Next batch."]]};
+    var mode='ppo',i=0,st=document.getElementById('sxSteps');
+    function draw(){var S=M[mode];st.innerHTML='';S.forEach(function(s,k){var e=document.createElement('span');e.textContent=s[0];e.className=k===i?'on':(k<i?'done':'');st.appendChild(e);});
+      document.getElementById('sxTxt').textContent=S[i][1];document.getElementById('sxI').textContent='step '+(i+1)+' / '+S.length;
+      document.getElementById('sxP').className=mode==='ppo'?'on':'';document.getElementById('sxD').className=mode==='dpo'?'on':'';}
+    document.getElementById('sxP').onclick=function(){mode='ppo';i=0;draw();};document.getElementById('sxD').onclick=function(){mode='dpo';i=0;draw();};
+    document.getElementById('sxB').onclick=function(){if(i>0)i--;draw();};document.getElementById('sxN').onclick=function(){if(i<M[mode].length-1)i++;draw();};draw();
+  })();
+  </script>
+  <p><b>Advantages of DPO over classic RLHF</b> (from the book):</p>
+  <ul class="plain">
+    <li><b>Simpler pipeline</b>, less engineering complexity.</li>
+    <li><b>More compute-efficient</b>: no separate reward model, no RL algorithm.</li>
+    <li><b>With adapters (LoRA, QLoRA) you load one model, not two.</b> Only the adapters are trained, so the base weights are untouched and can act as the frozen reference (just switch the adapters off). That saves VRAM (GPU memory).</li>
+    <li>Often <b>matches</b> the performance of more complex RLHF methods.</li>
+    <li>More <b>stable</b> in training and <b>less sensitive to hyperparameters</b>.</li>
+    <li>Easier to implement and scale, especially for <b>small teams without deep RL knowledge</b>.</li>
+  </ul>
+  <p><b>The trade-off.</b> RLHF allows iterative improvement over several rounds and can adapt dynamically to new preferences; DPO is a more direct route to similar results. The choice is <b>ease of implementation vs peak performance</b>: for very large training runs with <b>millions</b> of preference samples, PPO-inspired methods still have a <b>higher ceiling</b>. For most applications, DPO gives most of the benefit at lower compute and engineering cost.</p>
+  <p><b>Synthetic data helps both.</b> As LLMs improve, they can generate data that beats human-written content in quality and diversity. That creates a <b>virtuous cycle</b>: better models → better data → better models. Both RLHF and DPO can be run in several rounds, each targeting different aspects of performance.</p>
+  <p><b>DPO's drawbacks:</b> like RLHF it still needs <b>paired preference data</b>, which is costly and slow to collect; it lacks some <b>theoretical guarantees</b> of RL approaches; and for some complex tasks or environments the extra flexibility of RLHF may be worth it. Still, the book's verdict is that DPO is the right choice in most cases, including the LLM Twin. The implementation uses <b>Unsloth</b>.</p>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>RLHF with PPO</th><th>DPO</th></tr>
+    <tr><td>Reward model</td><td>separate, trained first</td><td>none (implicit in the policy)</td></tr>
+    <tr><td>Sampling during training</td><td>yes, the model generates</td><td>no, uses fixed pairs</td></tr>
+    <tr><td>Models in memory</td><td>trained + frozen + reward</td><td>trained + reference (one model with LoRA)</td></tr>
+    <tr><td>Stability / tuning</td><td>can be unstable</td><td>more stable, less sensitive</td></tr>
+    <tr><td>Peak at huge scale</td><td>higher ceiling (millions of pairs)</td><td>most of the benefit, cheaper</td></tr>
+    <tr><td>Iterative / online</td><td>natural: new feedback, new rounds</td><td>possible in rounds, more static per run</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>RLHF is like hiring a food critic (reward model), letting cooks cook new dishes every day and the critic score them. DPO is skipping the critic: you already have a notebook of "dish A beat dish B" verdicts, and you directly adjust the recipe so it makes A-like dishes more and B-like dishes less, while the old recipe card (reference) stops you from changing everything. <i>Where it breaks:</i> the notebook is fixed; DPO can't learn from dishes nobody has compared yet, which is RLHF's online advantage.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The KL-constrained RLHF objective has a known optimal solution: the best policy is the reference policy reweighted by exp(reward/β). Flip that equation around and the reward can be written as β·log(π_θ/π_ref) plus a term that depends only on the prompt. Plug it into the Bradley–Terry preference probability and the prompt-only term cancels between chosen and rejected. What is left is a loss on the policy's own log-probabilities: "your language model is secretly a reward model".</p></div>
+  <div class="box work"><b>Worked example</b><p>Say the reference gives the chosen answer log-prob −120 and the rejected −118 (it slightly prefers the rejected, formal answer). After some training, the model gives −119 and −121. Then Δw = +1, Δl = −3, gap = 4. With β = 0.1: margin 0.4, loss = −log σ(0.4) ≈ 0.51. With β = 0.5: margin 2.0, loss ≈ 0.13. Same drift, much lower loss at higher β, so higher β is satisfied with less change from the reference.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"DPO vs PPO?"</i> → "DPO uses the closed-form optimum of the KL-regularised RLHF objective to turn preference learning into a binary cross-entropy loss on log-probability ratios versus a frozen reference. No reward model, no sampling, two forward passes per answer, stable and cheap; with LoRA the reference is just the base without adapters. PPO-RLHF is more complex and unstable but has a higher ceiling at millions-of-pairs scale and supports online, iterative feedback. β sets how tightly you stay near the reference; 0.1 is the common default."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11 (what DPO removes) · plate 14 (β = 0.5 in practice) · plate 16 (rewards = β·log-ratio) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (LoRA, QLoRA) · <a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs Ch.12</a> · <a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7</a>.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><h2><span class="secno">13</span> Implementing DPO: goal and setup</h2><span class="chip">pdf p279–281</span></div>
+  <p>The plan: <b>DPO fine-tune TwinLlama-3.1-8B</b>, the SFT model from Chapter 5, using the <b>Unsloth</b> library again (easy and fast). Depending on your VRAM you choose:</p>
+  <ul class="plain">
+    <li><b>LoRA</b>: higher quality and speed, more VRAM.</li>
+    <li><b>QLoRA</b>: lower quality and speed, less VRAM (base model loaded in 4-bit).</li>
+  </ul>
+  <p>DPO and other preference-alignment algorithms are also available in <b>TRL</b> (Hugging Face's Transformer Reinforcement Learning library) and <b>Axolotl</b>.</p>
+  <p><b>Why this is an "advanced" DPO use.</b> Imitating a casual writing style <b>fights</b> DPO's natural tendency toward formal language. Part of the reason: in typical preference data, chosen answers are often more formal than rejected ones. So the authors had to do <b>light fine-tuning</b>: low learning rate, few epochs. To find good hyperparameters they trained <b>over 20 models</b> and compared outputs on a set of questions, including "Write a paragraph to introduce supervised fine-tuning", then picked the best model and settings.</p>
+  <p><b>Setup steps.</b> Dependencies are the same as Chapter 5 (book repo or Unsloth repo).</p>
+  <ul class="plain">
+    <li><b>Step 1 – Hugging Face login.</b> Needed to download a <b>gated</b> model and (optionally) upload yours. Create an access token (Settings → Access Tokens → Create new token) and store it as <code>HF_TOKEN</code> in a <code>.env</code> file.</li>
+    <li><b>Step 2 – Comet ML key.</b> Put <code>COMET_API_KEY</code> in <code>.env</code> too; otherwise the code <b>crashes when training starts</b> (training reports to Comet).</li>
+    <li><b>Step 3 – patch first.</b> Before other imports, apply Unsloth's <code>PatchDPOTrainer()</code>, which fixes DPO logging in notebook environments.</li>
+    <li><b>Step 4 – imports.</b> Same as SFT plus the DPO-specific <code>DPOConfig</code> and <code>DPOTrainer</code> from TRL (also <code>FastLanguageModel</code>, <code>is_bfloat16_supported</code>, <code>load_dataset</code>, <code>TextStreamer</code>).</li>
+    <li><b>Step 5 – load the SFT model</b> <code>mlabonne/TwinLlama-3.1-8B</code> with <code>max_seq_length = 2048</code>. <code>load_in_4bit=False</code> means plain LoRA; set it to <code>True</code> for QLoRA. The book uses LoRA for speed and quality.</li>
+    <li><b>Step 6 – LoRA config</b> via <code>get_peft_model</code>: <code>lora_dropout=0</code> (for speed) and adapters on <b>every linear module</b>: <code>q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj</code>.</li>
+  </ul>
+  <div class="verdict warn"><b>Note on a book inconsistency.</b> The text of step 6 says rank <code>r</code> and <code>lora_alpha</code> are raised from 32 to 64 "for more expressive fine-tuning", but the printed code shows <code>r=32, lora_alpha=32</code>. Treat 32 vs 64 as a knob to try; the book's own listing uses 32.</div>
+  <pre class="formula"><code>from unsloth import PatchDPOTrainer
+PatchDPOTrainer()                       # patch before importing TRL's trainer
+from unsloth import FastLanguageModel
+from trl import DPOConfig, DPOTrainer
+
+net, tok = FastLanguageModel.from_pretrained(
+    model_name="mlabonne/TwinLlama-3.1-8B",  # the Ch.5 SFT model
+    max_seq_length=2048, load_in_4bit=False) # True → QLoRA
+net = FastLanguageModel.get_peft_model(
+    net, r=32, lora_alpha=32, lora_dropout=0,
+    target_modules=["q_proj","k_proj","v_proj","o_proj",
+                    "gate_proj","up_proj","down_proj"])</code></pre>
+  <h3>Try it: LoRA vs QLoRA memory for the 8B model (modelled)</h3>
+  <p class="small">Rough rule-of-thumb arithmetic, invented for this page: base weights at 2 bytes/param (16-bit) or ~0.5 bytes/param (4-bit), plus a few GB for adapters, optimizer states and activations. Toggle "separate reference copy" to see what DPO with LoRA saves.</p>
+  <div class="controls"><label><input type="checkbox" id="vmQ"> QLoRA (4-bit base)</label><label><input type="checkbox" id="vmR"> separate reference model copy</label></div>
+  <div id="vmBars" style="display:grid;gap:4px"></div>
+  <div class="readout" id="vmOut"></div>
+  <script>
+  (function(){
+    function draw(){var q=document.getElementById('vmQ').checked,r=document.getElementById('vmR').checked;var base=8*(q?0.55:2),ref=r?base:0,extra=6;
+      var rows=[['policy base',base],['reference copy',ref],['adapters+optim+activ.',extra]],tot=base+ref+extra,B=document.getElementById('vmBars');B.innerHTML='';
+      rows.forEach(function(x){var d=document.createElement('div');d.className='barrow';d.innerHTML='<span>'+x[0]+'</span><div class="bar" style="width:'+(x[1]/40*100)+'%"></div><span>'+x[1].toFixed(1)+' GB</span>';B.appendChild(d);});
+      document.getElementById('vmOut').innerHTML='<span>total (modelled): <b>~'+tot.toFixed(0)+' GB</b></span><span>'+(r?'A second copy is what you pay without the adapter trick.':'With LoRA the frozen base doubles as the reference: no second copy.')+'</span>';}
+    document.getElementById('vmQ').onchange=draw;document.getElementById('vmR').onchange=draw;draw();
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>A tailor altering a suit with removable sleeves (adapters). To compare "before vs after", he just takes the new sleeves off; he doesn't need a second suit on the hanger. <i>Where it breaks:</i> with full fine-tuning the suit itself is changed, so you do need the original kept separately.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>DPO needs reference log-probabilities π_ref. With LoRA, the reference is the base weights with adapters disabled, so the trainer can compute both by running the same network with and without adapters. Gated models (like Llama) need an accepted license on the Hub, which is why the token is needed even to download.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you run DPO on one GPU?"</i> → "Start from the SFT checkpoint, add LoRA adapters on all linear layers, pass ref_model=None so the frozen base acts as the reference, choose QLoRA if VRAM is tight. Patch logging if in notebooks, and wire up an experiment tracker before training starts."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a> (Unsloth SFT code, LoRA/QLoRA) · plate 14 · <a href="ch02_tooling_and_installation.html">Ch.2</a> (Hugging Face, Comet ML setup).</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><h2><span class="secno">14</span> Data formatting and the DPOTrainer</h2><span class="chip">pdf p281–283</span></div>
+  <p><b>Step 7 – load the data:</b> the <code>train</code> split of <code>mlabonne/llmtwin-dpo</code> (prompt, chosen, rejected).</p>
+  <p><b>Step 8 – format it.</b> This differs a lot from SFT. Each row is a triple. A <code>format_samples</code> function:</p>
+  <ul class="plain">
+    <li>wraps <b>only the prompt</b> in the <b>Alpaca chat template</b> ("Below is an instruction that describes a task. Write a response…", then <code>### Instruction:</code>, the prompt, and <code>### Response:</code>);</li>
+    <li>appends the <b>EOS (end-of-sentence) token</b> to the chosen and to the rejected answers; they need no template, only the stop token;</li>
+    <li>is mapped over the dataset, followed by a <b>95% / 5% train/test split</b>.</li>
+  </ul>
+  <pre class="formula"><code>TEMPLATE = "...instruction preamble...\n### Instruction:\n{}\n### Response:\n"
+END = tok.eos_token
+def fmt(row):
+    return {"prompt":   TEMPLATE.format(row["prompt"]),
+            "chosen":   row["chosen"] + END,      # answers: just add EOS
+            "rejected": row["rejected"] + END}
+data = load_dataset("mlabonne/llmtwin-dpo", split="train").map(fmt)
+data = data.train_test_split(test_size=0.05)</code></pre>
+  <div class="pair">
+    <div class="cand ch" style="cursor:default"><b>prompt + chosen (modelled)</b><span style="font-family:var(--mono);font-size:12.5px;white-space:pre-wrap">### Instruction:
+What is LoRA?
+### Response:
+<span class="tok">It freezes the big weights and trains two small matrices instead.</span><span class="tok2">&lt;eos&gt;</span></span></div>
+    <div class="cand rj" style="cursor:default"><b>prompt + rejected (modelled)</b><span style="font-family:var(--mono);font-size:12.5px;white-space:pre-wrap">### Instruction:
+What is LoRA?
+### Response:
+<span class="tok">LoRA, or Low-Rank Adaptation, is a parameter-efficient technique that…</span><span class="tok2">&lt;eos&gt;</span></span></div>
+  </div>
+  <p class="small">The same prompt prefix is shared; only the coloured answer tokens are scored for the DPO loss. Including EOS teaches the model where answers end.</p>
+  <p><b>Step 9 – the trainer.</b> New compared with SFT: <code>ref_model</code> and <code>beta</code>, and <code>TrainingArguments</code> is replaced by <code>DPOConfig</code>. The key settings and why:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Setting</th><th class="num">SFT (Ch.5)</th><th class="num">DPO here</th><th>Why</th></tr>
+    <tr><td><code>ref_model</code></td><td class="num">–</td><td class="num">None</td><td>With LoRA we train adapters, not the model, so the original model (adapters off) serves as the reference. Saves a lot of VRAM.</td></tr>
+    <tr><td><code>beta</code></td><td class="num">–</td><td class="num">0.5</td><td>0.1 is standard, but with lower values the model wrote formally. A higher β keeps it closer to the reference (SFT) model, which fixes that.</td></tr>
+    <tr><td>learning rate</td><td class="num">3e-4</td><td class="num">2e-6</td><td>Much lower: light, surgical tuning.</td></tr>
+    <tr><td>epochs</td><td class="num">3</td><td class="num">1</td><td>Fewer passes, less drift.</td></tr>
+    <tr><td>length</td><td class="num">max_seq_length</td><td class="num">max_prompt_length 1024 · max_length 1024</td><td>Split into prompt-only length and prompt+answer length (both <code>max_seq_length // 2</code> in the code).</td></tr>
+    <tr><td>scheduler</td><td class="num"></td><td class="num">linear</td><td>Learning rate decays linearly, after 10 warmup steps.</td></tr>
+    <tr><td>batch</td><td class="num"></td><td class="num">2 × 8 accum = 16</td><td>Per-device batch 2 (train and eval), gradient accumulation 8 → effective batch 16.</td></tr>
+    <tr><td>precision</td><td class="num"></td><td class="num">bf16 if supported, else fp16</td><td>Uses <code>is_bfloat16_supported()</code>.</td></tr>
+    <tr><td>optimizer</td><td class="num"></td><td class="num">adamw_8bit, wd 0.01</td><td>8-bit AdamW saves memory; weight decay 0.01.</td></tr>
+    <tr><td>eval / logging</td><td class="num"></td><td class="num">eval every 0.2 of training, log every step</td><td><code>eval_strategy="steps"</code>, <code>eval_steps=0.2</code>, <code>logging_steps=1</code>, <code>report_to="comet_ml"</code>, <code>seed=0</code>, <code>output_dir="output"</code>.</td></tr>
+  </table></div>
+  <pre class="formula"><code>trainer = DPOTrainer(
+    model=net, ref_model=None,           # base w/o adapters = reference
+    tokenizer=tok, beta=0.5,
+    train_dataset=data["train"], eval_dataset=data["test"],
+    max_prompt_length=1024, max_length=1024,
+    args=DPOConfig(learning_rate=2e-6, num_train_epochs=1,
+                   per_device_train_batch_size=2, gradient_accumulation_steps=8,
+                   lr_scheduler_type="linear", warmup_steps=10,
+                   optim="adamw_8bit", weight_decay=0.01,
+                   eval_strategy="steps", eval_steps=0.2,
+                   logging_steps=1, report_to="comet_ml", seed=0,
+                   output_dir="output"))   # plus bf16/fp16 flags
+trainer.train()</code></pre>
+  <p class="small">Beyond the book: newer TRL versions moved <code>beta</code>, <code>max_length</code> and <code>max_prompt_length</code> into <code>DPOConfig</code> and renamed <code>tokenizer</code> to <code>processing_class</code>; the book's listing matches the TRL version current in 2024.</p>
+  <h3>Try it: how many optimizer steps? (book numbers + arithmetic)</h3>
+  <div class="controls"><label>pairs <input type="range" id="stN" min="200" max="5000" step="1" value="1467"><output id="stNO"></output></label><label>grad. accum <input type="range" id="stA" min="1" max="16" value="8"><output id="stAO"></output></label><label>epochs <input type="range" id="stE" min="1" max="3" value="1"><output id="stEO"></output></label></div>
+  <div class="readout" id="stOut"></div>
+  <script>
+  (function(){
+    function d(){var n=+document.getElementById('stN').value,a=+document.getElementById('stA').value,e=+document.getElementById('stE').value;
+      document.getElementById('stNO').textContent=n;document.getElementById('stAO').textContent=a;document.getElementById('stEO').textContent=e;
+      var tr=Math.floor(n*0.95),eff=2*a,steps=Math.ceil(tr/eff)*e;
+      document.getElementById('stOut').innerHTML='<span>train pairs (95%): <b>'+tr+'</b></span><span>eval pairs: <b>'+(n-tr)+'</b></span><span>effective batch: <b>'+eff+'</b></span><span>optimizer steps: <b>~'+steps+'</b></span><span>evals: every <b>~'+Math.round(steps*0.2)+'</b> steps</span>';}
+    ['stN','stA','stE'].forEach(function(i){document.getElementById(i).oninput=d;});d();
+  })();
+  </script>
+  <p class="small">With the book's 1,467 pairs: about 1,393 train pairs ÷ 16 ≈ 88 steps, consistent with the x-axis of the Comet charts in plate 16 (about 90 steps).</p>
+  <div class="box picture"><b>Picture it</b><p>Tuning a good singer's accent for a regional song: tiny corrections (low LR), one rehearsal (1 epoch), and the coach keeps saying "don't lose your natural voice" (high β keeps you near the reference). Push too hard and she starts sounding like a news anchor (formal, verbose). <i>Where it breaks:</i> a singer can feel when she's overdoing it; the model needs you to read the metrics and outputs.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>DPO's gradient keeps pushing until pairs are well separated, and the easiest way for a model to separate "formal LLM answer" from "casual human extract" might be odd shortcuts (like length or formality markers). A tiny learning rate and one epoch limit how far it can go; β = 0.5 makes the loss satisfied with smaller deviations from the reference. Together they keep the update small and on target.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Which hyperparameters differ between SFT and DPO?"</i> → "DPO adds beta and a reference model (None with LoRA, the base serves as reference). LR is usually 1–2 orders of magnitude lower (here 2e-6 vs 3e-4), epochs fewer (1 vs 3), and length splits into max_prompt_length and max_length. The book raised beta to 0.5 because lower values made the model too formal."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 12 (β) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (Alpaca template, EOS, LR, batch, optimizers, packing) · plate 16.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><h2><span class="secno">15</span> Sanity check, comparison with SFT, and saving</h2><span class="chip">pdf p283–284</span></div>
+  <p><b>Step 10 – quick test.</b> As in Chapter 5: switch the model to inference mode (<code>FastLanguageModel.for_inference</code>), format the prompt "Write a paragraph to introduce supervised fine-tuning." with the Alpaca template, tokenize it onto the GPU, and generate up to <b>256 new tokens</b> with a <code>TextStreamer</code> (prints tokens as they arrive) and the KV cache on (<code>use_cache=True</code>).</p>
+  <pre class="formula"><code>FastLanguageModel.for_inference(net)
+ids = tok([TEMPLATE.format("Write a paragraph to introduce supervised fine-tuning.")],
+          return_tensors="pt").to("cuda")
+net.generate(**ids, streamer=TextStreamer(tok), max_new_tokens=256, use_cache=True)</code></pre>
+  <p><b>The two answers, summarised:</b></p>
+  <div class="pair">
+    <div class="cand" style="cursor:default"><b>SFT model (Ch.5)</b><span>Describes SFT as improving a language model with a curated set of instructions and answers, to <i>align responses with human expectations</i> and improve accuracy and relevance, useful for chatbots and virtual assistants.</span></div>
+    <div class="cand ch" style="cursor:default"><b>DPO model (this chapter)</b><span>Describes SFT as improving a <i>pre-trained</i> model with labelled data, refining it on a specific task such as content creation or customer service, to create more specialised models that handle complex tasks accurately and efficiently.</span></div>
+  </div>
+  <p><b>The book's assessment (step 12):</b> the DPO answer is <b>more accurate</b> and <b>closer to the target style</b>:</p>
+  <ul class="plain">
+    <li>It correctly names <b>pre-trained models</b> as the starting point of SFT.</li>
+    <li>It talks about <b>domain- or task-specific fine-tunes</b>, rather than "alignment with human expectations", which really describes the <i>preference alignment</i> stage, not SFT.</li>
+    <li>It is <b>less formal</b>, the kind of text you would put in a blog post.</li>
+  </ul>
+  <p><b>Step 13 – save.</b> <code>save_pretrained_merged(..., save_method="merged_16bit")</code> merges the LoRA adapters into the base weights and saves a 16-bit model locally; it is then pushed to the Hub. The result is public as <code>mlabonne/TwinLlama-3.1-8B-DPO</code>.</p>
+  <div class="box picture"><b>Picture it</b><p>After the accent coaching, you ask the singer the same test line before and after. You don't measure with a machine yet; you just listen. That is this sanity check: one prompt, side by side. <i>Where it breaks:</i> one prompt is an anecdote, not an evaluation; Chapter 7 does it properly.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Merging computes W + (α/r)·B·A once and stores the result, so inference needs no adapter code and runs at full speed. 16-bit keeps quality; later chapters quantize for serving. The 20+ model comparison the authors did was exactly this kind of qualitative check repeated on a fixed set of questions.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you know DPO helped?"</i> → "First a qualitative A/B on fixed prompts against the SFT model (style, accuracy), then proper evaluation: held-out preference accuracy, LLM-as-judge win rate vs SFT, and for style, compare word distributions with the target corpus. Then merge adapters and push the model for serving."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_evaluating_llms.html">Ch.7</a> (proper evaluation) · <a href="ch08_inference_optimization.html">Ch.8</a> (KV cache, quantization) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (same test for SFT).</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><h2><span class="secno">16</span> Reading the DPO metrics in Comet ML</h2><span class="chip">pdf p284–286 · Fig 6.6</span></div>
+  <p>DPO adds metrics on top of SFT's. The book's Comet ML dashboard is public (project <code>mlabonne/llm-twin-training</code>).</p>
+  <figure class="bookfig"><img src="figs/fig-6-6.png" alt="Four Comet ML charts over about 90 steps: rewards/rejected drifting from 0 down to about -0.15; rewards/chosen rising from 0 to about 0.4; rewards/margins rising from 0 to about 0.5; rewards/accuracies rising quickly from 0 to around 0.8–1.0" loading="lazy"><figcaption>Figure 6.6 (book, pdf p285): Experiment tracking in Comet ML with DPO metrics</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Four panels, x-axis = training step (about 90). <b>rewards/rejected</b> (top left) starts at 0 and wanders down to around −0.1 to −0.2: the model makes rejected answers less likely than the reference does. <b>rewards/chosen</b> (top right) climbs from 0 to about 0.4: chosen answers become more likely. <b>rewards/margins</b> (bottom left) is the gap between the two; it rises steadily to around 0.5 and flattens near the end. <b>rewards/accuracies</b> (bottom right) jumps from 0 to about 0.8 within ~20 steps and then hovers between 0.8 and 1.0. All curves are noisy because each point is one small batch.</p>
+  <p><b>What each metric means and what you want:</b></p>
+  <div class="tablewrap"><table>
+    <tr><th>Metric</th><th>Meaning</th><th>Healthy pattern</th></tr>
+    <tr><td>Training loss</td><td>The DPO loss on training batches.</td><td>Decreases on average. It can drop quickly to <b>zero</b>, meaning the model learns nothing more. Not necessarily overfitting or a bad model, but watch it closely.</td></tr>
+    <tr><td>Validation loss</td><td>Same loss on the 5% eval split.</td><td>Same as above, with only a <b>small gap</b> to training loss.</td></tr>
+    <tr><td>Gradient norm</td><td>Size of the gradient each step.</td><td><b>Small</b>, with <b>few spikes</b>.</td></tr>
+    <tr><td>Rewards: chosen / rejected</td><td>Mean difference between the log-probabilities of the trained and reference models, for chosen and rejected answers (Beyond the book: TRL also multiplies them by β).</td><td>Chosen goes up, rejected goes down: the <b>gap widens</b>.</td></tr>
+    <tr><td>Margins</td><td>Chosen reward minus rejected reward.</td><td><b>Rises quickly, then plateaus</b> for a well-trained model.</td></tr>
+    <tr><td>Accuracies</td><td>% of pairs where the chosen answer gets a higher reward than the rejected one.</td><td><b>Rises gradually</b>; need not reach 100%. Hitting 100%, especially early, suggests the dataset is <b>too easy</b>; the model still learns, but add harder examples.</td></tr>
+  </table></div>
+  <h3>Try it: simulate a DPO run (modelled)</h3>
+  <p class="small">A toy model of how the four reward curves evolve. "Dataset difficulty" = how similar chosen and rejected are; "learning rate" scales the update; β scales the rewards. Each run uses random noise. Numbers and dynamics are invented to show the shapes the book describes.</p>
+  <div class="controls">
+    <label>learning rate <select id="rmLR"><option value="0.3">1e-6</option><option value="1" selected>2e-6 (book)</option><option value="6">1e-5</option><option value="40">1e-4</option></select></label>
+    <label>β <select id="rmB"><option value="0.1">0.1</option><option value="0.5" selected>0.5 (book)</option></select></label>
+    <label>dataset difficulty <select id="rmD"><option value="0.3">easy pairs</option><option value="1" selected>medium</option><option value="2">hard pairs</option></select></label>
+    <button id="rmGo">Run</button>
+  </div>
+  <svg viewBox="0 0 600 210" class="dg" id="rmSvg" role="img" aria-label="Simulated DPO reward curves" style="width:100%;height:auto;max-width:600px"></svg>
+  <div class="legend"><span style="--sw:var(--buy)">rewards/chosen</span><span style="--sw:var(--sell)">rewards/rejected</span><span style="--sw:var(--c1)">margins</span><span style="--sw:var(--c3)">accuracies (right scale 0–1)</span></div>
+  <div class="verdict" id="rmV"></div>
+  <script>
+  (function(){
+    var svg=document.getElementById('rmSvg');
+    function run(){var lr=+document.getElementById('rmLR').value,b=+document.getElementById('rmB').value,d=+document.getElementById('rmD').value;
+      var N=90,ch=[],rj=[],mg=[],ac=[],gap=0,cap=6/(d);
+      for(var t=0;t<N;t++){gap+=lr*0.12*(1-gap/cap)*(1+ (Math.random()-0.5)*0.6);gap=Math.max(0,gap);
+        var noise=(Math.random()-0.5)*0.12*b/0.5;var c=b*gap*0.65+noise,r=-b*gap*0.35+(Math.random()-0.5)*0.1*b/0.5;ch.push(c);rj.push(r);mg.push(c-r);
+        var sep=(c-r)/(0.08*d+0.02);var a=1/(1+Math.exp(-sep+1.2))+(Math.random()-0.5)*0.15;ac.push(Math.max(0,Math.min(1,t===0?0:a)));}
+      var all=ch.concat(rj,mg),mx=Math.max.apply(null,all),mn=Math.min.apply(null,all);mx=Math.max(mx,0.2);mn=Math.min(mn,-0.2);
+      var x0=40,x1=560,y0=185,y1=12;function X(i){return x0+i/(N-1)*(x1-x0);}function Y(v){return y0-(v-mn)/(mx-mn)*(y0-y1);}function YA(v){return y0-v*(y0-y1);}
+      function path(arr,f){return arr.map(function(v,i){return (i?'L':'M')+X(i).toFixed(1)+' '+f(v).toFixed(1);}).join('');}
+      svg.innerHTML='<line x1="'+x0+'" y1="'+Y(0)+'" x2="'+x1+'" y2="'+Y(0)+'" style="stroke-dasharray:3 3"/><text x="'+(x0-4)+'" y="'+(Y(0)+4)+'" text-anchor="end" class="m">0</text>'+
+        '<text x="'+(x0-4)+'" y="'+(y1+8)+'" text-anchor="end" class="m">'+mx.toFixed(1)+'</text><text x="'+(x1+4)+'" y="'+(y1+8)+'" class="m">1</text><text x="'+(x1+4)+'" y="'+y0+'" class="m">0</text><text x="'+x1+'" y="205" text-anchor="end" class="m">step →</text>'+
+        '<path d="'+path(ch,Y)+'" style="stroke:var(--buy);stroke-width:1.6"/><path d="'+path(rj,Y)+'" style="stroke:var(--sell);stroke-width:1.6"/><path d="'+path(mg,Y)+'" style="stroke:var(--c1);stroke-width:1.8"/><path d="'+path(ac,YA)+'" style="stroke:var(--c3);stroke-width:1.4;opacity:.8"/>';
+      var early=ac.slice(5,25).reduce(function(a,b){return a+b;},0)/20,late=ac.slice(-20).reduce(function(a,b){return a+b;},0)/20,V=document.getElementById('rmV');
+      if(lr>=40){V.className='verdict bad';V.textContent='LR far too high: margins shoot up and accuracies saturate at once. Loss would collapse toward zero quickly; with a style task this is where the model drifts formal/verbose. The book went low (2e-6) for this reason.';}
+      else if(early>0.9){V.className='verdict warn';V.textContent='Accuracy near 100% early: by the book, the pairs are probably too easy. The model still learns, but consider adding harder examples.';}
+      else if(late<0.6){V.className='verdict warn';V.textContent='Margins and accuracy barely move: learning is very slow (low LR and/or hard pairs). Fine for gentle tuning, but check outputs; you may need more steps.';}
+      else {V.className='verdict good';V.textContent='Healthy: chosen up, rejected down, margin rises then flattens, accuracy climbs to ~0.8–1.0 without being instantly perfect, like Figure 6.6.';}}
+    document.getElementById('rmGo').onclick=run;['rmLR','rmB','rmD'].forEach(function(i){document.getElementById(i).onchange=run;});run();
+  })();
+  </script>
+  <p><b>Monitoring in general.</b> DPO is <b>slightly harder to monitor and debug than SFT</b> because a reference model is involved, but it is <b>much easier than PPO</b> and other RLHF algorithms. With a high-quality preference dataset and a strong fine-tuned model, you can experiment with <b>LoRA rank, β, learning rate and number of epochs</b> to see which run best captures your preferences.</p>
+  <p><b>Automating style evaluation</b> (mentioned but not done in the chapter): compare the <b>distribution of words</b> in text generated by the SFT and DPO models against the ground-truth dataset. The SFT model should overuse words typical of GPT-4o-mini (the book's example: "delve into"); the DPO model's distribution should be much closer to the chosen answers.</p>
+  <h3>Try it: a tiny word-distribution check (modelled)</h3>
+  <p class="small">Counts per 10,000 words of a few "LLM-ish" words in three corpora. Invented numbers that illustrate the book's suggestion.</p>
+  <div class="tablewrap"><table id="wdT">
+    <tr><th>word</th><th class="num">authors (chosen)</th><th class="num">SFT model</th><th class="num">DPO model</th></tr>
+  </table></div>
+  <div class="readout" id="wdOut"></div>
+  <script>
+  (function(){
+    var R=[["delve",0.2,6.5,1.1],["leverage",1.0,5.2,1.6],["crucial",1.5,7.8,2.4],["cool",3.1,0.1,1.9],["basically",2.4,0.2,1.7]];
+    var T=document.getElementById('wdT'),sA=0,sB=0;
+    R.forEach(function(r){var tr=document.createElement('tr');tr.innerHTML='<td>'+r[0]+'</td><td class="num">'+r[1]+'</td><td class="num">'+r[2]+'</td><td class="num">'+r[3]+'</td>';T.appendChild(tr);sA+=Math.abs(r[2]-r[1]);sB+=Math.abs(r[3]-r[1]);});
+    document.getElementById('wdOut').innerHTML='<span>total distance to authors, SFT: <b>'+sA.toFixed(1)+'</b></span><span>DPO: <b>'+sB.toFixed(1)+'</b></span><span>(lower = closer style)</span>';
+  })();
+  </script>
+  <div class="box picture"><b>Picture it</b><p>A cricket coach tracking a batter in the nets: good shots go up, edges go down (rewards), the gap between them grows then levels off (margin), and the percentage of balls middled rises but never needs to be 100% (accuracy). If he middles every ball in the first over, the bowler is too easy (dataset too easy). <i>Where it breaks:</i> in the nets the coach also watches technique; here you must also read the generated text, because the numbers can look good while the style drifts.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each reward is β times the change in log-probability versus the reference, so at step 0 all rewards are exactly 0 (trained = reference). As training proceeds, the margin is what the loss directly optimises; once most pairs have a comfortable margin, σ(margin) saturates, gradients shrink and the margin plateaus. Accuracy just counts pairs with margin &gt; 0, so it can hit 1 long before margins are large; that is why it saturates first in Figure 6.6.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What do you monitor during DPO?"</i> → "Loss (can collapse to zero), eval loss gap, gradient norm spikes, and DPO-specific ones: chosen and rejected rewards (should diverge), margin (rise then plateau), and preference accuracy (rising but not instantly 100%, which would mean the pairs are too easy). And always read samples: DPO can raise margins while making text verbose or formal."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 12 (rewards = β·log-ratio) · <a href="ch05_supervised_fine_tuning.html">Ch.5</a> (SFT curves) · <a href="ch07_evaluating_llms.html">Ch.7</a> (evaluation) · <a href="ch11_mlops_and_llmops.html">Ch.11</a> (experiment tracking in LLMOps).</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><h2><span class="secno">Σ</span> Summary + key terms</h2><span class="chip">pdf p286–289</span></div>
+  <p>The book's summary, in plain words:</p>
+  <ul class="plain">
+    <li>The chapter covered <b>preference alignment</b> techniques for improving LLMs beyond SFT.</li>
+    <li>It explained <b>preference datasets</b>: their structure (instruction, chosen, rejected) and why they capture nuanced human preferences that SFT misses.</li>
+    <li>It built a <b>custom preference-data pipeline</b> that pairs original article text (chosen) with AI-generated text (rejected) for real articles; you can reuse and adapt it.</li>
+    <li>It traced the evolution of <b>RLHF</b> and introduced <b>DPO</b> as a simpler, more efficient alternative.</li>
+    <li>It implemented DPO with <b>Unsloth</b> on <b>TwinLlama-3.1-8B</b>, step by step, highlighting how it differs from SFT. The final model is on the Hugging Face Hub.</li>
+    <li><b>Next</b> (Chapter 7): LLM evaluation: why it is hard, domain-specific evaluation sets, LLM-as-a-judge (bigger models judging smaller ones), and a full evaluation pipeline.</li>
+  </ul>
+  <p>Pages 288–289 of the PDF are the book's Discord invitation and a blank page; no extra content.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td>Preference alignment</td><td>Fine-tuning on preference data (which answer is better), after SFT.</td></tr>
+    <tr><td>Preference dataset</td><td>Rows of instruction + ranked answers; for DPO exactly one chosen and one rejected.</td></tr>
+    <tr><td>Chosen / rejected</td><td>The preferred answer / the behaviour to suppress.</td></tr>
+    <tr><td>General vs task-specific alignment</td><td>Broad quality improvement (millions of pairs at providers, 10k–100k in open source) vs one behaviour like style or refusals (100–10k).</td></tr>
+    <tr><td>LLM-as-a-judge</td><td>Using an LLM to score (absolute) or compare (pairwise) answers.</td></tr>
+    <tr><td>Grading note</td><td>A description of the expected answer the judge writes first when there's no ground truth.</td></tr>
+    <tr><td>Position / length / family bias</td><td>Judge favours the first answer / longer answers / its own model family.</td></tr>
+    <tr><td>Jury</td><td>Several judge models whose votes are combined to cancel individual biases.</td></tr>
+    <tr><td>RLHF</td><td>Reinforcement Learning from Human Feedback: reward model from preferences + RL policy optimisation.</td></tr>
+    <tr><td>PbRL</td><td>Preference-based reinforcement learning (2011), RLHF's ancestor.</td></tr>
+    <tr><td>Reward model</td><td>Model trained on preferences to score answers; a proxy for humans.</td></tr>
+    <tr><td>Bradley–Terry model</td><td>Turns pairwise preferences into per-item scores.</td></tr>
+    <tr><td>Reward hacking</td><td>Policy exploits flaws in the reward to score high without doing the intended thing.</td></tr>
+    <tr><td>PPO</td><td>Proximal Policy Optimization, a popular RLHF algorithm with small, clipped updates.</td></tr>
+    <tr><td>KL divergence</td><td>A measure of how different two probability distributions are; penalises drift from the frozen model.</td></tr>
+    <tr><td>Frozen / reference model</td><td>Copy of the starting (SFT) model that isn't updated; anchor for KL or DPO.</td></tr>
+    <tr><td>DPO</td><td>Direct Preference Optimization: binary cross-entropy loss on policy vs reference log-probabilities; no reward model, no RL.</td></tr>
+    <tr><td>β (beta)</td><td>How strongly DPO keeps the model near the reference; 0.1 typical, 0.5 in the book.</td></tr>
+    <tr><td>Rewards / margins / accuracies</td><td>DPO metrics: β·log-ratio for chosen and rejected; their difference; % pairs where chosen wins.</td></tr>
+    <tr><td>DPOTrainer / DPOConfig</td><td>TRL classes for DPO training and its settings.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><h2><span class="secno">⚙</span> Where you meet this in real systems</h2><span class="chip">named in the chapter</span></div>
+  <div class="grid2">
+    <div class="card"><b>Hugging Face Hub + datasets</b><span>Hosts preference datasets (Anthropic HH-RLHF, OpenAI Summarize from Human Feedback, Intel/orca_dpo_pairs, argilla/Capybara-Preferences, mlabonne/orpo-dpo-mix-40k, mlabonne/llmtwin-dpo) and the models (TwinLlama-3.1-8B, TwinLlama-3.1-8B-DPO).</span></div>
+    <div class="card"><b>OpenAI GPT-4o-mini</b><span>Generates the instruction/answer triples in JSON mode; its answers become the rejected side.</span></div>
+    <div class="card"><b>TRL</b><span>Hugging Face library with <code>DPOTrainer</code> / <code>DPOConfig</code> and other preference algorithms.</span></div>
+    <div class="card"><b>Unsloth</b><span>Fast LoRA/QLoRA fine-tuning; <code>PatchDPOTrainer</code> fixes notebook logs; <code>save_pretrained_merged</code> merges adapters.</span></div>
+    <div class="card"><b>Axolotl</b><span>Alternative fine-tuning framework that also supports DPO and other alignment methods.</span></div>
+    <div class="card"><b>Comet ML</b><span>Experiment tracking: loss, grad norm, rewards, margins, accuracies (public dashboard).</span></div>
+    <div class="card"><b>Argilla distilabel</b><span>Cited in the references: a framework for synthetic data and AI feedback pipelines.</span></div>
+    <div class="card"><b>Nvidia, Meta</b><span>Named as converging on multi-round preference alignment with heavy synthetic data.</span></div>
+    <div class="card"><b>Anthropic, OpenAI</b><span>Sources of classic human-preference datasets (helpful/harmless; summarization).</span></div>
+    <div class="card"><b>Databricks</b><span>Cited for "grading notes" to improve LLM judges.</span></div>
+    <div class="card"><b>Intel (Gaudi2)</b><span>Cited for SFT + DPO practice; orca_dpo_pairs uses strong-vs-weak generation.</span></div>
+    <div class="card"><b>Llama 3.1 8B</b><span>Base family of TwinLlama; gated on the Hub, hence the HF token.</span></div>
+  </div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2><span class="secno">✓</span> Check yourself</h2><span class="chip">14 questions</span></div>
+  <details class="ans"><summary>1. What two weaknesses of SFT motivate preference alignment?</summary><p>SFT struggles with the nuances of human preferences (it has one target answer, no "better vs worse") and with the long tail of possible interactions. Preference alignment adds human or AI feedback in the form of comparisons.</p></details>
+  <details class="ans"><summary>2. What columns does a DPO dataset have, and why does the rejected column matter?</summary><p>Instruction (prompt), chosen, rejected. The rejected answer encodes the behaviour to remove; without it you just have an instruction dataset.</p></details>
+  <details class="ans"><summary>3. Give the book's size ranges for preference datasets.</summary><p>General-purpose alignment at providers: millions. Open-source community: 10k–100k. Task-specific: 100–10k. Identity ("who trained you"): 200–500 pairs can be enough.</p></details>
+  <details class="ans"><summary>4. Which of the four generation/evaluation combos is "rarely used", and why?</summary><p>Human-generated, LLM-evaluated: it still needs lots of human writing, and the LLM judge may miss nuance, so it's inefficient.</p></details>
+  <details class="ans"><summary>5. Name two ways to get preferences without any evaluation step.</summary><p>Generate chosen answers with a strong model and rejected with a weak or flawed model (Intel/orca_dpo_pairs); or compare model outputs with human-written answers (the LLM Twin approach).</p></details>
+  <details class="ans"><summary>6. Why is pairwise ranking preferred over absolute scoring for preference data?</summary><p>It matches the comparative nature of the data, mimics how humans compare, and is generally more accurate, more consistent and better correlated with human judgment.</p></details>
+  <details class="ans"><summary>7. What would happen if you always showed the chosen candidate first to a judge with position bias?</summary><p>The judge would favour it partly because of position, inflating agreement and hiding real quality differences; in the reverse order it would flip correct labels. Fix: randomize A/B order (and few-shot calibration, jury).</p></details>
+  <details class="ans"><summary>8. In the LLM Twin dataset, which answer is chosen and which rejected? Why is no judge needed?</summary><p>Chosen = verbatim extract from the authors' article; rejected = GPT-4o-mini's generated answer. The extract is ground truth for the target style, so the order is known.</p></details>
+  <details class="ans"><summary>9. What do the two quality filters check, and what were the counts?</summary><p>Chosen answer ≥ 100 characters; starts uppercase and ends with . ! or ?. 2,970 generated → 1,467 kept.</p></details>
+  <details class="ans"><summary>10. Draw (in words) the PPO loop of Figure 6.4.</summary><p>Prompts go to a frozen and a trained model; the trained model generates text that a reward model scores; a KL term compares trained vs frozen logits; reward minus KL penalty feeds PPO, which updates the trained model.</p></details>
+  <details class="ans"><summary>11. What is DPO's key insight, and what is the loss in practice?</summary><p>The KL-constrained RLHF objective has a closed-form optimal policy, so preferences can be optimised directly on the policy with no reward model or RL. In practice it is a binary cross-entropy loss pushing chosen probability up and rejected down relative to a frozen reference.</p></details>
+  <details class="ans"><summary>12. Why did the book set β = 0.5, LR = 2e-6 and 1 epoch?</summary><p>DPO tends to make models formal and verbose, which conflicts with the casual target style. Higher β keeps the model closer to the SFT reference; low LR and one epoch keep the tuning light. Chosen after training 20+ models.</p></details>
+  <details class="ans"><summary>13. Your DPO accuracy hits 100% after 10 steps. What does it mean and what do you do?</summary><p>The preference pairs are probably too easy. The model can still learn, but add harder examples (pairs whose answers are closer in quality). Also check that the loss hasn't collapsed to zero and read sample outputs.</p></details>
+  <details class="ans"><summary>14. Interview: when would you still choose PPO-based RLHF over DPO?</summary><p>For very large runs with millions of preference samples where peak performance matters (higher ceiling), or when you need online, iterative feedback and dynamic adaptation, and you have the RL engineering capacity. Otherwise DPO gives most of the benefit for less cost.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><h2><span class="secno">¶</span> References</h2><span class="chip">pdf p287–289</span></div>
+  <details><summary>The chapter's 13 references</summary>
+    <ol class="refs">
+      <li>Rafailov et al. – Direct Preference Optimization: Your Language Model is Secretly a Reward Model (2023).</li>
+      <li>Kaufmann et al. – A Survey of Reinforcement Learning from Human Feedback (2023).</li>
+      <li>Anthropic – hh-rlhf: human preference data for training a helpful and harmless assistant (2022).</li>
+      <li>Stiennon et al. – Learning to summarize from human feedback (2020).</li>
+      <li>Intel Neural Compressor – Supervised Fine-Tuning and Direct Preference Optimization on Intel Gaudi2 (2024).</li>
+      <li>Argilla – distilabel (GitHub, 2024).</li>
+      <li>Databricks – Enhancing LLM-as-a-Judge with Grading Notes (2024).</li>
+      <li>Akrour, Schoenauer &amp; Sebag – Preference-Based Policy Learning (2011).</li>
+      <li>Cheng, Fürnkranz, Hüllermeier &amp; Park – Preference-Based Policy Iteration (2011).</li>
+      <li>Christiano et al. – Deep reinforcement learning from human preferences (2017).</li>
+      <li>Ouyang et al. – Training language models to follow instructions with human feedback (2022).</li>
+      <li>Schulman et al. – Proximal Policy Optimization Algorithms (2017).</li>
+      <li>unslothai – Unsloth (GitHub, 2024).</li>
+    </ol>
+  </details>
+</section>
+
+</div></body></html>

@@ -1,0 +1,1535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hands-On LLMs Ch.4 Text Classification</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.4 Text Classification) ---- */
+.box.interview { background: var(--paper); border-left: 4px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+pre code { background: none; border: 0; padding: 0; font-size: 12.5px; overflow-wrap: normal; }
+pre.code .cm { color: var(--muted); }
+.codeexp { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15.5px; max-width: 70ch; }
+.tok { display: inline-block; font-family: var(--mono); font-size: 13px; border: 1px solid var(--c2); background: var(--tint2); border-radius: 4px; padding: 2px 7px; margin: 2px; }
+.tok.sub { border-color: var(--c3); background: var(--tint3); }
+.tok.unk { border-color: var(--sell); color: var(--sell); }
+.tok.mask { border-color: var(--c3); background: var(--c3); color: var(--plate); }
+.tok.tgt { border-color: var(--buy); color: var(--buy); background: var(--paper); }
+.vec { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vec i { display: inline-block; width: 16px; height: 16px; border-radius: 2px; border: 1px solid var(--rule); }
+.bar { height: 14px; background: var(--c2); border-radius: 3px; }
+.barrow { display: grid; grid-template-columns: minmax(90px, 210px) minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.barrow .track { background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; height: 16px; position: relative; overflow: hidden; }
+.barrow .track .bar { height: 100%; border-radius: 0; }
+.barrow .track .bar.best { background: var(--c1); }
+.cm-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; font-family: var(--mono); font-size: 13px; max-width: 460px; }
+.cm-grid div { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; background: var(--paper); text-align: center; }
+.cm-grid div.h { background: none; border: 0; color: var(--muted); font-size: 12px; }
+.cm-grid div.ok { background: var(--buy); background: color-mix(in srgb, var(--buy) 18%, var(--plate)); }
+.cm-grid div.no { background: color-mix(in srgb, var(--sell) 16%, var(--plate)); }
+.cm-grid input { width: 5em; font-family: var(--mono); font-size: 13px; padding: 3px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; text-align: center; }
+.chat { display: grid; gap: 6px; font-family: var(--mono); font-size: 13px; }
+.chat .msg { border: 1px solid var(--rule); border-radius: 6px; padding: 6px 9px; background: var(--paper); max-width: 92%; overflow-wrap: anywhere; }
+.chat .msg.user { justify-self: end; background: var(--tint2); }
+.chat .msg.sys { color: var(--muted); font-style: italic; }
+.chat .msg.bot { background: var(--tint); }
+.wordtag { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 13.5px; }
+textarea, input[type=text].wide { font-family: var(--mono); font-size: 13px; width: 100%; padding: 6px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.partplate { text-align: left; }
+.bignum { font-family: var(--display); font-size: 34px; font-weight: 700; color: var(--c1); line-height: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch03_looking_inside_llms.html">← Ch.3 Looking Inside LLMs</a><a href="ch05_text_clustering_and_topic_modeling.html">Ch.5 Text Clustering and Topic Modeling →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 4 · PDF p131–158</div>
+  <h1>Text classification: five ways to put a <em>label</em> on a piece of text</h1>
+  <p class="lede">This chapter opens Part II of the book, "Using Pretrained Language Models", and uses one small job to show off many kinds of model: decide whether a movie review is <b>positive</b> or <b>negative</b>. The data is the Rotten Tomatoes dataset (8,530 training reviews, 1,066 test reviews). First come <b>representation models</b> (BERT-style, nongenerative): a ready-made <b>task-specific</b> sentiment model (F1 0.80), then a frozen <b>embedding model</b> plus a small logistic regression you train on a CPU (F1 0.85), then the same embeddings with <b>no labeled data at all</b>, just by comparing each review with the sentence "A positive review" (zero-shot, F1 0.78). Then come <b>generative models</b>: the open encoder-decoder <b>Flan-T5</b>, told what to do with a prompt (F1 0.84), and the closed <b>ChatGPT</b> (GPT-3.5) through OpenAI's API (F1 0.91). Along the way you learn how to read a classification report (confusion matrix, precision, recall, F1), how T5 and ChatGPT were trained, and practical caveats: pick models for speed as well as accuracy, watch API costs and rate limits, and distrust scores from a model whose training data you cannot see.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>One task, one dataset, one evaluation function, and then a tour of model families. Each row answers the question raised by the row above it. The orange boxes are the approaches; the number after each is the weighted-average F1 score the book reports on the same 1,066 test reviews.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 4">
+    <div class="row"><span class="tag">Problem</span><span class="node">assign a label to text</span><span class="arr">→</span><span class="node">sentiment · intent · entities · language</span><span class="arr">→</span><span class="node key">Rotten Tomatoes: positive (1) vs negative (0)</span></div>
+    <div class="row"><span class="tag">Family 1</span><span class="node">representation models (BERT-like)</span><span class="arr">→</span><span class="node">fine-tuned by others, we keep them frozen</span></div>
+    <div class="row"><span class="tag">Idea 1</span><span class="node key">task-specific model → 0.80</span><span class="arr">→</span><span class="node">how good is "good"? confusion matrix, precision, recall, F1</span></div>
+    <div class="row"><span class="tag">No such model?</span><span class="node key">embeddings + logistic regression → 0.85</span><span class="arr">→</span><span class="node">cheap: classifier trains on CPU</span></div>
+    <div class="row"><span class="tag">No labels?</span><span class="node key">zero-shot: embed label descriptions, cosine similarity → 0.78</span></div>
+    <div class="row"><span class="tag">Family 2</span><span class="node">generative models: text in, text out</span><span class="arr">→</span><span class="node">need a prompt (prompt engineering)</span></div>
+    <div class="row"><span class="tag">Idea 4</span><span class="node key">Flan-T5 (open, encoder-decoder) → 0.84</span><span class="arr">→</span><span class="node">span masking, then many tasks as text</span></div>
+    <div class="row"><span class="tag">Idea 5</span><span class="node key">ChatGPT (closed, decoder-only) → 0.91</span><span class="arr">→</span><span class="node">API · cost · rate limits · unknown training data</span></div>
+    <div class="row"><span class="tag">Next</span><span class="node">no labels and no label names → clustering &amp; topic modeling (Ch.5)</span></div>
+  </div>
+  <div class="sqbox">
+  <svg viewBox="0 0 700 252" class="dg" role="img" aria-label="Decision tree: which classification approach to use" style="min-width:600px">
+    <rect x="250" y="8" width="200" height="30" rx="5" class="hi"/><text x="350" y="28" text-anchor="middle">Need to label text</text>
+    <line x1="350" y1="38" x2="350" y2="56"/>
+    <rect x="200" y="56" width="300" height="30" rx="5" class="f"/><text x="350" y="76" text-anchor="middle">Is there a model already tuned for this task?</text>
+    <line x1="230" y1="86" x2="90" y2="120"/><text x="120" y="106" class="m">yes</text>
+    <rect x="10" y="120" width="160" height="44" rx="5" class="ok"/><text x="90" y="138" text-anchor="middle">task-specific model</text><text x="90" y="155" text-anchor="middle" class="m">F1 0.80</text>
+    <line x1="420" y1="86" x2="420" y2="120"/><text x="430" y="106" class="m">no</text>
+    <rect x="300" y="120" width="240" height="30" rx="5" class="f"/><text x="420" y="140" text-anchor="middle">Do you have labeled data?</text>
+    <line x1="340" y1="150" x2="250" y2="186"/><text x="270" y="172" class="m">yes</text>
+    <rect x="160" y="186" width="190" height="44" rx="5" class="ok"/><text x="255" y="204" text-anchor="middle">embeddings + classifier</text><text x="255" y="221" text-anchor="middle" class="m">F1 0.85</text>
+    <line x1="500" y1="150" x2="560" y2="186"/><text x="545" y="172" class="m">no</text>
+    <rect x="370" y="186" width="320" height="44" rx="5" class="ok"/><text x="530" y="204" text-anchor="middle">zero-shot embeddings (0.78) · Flan-T5 (0.84)</text><text x="530" y="221" text-anchor="middle">· ChatGPT (0.91)</text>
+    <text x="10" y="246" class="m">(summary sketch, not a book figure)</text>
+  </svg>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s0"><span>00</span>Part II: Using Pretrained Language Models</a>
+    <a href="#s1"><span>01</span>What text classification is</a>
+    <a href="#s2"><span>02</span>The Sentiment of Movie Reviews</a>
+    <a href="#s3"><span>03</span>Classification with Representation Models</a>
+    <a href="#s4"><span>04</span>Model Selection</a>
+    <a href="#s5"><span>05</span>Using a Task-Specific Model</a>
+    <a href="#s6"><span>06</span>Reading the classification report</a>
+    <a href="#s7"><span>07</span>Classification Tasks That Leverage Embeddings</a>
+    <a href="#s8"><span>08</span>Supervised Classification</a>
+    <a href="#s9"><span>09</span>What If We Do Not Have Labeled Data?</a>
+    <a href="#s10"><span>10</span>Classification with Generative Models</a>
+    <a href="#s11"><span>11</span>Using the Text-to-Text Transfer Transformer</a>
+    <a href="#s12"><span>12</span>ChatGPT for Classification</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 0 -->
+<section class="plate" id="s0">
+  <div class="plate-head"><div><div class="secno">00 · PART II TITLE PAGE</div><h2>Part II: Using Pretrained Language Models</h2></div><span class="chip">pdf p131–132</span></div>
+  <p>Pages 131–132 are only the <b>part title page</b> ("PART II · Using Pretrained Language Models") and a blank back page. There is no introduction text. The title itself is the message: Part I (Chapters 1–3) explained <i>what</i> language models are and how they work inside (tokens, embeddings, attention). Part II (Chapters 4–9 of this book) is about <b>using models that other people have already trained</b>, without training them yourself.</p>
+  <div class="grid2">
+    <div class="card"><b>Part I · Understanding Language Models</b><span>Ch.1–3: history, tokens and embeddings, inside the Transformer.</span></div>
+    <div class="card"><b>Part II · Using Pretrained Language Models</b><span>Ch.4 classification · Ch.5 clustering and topics · Ch.6 prompt engineering · Ch.7 advanced generation · Ch.8 semantic search and RAG · Ch.9 multimodal.</span></div>
+    <div class="card"><b>Part III · Training and Fine-Tuning</b><span>Ch.10–12: making your own embedding models, fine-tuning for classification, fine-tuning generation models.</span></div>
+  </div>
+  <p>A <b>pretrained</b> model is one that has already been trained on a huge amount of data. In Part II you load such a model, give it your text, and use what comes out. You never change its weights. That is why Chapter 4 keeps every model <b>frozen</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>Part I was a cooking class: how dough, heat and spices work. Part II is ordering from restaurants that already exist: you choose the right kitchen for the dish and tell them exactly what you want. Part III is opening your own kitchen. <i>Where it breaks:</i> with models you can always look at the output scores and wire models together in ways a restaurant menu would never allow, like taking the embedding "half-cooked" and finishing it with your own small classifier (plate 08).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: representation vs generative models; <a href="ch03_looking_inside_llms.html">Ch.3</a>: how the Transformer computes its output.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>–<a href="ch12_fine_tuning_generation_models.html">Ch.12</a> (Part III) unfreeze the models used here.</li></ul></div>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER 4 OPENING</div><h2>What text classification is, and the two families of models that can do it</h2></div><span class="chip">pdf p133–134 · Fig 4-1, 4-2</span></div>
+  <p><b>Classification</b> is one of the most common tasks in NLP (natural language processing). The goal: train a model to assign a <b>label</b> (also called a <b>class</b>) to some input text. The book lists typical uses:</p>
+  <ul class="plain">
+    <li><b>Sentiment analysis</b>: is this review / tweet / message positive or negative?</li>
+    <li><b>Intent detection</b>: what does the user want (for example "returns", "shipping", "customer service")?</li>
+    <li><b>Extracting entities</b>: which words are names, places, products?</li>
+    <li><b>Detecting language</b>: is this text English, Dutch, Hindi?</li>
+  </ul>
+  <p>The authors say the impact of language models, both representative and generative, on classification "cannot be understated" (they mean it is very large).</p>
+  <figure class="bookfig"><img src="figs/fig-4-1.png" alt="Input document goes into a language model with objective classification; output is the best category among Customer service, Returns, Shipping, with Returns selected" loading="lazy"><figcaption>Figure 4-1 (book, pdf p133): Using a language model to classify text.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left: a document (any text). Middle: a language model whose <i>objective</i> is classification. Right: a fixed list of possible categories (Customer service, Returns, Shipping); the model picks the best one, here <b>Returns</b> (highlighted in yellow). The key idea is that the output is <i>one choice from a closed list</i>, not free text.</p>
+  <p>The chapter is an <b>accessible introduction to using language models that have already been trained</b>. Because text classification is a broad field, it uses several techniques to explore language models. It has two big parts:</p>
+  <ul class="plain">
+    <li><a href="#s3">"Text Classification with Representation Models"</a> (printed p.113 = pdf p135): shows how flexible <b>nongenerative</b> models are for classification. Covers both <b>task-specific models</b> and <b>embedding models</b>.</li>
+    <li><a href="#s10">"Text Classification with Generative Models"</a> (printed p.127 = pdf p149): an introduction to generative language models, because most of them can also be used for classification. Covers one <b>open source</b> and one <b>closed source</b> model.</li>
+  </ul>
+  <p>The focus is on <b>pretrained language models</b>: models already trained on large amounts of data, which we can use to classify text. Figure 4-2 shows that the two families do the same job in different ways.</p>
+  <figure class="bookfig"><img src="figs/fig-4-2.png" alt="Top: input text into a representation language model with classes 0,1,2 outputs the number 1. Bottom: a classification prompt containing the input text goes into a generative language model, which outputs the sentence 'The input class is of the type: 1: Returns'" loading="lazy"><figcaption>Figure 4-2 (book, pdf p134): Although both representation and generative models can be used for classification, their approaches differ.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top row (teal): a <b>representation language model</b> is built with a fixed set of classes (0, 1, 2). You hand it the raw text and it hands back a <i>number</i>, here <b>1</b>. Bottom row (pink): a <b>generative language model</b> has no built-in classes. You must wrap the text in a <b>classification prompt</b> (the grey box: "prompt containing the input text"), and it answers with <i>text</i>: "The input class is of the type: 1: Returns". You then have to read the class out of that sentence. Same objective, different interface: number vs sentence.</p>
+  <p>The chapter introduces many language models, generative and nongenerative, and the common Python packages for loading and using them (<code>datasets</code>, <code>transformers</code>, <code>sentence-transformers</code>, <code>scikit-learn</code>, <code>openai</code>).</p>
+  <div class="box behind"><b>Tip from the book: always compare with a classic baseline</b><p>Although the book is about LLMs, the authors strongly advise comparing these examples against classic but strong baselines, such as representing text with <b>TF-IDF</b> (term frequency–inverse document frequency: each word is weighted by how often it appears in this document and how rare it is across all documents) and training a <b>logistic regression</b> classifier on top. If a 10-line TF-IDF model is almost as good, the big model may not be worth its cost.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A representation model used for classification ends in a small <b>classification head</b>: a layer with one output per class, so the answer is always a score for each class and you take the biggest. A generative model ends in a layer with one output per <i>token in its vocabulary</i>: it can say anything, so the class must be asked for in the prompt and read back out of the words it writes.</p></div>
+  <div class="fig">
+    <h3>Try it: same review, two kinds of answer</h3>
+    <div class="controls"><label for="f2sel">Review <select id="f2sel">
+      <option value="0">best movie ever!</option>
+      <option value="1">the movie is all portent and no content .</option>
+      <option value="2">unpretentious , charming , quirky , original</option>
+      <option value="3">a dull , plodding two hours .</option>
+    </select></label></div>
+    <div class="two">
+      <div class="card"><b>Representation model</b><span class="mono" id="f2rep"></span></div>
+      <div class="card"><b>Generative model</b><span class="mono" id="f2gen"></span></div>
+    </div>
+    <p class="note">Outputs are modelled to show the shape of each answer (vector of scores vs a sentence), not real model outputs.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Sorting letters at a post office. A <b>representation model</b> is a sorting machine with fixed bins (PIN codes): a letter goes in, it drops into bin 1, 2 or 3. A <b>generative model</b> is a clever clerk you can talk to: you say "which bin does this go to?" and the clerk replies in a sentence, "This looks like it belongs to bin 1, Returns". The clerk can also sort into bins that didn't exist yesterday if you name them. <i>Where it breaks:</i> the clerk may answer "probably bin 1, but it could be 2", so you need rules to turn chatty answers into a clean label; the machine never chats.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you build an intent classifier for a support bot?"</i> Say: "First I'd decide whether I need a fixed label set and low latency. If so, a small encoder model or embeddings plus logistic regression gives a calibrated score in milliseconds. If labels change often or I have no data, an LLM with a constrained prompt works on day one. I'd benchmark both against TF-IDF plus logistic regression on a labeled test set before choosing." In a voice agent this matters: routing a caller's intent must be fast, so a small classifier often sits in front of the LLM.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: representation (encoder-only) vs generative (decoder-only) models.</li><li><a href="../ai_engineering/ch05_prompt_engineering.html">AI Engineering Ch.5</a>: prompting a model to classify; <a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: fine-tuning BERT for classification.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · THE SENTIMENT OF MOVIE REVIEWS</div><h2>The dataset: Rotten Tomatoes reviews, labeled 1 (positive) or 0 (negative)</h2></div><span class="chip">pdf p134–135</span></div>
+  <p>All examples use data from the <b>Hugging Face Hub</b>, a platform that hosts models and also datasets. The dataset is the well-known <b>"rotten_tomatoes"</b> dataset (Pang &amp; Lee, 2005, footnote 1). It contains <b>5,331 positive</b> and <b>5,331 negative</b> movie reviews from the Rotten Tomatoes website, so 10,662 in total and perfectly balanced.</p>
+  <p>To load it, the book uses the <b><code>datasets</code></b> package, which is used throughout the book:</p>
+  <pre class="code"><code>from datasets import load_dataset
+
+<span class="cm"># Load our data</span>
+data = load_dataset("rotten_tomatoes")
+data
+<span class="cm"># DatasetDict({
+#   train:      Dataset({ features: ['text', 'label'], num_rows: 8530 })
+#   validation: Dataset({ features: ['text', 'label'], num_rows: 1066 })
+#   test:       Dataset({ features: ['text', 'label'], num_rows: 1066 })
+# })</span></code></pre>
+  <ul class="codeexp">
+    <li><code>load_dataset("rotten_tomatoes")</code> downloads the dataset from the Hub by its name and caches it locally.</li>
+    <li>The result is a <code>DatasetDict</code>: a dictionary of <b>splits</b>. Each split has two columns (<code>features</code>): <code>text</code> (the review) and <code>label</code> (0 or 1).</li>
+    <li>Sizes: <b>train 8,530</b>, <b>validation 1,066</b>, <b>test 1,066</b> (8,530 + 1,066 + 1,066 = 10,662 = 5,331 × 2).</li>
+  </ul>
+  <div class="fig">
+    <h3>The three splits, to scale</h3>
+    <svg viewBox="0 0 640 70" class="dg" style="width:100%;height:auto" role="img" aria-label="Bar showing train 8530, validation 1066, test 1066">
+      <rect x="0" y="10" width="512" height="32" class="hi"/><text x="256" y="31" text-anchor="middle">train 8,530 (80%)</text>
+      <rect x="512" y="10" width="64" height="32" class="f"/><text x="544" y="31" text-anchor="middle">val</text>
+      <rect x="576" y="10" width="64" height="32" class="ok"/><text x="608" y="31" text-anchor="middle">test</text>
+      <text x="0" y="62" class="m">train = fit · validation = check after tuning · test = score</text>
+    </svg>
+  </div>
+  <p>How the chapter uses the splits: the <b>train</b> split is used when a model is trained, and the <b>test</b> split is used to validate (score) the results. The extra <b>validation</b> split can be used to further check <b>generalization</b> if you used the train and test splits to do <b>hyperparameter tuning</b> (choosing settings like learning rate). Why that matters: if you keep tweaking settings until the test score looks good, the test score is no longer an honest estimate; a third untouched split gives you one.</p>
+  <p>A look at the first and last training examples:</p>
+  <pre class="code"><code>data["train"][0, -1]
+<span class="cm"># {'text': ['the rock is destined to be the 21st century\'s new " conan " and that he\'s
+#            going to make a splash even greater than arnold schwarzenegger ,
+#            jean-claud van damme or steven segal .',
+#           'things really get weird , though not particularly scary : the movie is all
+#            portent and no content .'],
+#  'label': [1, 0]}</span></code></pre>
+  <p>Notice the text is lowercased and the punctuation is split off with spaces (" , ", " . "): this is how the dataset was prepared. The reviews are short and labeled <b>positive (1)</b> or <b>negative (0)</b>, so the chapter focuses on <b>binary sentiment classification</b> (binary = two classes).</p>
+  <div class="box work"><b>Worked example · browse the data shape</b>
+    <div class="stepbar"><button id="ds_prev" type="button">◀ Back</button><button id="ds_next" type="button">Next ▶</button><span id="ds_n"></span></div>
+    <div class="caption" id="ds_cap"></div>
+    <p class="note">The first two rows are the book's examples (train[0] and train[-1]); the others are short illustrative reviews in the same style, labelled "illustrative".</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A board exam. The <b>train</b> split is the textbook and practice questions you study. The <b>test</b> split is the final exam paper, sealed until the end. The <b>validation</b> split is the pre-board mock exam: if you keep adjusting how you study based on the mock, you need the sealed final to know your true level. <i>Where it breaks:</i> a student remembers questions; a model can also "remember" test data if it ever saw it in training, which is exactly the worry about ChatGPT in <a href="#s12">plate 12</a>.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A balanced dataset (as many positives as negatives) makes accuracy meaningful: a model that always says "positive" would score only 50%. The test split also has 533 of each class (you will see "support 533" in every report). Keeping one fixed test split for every method in the chapter is what makes the F1 scores 0.80 / 0.85 / 0.78 / 0.84 / 0.91 comparable.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Why three splits?"</i> Train fits the parameters; validation picks hyperparameters, prompts or thresholds; test is touched once to report the final number. If you tune on test, you overfit to it and your reported score is optimistic. The same applies to prompt engineering: iterating a prompt on your eval set is tuning, so keep a held-out set.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s6">Plate 06</a>: the evaluation function used on the test split.</li><li><a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a> and <a href="../ai_engineering/ch08_dataset_engineering.html">Ch.8</a>: building eval sets and datasets.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · TEXT CLASSIFICATION WITH REPRESENTATION MODELS</div><h2>Two flavours: a task-specific model, or an embedding model plus your own classifier</h2></div><span class="chip">pdf p135–136 · Fig 4-3, 4-4</span></div>
+  <p>Classification with pretrained <b>representation models</b> (encoder-only models like BERT, which turn text into numbers rather than writing text) comes in two flavours:</p>
+  <ul class="plain">
+    <li>a <b>task-specific model</b>, or</li>
+    <li>an <b>embedding model</b>.</li>
+  </ul>
+  <p>Both are made by <b>fine-tuning</b> (further training) a <b>foundation model</b> such as BERT on a specific <b>downstream task</b> (a concrete job, as opposed to the general pretraining job).</p>
+  <figure class="bookfig"><img src="figs/fig-4-3.png" alt="BERT base foundation model is fine-tuned (supervised) along two branches: task classification gives a task-specific model, task embeddings gives an embedding model; both fine-tuned models are used in this chapter" loading="lazy"><figcaption>Figure 4-3 (book, pdf p136): A foundation model is fine-tuned for specific tasks; for instance, to perform classification or generate general-purpose embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Read left to right. One <b>base</b> model, BERT (the foundation model), goes through <b>supervised fine-tuning</b> (the dotted box: training with labeled examples) on two different tasks. The "classification" branch produces a <b>task-specific model</b> whose objective is to perform classification. The "embeddings" branch produces an <b>embedding model</b> whose objective is to create embeddings. The arrow at the top says "used in this chapter": the chapter uses these <i>already fine-tuned</i> models, not the base BERT.</p>
+  <ul class="plain">
+    <li>A <b>task-specific model</b> is a representation model, such as BERT, trained for one specific task, like sentiment analysis. Its output <i>is</i> the label.</li>
+    <li>An <b>embedding model</b> (introduced in Chapter 1) generates <b>general-purpose embeddings</b>: lists of numbers that capture the meaning of a text. They can be used for many tasks beyond classification, such as <b>semantic search</b> (Chapter 8).</li>
+  </ul>
+  <p>How to make these models yourself is covered later: fine-tuning BERT for classification in <a href="ch11_fine_tuning_for_classification.html">Chapter 11</a>, creating an embedding model in <a href="ch10_creating_text_embedding_models.html">Chapter 10</a>. In this chapter, <b>both models are kept frozen</b> (nontrainable): their weights are never changed, and we only use their output.</p>
+  <figure class="bookfig"><img src="figs/fig-4-4.png" alt="Input 'Best movie ever!' goes into a frozen task-specific model which outputs 1 Positive directly, and into a frozen embedding model whose output feeds a trained classifier such as logistic regression which outputs 1 Positive. An iceberg labelled Nontrainable 'Frozen' sits under both models" loading="lazy"><figcaption>Figure 4-4 (book, pdf p136): Perform classification directly with a task-specific model or indirectly with general-purpose embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> One input, "Best movie ever!", takes two roads. <b>Top road (direct):</b> the task-specific model outputs the class straight away: <b>1 · Positive</b>. <b>Bottom road (indirect):</b> the embedding model outputs a vector, which goes into a small <b>classifier you train</b> (the S-shaped curve icon, "e.g., logistic regression"), which then outputs <b>1 · Positive</b>. The dotted box with the <b>iceberg</b> marks both language models as <b>"Nontrainable / Frozen"</b>. The only thing that ever learns in this chapter is the small classifier on the bottom road.</p>
+  <p>So we lean on pretrained models that others have already fine-tuned for us and see how well they classify our movie reviews.</p>
+  <div class="fig">
+    <h3>Step through: what is frozen, what learns</h3>
+    <div class="stepbar"><button id="fz_prev" type="button">◀ Back</button><button id="fz_next" type="button">Next ▶</button><span id="fz_n"></span></div>
+    <div class="sqbox"><svg id="fz_svg" viewBox="0 0 640 170" class="dg" style="min-width:560px" role="img" aria-label="Diagram of frozen and trainable parts"></svg></div>
+    <div class="caption" id="fz_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A <b>task-specific model</b> is a ready-made thermometer: point it at a patient and it reads "fever / no fever". An <b>embedding model</b> is a full blood-test machine: it gives you a sheet of 768 numbers about the patient, and you (the doctor) learn which numbers mean "fever". Both machines come sealed from the factory (frozen); you only learn how to read the blood sheet. <i>Where it breaks:</i> a doctor reads a few numbers; the classifier weighs all 768 at once, and none of them means one human-readable thing.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Fine-tuning shapes what the model's output means. A classification head on top of BERT learns to map the [CLS] representation to class scores (Ch.11). An embedding model is trained so that texts with similar meaning land near each other (Ch.10). Freezing them means inference only: no gradients, no GPU training, and the same model can serve many downstream tasks.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Task-specific model or embeddings?"</i> "If someone has already fine-tuned a model on my exact task and domain, use it directly. Otherwise embeddings are more reusable: I compute them once, store them (often in the same vector database as my RAG index), and train cheap classifiers for many tasks on top. In a RAG memory system the same embeddings can power retrieval, deduplication and routing."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s5">Plate 05</a> (top road) and <a href="#s8">plate 08</a> (bottom road).</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: what embeddings are; <a href="ch08_semantic_search_and_rag.html">Ch.8</a>: embeddings for search.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · MODEL SELECTION</div><h2>Picking a model: architecture, language, size, performance and speed</h2></div><span class="chip">pdf p137–138 · Fig 4-5</span></div>
+  <p>Choosing models is harder than it looks. At the time of writing, the Hugging Face Hub had <b>over 60,000 models for text classification</b> and <b>more than 8,000 models that generate embeddings</b>. You must pick a model that fits your use case and check:</p>
+  <ul class="plain">
+    <li><b>language compatibility</b> (does it understand the language of your text?),</li>
+    <li><b>underlying architecture</b>,</li>
+    <li><b>size</b>, and</li>
+    <li><b>performance</b>.</li>
+  </ul>
+  <p><b>Architecture first.</b> As in Chapter 1, <b>BERT</b>, a well-known <b>encoder-only</b> architecture, is a popular choice for building task-specific and embedding models. Generative models like the GPT family are incredible, but encoder-only models also excel at task-specific use cases <b>and tend to be significantly smaller</b>.</p>
+  <p>Over the years many variations of BERT were developed, each trained in different contexts: <b>RoBERTa</b> (Liu et al., 2019), <b>DistilBERT</b> (Sanh et al., 2019), <b>ALBERT</b> (Lan et al., 2019) and <b>DeBERTa</b> (He et al., 2020).</p>
+  <figure class="bookfig"><img src="figs/fig-4-5.png" alt="Timeline of BERT-like models from 2019 to 2021: BERT 110/340M, RoBERTa 356M, ALBERT 12/18/60/235M, DistilBERT 66M, DeBERTa 134/384/750M" loading="lazy"><figcaption>Figure 4-5 (book, pdf p137): A timeline of common BERT-like model releases. These are considered foundation models and are mostly intended to be fine-tuned on a downstream task.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A time axis from before 2019 to 2021, with each model's release marked and its parameter counts in millions (M); a slash separates sizes of the same family (base/large…). <b>BERT</b>: 110M / 340M (just before 2019). <b>RoBERTa</b>: 356M (mid-2019). <b>ALBERT</b>: 12M / 18M / 60M / 235M (late 2019; beyond the book: it is small because it shares parameters across layers). <b>DistilBERT</b>: 66M (late 2019; a "distilled", smaller copy of BERT). <b>DeBERTa</b>: 134M / 384M / 750M (2020). All are <b>foundation models</b>, meant to be fine-tuned on a downstream task. Compare: these are hundreds of millions of parameters, while generative LLMs are billions.</p>
+  <div class="fig">
+    <h3>Model sizes from Figure 4-5, to scale</h3>
+    <div id="szbars" style="display:grid;gap:6px"></div>
+    <p class="note">Each size from Figure 4-5; the variant names (base, large, xlarge…) are inferred, not in the figure. bert-tiny is not in the figure. For scale, the book's later generative examples run to billions of parameters.</p>
+  </div>
+  <p>Selecting a model can be "a form of art". You cannot try thousands of models, so be efficient. Several models are great starting points and give you an idea of base performance. The book calls them <b>solid baselines</b>:</p>
+  <div class="grid2">
+    <div class="card"><b>BERT base model (uncased)</b><span>The original; "uncased" means it lowercases text.</span></div>
+    <div class="card"><b>RoBERTa base model</b><span>BERT trained longer and more carefully ("robustly optimized").</span></div>
+    <div class="card"><b>DistilBERT base model (uncased)</b><span>Smaller, faster, cheaper, lighter version of BERT.</span></div>
+    <div class="card"><b>DeBERTa base model</b><span>"Decoding-enhanced BERT with disentangled attention".</span></div>
+    <div class="card"><b>bert-tiny</b><span>A very small BERT, for speed tests.</span></div>
+    <div class="card"><b>ALBERT base v2</b><span>"A lite BERT": shares weights to cut size.</span></div>
+  </div>
+  <p><b>The task-specific model chosen:</b> <b>Twitter-RoBERTa-base for Sentiment Analysis</b> (<code>cardiffnlp/twitter-roberta-base-sentiment-latest</code>). It is a RoBERTa model fine-tuned on <b>tweets</b> for sentiment analysis. It was <i>not</i> trained on movie reviews, so it is interesting to see how well it <b>generalizes</b> to a new domain.</p>
+  <p><b>The embedding model chosen:</b> for embedding models, the <b>MTEB leaderboard</b> (Massive Text Embedding Benchmark) is a great place to start. It lists open and closed source models benchmarked across several tasks. But don't look at performance alone: <b>inference speed should not be underestimated</b> in real solutions. So the book uses <b><code>sentence-transformers/all-mpnet-base-v2</code></b>, "a small but performant model".</p>
+  <div class="fig">
+    <h3>Try it: a model picker that weighs speed as well as score</h3>
+    <div class="controls"><label for="mpw">Weight on speed <input id="mpw" type="range" min="0" max="100" value="40"><output id="mpwo">40%</output></label></div>
+    <div class="tablewrap"><table id="mptab"><thead><tr><th>candidate (modelled)</th><th>quality</th><th>latency / text</th><th>combined</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">Candidates and numbers are modelled to show the trade-off the book warns about; they are not MTEB scores.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Hiring a cook for a busy dhaba. The top-ranked chef in a cooking contest (top of the leaderboard) may take 20 minutes per dish. A slightly less fancy cook who serves in 2 minutes keeps the queue moving. <i>Where it breaks:</i> a cook's speed is fixed; a model's speed also depends on your hardware, batch size and text length, so measure on your own setup.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Encoder-only models read the whole text once and output a fixed-size vector or a few class scores. There is no token-by-token generation loop, so even a 110M-parameter BERT is fast and cheap compared with a multi-billion-parameter generator. Model families differ in training data, objective and tricks (distillation, parameter sharing, disentangled attention), which is why the same task can give different results across them.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Newer encoder families (for example ModernBERT, 2024) and newer embedding models (for example BGE, E5, GTE, nomic-embed) have appeared since the book. MTEB has also grown into a multilingual version (MMTEB). The selection rules here still hold: check language, size, speed and your own eval.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you choose an embedding model?"</i> "Start from MTEB for the task type I care about (retrieval, classification, clustering) and my language, shortlist two or three small ones, then measure on my own labeled sample: quality, latency at my batch size, embedding dimension (storage cost in the vector DB), and max sequence length. Leaderboard rank alone is not a decision."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: BERT's encoder-only design; <a href="ch10_creating_text_embedding_models.html">Ch.10</a>: MTEB used to evaluate embedding models.</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: model selection with public benchmarks.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · USING A TASK-SPECIFIC MODEL</div><h2>Load the sentiment model, tokenize, and predict 1,066 reviews</h2></div><span class="chip">pdf p138–140 · Fig 4-6, 4-7</span></div>
+  <p>Load the selected task-specific model with the <code>transformers</code> <b>pipeline</b>:</p>
+  <pre class="code"><code>from transformers import pipeline
+
+<span class="cm"># Path to our HF model</span>
+model_path = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+
+<span class="cm"># Load model into pipeline</span>
+pipe = pipeline(
+    model=model_path,
+    tokenizer=model_path,
+    return_all_scores=True,
+    device="cuda:0"
+)</code></pre>
+  <ul class="codeexp">
+    <li><code>pipeline(...)</code> is the high-level <code>transformers</code> helper: it bundles the tokenizer, the model and the post-processing into one callable.</li>
+    <li><code>model=model_path</code>: the Hub ID of the fine-tuned RoBERTa sentiment model.</li>
+    <li><code>tokenizer=model_path</code>: load the matching tokenizer. The book notes this is <i>not needed</i> (it is loaded automatically), but writing it shows what happens under the hood.</li>
+    <li><code>return_all_scores=True</code>: return a score for <i>every</i> class, not just the top one.</li>
+    <li><code>device="cuda:0"</code>: run on the first GPU.</li>
+  </ul>
+  <p>The <b>tokenizer</b> converts the input text into individual <b>tokens</b> (Figure 4-6).</p>
+  <figure class="bookfig"><img src="figs/fig-4-6.png" alt="Input 'Her vocalization was melodic' goes through a tokenizer that splits it into tokens Her, vocal, ##ization, was, melodic, which go into the task-specific model whose output is 1 Positive" loading="lazy"><figcaption>Figure 4-6 (book, pdf p139): An input sentence is first fed to a tokenizer before it can be processed by the task-specific model.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top to bottom. The sentence "Her vocalization was melodic" enters the <b>tokenizer</b> ("split input up into tokens"). It comes out as five tokens: <b>Her · vocal · ##ization · was · melodic</b>. The <code>##</code> marks a piece that continues the previous token (WordPiece style): the rare word "vocalization" was split into "vocal" + "##ization". Only these tokens (as IDs) go into the task-specific model, which outputs <b>1 · Positive</b>.</p>
+  <p>Tokens are at the core of most language models (Chapter 2). A big benefit: tokens can be <b>combined</b> to produce representations even for words that were <b>not in the training data</b> (Figure 4-7).</p>
+  <figure class="bookfig"><img src="figs/fig-4-7.png" alt="The tokens Her, vocal, ##ization, was, melodic each get a token embedding inside BERT; the embeddings of vocal and ##ization are combined into one output word embedding" loading="lazy"><figcaption>Figure 4-7 (book, pdf p140): By breaking down an unknown word into tokens, word embeddings can still be generated.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same five tokens. Inside the teal <b>BERT foundation model</b> box, each token gets its own <b>token embedding</b> (the rows of small purple squares). The two dark-purple rows belong to <b>vocal</b> and <b>##ization</b>; their arrows join and produce one green <b>word embedding</b> at the bottom ("Output"). So even if "vocalization" never appeared as a whole word, the model can still build a vector for it from its pieces.</p>
+  <div class="fig">
+    <h3>Try it: a toy subword tokenizer</h3>
+    <div class="controls"><label for="tkin">Word or sentence <input id="tkin" type="text" class="wide" value="Her vocalization was melodic" style="width:260px;max-width:100%"></label></div>
+    <div id="tkout" style="min-height:40px"></div>
+    <div class="readout" id="tkread"></div>
+    <p class="note">Modelled: greedy longest-match over a tiny hand-made vocabulary (about 120 pieces), WordPiece-style with <code>##</code>. Real tokenizers have 30,000–50,000+ pieces and RoBERTa actually uses byte-level BPE (Ch.2), so real splits differ.</p>
+  </div>
+  <p>With everything loaded, run the model on the <b>test</b> split:</p>
+  <pre class="code"><code>import numpy as np
+from tqdm import tqdm
+from transformers.pipelines.pt_utils import KeyDataset
+
+<span class="cm"># Run inference</span>
+y_pred = []
+for output in tqdm(pipe(KeyDataset(data["test"], "text")), total=len(data["test"])):
+    negative_score = output[0]["score"]
+    positive_score = output[2]["score"]
+    assignment = np.argmax([negative_score, positive_score])
+    y_pred.append(assignment)</code></pre>
+  <ul class="codeexp">
+    <li><code>KeyDataset(data["test"], "text")</code> wraps the test split so the pipeline reads only the <code>text</code> column, one review at a time, and can stream them efficiently.</li>
+    <li><code>tqdm(..., total=...)</code> only draws a progress bar.</li>
+    <li>For each review, <code>output</code> is a list of class scores (because of <code>return_all_scores=True</code>). The code takes the score at index <b>0</b> as negative and index <b>2</b> as positive.</li>
+    <li><code>np.argmax([negative, positive])</code> returns <b>0</b> if negative is bigger, <b>1</b> if positive is bigger, which matches the dataset's labels (0 = negative, 1 = positive).</li>
+  </ul>
+  <div class="box beyond"><b>Beyond the book</b><p>The book does not explain index 1. This Cardiff NLP model has <b>three</b> classes (negative, neutral, positive), so index 1 is <b>neutral</b>; the code simply ignores it and compares negative against positive, forcing a binary answer. Also, newer <code>transformers</code> versions deprecate <code>return_all_scores=True</code> in favour of <code>top_k=None</code>, and with that the scores may come back sorted by score rather than by class, so read the <code>label</code> field instead of relying on positions.</p></div>
+  <div class="box work"><b>Worked example · one review through the loop</b>
+    <p>Suppose the model returns, for one review (modelled numbers): negative 0.12, neutral 0.30, positive 0.58. The loop keeps <code>[0.12, 0.58]</code>; argmax is index 1, so the prediction is <b>1 (positive)</b>. Now a lukewarm review: negative 0.40, neutral 0.45, positive 0.15. Neutral is the biggest overall, but it is dropped: <code>[0.40, 0.15]</code> → <b>0 (negative)</b>. A tweet-trained model's "neutral" mass is thrown away, which is one reason it may stumble on movie reviews.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Tokenizing is like how a kirana shopkeeper reads an unfamiliar brand name, "Chocolicious", as "Choco" + "licious": two pieces he already knows. He can guess it is a chocolate snack without ever having seen the brand. <i>Where it breaks:</i> some splits are misleading ("therapist" → "the" + "rapist" in some tokenizers); the model has to learn from context that the pieces mean something else together.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The pipeline does three things for each review: (1) the tokenizer maps text to token IDs (and, beyond the book, adds special tokens like &lt;s&gt; and &lt;/s&gt; for RoBERTa); (2) the model runs the encoder and a classification head that outputs one <b>logit</b> (raw score) per class; (3) post-processing applies softmax so scores sum to 1. The sentiment knowledge was put into the weights by Cardiff NLP's fine-tuning on tweets; we only run inference.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How does a model handle a word it has never seen?"</i> "Subword tokenization. The tokenizer breaks unknown words into known pieces, like 'vocal' + '##ization', each piece has an embedding, and the Transformer's contextual layers combine them. So there is no true out-of-vocabulary problem, just longer token sequences for rare words, which also means more tokens and higher cost for unusual languages or jargon."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: WordPiece and BPE tokenizers compared in detail.</li><li><a href="#s6">Plate 06</a>: scoring these predictions.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · USING A TASK-SPECIFIC MODEL (EVALUATION)</div><h2>Reading a classification report: confusion matrix, precision, recall, accuracy, F1</h2></div><span class="chip">pdf p140–142 · Fig 4-8, 4-9</span></div>
+  <p>With predictions in hand, all that's left is <b>evaluation</b>. The book writes one small helper used throughout the chapter:</p>
+  <pre class="code"><code>from sklearn.metrics import classification_report
+
+def evaluate_performance(y_true, y_pred):
+    """Create and print the classification report"""
+    performance = classification_report(
+        y_true, y_pred,
+        target_names=["Negative Review", "Positive Review"]
+    )
+    print(performance)
+
+evaluate_performance(data["test"]["label"], y_pred)</code></pre>
+  <ul class="codeexp">
+    <li><code>classification_report</code> from scikit-learn compares true labels with predicted labels and prints per-class metrics.</li>
+    <li><code>target_names</code> gives human names to class 0 and class 1, in that order.</li>
+  </ul>
+  <p>Result for the Twitter-RoBERTa model:</p>
+  <pre class="code"><code>                 precision    recall  f1-score   support
+
+Negative Review       0.76      0.88      0.81       533
+Positive Review       0.86      0.72      0.78       533
+
+       accuracy                           0.80      1066
+      macro avg       0.81      0.80      0.80      1066
+   weighted avg       0.81      0.80      0.80      1066</code></pre>
+  <p>To read this report, first see how predictions can be right or wrong. There are four combinations: whether the prediction is correct (<b>True</b>) or incorrect (<b>False</b>), and whether the predicted class is the <b>Positive</b> or the <b>Negative</b> class. Drawn as a 2×2 grid, this is the <b>confusion matrix</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-4-8.png" alt="2 by 2 confusion matrix with actual values Positive and Negative as columns and predicted values Positive and Negative as rows: True positive, False positive, False negative, True negative, each with an explanation" loading="lazy"><figcaption>Figure 4-8 (book, pdf p141): The confusion matrix describes four types of predictions we can make.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Columns are the <b>actual</b> values (green Positive, red Negative); rows are the <b>predicted</b> values. The white diagonal cells are correct: <b>True positive (TP)</b> = positive review correctly classified as positive; <b>True negative (TN)</b> = negative review correctly classified as negative. The grey cells are mistakes: <b>False positive (FP)</b> = negative review incorrectly classified as positive; <b>False negative (FN)</b> = positive review incorrectly classified as negative. Tip for remembering: the second word is what the model <i>said</i>; the first word says whether it was right.</p>
+  <p>From the confusion matrix come several formulas for model quality. The report shows four:</p>
+  <ul class="plain">
+    <li><b>Precision</b> = TP / (TP + FP): of the items the model <i>found</i> (predicted positive), how many are relevant. It shows how accurate the relevant results are.</li>
+    <li><b>Recall</b> = TP / (TP + FN): of all the relevant items, how many the model found. It shows its ability to find <i>all</i> relevant results.</li>
+    <li><b>Accuracy</b> = (TP + TN) / (TP + TN + FP + FN): correct predictions out of all predictions; the overall correctness.</li>
+    <li><b>F1 score</b> = 2 × (precision × recall) / (precision + recall): balances precision and recall into one overall number (their <b>harmonic mean</b>).</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-4-9.png" alt="The classification report annotated with formulas: precision TP over TP+FP (0.76, 0.86), recall TP over TP+FN (0.88, 0.72), F1 two times precision times recall over precision plus recall (0.81, 0.78), support number of samples 533, 533, accuracy formula with 0.80, macro avg and weighted avg rows averaged across all classes" loading="lazy"><figcaption>Figure 4-9 (book, pdf p142): The classification report describes several metrics for evaluating a model's performance.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The same report, with each column labelled by its formula. Blue box: <b>precision</b> (0.76 for negative, 0.86 for positive). Pink box: <b>recall</b> (0.88, 0.72). Grey box: <b>f1-score</b> (0.81, 0.78). Right column: <b>support</b> = number of samples per class (533 each; 1,066 total). Below: <b>accuracy</b> 0.80, and two rows "averaged across all classes": <b>macro avg</b> (plain average of the two class scores) and <b>weighted avg</b> (average weighted by support), with the weighted F1 <b>0.80</b> in bold. Small slip in the figure: the accuracy denominator is printed "TP + TN + FP + FP"; it should be TP + TN + FP + <b>FN</b>.</p>
+  <p>Throughout the book the authors use the <b>weighted average F1</b> score "to make sure each class is treated equally". Here it is <b>0.80</b> (row "weighted avg", column "f1-score"), which they call great for a model not trained on our domain data. A note on that wording: <i>macro</i> average is the one that gives each class equal weight; <i>weighted</i> weights by support. Because this test set has 533 of each class, the two rows come out identical in every report in this chapter, so the choice makes no difference here.</p>
+  <p>Reading the per-class rows tells a story: <b>negative recall is high (0.88)</b> but <b>positive recall is low (0.72)</b>. The model often calls positive reviews negative. One plausible reason (our guess, not from the book): the "dropped neutral" effect from plate 05, where mild praise loses to its negative score.</p>
+  <div class="fig">
+    <h3>Try it: confusion-matrix calculator</h3>
+    <p class="small">Defaults are reconstructed from the book's report (one set of counts that rounds to the same numbers); change any cell.</p>
+    <div class="cm-grid">
+      <div class="h"></div><div class="h">actual positive</div><div class="h">actual negative</div>
+      <div class="h">predicted positive</div><div class="ok"><label>TP<br><input id="cmTP" type="number" min="0" value="385"></label></div><div class="no"><label>FP<br><input id="cmFP" type="number" min="0" value="65"></label></div>
+      <div class="h">predicted negative</div><div class="no"><label>FN<br><input id="cmFN" type="number" min="0" value="148"></label></div><div class="ok"><label>TN<br><input id="cmTN" type="number" min="0" value="468"></label></div>
+    </div>
+    <div class="stepbar"><button type="button" id="cmBook">Book report (task-specific)</button><button type="button" id="cmAllPos">Always say "positive"</button><button type="button" id="cmGPT">ChatGPT-like</button></div>
+    <div class="tablewrap"><table id="cmtab"><thead><tr><th></th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr></thead><tbody></tbody></table></div>
+    <div class="readout" id="cmread"></div>
+  </div>
+  <div class="box work"><b>Worked example · computing the positive row by hand</b>
+    <p>Using the reconstructed counts TP = 385, FP = 65, FN = 148, TN = 468:</p>
+    <div class="formula">precision(pos) = 385 / (385 + 65)  = 385 / 450 = 0.856 → 0.86
+recall(pos)    = 385 / (385 + 148) = 385 / 533 = 0.722 → 0.72
+F1(pos)        = 2 × 0.856 × 0.722 / (0.856 + 0.722) = 0.783 → 0.78
+accuracy       = (385 + 468) / 1066 = 853 / 1066 = 0.800 → 0.80</div>
+    <p>For the <b>negative</b> row, swap roles: the "positives" are now negative reviews, so precision(neg) = TN / (TN + FN) = 468 / 616 = 0.76 and recall(neg) = TN / (TN + FP) = 468 / 533 = 0.88. These counts are a reconstruction; the book only prints the rounded report.</p>
+  </div>
+  <p>How could we improve? The book suggests:</p>
+  <ul class="plain">
+    <li>select a model trained on <b>our domain data</b> (movie reviews), such as <b>DistilBERT base uncased finetuned SST-2</b> (beyond the book: SST-2 is the Stanford Sentiment Treebank, a movie-review sentiment dataset), or</li>
+    <li>switch to the other flavour of representation model: <b>embedding models</b> (next plate).</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A fishing net. <b>Recall</b>: of all the fish in the lake, how many did your net catch? <b>Precision</b>: of everything in your net, how much is fish and not old chappals? A huge net catches every fish (high recall) and lots of rubbish (low precision). <b>F1</b> punishes you if either one is bad. <i>Where it breaks:</i> with two balanced classes, "fish" and "rubbish" swap roles for each row of the report; in real fishing you only care about one side.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>F1 is a <b>harmonic</b> mean, which is pulled towards the smaller number: precision 1.0 and recall 0.1 give F1 0.18, not 0.55. That is why F1 is preferred over accuracy when classes are imbalanced or when both kinds of error matter. Accuracy alone can hide a model that ignores a rare class.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Precision vs recall: when do you favour which?"</i> "Precision when false positives are costly, like auto-blocking a payment as fraud or an agent auto-executing a tool call. Recall when misses are costly, like flagging abusive content for human review. F1 when both matter. And always look at per-class rows and the confusion matrix, not just one averaged number." For an LLM gateway's safety classifier, you would tune the threshold on validation data to hit a target recall.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Every later plate reuses <code>evaluate_performance</code>: scores at <a href="#s8">08</a>, <a href="#s9">09</a>, <a href="#s11">11</a>, <a href="#s12">12</a>.</li><li><a href="../llm_engineers_handbook/ch07_evaluating_llms.html">LLM Engineer's Handbook Ch.7</a> and <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a>: evaluation metrics for LLMs.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · CLASSIFICATION TASKS THAT LEVERAGE EMBEDDINGS</div><h2>No ready-made model for your task? You still don't have to fine-tune</h2></div><span class="chip">pdf p142–143</span></div>
+  <p>The previous example used a model already trained for sentiment. But <b>what if no pretrained model exists for your specific task?</b> Do you have to fine-tune a representation model yourself? The book's answer: <b>no</b>.</p>
+  <p>Sometimes you will want to fine-tune yourself, if you have enough compute (Chapter 11). But not everyone has access to a lot of computing power. This is where <b>general-purpose embedding models</b> come in: one frozen model gives useful vectors for almost any text, and you build the task-specific part on top cheaply.</p>
+  <div class="fig">
+    <h3>Three ways to get a classifier, by what they cost</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>approach</th><th>what you train</th><th>needs GPU for training?</th><th>needs labels?</th><th>where</th></tr></thead>
+      <tbody>
+        <tr><td>Fine-tune BERT yourself</td><td>the whole model (~110M+ weights)</td><td>yes, usually</td><td>yes</td><td><a href="ch11_fine_tuning_for_classification.html">Ch.11</a></td></tr>
+        <tr><td>Embeddings + classifier</td><td>a small classifier (769 weights for logistic regression on 768-dim vectors)</td><td>no, CPU is fine</td><td>yes</td><td><a href="#s8">plate 08</a></td></tr>
+        <tr><td>Embeddings, zero-shot</td><td>nothing</td><td>no</td><td>no (only label names)</td><td><a href="#s9">plate 09</a></td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">The 769 count (768 weights + 1 bias for binary logistic regression) is arithmetic, not stated in the book.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>You need a tailor-made suit. Fine-tuning is weaving your own cloth. Embeddings are buying good ready cloth (frozen) and paying a local tailor only for the stitching (the small classifier). <i>Where it breaks:</i> if no cloth on the market suits your purpose (very unusual domain text), stitching won't save it, and you are back to fine-tuning.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You have little compute and a new classification task. What do you do?"</i> "Embed the texts once with a good off-the-shelf embedding model, train logistic regression on the vectors, and evaluate. It trains in seconds on a CPU. Only if that plateaus do I consider fine-tuning or SetFit-style approaches."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: full fine-tuning and few-shot SetFit.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · SUPERVISED CLASSIFICATION</div><h2>Embeddings as features, logistic regression on top: F1 0.85</h2></div><span class="chip">pdf p143–145 · Fig 4-10, 4-11, 4-12</span></div>
+  <p>Here we do part of the training ourselves, from a more <b>classical</b> angle. Instead of using the representation model to classify directly, we use an <b>embedding model to generate features</b>, and feed those features into a <b>classifier</b>. That is a <b>two-step approach</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-4-10.png" alt="Step 1 feature extractor: an embedding model creates embeddings. A dotted line separates it from step 2 classifier, e.g. logistic regression" loading="lazy"><figcaption>Figure 4-10 (book, pdf p143): The feature extraction step and classification steps are separated.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two numbered stages split by a dotted vertical line. <b>① Feature extractor</b>: the embedding model, objective "create embeddings". <b>② Classifier</b>: the S-curve icon, "e.g., logistic regression". The arrow across the line is the embedding vector. The dotted line is the point: the two parts are built and trained separately.</p>
+  <p>Big benefit of this separation: we <b>do not need to fine-tune the embedding model</b>, which can be costly. We only train a classifier, like a <b>logistic regression</b>, and that can run on the <b>CPU</b>.</p>
+  <p><b>Step 1</b>: convert the text to embeddings with the embedding model. This model is also kept <b>frozen</b> and not updated during training.</p>
+  <figure class="bookfig"><img src="figs/fig-4-11.png" alt="Input 'Best movie ever!' goes into the embedding model (frozen, nontrainable iceberg) which outputs a red embedding vector" loading="lazy"><figcaption>Figure 4-11 (book, pdf p143): In step 1, we use the embedding model to extract the features and convert the input text to embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> "Best movie ever!" goes into the embedding model; out comes a short red bar of cells, the <b>embedding</b> (a vector of numbers; drawn with 4 cells, really 768). The iceberg again says <b>Nontrainable · "Frozen"</b>. The dots at the bottom mean "continued in the next step".</p>
+  <p>The book does this step with <b>sentence-transformers</b> (Reimers &amp; Gurevych, "Sentence-BERT", 2019, footnote 6), a popular package for using pretrained embedding models:</p>
+  <pre class="code"><code>from sentence_transformers import SentenceTransformer
+
+<span class="cm"># Load model</span>
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+
+<span class="cm"># Convert text to embeddings</span>
+train_embeddings = model.encode(data["train"]["text"], show_progress_bar=True)
+test_embeddings  = model.encode(data["test"]["text"],  show_progress_bar=True)
+
+train_embeddings.shape
+<span class="cm"># (8530, 768)</span></code></pre>
+  <ul class="codeexp">
+    <li><code>SentenceTransformer(...)</code> downloads and loads the embedding model chosen in <a href="#s4">plate 04</a>.</li>
+    <li><code>model.encode(list_of_texts)</code> returns one vector per text, as a NumPy array. It batches internally; <code>show_progress_bar</code> only shows progress.</li>
+    <li><code>.shape == (8530, 768)</code>: <b>8,530 documents</b>, each with an embedding of <b>dimension 768</b>, i.e. 768 numbers per review. The dimension depends on the embedding model.</li>
+  </ul>
+  <p>As covered in Chapter 1, these embeddings are <b>numerical representations</b> of the input text.</p>
+  <p><b>Step 2</b>: the embeddings become the <b>input features</b> of the classifier. The classifier is <b>trainable</b>, and it does not have to be logistic regression: it can be any model that does classification.</p>
+  <figure class="bookfig"><img src="figs/fig-4-12.png" alt="The red embedding vector is input for the classifier, a trainable logistic regression marked with a flame, which outputs 1 Positive" loading="lazy"><figcaption>Figure 4-12 (book, pdf p144): Using the embeddings as our features, we train a logistic regression model on our training data.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Continuing from Figure 4-11 (the dots at the top): the red embedding is "input for <b>classifier</b>". The classifier box carries a flame and the word <b>Trainable</b>: this is the only part that learns. Its output is <b>1 · Positive</b>. Compare with the iceberg (frozen) in 4-11: ice = fixed, fire = learning.</p>
+  <p>The book keeps it simple with logistic regression. Training needs only the embeddings and the labels:</p>
+  <pre class="code"><code>from sklearn.linear_model import LogisticRegression
+
+<span class="cm"># Train a logistic regression on our train embeddings</span>
+clf = LogisticRegression(random_state=42)
+clf.fit(train_embeddings, data["train"]["label"])
+
+<span class="cm"># Predict previously unseen instances</span>
+y_pred = clf.predict(test_embeddings)
+evaluate_performance(data["test"]["label"], y_pred)</code></pre>
+  <ul class="codeexp">
+    <li><code>LogisticRegression(random_state=42)</code>: a linear classifier; the fixed <code>random_state</code> makes the run reproducible.</li>
+    <li><code>.fit(X, y)</code>: learns one weight per embedding dimension (plus a bias) so that weighted sums separate positives from negatives.</li>
+    <li><code>.predict(test_embeddings)</code>: labels the 1,066 test reviews it has never seen.</li>
+  </ul>
+  <pre class="code"><code>                 precision    recall  f1-score   support
+
+Negative Review       0.85      0.86      0.85       533
+Positive Review       0.86      0.85      0.85       533
+
+       accuracy                           0.85      1066
+      macro avg       0.85      0.85      0.85      1066
+   weighted avg       0.85      0.85      0.85      1066</code></pre>
+  <p>Training a classifier on top of the embeddings gives an <b>F1 score of 0.85</b>, better than the task-specific model's 0.80, and the errors are now balanced between the classes (0.85/0.86 everywhere). This shows what a lightweight classifier can do while the embedding model stays frozen.</p>
+  <div class="box behind"><b>Tip from the book: drop the GPU entirely</b><p>sentence-transformers benefits from a <b>GPU</b> to speed up inference (making the embeddings). You can remove even that dependency by using an <b>external API</b> to create the embeddings. Popular choices are <b>Cohere's</b> and <b>OpenAI's</b> embedding offerings. Then the whole pipeline can run on a CPU.</p></div>
+  <div class="fig">
+    <h3>Try it: a 2-D toy of "embed, then draw a line"</h3>
+    <p class="small">Each dot is a review squeezed to 2 numbers instead of 768 (modelled). Logistic regression learns a straight boundary. Press train to run gradient descent; drag the slider to move the decision threshold.</p>
+    <div class="stepbar"><button type="button" id="lrTrain">Train 50 steps</button><button type="button" id="lrReset">Reset</button><label class="mono" for="lrThr">threshold <input id="lrThr" type="range" min="5" max="95" value="50"> <output id="lrThro">0.50</output></label></div>
+    <div class="sqbox"><svg id="lrsvg" viewBox="0 0 400 260" style="min-width:300px;width:100%;height:auto" role="img" aria-label="Scatter of toy embeddings with a learned decision boundary"></svg></div>
+    <div class="readout" id="lrread"></div>
+  </div>
+  <div class="box work"><b>Worked example · what the classifier actually computes</b>
+    <p>For one review the model outputs a 768-number vector <b>x</b>. Logistic regression has learned 768 weights <b>w</b> and a bias <b>b</b>. It computes z = w·x + b (one number), then p = 1 / (1 + e<sup>−z</sup>), the probability of "positive". If z = 1.4, p = 0.80 → predict 1. If z = −0.6, p = 0.35 → predict 0. Training adjusts w and b so that, over the 8,530 training reviews, p is high for positives and low for negatives. Storage check: 8,530 × 768 float32 numbers ≈ 26 MB, which fits easily in RAM (arithmetic, not from the book).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wholesale mandi grades mangoes. A machine measures each mango on 768 things (colour, firmness, smell…) and never changes (frozen). A junior grader looks at those measurements for 8,530 mangoes that seniors already graded and learns a simple rule: "add these readings with these weights; above a line = export quality". Teaching the junior takes an afternoon; building the machine took years. <i>Where it breaks:</i> the junior can only draw a straight line through the measurements; if quality depends on a twisted combination, you'd need a smarter grader (another classifier) or a better machine.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A good embedding model already places texts with similar meaning near each other, so "positive" and "negative" reviews end up in roughly separate regions of the 768-dimensional space. A linear classifier then only has to find the dividing plane. It's the classic <b>feature extraction</b> pattern from pre-deep-learning ML, with a modern feature extractor. And because the embeddings are general-purpose, you can reuse the same vectors for other tasks.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Design a cheap intent router for a voice agent."</i> "Embed each utterance with a small embedding model (or an embeddings API), train logistic regression on a few thousand labeled utterances, and serve it on CPU in a few milliseconds. Keep the probability output so low-confidence cases can fall back to an LLM. Retraining is seconds, so new intents are cheap." That is exactly the frozen-embeddings + trainable-head pattern from this plate.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s9">Plate 09</a>: the same embeddings with no labels at all.</li><li><a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a>: the same embeddings for clustering; <a href="ch10_creating_text_embedding_models.html">Ch.10</a>: training embedding models.</li><li><a href="../llm_engineers_handbook/ch04_rag_feature_pipeline.html">LLM Engineer's Handbook Ch.4</a>: an embedding pipeline in production.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · WHAT IF WE DO NOT HAVE LABELED DATA?</div><h2>Zero-shot classification: compare each review with the sentence "A positive review"</h2></div><span class="chip">pdf p145–148 · Fig 4-13, 4-14, 4-15, 4-16</span></div>
+  <p>So far we had labeled data. In practice you often don't. Getting labels is <b>resource-intensive</b> and can need a lot of human labour. And is it even worth collecting them?</p>
+  <p>To test whether a task is feasible at all, we can do <b>zero-shot classification</b>: we have <b>no labeled data</b>. We know the <b>definition of the labels</b> (their names) but have no examples to support them. Zero-shot classification tries to predict the labels of input text even though the model was not trained on them.</p>
+  <figure class="bookfig"><img src="figs/fig-4-13.png" alt="Input 'Explore the world's flavors through global culinary adventures' plus candidate labels travel, cooking, sports (previously unseen) go into a zero-shot model, which outputs Cooking 0.60, Travel 0.35, Sports 0.05" loading="lazy"><figcaption>Figure 4-13 (book, pdf p146): In zero-shot classification, we have no labeled data, only the labels themselves. The zero-shot model decides how the input is related to the candidate labels.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two inputs: the text "Explore the world's flavors through global culinary adventures." and the <b>candidate labels</b> travel / cooking / sports, marked "previously <u>unseen</u>" (the model was never trained on them). The <b>zero-shot model</b>'s objective is to predict unseen labels. Output is a score per label: <b>Cooking .60, Travel .35, Sports .05</b>. Notice "travel" gets a fair share: the sentence really is about both, and the scores show that.</p>
+  <p>The neat trick for zero-shot with embeddings: <b>describe each label</b> in words. For example, the negative label for movie reviews can be described as "This is a negative movie review." By embedding the label descriptions and the documents, we have data to work with. We generate our own target labels without any labeled data.</p>
+  <figure class="bookfig"><img src="figs/fig-4-14.png" alt="Document 'Best movie ever!' and candidate labels 0 negative and 1 positive; labels are described as 'A negative review' and 'A positive review'; all three go through the embedding model to give one document embedding and two label embeddings" loading="lazy"><figcaption>Figure 4-14 (book, pdf p146): To embed the labels, we first need to give them a description, such as "a negative movie review." This can then be embedded through sentence-transformers.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: one <b>document</b> ("Best movie ever!") and two <b>candidate labels</b>, 0 (negative) and 1 (positive). "Describe labels" turns them into short sentences: "A <b>negative</b> review", "A <b>positive</b> review". All three texts pass through the <i>same</i> embedding model. Bottom: one blue <b>document embedding</b> and two <b>label embeddings</b> (red, green). Now document and labels live in the same vector space and can be compared.</p>
+  <p>Creating label embeddings uses the same <code>.encode</code> function:</p>
+  <pre class="code"><code><span class="cm"># Create embeddings for our labels</span>
+label_embeddings = model.encode(["A negative review", "A positive review"])</code></pre>
+  <p>To assign a label, compute the <b>cosine similarity</b> of each document–label pair. Cosine similarity is the <b>cosine of the angle between two vectors</b>: the <b>dot product</b> of the embeddings divided by the <b>product of their lengths</b>:</p>
+  <div class="formula">cos(θ) = (a · b) / (‖a‖ × ‖b‖)      a · b = a₁b₁ + a₂b₂ + … + a₇₆₈b₇₆₈</div>
+  <figure class="bookfig"><img src="figs/fig-4-15.png" alt="Three arrows from the origin: blue 'Best movie ever!', green 'A positive movie review', red 'A negative movie review'. The angle theta1 between the document and the positive label is smaller than theta2 between the document and the negative label" loading="lazy"><figcaption>Figure 4-15 (book, pdf p147): The cosine similarity is the angle between two vectors or embeddings. In this example, we calculate the similarity between a document and the two possible labels, positive and negative.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A 2-D sketch of the embedding space. Three arrows start at the origin: blue (the document "Best movie ever!"), green ("A positive movie review") and red ("A negative movie review"). <b>θ₁</b> (orange dashes) is the angle between document and positive label; <b>θ₂</b> (black dashes) between document and negative label. θ₁ is clearly smaller, so the document points more in the "positive" direction. Smaller angle → larger cosine → more similar. (The caption calls the angle itself the cosine similarity; strictly it is the <i>cosine of</i> the angle.)</p>
+  <p>We check how similar a document is to each label description, and pick the label with the <b>highest similarity</b>:</p>
+  <figure class="bookfig"><img src="figs/fig-4-16.png" alt="Cosine similarity of 'Best movie ever!' with 'A negative review' is 0.08; with 'A positive review' is 0.92; the larger value means Positive" loading="lazy"><figcaption>Figure 4-16 (book, pdf p147): After embedding the label descriptions and the documents, we can use cosine similarity for each label document pair.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two equations. cosine("Best movie ever!", "A negative review") = <b>.08</b>. cosine("Best movie ever!", "A positive review") = <b>.92</b>. The bigger one wins, so the label is <b>Positive</b>. (Beyond the book: these neat numbers are illustrative; real sentence-embedding cosines between related sentences are often closer together, which is why we take the argmax rather than a fixed threshold.)</p>
+  <pre class="code"><code>from sklearn.metrics.pairwise import cosine_similarity
+
+<span class="cm"># Find the best matching label for each document</span>
+sim_matrix = cosine_similarity(test_embeddings, label_embeddings)
+y_pred = np.argmax(sim_matrix, axis=1)
+
+evaluate_performance(data["test"]["label"], y_pred)</code></pre>
+  <ul class="codeexp">
+    <li><code>cosine_similarity(A, B)</code> returns a matrix of shape (1066, 2): row = review, column = label ("negative", "positive").</li>
+    <li><code>np.argmax(..., axis=1)</code> picks, for each row, the column with the higher similarity: 0 = negative, 1 = positive. The label order in <code>encode([...])</code> was chosen to match the dataset's 0/1.</li>
+  </ul>
+  <p>"And that is it!" We only had to name the labels. The result:</p>
+  <pre class="code"><code>                 precision    recall  f1-score   support
+
+Negative Review       0.78      0.77      0.78       533
+Positive Review       0.77      0.79      0.78       533
+
+       accuracy                           0.78      1066
+      macro avg       0.78      0.78      0.78      1066
+   weighted avg       0.78      0.78      0.78      1066</code></pre>
+  <p>An <b>F1 of 0.78</b> with <b>no labeled data at all</b>. The authors call it quite impressive, and say it shows how versatile embeddings are, "especially if you are a bit creative with how they are used". It is only 0.02 below the task-specific model trained on tweets.</p>
+  <div class="fig">
+    <h3>Try it: cosine similarity with two label arrows</h3>
+    <div class="controls">
+      <label for="csD">document angle <input id="csD" type="range" min="0" max="180" value="70"><output id="csDo">70°</output></label>
+      <label for="csP">"positive" label <input id="csP" type="range" min="0" max="180" value="45"><output id="csPo">45°</output></label>
+      <label for="csN">"negative" label <input id="csN" type="range" min="0" max="180" value="140"><output id="csNo">140°</output></label>
+    </div>
+    <div class="sqbox"><svg id="cssvg" viewBox="0 0 400 220" style="min-width:300px;width:100%;height:auto" role="img" aria-label="Three vectors from the origin with angles"></svg></div>
+    <div class="readout" id="csread"></div>
+    <p class="note">Modelled 2-D vectors. Real embeddings have 768 dimensions, but cosine still just measures the angle between the two arrows; arrow length does not matter.</p>
+  </div>
+  <div class="box work"><b>Worked example · cosine by hand in 3 dimensions</b>
+    <p>Toy embeddings (modelled): document d = (0.9, 0.3, 0.1); "positive" p = (0.8, 0.5, 0.0); "negative" n = (0.1, 0.4, 0.9).</p>
+    <div class="formula">d·p = 0.72 + 0.15 + 0.00 = 0.87    ‖d‖ = 0.954   ‖p‖ = 0.943   cos = 0.87 / 0.900 = 0.97
+d·n = 0.09 + 0.12 + 0.09 = 0.30    ‖n‖ = 0.990                  cos = 0.30 / 0.944 = 0.32
+argmax → "positive"</div>
+  </div>
+  <div class="box behind"><b>Note from the book: why embeddings and not NLI?</b><p>If you know zero-shot classification with Transformer models, you may wonder why the book uses embeddings. <b>Natural language inference (NLI)</b> models (models trained to say whether one sentence implies another) are "amazing" for zero-shot classification. But this example shows how flexible embeddings are across tasks. Throughout the book, embeddings appear in most Language AI use cases, and they are "an underestimated but incredibly vital component".</p></div>
+  <div class="box behind"><b>Tip from the book: name your labels better</b><p>"A negative/positive review" can be improved. Make the descriptions more <b>concrete</b> and specific to the data, such as <b>"A very negative/positive movie review"</b>. Then the embedding captures that it is a <i>movie</i> review and focuses more on the <i>extremes</i> of the two labels. The book leaves this as an experiment ("Try it out") and does not report the new score.</p>
+    <div class="controls"><label for="lblsel">Label wording <select id="lblsel"><option value="0">A negative review / A positive review</option><option value="1">A very negative movie review / A very positive movie review</option><option value="2">bad / good</option><option value="3">This is a negative movie review. / This is a positive movie review.</option></select></label></div>
+    <div class="caption" id="lblcap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>New at a railway parcel office, with no training. You get two signboards: "Fragile items" and "Heavy items". For each parcel you ask "which signboard does this look most like?" and put it there. You didn't need anyone to show you examples first, just the signboard wording. Write better signboards ("Glassware and electronics: fragile") and you sort better. <i>Where it breaks:</i> the model has no idea what <i>you</i> mean by a label beyond the words; sarcastic reviews ("great, another two hours of my life gone") look "positive" by wording.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The embedding model was trained so that sentences with similar meaning point in similar directions. "A positive review" sits somewhere in that space near praise-like sentences. A review full of praise points the same way, so its cosine with the positive description is higher. Nothing is learned; we're just measuring which description each review is closest to. It also gives a cheap <b>feasibility test</b>: if zero-shot already gets 0.78, the task is clearly learnable and labeling more data is likely worthwhile.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You have no labels. How do you classify support tickets?"</i> "Zero-shot first: embed short descriptions of each category and assign each ticket to the nearest by cosine similarity, or ask an LLM with a constrained prompt. Hand-label a small sample to measure it. If it's promising, use those labels (and the zero-shot guesses reviewed by humans) to train a proper classifier." In RAG memory, this same cosine trick routes queries to the right memory type without training anything.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: the same cosine similarity is the core of semantic search.</li><li><a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a>: when you don't even have label names.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: NLI data used to train embedding models.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · TEXT CLASSIFICATION WITH GENERATIVE MODELS</div><h2>Generative models answer in text, so you must tell them what you want: prompts</h2></div><span class="chip">pdf p149–150 · Fig 4-17, 4-18</span></div>
+  <p>Classifying with <b>generative</b> language models, such as OpenAI's GPT models, works differently. These models take text as input and generate text as output, so they are called <b>sequence-to-sequence</b> models. That is in stark contrast to the task-specific model, which outputs a class.</p>
+  <figure class="bookfig"><img src="figs/fig-4-17.png" alt="Top: token sequence 'Best movie ever !' into a task-specific model outputs the number 1, a sequence-to-value model. Bottom: token sequence 'What is 1 + 1 ?' into a generative model outputs the token sequence 'The answer is 2', a sequence-to-sequence model" loading="lazy"><figcaption>Figure 4-17 (book, pdf p149): A task-specific model generates numerical values from sequences of tokens while a generative model generates sequences of tokens from sequences of tokens.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: the token sequence <b>Best · movie · ever · !</b> goes into the teal task-specific model and out comes a single <b>numerical value</b>, 1. The dotted bracket names it a <b>sequence-to-<i>value</i> model</b>. Bottom: the tokens <b>What · is · 1 · + · 1 · ?</b> go into the pink generative model, objective "generate text", and out comes another token sequence, <b>The · answer · is · 2</b>: a <b>sequence-to-<i>sequence</i> model</b>.</p>
+  <p>Generative models are usually trained on a wide variety of tasks and <b>usually won't do your use case out of the box</b>. Give one a movie review with no context and it has no idea what to do with it. We must help it understand the context and guide it to the answer we want. This guiding is done mainly through the <b>instruction</b>, or <b>prompt</b>. Iteratively improving the prompt to get the preferred output is called <b>prompt engineering</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-4-18.png" alt="Three prompts with the review 'Best movie ever!' go into a generative model: 'Rate the sentiment' gives a long answer about a rating of 5; 'What sentiment does this review have?' gives 'The review expresses a positive sentiment'; 'Is this movie review negative or positive?' gives just 'Positive', marked as the best prompt for the preferred output" loading="lazy"><figcaption>Figure 4-18 (book, pdf p150): Prompt engineering allows prompts to be updated to improve the output generated by the model.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three attempts, left to right, each with the same review "Best movie ever!". <b>1.</b> "Rate the sentiment." → a long completion: "Given a typical sentiment rating scale it would be rated as 5 due to its highly positive connotation." (correct but hard to parse; faded = not ideal). <b>2.</b> "What sentiment does this review have?" → "The review expresses a positive sentiment." (better, still a sentence). <b>3.</b> "Is this movie review negative or positive?" → just <b>"Positive"</b>, boxed as the "best prompt for the preferred output". The input is called the <i>prompt</i>, the output the <i>completion</i>. Each rewrite moves the output closer to a clean label you can map to 0/1.</p>
+  <div class="fig">
+    <h3>Step through: iterate a prompt until the output is parseable</h3>
+    <div class="stepbar"><button id="pe_prev" type="button">◀ Back</button><button id="pe_next" type="button">Next ▶</button><span id="pe_n"></span></div>
+    <div class="chat" id="pe_chat"></div>
+    <div class="caption" id="pe_cap"></div>
+    <p class="note">Prompts 1–3 and their outputs are Figure 4-18's; prompt 4 adds an output-format rule like the one the book uses for ChatGPT in plate 12.</p>
+  </div>
+  <p>This section shows how different types of generative models can classify the Rotten Tomatoes dataset. (The book's sentence says "without our Rotten Tomatoes dataset"; from the rest of the section it clearly means <i>with</i> it: both models are scored on the same test split.)</p>
+  <div class="box picture"><b>Picture it</b><p>Asking a very knowledgeable but chatty uncle to grade an essay. "What do you think?" gets a 10-minute speech. "Pass or fail? One word." gets "Pass". Same uncle, same knowledge; the question decides how usable the answer is. <i>Where it breaks:</i> the uncle will remember yesterday's instruction; a model only knows what is in this prompt, so every request must carry the instruction again.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A generative model predicts the next token given everything before it. A bare review has many plausible continuations (more review text, a reply, a summary). A prompt that names the task and the allowed answers makes "positive"/"negative" by far the most likely next tokens. Prompt engineering is shaping that probability distribution with words instead of with training.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you get reliable labels out of an LLM?"</i> "Constrain the output: list the allowed labels, ask for only the label (or JSON), use temperature 0, and parse strictly with a fallback for anything unexpected. Where the API supports it, use structured outputs or function calling so the model can only return a valid enum. Then measure on a labeled set just like any classifier." In a tool-calling agent, the tool choice itself is this kind of classification.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: prompt engineering in depth; <a href="ch07_advanced_text_generation.html">Ch.7</a>: constrained generation.</li><li><a href="../ai_engineering/ch05_prompt_engineering.html">AI Engineering Ch.5</a>.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · USING THE TEXT-TO-TEXT TRANSFER TRANSFORMER</div><h2>T5 and Flan-T5: an open encoder-decoder model that reads instructions (F1 0.84)</h2></div><span class="chip">pdf p150–153 · Fig 4-19, 4-20, 4-21</span></div>
+  <p>The book mostly uses <b>encoder-only</b> (representation) models like BERT and <b>decoder-only</b> (generative) models like ChatGPT. But, as Chapter 1 showed, the <b>original Transformer</b> is an <b>encoder-decoder</b> architecture. Like decoder-only models, encoder-decoder models are sequence-to-sequence models and generally count as <b>generative</b> models.</p>
+  <p>An interesting family using this architecture is the <b>Text-to-Text Transfer Transformer</b>, or <b>T5</b> (Raffel et al., 2020, footnote 7). Its architecture is similar to the original Transformer: <b>12 encoders and 12 decoders</b> stacked together.</p>
+  <figure class="bookfig"><img src="figs/fig-4-19.png" alt="T5 Text-to-Text Transfer Transformer: input token sequence 'What is 1 + 1 ?' goes into a stack of 12 encoders and then a stack of 12 decoders, which output the sequence 'The answer is 2'" loading="lazy"><figcaption>Figure 4-19 (book, pdf p151): The T5 architecture is similar to the original Transformer model, a decoder-encoder architecture.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Input sequence on top (What · is · 1 · + · 1 · ?), output sequence at the bottom (The · answer · is · 2). Inside the dotted T5 box: a stack of teal <b>Encoder</b> blocks marked <b>×12</b>, then a stack of pink <b>Decoder</b> blocks marked <b>×12</b>. The encoder reads the whole input; the decoder writes the answer token by token while looking at the encoder's output. (The caption says "decoder-encoder"; the order of data flow is encoder → decoder.)</p>
+  <p>T5 is trained in two steps.</p>
+  <p><b>Step 1 · Pretraining</b> with <b>masked language modeling</b>. Unlike BERT, which masks single tokens, T5 masks <b>sets of tokens (token spans)</b>. The model must predict what fills each mask, and a mask may hide several tokens.</p>
+  <figure class="bookfig"><img src="figs/fig-4-20.png" alt="Masked input 'LLMs can be used for [MASK], a form of [MASK].' goes into the T5 model with objective predict [MASK]; the predicted masks are 'text generation' and 'generative ai'" loading="lazy"><figcaption>Figure 4-20 (book, pdf p151): In the first step of training, namely pretraining, the T5 model needs to predict masks that could contain multiple tokens.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The input "LLMs can be used for <b>[MASK]</b>, a form of <b>[MASK]</b>." has two masks (purple and green). Step <b>① Pretraining</b>: the T5 model's objective is "predict [MASK]". Output (predicted masks): purple mask → <b>text generation</b> (two tokens); green mask → <b>generative ai</b> (two tokens). One mask, several tokens: that is the span idea.</p>
+  <div class="fig">
+    <h3>Try it: span masking</h3>
+    <div class="controls"><label for="smlen">span length <input id="smlen" type="range" min="1" max="3" value="2"><output id="smleno">2</output></label><button type="button" id="smnew">New masks</button><button type="button" id="smshow">Reveal targets</button></div>
+    <div id="smin" style="min-height:40px"></div>
+    <div id="smout" class="mono"></div>
+    <p class="note">Toy: masks are placed at random over the book's example sentence. Real T5 uses sentinel tokens such as &lt;extra_id_0&gt; and corrupts about 15% of tokens with spans averaging 3 tokens (Beyond the book: from the T5 paper).</p>
+  </div>
+  <p><b>Step 2 · Fine-tuning</b> the base model, "where the real magic happens". Instead of fine-tuning for one task, <b>each task is turned into a sequence-to-sequence task</b> (text in, text out) and all are trained <b>at the same time</b>. So one model learns a wide variety of tasks.</p>
+  <figure class="bookfig"><img src="figs/fig-4-21.png" alt="Three task inputs: 'Translate into Dutch: My name is Maarten.', 'Grammar: The building is tall and wide.', and 'Summarize: Reading books has a myriad of advantages...'; the T5 model with objective predict multiple tasks outputs 'Mijn naam is Maarten', 'Acceptable', and 'Reading improves mental health and broadens knowledge.'" loading="lazy"><figcaption>Figure 4-21 (book, pdf p152): By converting specific tasks to textual instructions, the T5 model can be trained on a variety of tasks during fine-tuning.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Step <b>② Fine-tuning</b>, objective "predict multiple tasks". Each input starts with a task word: "<b>Translate into Dutch:</b> My name is Maarten." → "Mijn naam is Maarten"; "<b>Grammar:</b> The building is tall and wide." → "Acceptable"; "<b>Summarize:</b> Reading books has a myriad of advantages…" → "Reading improves mental health and broadens knowledge." Translation, grammar checking (really a classification) and summarization all become "text in → text out" for one model.</p>
+  <p>This method was extended in the paper <b>"Scaling instruction-finetuned language models"</b> (Chung et al., 2022, footnote 8), which used <b>more than a thousand tasks</b> during fine-tuning, phrased more like the instructions we know from GPT models. The result is the <b>Flan-T5</b> family, which benefits from this huge variety of tasks.</p>
+  <p>Load Flan-T5 through the <b><code>"text2text-generation"</code></b> pipeline task, which is generally reserved for encoder-decoder models:</p>
+  <pre class="code"><code><span class="cm"># Load our model</span>
+pipe = pipeline(
+    "text2text-generation",
+    model="google/flan-t5-small",
+    device="cuda:0"
+)</code></pre>
+  <p>Flan-T5 comes in sizes <b>flan-t5-small / base / large / xl / xxl</b>. The book uses the smallest to speed things up, and invites you to try bigger ones to see if results improve.</p>
+  <p>Unlike the task-specific model, we can't just give the text and hope for a sentiment. We must <b>instruct</b> the model. So each document gets the prefix prompt <b>"Is the following sentence positive or negative?"</b>:</p>
+  <pre class="code"><code><span class="cm"># Prepare our data</span>
+prompt = "Is the following sentence positive or negative? "
+data = data.map(lambda example: {"t5": prompt + example['text']})
+data
+<span class="cm"># DatasetDict({ train / validation / test: features: ['text', 'label', 't5'], ... })</span></code></pre>
+  <ul class="codeexp">
+    <li><code>data.map(fn)</code> runs <code>fn</code> on every row of every split and adds the returned keys as new columns. Here it adds a <code>t5</code> column = prompt + review. Row counts stay 8,530 / 1,066 / 1,066.</li>
+  </ul>
+  <pre class="code"><code><span class="cm"># Run inference</span>
+y_pred = []
+for output in tqdm(pipe(KeyDataset(data["test"], "t5")), total=len(data["test"])):
+    text = output[0]["generated_text"]
+    y_pred.append(0 if text == "negative" else 1)</code></pre>
+  <ul class="codeexp">
+    <li>Same loop pattern as plate 05, but reading the new <code>t5</code> column.</li>
+    <li><code>output[0]["generated_text"]</code> is the model's text answer.</li>
+    <li>Because the model outputs text, we must convert it to numbers: <b>"negative" → 0</b>, everything else → <b>1</b>. Note the asymmetry: any unexpected answer ("Negative", "neutral", "I don't know") counts as positive.</li>
+  </ul>
+  <pre class="code"><code>                 precision    recall  f1-score   support
+
+Negative Review       0.83      0.85      0.84       533
+Positive Review       0.85      0.83      0.84       533
+
+       accuracy                           0.84      1066
+      macro avg       0.84      0.84      0.84      1066
+   weighted avg       0.84      0.84      0.84      1066</code></pre>
+  <p>An <b>F1 of 0.84</b>: the authors call this Flan-T5 model "an amazing first look" at the capabilities of generative models. With no training by us and only a one-line prompt, the <i>smallest</i> Flan-T5 beats the tweet-trained task-specific model (0.80).</p>
+  <div class="box work"><b>Worked example · the parser decides your score</b>
+    <p>Imagine (modelled) 1,000 answers: 480 "negative", 500 "positive", 20 odd ones ("Negative." with a capital and full stop). With <code>0 if text == "negative" else 1</code>, those 20 become <b>positive</b>. If they were really negative reviews, recall on negatives drops by 20 / 500 = 4 points. A safer parser: <code>text.strip().lower().startswith("neg")</code>, and count unparseable outputs separately.</p>
+    <div class="controls"><label for="psin">Try an output <input id="psin" type="text" value="Negative." style="width:12em"></label></div>
+    <div class="readout" id="psread"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book</b><p>Approximate Flan-T5 sizes (from the model cards): small ~80M, base ~250M, large ~780M, xl ~3B, xxl ~11B parameters. Encoder-decoder models remain popular for translation and summarization; most chat LLMs today are decoder-only.</p></div>
+  <div class="box picture"><b>Picture it</b><p>T5's pretraining is a fill-in-the-blanks exam where a blank can hide a whole phrase ("LLMs can be used for ______, a form of ______."). Its fine-tuning is a coaching centre that turns every subject into the same format: "Question: … Answer: …", for translation, grammar and summaries alike, so one student learns them all. Flan adds a thousand more subjects. <i>Where it breaks:</i> a student who aced 1,000 subjects still answers in their own words; you must still check the answer format (the parser).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Casting every task as text-to-text gives one model, one loss (predict the target text) and one interface. Training on many tasks phrased as instructions teaches the model to <b>follow instructions it has not seen before</b>, which is why "Is the following sentence positive or negative?" just works. The encoder reads the full prompt bidirectionally; the decoder only has to emit one short word.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Encoder-only vs decoder-only vs encoder-decoder?"</i> "Encoder-only (BERT) outputs representations: great for classification and embeddings, small and fast. Decoder-only (GPT) generates text left to right: general chat and reasoning. Encoder-decoder (T5) encodes the input fully, then decodes an output: natural for input→output tasks like translation and summarization. All can classify; the choice is about output form, latency and cost."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: the original encoder-decoder Transformer; <a href="ch03_looking_inside_llms.html">Ch.3</a>: decoder internals.</li><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: instruction tuning yourself; <a href="../llm_engineers_handbook/ch05_supervised_fine_tuning.html">LLM Engineer's Handbook Ch.5</a>: supervised fine-tuning.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · CHATGPT FOR CLASSIFICATION</div><h2>A closed model through an API: instruction tuning, preference tuning, cost and rate limits (F1 0.91)</h2></div><span class="chip">pdf p154–157 · Fig 4-22, 4-23</span></div>
+  <p>The book focuses on open source models, but <b>closed source</b> models are a major part of Language AI, ChatGPT above all. The architecture of the original ChatGPT model (<b>GPT-3.5</b>) is not shared, but from the name we can assume it is <b>decoder-only</b>, like the GPT models seen so far.</p>
+  <p>OpenAI did share an overview of the <b>training procedure</b>, which includes an important part: <b>preference tuning</b>. First, OpenAI <b>manually created the desired output</b> for input prompts (<b>instruction data</b>) and used it to create a first variant of the model.</p>
+  <figure class="bookfig"><img src="figs/fig-4-22.png" alt="Instruction data collection: sample prompt 'What is 1 + 1?' and human labelers create the desired output 'The answer is 2.'; this is used for instruction-tuning a generative model whose objective is to generate output given prompt" loading="lazy"><figcaption>Figure 4-22 (book, pdf p154): Manually labeled data consisting of an instruction (prompt) and output was used to perform fine-tuning (instruction-tuning).</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left, under the dotted bracket "<b>Instruction</b> data collection": a sample <b>prompt</b> ("What is 1 + 1?") and the desired <b>output</b> written by human labelers ("The answer is 2."). These pairs feed <b>instruction-tuning</b> of the generative model, whose objective becomes "generate output given prompt". The trailing "…" means this is not the end of training.</p>
+  <p>OpenAI then used that model to <b>generate multiple outputs</b>, which humans <b>ranked from best to worst</b>. The ranking shows a preference for certain outputs (<b>preference data</b>) and was used to create the final model, ChatGPT.</p>
+  <figure class="bookfig"><img src="figs/fig-4-23.png" alt="For the prompt 'Explain LLMs', the instruction-tuned model generates outputs A 'An abbreviation for the Master of Laws', B 'I am not familiar with...', C 'Large language models are artificial...'; human labelers rank C > B > A; this preference data is used for preference-tuning a generative model to generate the preferred output given the prompt" loading="lazy"><figcaption>Figure 4-23 (book, pdf p154): Manually ranked preference data was used to generate the final model, ChatGPT.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The prompt "Explain LLMs" goes to the instruction-tuned model, which writes three answers: <b>A</b> "An abbreviation for the Master of Laws." (LLM also means a law degree: wrong meaning), <b>B</b> "I am not familiar with…" (unhelpful), <b>C</b> "Large language models are artificial…" (right). Human labelers <b>rank</b> them: <b>C &gt; B &gt; A</b>. That ranking is the <b>preference data</b> ("Create preference data"), used for <b>preference-tuning</b>: objective "generate <i>preferred</i> output given prompt".</p>
+  <p>Big benefit of <b>preference data over instruction data</b>: the <b>nuance</b> it carries. By showing the difference between a <i>good</i> and a <i>better</i> output, the model learns to generate text that resembles <b>human preference</b>. Chapter 12 explains how fine-tuning and preference tuning work and how to do them yourself.</p>
+  <div class="fig">
+    <h3>Step through: from base model to ChatGPT</h3>
+    <div class="stepbar"><button id="rl_prev" type="button">◀ Back</button><button id="rl_next" type="button">Next ▶</button><span id="rl_n"></span></div>
+    <div class="caption" id="rl_cap"></div>
+    <div id="rl_box" style="display:grid;gap:6px"></div>
+  </div>
+  <p><b>Using a closed model is different</b>: instead of loading the model, you access it through <b>OpenAI's API</b>. First create a free account and an <b>API key</b> (the book gives links), then use the key to talk to OpenAI's servers:</p>
+  <pre class="code"><code>import openai
+
+<span class="cm"># Create client</span>
+client = openai.OpenAI(api_key="YOUR_KEY_HERE")
+
+def chatgpt_generation(prompt, document, model="gpt-3.5-turbo-0125"):
+    """Generate an output based on a prompt and an input document."""
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user",   "content": prompt.replace("[DOCUMENT]", document)}
+    ]
+    chat_completion = client.chat.completions.create(
+        messages=messages,
+        model=model,
+        temperature=0
+    )
+    return chat_completion.choices[0].message.content</code></pre>
+  <ul class="codeexp">
+    <li><code>openai.OpenAI(api_key=...)</code> creates a client that sends HTTPS requests to OpenAI. (Never hard-code a real key; read it from an environment variable.)</li>
+    <li><code>messages</code> is the chat format: a <b>system</b> message that sets behaviour ("You are a helpful assistant."), then a <b>user</b> message.</li>
+    <li><code>prompt.replace("[DOCUMENT]", document)</code>: the prompt is a <b>template</b> with a placeholder; each review is pasted in.</li>
+    <li><code>temperature=0</code>: always pick the most likely tokens, so the same review gives (nearly) the same answer: what you want for classification.</li>
+    <li><code>choices[0].message.content</code> is the text of the reply.</li>
+  </ul>
+  <pre class="code"><code><span class="cm"># Define a prompt template as a base</span>
+prompt = """Predict whether the following document is a positive or negative movie review:
+
+[DOCUMENT]
+
+If it is positive return 1 and if it is negative return 0. Do not give any other answers.
+"""
+
+<span class="cm"># Predict the target using GPT</span>
+document = "unpretentious , charming , quirky , original"
+chatgpt_generation(prompt, document)</code></pre>
+  <p>The template is "merely an example"; change it however you like. It is kept simple to show the idea. Note the last line: it forces the output format (1 or 0, nothing else), so the answer can be turned into an integer directly.</p>
+  <div class="fig">
+    <h3>Try it: fill the template</h3>
+    <div class="controls" style="display:grid"><label for="tpdoc" style="display:grid">document <input id="tpdoc" type="text" class="wide" value="unpretentious , charming , quirky , original"></label></div>
+    <div class="chat" id="tpchat"></div>
+    <p class="note">Shows the exact messages the function sends. No API is called; the "reply" line is a placeholder.</p>
+  </div>
+  <p><b>Keep track of usage.</b> External APIs can quickly become costly with many requests. At the time of writing, running the whole test set with <code>gpt-3.5-turbo-0125</code> cost <b>3 cents</b>, covered by the free account, but this might change.</p>
+  <div class="box behind"><b>Tip from the book: rate limits and exponential backoff</b><p>With external APIs you may hit <b>rate limit errors</b>: you called the API too often, because some APIs limit requests per minute or per hour. To prevent them, retry the request using methods such as <b>exponential backoff</b>: sleep a short time each time you hit a rate-limit error, then retry; if it fails again, <b>increase the sleep length</b>, until the request succeeds or you reach a <b>maximum number of retries</b>. The book points to OpenAI's guide for using it.</p></div>
+  <div class="fig">
+    <h3>Try it: exponential backoff simulator</h3>
+    <div class="controls">
+      <label for="bkb">base wait (s) <input id="bkb" type="range" min="1" max="4" value="1"><output id="bkbo">1</output></label>
+      <label for="bkm">max retries <input id="bkm" type="range" min="2" max="8" value="6"><output id="bkmo">6</output></label>
+      <label for="bkf">limit clears after (s) <input id="bkf" type="range" min="0" max="40" value="10"><output id="bkfo">10</output></label>
+      <label><input id="bkj" type="checkbox"> jitter</label>
+    </div>
+    <div class="log" id="bklog"></div>
+    <div class="verdict" id="bkv"></div>
+    <p class="note">Modelled: wait = base × 2<sup>attempt</sup>; the API rejects every call until the "limit clears" time. Jitter (random spread of waits, Beyond the book) avoids many clients retrying in lock-step.</p>
+  </div>
+  <p>Then run all test reviews (the book says you can skip this to save your free credits), and convert the string outputs to integers:</p>
+  <pre class="code"><code><span class="cm"># You can skip this if you want to save your (free) credits</span>
+predictions = [chatgpt_generation(prompt, doc) for doc in tqdm(data["test"]["text"])]
+
+<span class="cm"># Extract predictions</span>
+y_pred = [int(pred) for pred in predictions]
+
+<span class="cm"># Evaluate performance</span>
+evaluate_performance(data["test"]["label"], y_pred)</code></pre>
+  <ul class="codeexp">
+    <li>One API call per review, 1,066 calls in a simple loop (sequential; no batching).</li>
+    <li><code>int(pred)</code> converts "1"/"0" to integers. If the model ever replied with anything else, this line would raise an error; the strict instruction in the prompt plus <code>temperature=0</code> is what makes it safe here.</li>
+  </ul>
+  <pre class="code"><code>                 precision    recall  f1-score   support
+
+Negative Review       0.87      0.97      0.92       533
+Positive Review       0.96      0.86      0.91       533
+
+       accuracy                           0.91      1066
+      macro avg       0.92      0.91      0.91      1066
+   weighted avg       0.92      0.91      0.91      1066</code></pre>
+  <p>An <b>F1 of 0.91</b>, a glimpse of the model that brought generative AI to the masses. Per-class rows: negative recall 0.97 but positive recall 0.86, so it leans towards saying "negative".</p>
+  <p><b>The big caveat:</b> we <b>don't know what data the model was trained on</b>, so we can't easily trust these metrics. "For all we know, it might have actually been trained on our dataset!" (Beyond the book, this is called <b>data contamination</b>: the test set leaking into training.) Chapter 12 explores evaluating open and closed models on more general tasks.</p>
+  <div class="box work"><b>Worked example · cost and time of the API run</b>
+    <p>The book's number: whole test set ≈ <b>$0.03</b>. That is ≈ $0.000028 per review. Scale it (arithmetic on the book's figure, same price assumed): 100,000 reviews ≈ $2.80; 10 million ≈ $280. Time is the other cost: at a modelled 0.5 s per sequential call, 1,066 calls take about 9 minutes; 10 million would take ~58 days unless you send requests in parallel, which is exactly when rate limits and backoff start to matter.</p>
+  </div>
+  <div class="box beyond"><b>Beyond the book</b><p><code>gpt-3.5-turbo-0125</code> has since been superseded by newer, cheaper OpenAI models; prices and free-tier rules change. Modern APIs also offer <b>structured outputs / JSON schema</b> and <b>logprobs</b> (token probabilities), which give a safer parse and a confidence score for classification. Official SDKs already retry some errors with backoff by default.</p></div>
+  <div class="box picture"><b>Picture it</b><p>ChatGPT's training is like training a new waiter. First, the head waiter shows exactly what to say to customers (instruction data). Then the new waiter tries three ways of describing a dish, and the head waiter ranks them: "C is best, then B, A is wrong" (preference data). Rankings teach the subtle difference between fine and great. Calling the API is like ordering from a cloud kitchen: you don't see the kitchen, you pay per order, and at rush hour they say "try again in a minute" (rate limit). <i>Where it breaks:</i> if the cloud kitchen secretly memorised the menu of your exam (the test set), its perfect dishes prove nothing.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Instruction tuning teaches the format "prompt → helpful answer". Preference tuning (beyond the book's wording here: RLHF, reinforcement learning from human feedback, and related methods; see Ch.12) teaches which of several acceptable answers humans prefer. Together they make the model follow an instruction like "return 1 or 0, nothing else" reliably. Its high score comes from scale and broad training, but because the training data is unknown, a high score on a public dataset might partly be memorization.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Would you classify with a GPT API in production?"</i> "It's the fastest path to high accuracy with no training, but I'd weigh cost per call, latency, rate limits, vendor dependence and data privacy. I'd add retries with exponential backoff and jitter, strict output parsing, caching for repeated inputs, and a private eval set the vendor can't have trained on. At high volume, I'd use the LLM to label data and distil into a small embeddings classifier." That distillation pattern is common behind LLM gateways.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: instruction and preference tuning; <a href="../llm_engineers_handbook/ch06_preference_alignment.html">LLM Engineer's Handbook Ch.6</a>: preference alignment (DPO).</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: data contamination; <a href="../ai_engineering/ch09_inference_optimization.html">Ch.9</a>: API cost and latency.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>Summary: from fine-tuned models to no tuning at all</h2></div><span class="chip">pdf p157</span></div>
+  <p>The chapter covered many techniques for classification, "from fine-tuning your entire model to no tuning at all". Classifying text is not as simple as it looks, and there are many creative ways to do it.</p>
+  <ul class="plain">
+    <li>The goal throughout: assign a label (class) to input text, here the sentiment of a movie review.</li>
+    <li><b>Two types of representation model.</b> The <b>task-specific model</b> was pretrained (fine-tuned by others) specifically for sentiment analysis, and showed that pretrained models are a great way to classify documents. The <b>embedding model</b> produced multipurpose embeddings that we used as input to train a classifier.</li>
+    <li><b>Two types of generative model.</b> An <b>open source encoder-decoder</b> model (<b>Flan-T5</b>) and a <b>closed source decoder-only</b> model (<b>GPT-3.5</b>). Both classified text without any extra training on domain data or labeled datasets.</li>
+    <li><b>Next chapter:</b> classification continues, but <b>unsupervised</b>: what can we do with text that has no labels at all? What information can we extract? Clustering the data and naming the clusters with <b>topic modeling</b>.</li>
+  </ul>
+  <div class="fig">
+    <h3>Scoreboard: the five approaches on the same 1,066 test reviews</h3>
+    <div class="controls"><label for="sbm">metric <select id="sbm"><option value="f1">weighted F1</option><option value="rn">recall (negative)</option><option value="rp">recall (positive)</option></select></label><label for="sbs">sort <select id="sbs"><option value="book">book order</option><option value="score">by score</option></select></label></div>
+    <div id="sbbars" style="display:grid;gap:6px"></div>
+    <p class="note">All numbers are the book's classification reports (pdf p141, p145, p148, p153, p157).</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>approach</th><th>model</th><th>training by us</th><th>labels needed</th><th>runs</th><th>F1</th></tr></thead>
+    <tbody>
+      <tr><td>Task-specific</td><td>cardiffnlp/twitter-roberta-base-sentiment-latest</td><td>none</td><td>none (someone else's)</td><td>local GPU</td><td class="num">0.80</td></tr>
+      <tr><td>Embeddings + logistic regression</td><td>all-mpnet-base-v2 + sklearn</td><td>small classifier on CPU</td><td>yes (8,530)</td><td>local</td><td class="num">0.85</td></tr>
+      <tr><td>Zero-shot embeddings</td><td>all-mpnet-base-v2</td><td>none</td><td>only label names</td><td>local</td><td class="num">0.78</td></tr>
+      <tr><td>Flan-T5 + prompt</td><td>google/flan-t5-small</td><td>none</td><td>none</td><td>local GPU</td><td class="num">0.84</td></tr>
+      <tr><td>ChatGPT + prompt</td><td>gpt-3.5-turbo-0125</td><td>none</td><td>none</td><td>OpenAI API (~3 cents)</td><td class="num">0.91*</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">* Training data unknown; the test set may have been seen during training.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>term</th><th>meaning in this chapter</th></tr></thead>
+    <tbody>
+      <tr><td>Text classification</td><td>Assigning a label/class from a fixed set to an input text.</td></tr>
+      <tr><td>Pretrained model</td><td>A model already trained on lots of data, used as-is.</td></tr>
+      <tr><td>Representation model</td><td>Encoder-only model (BERT family) that outputs vectors or class scores, not text.</td></tr>
+      <tr><td>Generative model</td><td>Model that outputs text (decoder-only GPT, or encoder-decoder T5).</td></tr>
+      <tr><td>Foundation model</td><td>A base model (e.g. BERT) meant to be fine-tuned for downstream tasks.</td></tr>
+      <tr><td>Fine-tuning</td><td>Further training a pretrained model on a specific task.</td></tr>
+      <tr><td>Task-specific model</td><td>A representation model fine-tuned for one task (e.g. sentiment).</td></tr>
+      <tr><td>Embedding model</td><td>A model that turns text into general-purpose vectors.</td></tr>
+      <tr><td>Frozen</td><td>Weights are not updated; only the output is used.</td></tr>
+      <tr><td>Tokenizer / token</td><td>Splits text into pieces (tokens), including subwords like ##ization.</td></tr>
+      <tr><td>Hugging Face Hub</td><td>Platform hosting models and datasets.</td></tr>
+      <tr><td>Train / validation / test split</td><td>Data for fitting / extra check after tuning / final scoring.</td></tr>
+      <tr><td>Confusion matrix</td><td>2×2 table of TP, FP, FN, TN.</td></tr>
+      <tr><td>Precision</td><td>TP / (TP + FP): how many found items are relevant.</td></tr>
+      <tr><td>Recall</td><td>TP / (TP + FN): how many relevant items were found.</td></tr>
+      <tr><td>Accuracy</td><td>(TP + TN) / all: overall correctness.</td></tr>
+      <tr><td>F1 score</td><td>Harmonic mean of precision and recall.</td></tr>
+      <tr><td>Support</td><td>Number of true samples of each class (533 each).</td></tr>
+      <tr><td>Macro / weighted average</td><td>Plain average over classes / average weighted by support.</td></tr>
+      <tr><td>MTEB</td><td>Massive Text Embedding Benchmark leaderboard.</td></tr>
+      <tr><td>Logistic regression</td><td>Linear classifier that outputs a probability via the sigmoid.</td></tr>
+      <tr><td>Zero-shot classification</td><td>Predicting labels with no labeled examples, only label names.</td></tr>
+      <tr><td>Cosine similarity</td><td>Dot product divided by product of lengths: cosine of the angle between vectors.</td></tr>
+      <tr><td>NLI</td><td>Natural language inference; NLI models are another zero-shot route.</td></tr>
+      <tr><td>Sequence-to-value / sequence-to-sequence</td><td>Tokens → a number / tokens → tokens.</td></tr>
+      <tr><td>Prompt / prompt engineering</td><td>The instruction given to a generative model / iteratively improving it.</td></tr>
+      <tr><td>T5</td><td>Text-to-Text Transfer Transformer: encoder-decoder, 12 + 12 layers, span masking, multitask fine-tuning.</td></tr>
+      <tr><td>Flan-T5</td><td>T5 instruction-fine-tuned on more than 1,000 tasks.</td></tr>
+      <tr><td>Instruction tuning</td><td>Fine-tuning on human-written prompt → output pairs.</td></tr>
+      <tr><td>Preference tuning</td><td>Fine-tuning on human rankings of outputs (preference data).</td></tr>
+      <tr><td>Temperature</td><td>Randomness of generation; 0 = most likely tokens.</td></tr>
+      <tr><td>Rate limit / exponential backoff</td><td>API cap on calls per time / retrying with growing waits.</td></tr>
+      <tr><td>TF-IDF</td><td>Classic word-weighting text representation; a strong baseline.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">named in the chapter</span></div>
+  <div class="grid2">
+    <div class="card"><b>Hugging Face Hub</b><span>Hosts the rotten_tomatoes dataset and every open model used (60,000+ classification models, 8,000+ embedding models at writing time).</span></div>
+    <div class="card"><b>datasets</b><span>Loads Hub datasets as <code>DatasetDict</code> splits; <code>.map</code> adds the prompt column for T5.</span></div>
+    <div class="card"><b>transformers</b><span><code>pipeline</code> for the sentiment model and for <code>"text2text-generation"</code>; <code>KeyDataset</code> to stream a column.</span></div>
+    <div class="card"><b>sentence-transformers</b><span>Loads all-mpnet-base-v2 and turns texts into 768-dim embeddings with <code>.encode</code>.</span></div>
+    <div class="card"><b>scikit-learn</b><span><code>classification_report</code>, <code>LogisticRegression</code>, <code>cosine_similarity</code>.</span></div>
+    <div class="card"><b>Cardiff NLP · Twitter-RoBERTa</b><span>RoBERTa fine-tuned on tweets for sentiment; the task-specific model.</span></div>
+    <div class="card"><b>BERT, RoBERTa, DistilBERT, ALBERT, DeBERTa, bert-tiny</b><span>BERT-like foundation models; suggested baselines.</span></div>
+    <div class="card"><b>DistilBERT finetuned SST-2</b><span>A movie-review sentiment model: the suggested domain-matched upgrade.</span></div>
+    <div class="card"><b>MTEB leaderboard</b><span>Benchmarks open and closed embedding models across tasks; start point for choosing one.</span></div>
+    <div class="card"><b>Cohere and OpenAI embeddings</b><span>Embedding APIs that let the supervised pipeline run without a GPU.</span></div>
+    <div class="card"><b>Google · T5 / Flan-T5</b><span>Encoder-decoder models; flan-t5-small used with a one-line prompt.</span></div>
+    <div class="card"><b>OpenAI · ChatGPT (GPT-3.5)</b><span>Closed decoder-only model via the Chat Completions API; instruction + preference tuned.</span></div>
+    <div class="card"><b>NumPy, tqdm</b><span><code>argmax</code> over scores; progress bars.</span></div>
+    <div class="card"><b>Rotten Tomatoes</b><span>Movie review site; source of the 10,662 labeled reviews.</span></div>
+  </div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Check yourself</h2></div><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. What are the two flavours of classification with representation models, and what is frozen in each?</summary><p>A task-specific model (outputs the class directly) and an embedding model (outputs vectors that a classifier uses). Both language models are frozen; only the classifier on top of the embeddings is trained.</p></details>
+  <details class="ans"><summary>2. How big are the Rotten Tomatoes splits, and how is each used in the chapter?</summary><p>Train 8,530, validation 1,066, test 1,066 (5,331 positive + 5,331 negative overall). Train is used to fit, test to score; validation is for checking generalization if you tuned hyperparameters on train and test.</p></details>
+  <details class="ans"><summary>3. Why does the inference loop for the task-specific model use output[0] and output[2]?</summary><p>It compares the negative score (index 0) with the positive score (index 2) and takes the argmax to get 0 or 1. Index 1 (the model's neutral class, Beyond the book) is ignored.</p></details>
+  <details class="ans"><summary>4. Define precision and recall in one sentence each, with formulas.</summary><p>Precision = TP/(TP+FP): of everything predicted positive, how much really is. Recall = TP/(TP+FN): of everything really positive, how much was found.</p></details>
+  <details class="ans"><summary>5. What happens to accuracy and F1 if a model always predicts "positive" on this test set?</summary><p>Accuracy = 533/1066 = 0.50. Positive class: precision 0.50, recall 1.0, F1 0.67; negative class: recall 0, F1 0. Weighted F1 ≈ 0.33. Try it in the calculator in plate 06.</p></details>
+  <details class="ans"><summary>6. Why is the weighted average equal to the macro average in every report here?</summary><p>Both classes have the same support (533), so weighting by support gives the same result as a plain average.</p></details>
+  <details class="ans"><summary>7. What shape is train_embeddings and what does it mean?</summary><p>(8530, 768): one 768-number embedding per training review; 768 is the dimension of all-mpnet-base-v2.</p></details>
+  <details class="ans"><summary>8. Why can the logistic regression be trained on a CPU, and how can you remove the GPU entirely?</summary><p>It only learns a few hundred weights on precomputed vectors. Creating the embeddings benefits from a GPU, but you can call an embedding API (Cohere, OpenAI) so the whole pipeline runs on CPU.</p></details>
+  <details class="ans"><summary>9. How does zero-shot classification with embeddings work, step by step?</summary><p>Describe each label in words ("A negative review", "A positive review"), embed the descriptions and the documents with the same model, compute cosine similarity for each document–label pair, and pick the label with the highest similarity. F1 0.78 with no labels.</p></details>
+  <details class="ans"><summary>10. What would you expect if you changed the label descriptions to "A very negative/positive movie review"?</summary><p>The book suggests it should help: the embedding captures that it's a movie review and focuses on the extremes. It does not report a number, so you'd have to measure it.</p></details>
+  <details class="ans"><summary>11. What is the difference between a sequence-to-value and a sequence-to-sequence model?</summary><p>Sequence-to-value maps tokens to a number (the task-specific classifier). Sequence-to-sequence maps tokens to tokens (generative models like T5 and GPT), so their text output must be converted to a label.</p></details>
+  <details class="ans"><summary>12. How was T5 pretrained and fine-tuned, and what does Flan add?</summary><p>Pretrained with masked language modeling over token spans (a mask can hide several tokens); fine-tuned with every task turned into text-to-text and trained together. Flan-T5 extends this to more than 1,000 instruction-style tasks.</p></details>
+  <details class="ans"><summary>13. In the Flan-T5 loop, what happens if the model outputs "Negative" with a capital N?</summary><p>The check is <code>text == "negative"</code>, so "Negative" fails it and the review is counted as positive (1). The parser matters.</p></details>
+  <details class="ans"><summary>14. Why does preference data carry more nuance than instruction data?</summary><p>Instruction data shows one good answer; preference data shows which of several answers is better (C &gt; B &gt; A), teaching the difference between good and better, i.e. what humans prefer.</p></details>
+  <details class="ans"><summary>15. ChatGPT scored 0.91. Why should you be careful with that number, and what would you do in an interview design question?</summary><p>Its training data is unknown, so the public test set may have been in it (contamination). Use a private, fresh eval set; also account for API cost, rate limits (exponential backoff), latency and privacy before relying on it.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>References (chapter footnotes)</h2></div><span class="chip">8 footnotes</span></div>
+  <details><summary>Show the 8 references</summary>
+    <ol class="refs">
+      <li>Bo Pang and Lillian Lee. "Seeing stars: Exploiting class relationships for sentiment categorization with respect to rating scales." arXiv cs/0506075 (2005).</li>
+      <li>Yinhan Liu et al. "RoBERTa: A robustly optimized BERT pretraining approach." arXiv:1907.11692 (2019).</li>
+      <li>Victor Sanh et al. "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter." arXiv:1910.01108 (2019).</li>
+      <li>Zhenzhong Lan et al. "ALBERT: A lite BERT for self-supervised learning of language representations." arXiv:1909.11942 (2019).</li>
+      <li>Pengcheng He et al. "DeBERTa: Decoding-enhanced BERT with disentangled attention." arXiv:2006.03654 (2020).</li>
+      <li>Nils Reimers and Iryna Gurevych. "Sentence-BERT: Sentence embeddings using Siamese BERT-networks." arXiv:1908.10084 (2019).</li>
+      <li>Colin Raffel et al. "Exploring the limits of transfer learning with a unified text-to-text transformer." JMLR 21.1 (2020): 5485–5551.</li>
+      <li>Hyung Won Chung et al. "Scaling instruction-finetuned language models." arXiv:2210.11416 (2022).</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Alammar &amp; Grootendorst, O'Reilly 2024), Chapter 4, pdf p131–158. Figures are the book's; numbers marked "modelled" are illustrative. <a href="ch03_looking_inside_llms.html">← Ch.3</a> · <a href="index.html">All chapters</a> · <a href="ch05_text_clustering_and_topic_modeling.html">Ch.5 →</a></footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var NS = "http://www.w3.org/2000/svg";
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function stepper(prefix, n, render) {
+    var i = 0;
+    var prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+    function go() { render(i); lab.textContent = "step " + (i + 1) + " / " + n; prev.disabled = i === 0; next.disabled = i === n - 1; }
+    prev.addEventListener("click", function () { if (i > 0) { i--; go(); } });
+    next.addEventListener("click", function () { if (i < n - 1) { i++; go(); } });
+    go();
+  }
+
+  /* ---- plate 01: representation vs generative answer ---- */
+  var f2 = [
+    { s: [0.03, 0.97], g: "Positive. The reviewer clearly loved the film." },
+    { s: [0.81, 0.19], g: "The sentiment of this sentence is negative." },
+    { s: [0.08, 0.92], g: "This review is positive: it praises the film as charming and original." },
+    { s: [0.94, 0.06], g: "Negative" }
+  ];
+  function f2draw() {
+    var d = f2[+$("f2sel").value];
+    var lab = d.s[1] > d.s[0] ? 1 : 0;
+    $("f2rep").innerHTML = "scores [neg " + d.s[0].toFixed(2) + ", pos " + d.s[1].toFixed(2) + "] → argmax = <b>" + lab + "</b>";
+    $("f2gen").innerHTML = "“" + esc(d.g) + "”<br><span class=\"wordtag\">→ you still have to parse this into 0/1</span>";
+  }
+  $("f2sel").addEventListener("change", f2draw); f2draw();
+
+  /* ---- plate 02: dataset browser ---- */
+  var ds = [
+    ["train[0] (book)", 1, "the rock is destined to be the 21st century's new \" conan \" and that he's going to make a splash even greater than arnold schwarzenegger , jean-claud van damme or steven segal ."],
+    ["train[-1] (book)", 0, "things really get weird , though not particularly scary : the movie is all portent and no content ."],
+    ["illustrative", 1, "a warm , funny and surprisingly moving story ."],
+    ["illustrative", 0, "a dull , plodding two hours ."],
+    ["shape (book)", -1, "train 8,530 rows · validation 1,066 · test 1,066 · columns: text, label"]
+  ];
+  stepper("ds", ds.length, function (i) {
+    var r = ds[i];
+    var lab = r[1] < 0 ? "" : " · label <b>" + r[1] + "</b> (" + (r[1] ? "positive" : "negative") + ")";
+    $("ds_cap").innerHTML = "<b>" + r[0] + "</b>" + lab + "<br>" + esc(r[2]);
+  });
+
+  /* ---- plate 03: frozen vs trainable step-through ---- */
+  var fzSteps = [
+    "Both language models arrive <b>already fine-tuned</b> by someone else (Figure 4-3). We download them.",
+    "<b>Top road</b>: the task-specific model is frozen and outputs the class directly. Nothing is trained.",
+    "<b>Bottom road</b>: the embedding model is frozen too. It outputs a 768-number vector per review.",
+    "Only the small <b>classifier</b> (logistic regression) is trained, on the vectors + labels. On a CPU, in seconds."
+  ];
+  function fzDraw(i) {
+    var s = $("fz_svg");
+    var cls = function (on, hot) { return hot ? "hi" : (on ? "f" : "s"); };
+    s.innerHTML =
+      '<rect x="10" y="70" width="110" height="30" rx="4" class="f"/><text x="65" y="90" text-anchor="middle">"Best movie ever!"</text>' +
+      '<line x1="120" y1="85" x2="170" y2="40" class="' + (i === 1 ? "on" : "") + '"/><line x1="120" y1="85" x2="170" y2="130" class="' + (i >= 2 ? "on" : "") + '"/>' +
+      '<rect x="170" y="22" width="180" height="36" rx="4" class="' + cls(i >= 0, i === 1) + '"/><text x="260" y="44" text-anchor="middle">task-specific model ❄</text>' +
+      '<rect x="170" y="112" width="180" height="36" rx="4" class="' + cls(i >= 0, i === 2) + '"/><text x="260" y="134" text-anchor="middle">embedding model ❄</text>' +
+      '<line x1="350" y1="40" x2="560" y2="40" class="' + (i === 1 ? "on" : "") + '"/><rect x="560" y="25" width="70" height="30" rx="4" class="ok"/><text x="595" y="45" text-anchor="middle">1 pos</text>' +
+      '<line x1="350" y1="130" x2="410" y2="130" class="' + (i >= 2 ? "on" : "") + '"/>' +
+      '<rect x="410" y="115" width="120" height="30" rx="4" class="' + (i === 3 ? "hi" : "f") + '"/><text x="470" y="135" text-anchor="middle">classifier ' + (i === 3 ? "🔥" : "") + '</text>' +
+      '<line x1="530" y1="130" x2="560" y2="130" class="' + (i === 3 ? "on" : "") + '"/><rect x="560" y="115" width="70" height="30" rx="4" class="ok"/><text x="595" y="135" text-anchor="middle">1 pos</text>' +
+      '<text x="170" y="168" class="m">❄ frozen (never updated)   🔥 trainable</text>';
+    $("fz_cap").innerHTML = fzSteps[i];
+  }
+  stepper("fz", fzSteps.length, fzDraw);
+
+  /* ---- plate 04: sizes + picker ---- */
+  var sizes = [["bert-tiny (Beyond the book: ~4M)", 4.4], ["ALBERT base", 12], ["ALBERT large", 18], ["ALBERT xlarge", 60], ["DistilBERT", 66], ["BERT base", 110], ["DeBERTa base", 134], ["ALBERT xxlarge", 235], ["BERT large", 340], ["RoBERTa", 356], ["DeBERTa large", 384], ["DeBERTa xlarge", 750]];
+  (function () {
+    var max = 750, h = "";
+    sizes.forEach(function (r) {
+      h += '<div class="barrow"><span>' + r[0] + '</span><div class="track"><div class="bar" style="width:' + (100 * r[1] / max).toFixed(1) + '%"></div></div><span>' + r[1] + 'M</span></div>';
+    });
+    $("szbars").innerHTML = h;
+  })();
+  var cands = [["large leaderboard-topper (7B)", 0.92, 120], ["mid-size encoder (335M)", 0.88, 18], ["small encoder, e.g. mpnet-base (110M)", 0.86, 6], ["tiny encoder (22M)", 0.81, 2]];
+  function mpDraw() {
+    var w = +$("mpw").value / 100;
+    $("mpwo").textContent = Math.round(w * 100) + "%";
+    var best = -1, bi = 0, rows = cands.map(function (c, i) {
+      var speed = 1 - Math.log(c[2]) / Math.log(150);
+      var q = (c[1] - 0.8) / 0.12;
+      var sc = (1 - w) * q + w * speed;
+      if (sc > best) { best = sc; bi = i; }
+      return sc;
+    });
+    $("mptab").querySelector("tbody").innerHTML = cands.map(function (c, i) {
+      return "<tr" + (i === bi ? ' style="background:var(--tint)"' : "") + "><td>" + c[0] + (i === bi ? " ← pick" : "") + '</td><td class="num">' + c[1].toFixed(2) + '</td><td class="num">' + c[2] + ' ms</td><td class="num">' + rows[i].toFixed(2) + "</td></tr>";
+    }).join("");
+  }
+  $("mpw").addEventListener("input", mpDraw); mpDraw();
+
+  /* ---- plate 05: toy tokenizer ---- */
+  var vocab = ("her was melodic the a an is it movie film best ever good bad great not very this that and of to in for with on vocal un happy believ able sing er ing ed ly ness ful less re pre view write story act or love hate charm quirk origin al bore fun funny dull plod ding pretend ious time two hours rock token iz ation tion tokenizer word play").split(" ");
+  var V = {};
+  vocab.forEach(function (p) { V[p] = 1; });
+  ["ization", "ation", "tion", "ing", "ed", "ly", "ness", "ful", "less", "er", "able", "ious", "al", "s", "ic", "ize", "y", "ish", "ment", "ist"].forEach(function (p) { V["##" + p] = 1; });
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(function (ch) { V[ch] = 1; V["##" + ch] = 1; });
+  function wp(word) {
+    var out = [], start = 0;
+    while (start < word.length) {
+      var end = word.length, piece = null;
+      while (end > start) {
+        var sub = word.slice(start, end);
+        if (start > 0) sub = "##" + sub;
+        if (V[sub]) { piece = sub; break; }
+        end--;
+      }
+      if (!piece) return ["[UNK]"];
+      out.push(piece); start = end;
+    }
+    return out;
+  }
+  function tkDraw() {
+    var txt = $("tkin").value.toLowerCase();
+    var words = txt.match(/[a-z]+|[^a-z\s]/g) || [];
+    var html = "", n = 0, split = 0;
+    words.forEach(function (w) {
+      var ps = /[a-z]/.test(w) ? wp(w) : (V[w] ? [w] : ["[UNK]"]);
+      if (ps.length > 1) split++;
+      ps.forEach(function (p) { n++; html += '<span class="tok' + (p.indexOf("##") === 0 ? " sub" : "") + (p === "[UNK]" ? " unk" : "") + '">' + esc(p) + "</span>"; });
+      html += " ";
+    });
+    $("tkout").innerHTML = html || '<span class="note">type something</span>';
+    $("tkread").innerHTML = "<span>words <b>" + words.length + "</b></span><span>tokens <b>" + n + "</b></span><span>words split into pieces <b>" + split + "</b></span>";
+  }
+  $("tkin").addEventListener("input", tkDraw); tkDraw();
+
+  /* ---- plate 06: confusion matrix calculator ---- */
+  function cmSet(a) { $("cmTP").value = a[0]; $("cmFP").value = a[1]; $("cmFN").value = a[2]; $("cmTN").value = a[3]; cmDraw(); }
+  function f1(p, r) { return p + r > 0 ? 2 * p * r / (p + r) : 0; }
+  function cmDraw() {
+    var TP = Math.max(0, +$("cmTP").value || 0), FP = Math.max(0, +$("cmFP").value || 0), FN = Math.max(0, +$("cmFN").value || 0), TN = Math.max(0, +$("cmTN").value || 0);
+    var pP = TP + FP ? TP / (TP + FP) : 0, rP = TP + FN ? TP / (TP + FN) : 0;
+    var pN = TN + FN ? TN / (TN + FN) : 0, rN = TN + FP ? TN / (TN + FP) : 0;
+    var fP = f1(pP, rP), fN = f1(pN, rN);
+    var sP = TP + FN, sN = TN + FP, tot = sP + sN;
+    var acc = tot ? (TP + TN) / tot : 0;
+    var mac = [(pN + pP) / 2, (rN + rP) / 2, (fN + fP) / 2];
+    var wt = tot ? [(pN * sN + pP * sP) / tot, (rN * sN + rP * sP) / tot, (fN * sN + fP * sP) / tot] : [0, 0, 0];
+    var r2 = function (x) { return x.toFixed(2); };
+    $("cmtab").querySelector("tbody").innerHTML =
+      '<tr><td>Negative Review</td><td class="num">' + r2(pN) + '</td><td class="num">' + r2(rN) + '</td><td class="num">' + r2(fN) + '</td><td class="num">' + sN + "</td></tr>" +
+      '<tr><td>Positive Review</td><td class="num">' + r2(pP) + '</td><td class="num">' + r2(rP) + '</td><td class="num">' + r2(fP) + '</td><td class="num">' + sP + "</td></tr>" +
+      '<tr><td>accuracy</td><td></td><td></td><td class="num">' + r2(acc) + '</td><td class="num">' + tot + "</td></tr>" +
+      '<tr><td>macro avg</td><td class="num">' + r2(mac[0]) + '</td><td class="num">' + r2(mac[1]) + '</td><td class="num">' + r2(mac[2]) + '</td><td class="num">' + tot + "</td></tr>" +
+      '<tr><td>weighted avg</td><td class="num">' + r2(wt[0]) + '</td><td class="num">' + r2(wt[1]) + '</td><td class="num"><b>' + r2(wt[2]) + '</b></td><td class="num">' + tot + "</td></tr>";
+    var msg = "<span>weighted F1 <b>" + r2(wt[2]) + "</b></span><span>errors <b>" + (FP + FN) + "</b> (FP " + FP + ", FN " + FN + ")</span>";
+    if (Math.abs(mac[2] - wt[2]) > 0.005) msg += '<span class="bad">macro ≠ weighted: classes are unbalanced</span>';
+    $("cmread").innerHTML = msg;
+  }
+  ["cmTP", "cmFP", "cmFN", "cmTN"].forEach(function (id) { $(id).addEventListener("input", cmDraw); });
+  $("cmBook").addEventListener("click", function () { cmSet([385, 65, 148, 468]); });
+  $("cmAllPos").addEventListener("click", function () { cmSet([533, 533, 0, 0]); });
+  $("cmGPT").addEventListener("click", function () { cmSet([459, 17, 74, 516]); });
+  cmDraw();
+
+  /* ---- plate 08: 2-D logistic regression toy ---- */
+  var seed = 7;
+  function rnd() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  function gauss() { var u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  var pts = [];
+  for (var k = 0; k < 44; k++) {
+    var lab = k % 2;
+    pts.push({ x: (lab ? 0.9 : -0.9) + gauss() * 0.85, y: (lab ? 0.5 : -0.5) + gauss() * 0.75, l: lab });
+  }
+  var W = [0, 0], B = 0, steps = 0;
+  function sig(z) { return 1 / (1 + Math.exp(-z)); }
+  function lrTrain(n) {
+    for (var s = 0; s < n; s++) {
+      var g0 = 0, g1 = 0, gb = 0;
+      pts.forEach(function (p) { var e = sig(W[0] * p.x + W[1] * p.y + B) - p.l; g0 += e * p.x; g1 += e * p.y; gb += e; });
+      W[0] -= 0.3 * g0 / pts.length; W[1] -= 0.3 * g1 / pts.length; B -= 0.3 * gb / pts.length;
+    }
+    steps += n;
+  }
+  function sx(x) { return 200 + x * 60; }
+  function sy(y) { return 130 - y * 50; }
+  function lrDraw() {
+    var thr = +$("lrThr").value / 100;
+    $("lrThro").textContent = thr.toFixed(2);
+    var h = '<rect x="0" y="0" width="400" height="260" style="fill:none;stroke:var(--rule)"/>';
+    var c = Math.log(thr / (1 - thr)) - B;
+    if (steps > 0 && (Math.abs(W[0]) > 1e-6 || Math.abs(W[1]) > 1e-6)) {
+      var x1, y1, x2, y2;
+      if (Math.abs(W[1]) > 1e-6) { x1 = -3.4; x2 = 3.4; y1 = (c - W[0] * x1) / W[1]; y2 = (c - W[0] * x2) / W[1]; }
+      else { y1 = -2.6; y2 = 2.6; x1 = x2 = c / W[0]; }
+      h += '<line x1="' + sx(x1) + '" y1="' + sy(y1) + '" x2="' + sx(x2) + '" y2="' + sy(y2) + '" style="stroke:var(--c1);stroke-width:2.5"/>';
+    }
+    var TP = 0, TN = 0, FP = 0, FN = 0;
+    pts.forEach(function (p) {
+      var pr = steps > 0 ? (sig(W[0] * p.x + W[1] * p.y + B) >= thr ? 1 : 0) : -1;
+      if (pr === 1 && p.l === 1) TP++; else if (pr === 0 && p.l === 0) TN++; else if (pr === 1) FP++; else if (pr === 0) FN++;
+      var wrong = pr >= 0 && pr !== p.l;
+      h += '<circle cx="' + sx(p.x).toFixed(1) + '" cy="' + sy(p.y).toFixed(1) + '" r="5" style="fill:' + (p.l ? "var(--buy)" : "var(--sell)") + ';fill-opacity:.75;stroke:' + (wrong ? "var(--ink)" : "none") + ';stroke-width:2"/>';
+    });
+    h += '<text x="8" y="16">● green = positive review, ● red = negative (ringed = misclassified)</text>';
+    $("lrsvg").innerHTML = h;
+    if (steps === 0) { $("lrread").innerHTML = "<span>untrained: press Train</span>"; return; }
+    var acc = (TP + TN) / pts.length;
+    $("lrread").innerHTML = "<span>steps <b>" + steps + "</b></span><span>w = (" + W[0].toFixed(2) + ", " + W[1].toFixed(2) + "), b = " + B.toFixed(2) + "</span><span>accuracy <b>" + acc.toFixed(2) + "</b></span><span>FP " + FP + " · FN " + FN + "</span>";
+  }
+  $("lrTrain").addEventListener("click", function () { lrTrain(50); lrDraw(); });
+  $("lrReset").addEventListener("click", function () { W = [0, 0]; B = 0; steps = 0; lrDraw(); });
+  $("lrThr").addEventListener("input", lrDraw);
+  lrDraw();
+
+  /* ---- plate 09: cosine similarity ---- */
+  function csDraw() {
+    var d = +$("csD").value, p = +$("csP").value, n = +$("csN").value;
+    $("csDo").textContent = d + "°"; $("csPo").textContent = p + "°"; $("csNo").textContent = n + "°";
+    var ox = 200, oy = 200, h = '<line x1="10" y1="200" x2="390" y2="200" style="stroke:var(--rule)"/>';
+    function arrow(a, len, col, lbl) {
+      var r = a * Math.PI / 180, x = ox + Math.cos(r) * len, y = oy - Math.sin(r) * len;
+      return '<line x1="' + ox + '" y1="' + oy + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) + '" style="stroke:' + col + ';stroke-width:3"/><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="5" style="fill:' + col + '"/><text x="' + (x + (Math.cos(r) >= 0 ? 6 : -6)).toFixed(1) + '" y="' + (y - 6).toFixed(1) + '" text-anchor="' + (Math.cos(r) >= 0 ? "start" : "end") + '">' + lbl + "</text>";
+    }
+    h += arrow(p, 150, "var(--buy)", "positive label") + arrow(n, 130, "var(--sell)", "negative label") + arrow(d, 170, "var(--c2)", "document");
+    $("cssvg").innerHTML = h;
+    var cp = Math.cos((d - p) * Math.PI / 180), cn = Math.cos((d - n) * Math.PI / 180);
+    var win = cp > cn ? '<b class="good">positive</b>' : (cn > cp ? '<b class="bad">negative</b>' : "<b>tie</b>");
+    $("csread").innerHTML = "<span>cos(doc, positive) = <b>" + cp.toFixed(2) + "</b> (angle " + Math.abs(d - p) + "°)</span><span>cos(doc, negative) = <b>" + cn.toFixed(2) + "</b> (angle " + Math.abs(d - n) + "°)</span><span>argmax → " + win + "</span>";
+  }
+  ["csD", "csP", "csN"].forEach(function (id) { $(id).addEventListener("input", csDraw); });
+  csDraw();
+
+  var lbl = [
+    "The book's labels. Short and generic: they don't mention movies. Result in the book: F1 <b>0.78</b>.",
+    "The book's suggested improvement: mentions <b>movie</b> and pushes towards the <b>extremes</b>. The book does not report a score; it says “try it out”.",
+    "Very short labels (illustrative). Single words carry little context; expect a weaker, noisier match. Not tested in the book.",
+    "The book's first example wording in the text (“This is a negative movie review.”). Full sentences tend to embed more like the reviews themselves. Not scored in the book."
+  ];
+  function lblDraw() { $("lblcap").innerHTML = lbl[+$("lblsel").value]; }
+  $("lblsel").addEventListener("change", lblDraw); lblDraw();
+
+  /* ---- plate 10: prompt engineering steps ---- */
+  var pe = [
+    ["Rate the sentiment. “Best movie ever!”", "Given a typical sentiment rating scale it would be rated as 5 due to its highly positive connotation.", "Figure 4-18, prompt 1: correct, but a number on an unknown scale plus an explanation. Hard to map to 0/1."],
+    ["What sentiment does this review have? “Best movie ever!”", "The review expresses a positive sentiment.", "Prompt 2: names the task. The answer contains “positive” but inside a sentence; you'd need text search to parse it."],
+    ["Is this movie review negative or positive? “Best movie ever!”", "Positive", "Prompt 3, the book's “best prompt”: offers the two allowed answers, so the model replies with one of them."],
+    ["Is this movie review negative or positive? Return 1 if positive, 0 if negative. Do not give any other answers. “Best movie ever!”", "1", "Extra step (like the ChatGPT template in plate 12): fix the output format so <code>int(answer)</code> works directly."]
+  ];
+  stepper("pe", pe.length, function (i) {
+    $("pe_chat").innerHTML = '<div class="msg user">' + esc(pe[i][0]) + '</div><div class="msg bot">' + esc(pe[i][1]) + "</div>";
+    $("pe_cap").innerHTML = pe[i][2];
+  });
+
+  /* ---- plate 11: span masking ---- */
+  var smWords = ["LLMs", "can", "be", "used", "for", "text", "generation", ",", "a", "form", "of", "generative", "ai", "."];
+  var smMasks = [], smReveal = false;
+  function smNew() {
+    var L = +$("smlen").value; $("smleno").textContent = L;
+    smMasks = [];
+    var tries = 0;
+    while (smMasks.length < 2 && tries < 50) {
+      tries++;
+      var s = Math.floor(Math.random() * (smWords.length - L));
+      var ok = true;
+      for (var j = s; j < s + L; j++) { if (smWords[j] === "," || smWords[j] === ".") ok = false; }
+      smMasks.forEach(function (m) { if (s < m[0] + m[1] + 1 && m[0] < s + L + 1) ok = false; });
+      if (ok) smMasks.push([s, L]);
+    }
+    smMasks.sort(function (a, b) { return a[0] - b[0]; });
+    smReveal = false; smDraw();
+  }
+  function smDraw() {
+    var h = "", i = 0;
+    while (i < smWords.length) {
+      var m = null;
+      smMasks.forEach(function (mm, k) { if (mm[0] === i) m = [mm, k]; });
+      if (m) { h += '<span class="tok mask">[MASK ' + (m[1] + 1) + "]</span>"; i += m[0][1]; }
+      else { h += '<span class="tok">' + esc(smWords[i]) + "</span>"; i++; }
+    }
+    $("smin").innerHTML = h;
+    $("smout").innerHTML = smMasks.map(function (mm, k) {
+      var t = smWords.slice(mm[0], mm[0] + mm[1]).join(" ");
+      return "[MASK " + (k + 1) + "] → " + (smReveal ? '<span class="tok tgt">' + esc(t) + "</span>" : "<i>" + mm[1] + " token" + (mm[1] > 1 ? "s" : "") + " hidden</i>");
+    }).join("<br>");
+  }
+  $("smlen").addEventListener("input", smNew);
+  $("smnew").addEventListener("click", smNew);
+  $("smshow").addEventListener("click", function () { smReveal = true; smDraw(); });
+  smMasks = [[5, 2], [11, 2]]; smDraw();
+
+  /* ---- plate 11: parser ---- */
+  function psDraw() {
+    var t = $("psin").value;
+    var book = t === "negative" ? 0 : 1;
+    var s = t.trim().toLowerCase();
+    var safe = s.indexOf("neg") === 0 ? "0" : (s.indexOf("pos") === 0 ? "1" : "unparseable");
+    $("psread").innerHTML = "<span>book parser <code>0 if text == \"negative\" else 1</code> → <b>" + book + "</b></span><span>safer parser → <b>" + safe + "</b></span>";
+  }
+  $("psin").addEventListener("input", psDraw); psDraw();
+
+  /* ---- plate 12: training pipeline step-through ---- */
+  var rl = [
+    ["Pretrained base model", "Trained to predict the next token on huge amounts of text. It can continue text but doesn't reliably follow instructions."],
+    ["Instruction data (Figure 4-22)", "Humans write the desired output for sample prompts: “What is 1 + 1?” → “The answer is 2.”"],
+    ["Instruction tuning", "Fine-tune on those pairs. Objective: generate output given prompt. This gives the first variant of the model."],
+    ["Preference data (Figure 4-23)", "The tuned model writes several answers to “Explain LLMs”. Humans rank them: C (correct) &gt; B (unhelpful) &gt; A (wrong meaning: Master of Laws)."],
+    ["Preference tuning → ChatGPT", "Fine-tune so preferred answers become more likely. Rankings carry nuance: the difference between good and better (Ch.12)."]
+  ];
+  stepper("rl", rl.length, function (i) {
+    $("rl_cap").innerHTML = "<b>" + rl[i][0] + "</b>: " + rl[i][1];
+    $("rl_box").innerHTML = '<div class="log">' + rl.map(function (r, k) { return '<span class="' + (k < i ? "have" : (k === i ? "snap" : "miss")) + '">' + (k + 1) + ". " + r[0] + "</span>"; }).join("") + "</div>";
+  });
+
+  /* ---- plate 12: template filler ---- */
+  var tpl = "Predict whether the following document is a positive or negative movie review:\n\n[DOCUMENT]\n\nIf it is positive return 1 and if it is negative return 0. Do not give any other answers.";
+  function tpDraw() {
+    var doc = $("tpdoc").value;
+    $("tpchat").innerHTML = '<div class="msg sys">system: You are a helpful assistant.</div><div class="msg user" style="white-space:pre-wrap">user: ' + esc(tpl.replace("[DOCUMENT]", doc)) + '</div><div class="msg bot">assistant: (expected reply: a single “1” or “0”)</div>';
+  }
+  $("tpdoc").addEventListener("input", tpDraw); tpDraw();
+
+  /* ---- plate 12: exponential backoff ---- */
+  function bkDraw() {
+    var base = +$("bkb").value, max = +$("bkm").value, clear = +$("bkf").value, jit = $("bkj").checked;
+    $("bkbo").textContent = base; $("bkmo").textContent = max; $("bkfo").textContent = clear;
+    var t = 0, h = "", ok = false, att = 0;
+    for (att = 0; att <= max; att++) {
+      if (t >= clear) { h += '<span class="have">t=' + t.toFixed(1) + "s ✓ 200</span>"; ok = true; break; }
+      h += '<span class="lost">t=' + t.toFixed(1) + "s 429</span>";
+      if (att === max) break;
+      var w = base * Math.pow(2, att);
+      if (jit) w = w * (0.5 + Math.random());
+      h += "<span>sleep " + w.toFixed(1) + "s</span>";
+      t += w;
+    }
+    $("bklog").innerHTML = h;
+    var v = $("bkv");
+    if (ok) { v.className = "verdict good"; v.textContent = "Succeeded on attempt " + (att + 1) + " after " + t.toFixed(1) + " s of waiting in total."; }
+    else { v.className = "verdict bad"; v.textContent = "Gave up after " + (max + 1) + " attempts (" + t.toFixed(1) + " s). Raise max retries, or slow down your request rate."; }
+  }
+  ["bkb", "bkm", "bkf", "bkj"].forEach(function (id) { $(id).addEventListener("input", bkDraw); $(id).addEventListener("change", bkDraw); });
+  bkDraw();
+
+  /* ---- summary scoreboard ---- */
+  var sb = [
+    ["Task-specific (Twitter-RoBERTa)", 0.80, 0.88, 0.72],
+    ["Embeddings + logistic regression", 0.85, 0.86, 0.85],
+    ["Zero-shot embeddings", 0.78, 0.77, 0.79],
+    ["Flan-T5-small + prompt", 0.84, 0.85, 0.83],
+    ["ChatGPT (GPT-3.5) + prompt", 0.91, 0.97, 0.86]
+  ];
+  function sbDraw() {
+    var m = { f1: 1, rn: 2, rp: 3 }[$("sbm").value];
+    var rows = sb.slice();
+    if ($("sbs").value === "score") rows.sort(function (a, b) { return b[m] - a[m]; });
+    var best = Math.max.apply(null, rows.map(function (r) { return r[m]; }));
+    $("sbbars").innerHTML = rows.map(function (r) {
+      return '<div class="barrow"><span>' + r[0] + '</span><div class="track"><div class="bar' + (r[m] === best ? " best" : "") + '" style="width:' + (100 * (r[m] - 0.5) / 0.5).toFixed(1) + '%"></div></div><span>' + r[m].toFixed(2) + "</span></div>";
+    }).join("") + '<p class="note">Bars start at 0.50 (the score of always guessing one class on this balanced test set).</p>';
+  }
+  $("sbm").addEventListener("change", sbDraw); $("sbs").addEventListener("change", sbDraw); sbDraw();
+})();
+</script>
+</body>
+</html>

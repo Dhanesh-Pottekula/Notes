@@ -1,0 +1,1733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hands-On LLMs Ch.5 Clustering</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.5 Clustering & Topic Modeling) ---- */
+.scat { border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); overflow: hidden; }
+.scat svg { display: block; width: 100%; height: auto; }
+.scat .pt { stroke: var(--ink); stroke-width: .6; }
+.scat .pt.out { fill: var(--muted); fill-opacity: .35; stroke-dasharray: 1.5 1.5; }
+.scat .cen { stroke: var(--ink); stroke-width: 2; fill: none; }
+.k0 { fill: var(--c1); } .k1 { fill: var(--c2); } .k2 { fill: var(--c3); } .k3 { fill: var(--buy); } .k4 { fill: var(--sell); } .k5 { fill: #b08a2e; }
+.mat { border-collapse: collapse; font-family: var(--mono); font-size: 13px; width: auto; }
+.mat th, .mat td { border: 1px solid var(--rule); padding: 4px 7px; text-align: center; }
+.mat th { font-family: var(--mono); font-size: 12px; background: var(--paper); }
+.mat td.hot { background: var(--tint); font-weight: 600; }
+.mat td.top { outline: 2px solid var(--c1); outline-offset: -2px; font-weight: 600; }
+.mat input { width: 3.2em; font-family: var(--mono); font-size: 13px; text-align: center; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 3px; padding: 2px; }
+.lego { display: grid; gap: 4px; max-width: 520px; }
+.lego .blk { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-radius: 5px; border: 1.5px solid var(--ink); font-family: var(--mono); font-size: 13px; }
+.lego .blk b { font-family: var(--display); }
+.lego .l1 { background: #cfe3f1; color: #17212c; } .lego .l2 { background: #f1cfd3; color: #17212c; } .lego .l3 { background: #cdebd9; color: #17212c; }
+.lego .l4 { background: #fbf3c4; color: #17212c; } .lego .l5 { background: #d6d6d6; color: #17212c; } .lego .l6 { background: #1d68b5; color: #fff; }
+.lego select { max-width: 100%; }
+.kw { display: flex; flex-wrap: wrap; gap: 5px; }
+.kw span { font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 2px 9px; }
+.kw span.pick { background: var(--tint); border-color: var(--c1); font-weight: 600; }
+.kw span.drop { opacity: .4; text-decoration: line-through; }
+.bars { display: grid; gap: 3px; font-family: var(--mono); font-size: 12.5px; }
+.bars .r { display: grid; grid-template-columns: 9em 1fr 4.5em; gap: 8px; align-items: center; }
+.bars .r i { display: block; height: 12px; background: var(--c2); border-radius: 2px; }
+.bars .r.hi i { background: var(--c1); }
+.bars .r em { font-style: normal; color: var(--muted); text-align: right; }
+.prompt { font-family: var(--mono); font-size: 13px; background: var(--paper); border: 1px solid var(--rule); border-left: 4px solid var(--c3); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt mark { background: var(--tint); color: var(--ink); padding: 0 2px; }
+.tabsrow { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch04_text_classification.html">← Ch.4 Text Classification</a><a href="ch06_prompt_engineering.html">Ch.6 Prompt Engineering →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 5 · PDF p159–188</div>
+  <h1>Text clustering and topic modeling: finding <em>groups</em> in text nobody has labelled</h1>
+  <p class="lede">Classification (Chapter 4) needs labels. This chapter asks what you can do <b>without</b> any labels: take 44,949 research-paper abstracts and let the machine find the groups by itself. The recipe has three steps: turn every document into an <b>embedding</b>, squeeze those embeddings down to a few dimensions with <b>UMAP</b>, and let <b>HDBSCAN</b> find dense groups (and leave the odd ones out as outliers). Clusters alone have no names, so the second half builds <b>BERTopic</b>, which describes each cluster with keywords using an old-school trick, a cluster-level bag-of-words weighted by <b>c-TF-IDF</b>. Because every step is a swappable "Lego block", you can then put smarter blocks on top: <b>KeyBERTInspired</b> and <b>MMR</b> rerank the keywords, and a generative LLM (Flan-T5, GPT-3.5) writes a readable label, called once per topic instead of once per document.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is one chain of "here is a problem → here is a fix → here is what the fix still lacks". Read the rows top to bottom; each orange box is the idea that the next row reacts to.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 5">
+    <div class="row"><span class="tag">Problem</span><span class="node">lots of unlabelled text</span><span class="arr">→</span><span class="node">no labels, so no classifier</span><span class="arr">→</span><span class="node key">group by meaning (clustering)</span></div>
+    <div class="row"><span class="tag">Step 1</span><span class="node key">embed each document</span><span class="arr">→</span><span class="node">384 numbers per abstract</span><span class="arr">→</span><span class="node">too many dimensions for clustering</span></div>
+    <div class="row"><span class="tag">Step 2</span><span class="node key">reduce with UMAP (384 → 5)</span><span class="arr">→</span><span class="node">some information is always lost</span></div>
+    <div class="row"><span class="tag">Step 3</span><span class="node key">cluster with HDBSCAN</span><span class="arr">→</span><span class="node">156 groups + outliers</span><span class="arr">→</span><span class="node">but what is each group about?</span></div>
+    <div class="row"><span class="tag">Idea</span><span class="node key">topic modeling</span><span class="arr">→</span><span class="node">classic LDA ignores meaning</span><span class="arr">→</span><span class="node key">BERTopic = clusters + c-TF-IDF keywords</span></div>
+    <div class="row"><span class="tag">Strength</span><span class="node key">every step is a Lego block</span><span class="arr">→</span><span class="node">swap SBERT, UMAP, HDBSCAN, k-means …</span></div>
+    <div class="row"><span class="tag">Weakness</span><span class="node">keywords are still bag-of-words</span><span class="arr">→</span><span class="node key">rerank: KeyBERTInspired · MMR</span><span class="arr">→</span><span class="node key">LLM writes a label (Flan-T5 · GPT-3.5)</span></div>
+    <div class="row"><span class="tag">Trick</span><span class="node">expensive models run once per <b>topic</b>, not per document</span><span class="arr">→</span><span class="node">hundreds of calls, not millions</span></div>
+  </div>
+  <svg viewBox="0 0 660 150" class="dg" role="img" aria-label="BERTopic pipeline: three clustering blocks, two representation blocks, an optional fine-tune block" style="width:100%;height:auto;max-width:660px">
+    <text x="10" y="16" class="b">Clustering (make groups)</text>
+    <text x="330" y="16" class="b">Representation (name groups)</text>
+    <rect x="10" y="30" width="90" height="36" rx="5" class="f"/><text x="55" y="53" text-anchor="middle">embed</text>
+    <rect x="115" y="30" width="90" height="36" rx="5" class="f"/><text x="160" y="53" text-anchor="middle">UMAP</text>
+    <rect x="220" y="30" width="90" height="36" rx="5" class="f"/><text x="265" y="53" text-anchor="middle">HDBSCAN</text>
+    <rect x="330" y="30" width="120" height="36" rx="5" class="f"/><text x="390" y="53" text-anchor="middle">CountVectorizer</text>
+    <rect x="465" y="30" width="90" height="36" rx="5" class="f"/><text x="510" y="53" text-anchor="middle">c-TF-IDF</text>
+    <rect x="570" y="30" width="84" height="36" rx="5" class="hi"/><text x="612" y="47" text-anchor="middle">rerank /</text><text x="612" y="61" text-anchor="middle">LLM label</text>
+    <line x1="100" y1="48" x2="115" y2="48"/><line x1="205" y1="48" x2="220" y2="48"/><line x1="310" y1="48" x2="330" y2="48" class="on"/><line x1="450" y1="48" x2="465" y2="48"/><line x1="555" y1="48" x2="570" y2="48"/>
+    <text x="10" y="92" class="m">once per document (44,949×)</text>
+    <text x="330" y="92" class="m">once per cluster (≈155×)</text>
+    <text x="570" y="92" class="m">optional</text>
+    <text x="10" y="125">Output: [doc → topic id]</text>
+    <text x="330" y="125">Output: [topic id → keywords / label]</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Why cluster text?</a>
+    <a href="#s2"><span>02</span>The dataset: ArXiv cs.CL</a>
+    <a href="#s3"><span>03</span>A common clustering pipeline</a>
+    <a href="#s4"><span>04</span>Step 1: embedding documents</a>
+    <a href="#s5"><span>05</span>Step 2: reducing dimensionality</a>
+    <a href="#s6"><span>06</span>Step 3: clustering (HDBSCAN)</a>
+    <a href="#s7"><span>07</span>Inspecting the clusters</a>
+    <a href="#s8"><span>08</span>From clustering to topic modeling</a>
+    <a href="#s9"><span>09</span>BERTopic part 1: the clusters</a>
+    <a href="#s10"><span>10</span>BERTopic part 2: c-TF-IDF</a>
+    <a href="#s11"><span>11</span>Full pipeline &amp; Lego blocks</a>
+    <a href="#s12"><span>12</span>The modularity of BERTopic</a>
+    <a href="#s13"><span>13</span>Running BERTopic, exploring topics</a>
+    <a href="#s14"><span>14</span>Visualizing topics</a>
+    <a href="#s15"><span>15</span>Adding a special Lego block</a>
+    <a href="#s16"><span>16</span>KeyBERTInspired</a>
+    <a href="#s17"><span>17</span>Maximal marginal relevance</a>
+    <a href="#s18"><span>18</span>The text generation Lego block</a>
+    <a href="#s19"><span>19</span>The final map (datamapplot)</a>
+    <a href="#s20"><span>20</span>Summary &amp; key terms</a>
+    <a href="#s21"><span>21</span>Where you meet this in real systems</a>
+    <a href="#s22"><span>22</span>Check yourself</a>
+    <a href="#s23"><span>23</span>References</a>
+  </nav>
+</section>
+
+<!-- ============ 01 ============ -->
+<section class="plate" id="s1">
+  <div class="plate-head"><h2><span class="secno">01</span> Why cluster text? (chapter opening)</h2><span class="chip">pdf p159–160 · Fig 5-1, 5-2</span></div>
+  <p>For the last few years <b>supervised</b> techniques (you have labelled examples, like "this review is positive") such as classification have ruled industry. The authors argue that <b>unsupervised</b> techniques (no labels at all) such as <b>text clustering</b> are just as valuable and should not be underestimated.</p>
+  <p><b>Text clustering</b> means grouping texts that are similar in their <i>semantic content</i>: their meaning and the relationships inside them. The result (Figure 5-1) is a set of <b>clusters</b>, each holding semantically similar documents. That gives you two things at once:</p>
+  <ul class="plain">
+    <li><b>efficient categorisation</b> of large volumes of unstructured text, and</li>
+    <li><b>quick exploratory data analysis</b>: you see what is in a pile of text before you read it.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-5-1.png" alt="Documents on the left go through clustering and land as points in three coloured regions: cat and dog together, soccer and basketball together, pasta and pizza together." loading="lazy"><figcaption>Figure 5-1 (book, pdf p159): Clustering unstructured textual data.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left: a pile of plain documents (the input, with no labels). Right: each document has become a point on a grid. A document about <i>cats</i> lands right next to one about <i>dogs</i> (purple blob), <i>soccer</i> next to <i>basketball</i> (blue), <i>pasta</i> next to <i>pizza</i> (green). Nobody told the algorithm "pets", "sports" or "food"; closeness in meaning alone made the groups.</p>
+  <p>Why does it work better now? Newer language models give <b>contextual and semantic representations</b> of text. "Language is more than a bag of words", and these models capture that. Because clustering does not need supervision, it allows creative uses the book lists:</p>
+  <ul class="plain">
+    <li><b>finding outliers</b> (documents that fit no group),</li>
+    <li><b>speeding up labelling</b> (label a whole cluster at once instead of one document at a time),</li>
+    <li><b>finding incorrectly labelled data</b> (a "positive" review sitting inside a cluster of negative ones is suspicious).</li>
+  </ul>
+  <p>Clustering also leads into <b>topic modeling</b>: discovering the (abstract) <b>topics</b> that appear in a large collection of text. As Figure 5-2 shows, a topic is usually described with <b>keywords or keyphrases</b> and, ideally, one overarching <b>label</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-5-2.png" alt="The same three clusters now carry names: Topic 1 Pets with keywords pet, dog, cat, animal shelter; Topic 2 Food with pasta, pizza, rice; Topic 3 Sports with sport, soccer, game." loading="lazy"><figcaption>Figure 5-2 (book, pdf p160): Topic modeling is a way to give meaning to clusters of textual documents.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same three blobs as Figure 5-1, but each now has a <b>label</b> in bold (Pets, Food, Sports) and a list of <b>keywords</b> in italics ("pet, dog, cat, animal shelter, …"). Clustering gave us the groups; topic modeling gives them meaning. Notice that keywords can include words not in the two example documents ("rice", "animal shelter"): they summarise the whole cluster.</p>
+  <p><b>Plan of the chapter:</b> first do clustering with embedding models, then move to a clustering-inspired topic modeling method called <b>BERTopic</b>. The authors say this chapter is important for the whole book because it shows how to <b>combine</b> different kinds of language models: <b>encoder-only</b> models (for embeddings), <b>decoder-only</b> models (generative), and even <b>classical</b> methods (bag-of-words) into new pipelines.</p>
+  <div class="box picture"><b>Picture it</b><p>A raddiwala (scrap dealer) gets a truck of mixed paper with no labels. He doesn't know beforehand which piles he'll need; he just puts newspapers with newspapers, cardboard with cardboard, notebooks with notebooks, and keeps a small "odd stuff" heap. That's clustering. Writing "NEWSPAPER — ₹14/kg" on each pile is topic modeling.</p><p><i>Where it breaks:</i> the raddiwala sorts by what paper <i>is</i> (one property). Text clustering sorts by meaning across hundreds of hidden properties at once, and the piles can be fuzzy at the edges.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Clustering relies on one assumption: <b>distance between representations ≈ difference in meaning</b>. If the embedding model puts "cat" and "dog" documents near each other and far from "pizza" documents, any algorithm that looks for crowded regions will find the groups. So the quality of the clusters is capped by the quality of the representation. That is exactly why better language models made clustering better.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"When would you use clustering instead of classification?"</i> — "When I don't have labels yet, or don't even know the categories. I'd embed the texts, cluster them, and read samples per cluster. That tells me what categories exist, how hard the task is, and lets me label a whole cluster at once. It also surfaces outliers and mislabelled data." In a voice-agent product this is how you'd mine thousands of call transcripts for the intents users actually have before building an intent classifier.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Labels-based approach: <a href="ch04_text_classification.html">Ch.4 Text Classification</a>.</li><li>Bag-of-words first appeared in <a href="ch01_introduction_to_llms.html">Ch.1</a>; embeddings in <a href="ch02_tokens_and_embeddings.html">Ch.2</a>.</li><li>Encoder vs decoder models: <a href="ch01_introduction_to_llms.html">Ch.1</a>, <a href="ch03_looking_inside_llms.html">Ch.3</a>.</li></ul></div>
+</section>
+
+<!-- ============ 02 ============ -->
+<section class="plate" id="s2">
+  <div class="plate-head"><h2><span class="secno">02</span> The dataset: ArXiv's articles (Computation and Language)</h2><span class="chip">pdf p160–161 · sidebar</span></div>
+  <p>All examples in the chapter run on <b>ArXiv</b> articles. ArXiv is an open-access platform for scholarly papers, mostly computer science, mathematics and physics. To fit the book's theme the authors use the <b>Computation and Language</b> section, <code>cs.CL</code>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Fact</th><th>Value (book)</th></tr>
+    <tr><td>Documents</td><td class="num">44,949 abstracts</td></tr>
+    <tr><td>Years covered</td><td class="num">1991 – 2024</td></tr>
+    <tr><td>Section</td><td class="num">cs.CL</td></tr>
+    <tr><td>Hugging Face dataset</td><td class="num">maartengr/arxiv_nlp</td></tr>
+  </table></div>
+  <pre class="code"><code># Load data from Hugging Face
+from datasets import load_dataset
+dataset = load_dataset("maartengr/arxiv_nlp")["train"]
+
+# Extract metadata
+abstracts = dataset["Abstracts"]
+titles = dataset["Titles"]</code></pre>
+  <ul class="plain">
+    <li><code>load_dataset(...)["train"]</code> downloads the dataset from the Hugging Face Hub and takes its only split, <code>train</code>.</li>
+    <li><code>abstracts</code> is the text we will embed and cluster. <code>titles</code> is kept for later: short titles are easier to read than long abstracts when we hover over points in a plot.</li>
+    <li>The prose says it creates variables for abstracts, titles <i>and years</i>, but the printed code only extracts abstracts and titles. Years are not used anywhere in the chapter.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>44,949 abstracts is like the whole reading list of an NLP department across 33 years dumped on one table. You can't read them; you want the machine to say "these 2,290 are about speech recognition, these 1,403 are medical, …".</p><p><i>Where it breaks:</i> a real reading list has folders. This one deliberately has none; that's the point of the exercise.</p></div>
+  <div class="box behind"><b>Interview angle</b><p>Mention scale. "~45k short documents is small: embedding them with a small model takes minutes on a GPU and the embedding matrix is about 69 MB in float32. The same pipeline works for millions of support tickets, but then you batch the embedding step and care about UMAP's memory." (The 69 MB is modelled: 44,949 × 384 × 4 bytes.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Hugging Face <code>datasets</code> was also used in <a href="ch04_text_classification.html">Ch.4</a> (Rotten Tomatoes).</li></ul></div>
+</section>
+
+<!-- ============ 03 ============ -->
+<section class="plate" id="s3">
+  <div class="plate-head"><h2><span class="secno">03</span> A common pipeline for text clustering</h2><span class="chip">pdf p161</span></div>
+  <p>Clustering lets you discover patterns in data that you may or may not know about. It gives an intuitive feel for a task (for example, a classification task you're about to build) and for <b>how complex</b> that task is. So clustering is more than a quick exploratory tool.</p>
+  <p>There are many clustering methods, from <b>graph-based neural networks</b> to <b>centroid-based</b> techniques. But one pipeline has become popular, with three steps and three algorithms:</p>
+  <ol class="plain">
+    <li><b>Embed</b>: convert the input documents to embeddings with an <b>embedding model</b>.</li>
+    <li><b>Reduce</b>: shrink the number of dimensions of the embeddings with a <b>dimensionality reduction model</b>.</li>
+    <li><b>Cluster</b>: find groups of semantically similar documents with a <b>cluster model</b>.</li>
+  </ol>
+  <div class="fig">
+    <div class="stepbar"><button id="pp-prev">◀ Back</button><button id="pp-next">Next ▶</button><span id="pp-n">step 0 / 3</span></div>
+    <svg viewBox="0 0 640 170" class="dg" id="pp-svg" role="img" aria-label="Step-through of the three-step clustering pipeline" style="width:100%;height:auto">
+      <rect x="10" y="40" width="110" height="80" rx="6" class="f" id="pp-b0"/><text x="65" y="76" text-anchor="middle">44,949</text><text x="65" y="94" text-anchor="middle">abstracts</text>
+      <rect x="150" y="40" width="140" height="80" rx="6" class="s" id="pp-b1"/><text x="220" y="70" text-anchor="middle">1. embed</text><text x="220" y="90" text-anchor="middle" class="m">gte-small</text><text x="220" y="108" text-anchor="middle" class="m">→ 44,949 × 384</text>
+      <rect x="310" y="40" width="140" height="80" rx="6" class="s" id="pp-b2"/><text x="380" y="70" text-anchor="middle">2. reduce</text><text x="380" y="90" text-anchor="middle" class="m">UMAP</text><text x="380" y="108" text-anchor="middle" class="m">→ 44,949 × 5</text>
+      <rect x="470" y="40" width="160" height="80" rx="6" class="s" id="pp-b3"/><text x="550" y="70" text-anchor="middle">3. cluster</text><text x="550" y="90" text-anchor="middle" class="m">HDBSCAN</text><text x="550" y="108" text-anchor="middle" class="m">→ label per doc</text>
+      <line x1="120" y1="80" x2="150" y2="80"/><line x1="290" y1="80" x2="310" y2="80"/><line x1="450" y1="80" x2="470" y2="80"/>
+      <text x="10" y="150" class="m" id="pp-out">shape of the data at this step: list of 44,949 strings</text>
+    </svg>
+    <div class="caption" id="pp-cap">Press <b>Next</b> to push the documents through the pipeline.</div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Sorting wedding guests into tables: (1) for every guest write a long profile card (embed), (2) boil each card down to a few key traits like "family side, age group, language" (reduce), (3) seat people who share traits together and leave the one stranger at the side (cluster).</p><p><i>Where it breaks:</i> a caterer decides the number of tables first. The density-based clusterer we'll use does not; it discovers how many tables there should be.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each step fixes a weakness of the next. Clustering algorithms need numbers, so we embed. Clustering on 384 numbers works badly (distances become less meaningful in high dimensions), so we reduce. Only then do we cluster. Because the three steps only talk to each other through arrays (documents → matrix → smaller matrix → labels), any one of them can be replaced. That property becomes BERTopic's big selling point later.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Walk me through how you'd cluster 1M support tickets."</i> — "Embed with a sentence-embedding model chosen for clustering on MTEB, reduce to ~5–10 dimensions with UMAP using cosine distance, then HDBSCAN so I don't have to pick the number of clusters and noise stays as outliers. Then I name clusters with c-TF-IDF keywords and spot-check samples by hand."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The same three steps become BERTopic's first half: <a href="#s9">09</a>.</li><li>Embedding models in depth: <a href="ch10_creating_text_embedding_models.html">Ch.10 Creating Text Embedding Models</a>.</li></ul></div>
+</section>
+
+<!-- ============ 04 ============ -->
+<section class="plate" id="s4">
+  <div class="plate-head"><h2><span class="secno">04</span> Step 1: embedding documents</h2><span class="chip">pdf p161–162 · Fig 5-3</span></div>
+  <p>The first step turns text into <b>embeddings</b>. Recall from earlier chapters: an embedding is a list of numbers that tries to capture the <b>meaning</b> of a text.</p>
+  <figure class="bookfig"><img src="figs/fig-5-3.png" alt="n documents go through 'Embed documents' and become an orange table with one row per document and a fixed number of columns (dimensions), e.g. 512 values." loading="lazy"><figcaption>Figure 5-3 (book, pdf p161): Step 1: We convert documents to embeddings using an embedding model.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> On the left, <i>n</i> documents. On the right, an orange grid: <b>one row per document</b> (the vertical arrow, "number of documents") and <b>one column per dimension</b> (the horizontal arrow, "e.g., 512 values"). Every document, short or long, becomes a row of the <i>same</i> width. The "512" is just an example; the model actually used gives 384.</p>
+  <p><b>Choosing the model.</b> For clustering, pick an embedding model optimised for <b>semantic similarity</b>, because we are looking for groups of semantically similar documents. Luckily, at the time of writing, most embedding models focus on exactly that.</p>
+  <p>As in Chapter 4, the authors use the <b>MTEB</b> (Massive Text Embedding Benchmark) leaderboard to choose. They want a model that scores decently on <b>clustering</b> tasks but is <b>small enough to run quickly</b>. Instead of Chapter 4's <code>sentence-transformers/all-mpnet-base-v2</code>, they use <code>thenlper/gte-small</code>: it is more recent, it beats the older model on clustering tasks, and being small it is even faster at inference. They invite you to try newer models released since.</p>
+  <pre class="code"><code>from sentence_transformers import SentenceTransformer
+
+# Create an embedding for each abstract
+embedding_model = SentenceTransformer("thenlper/gte-small")
+embeddings = embedding_model.encode(abstracts, show_progress_bar=True)
+
+# Check the dimensions of the resulting embeddings
+embeddings.shape
+(44949, 384)</code></pre>
+  <ul class="plain">
+    <li><code>SentenceTransformer("thenlper/gte-small")</code> downloads the model and wraps it so one call gives one vector per text.</li>
+    <li><code>.encode(abstracts, ...)</code> runs all 44,949 abstracts through the model (in batches) and returns a NumPy array.</li>
+    <li><code>(44949, 384)</code>: one row per abstract, <b>384 values</b> per row. Together those 384 values are the semantic representation of the document. Think of them as the <b>features</b> we want to cluster.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: how big is the embedding matrix? (modelled)</h3>
+    <div class="controls">
+      <label>documents <input type="number" id="em-n" value="44949" min="1" step="1000"></label>
+      <label>dimensions <select id="em-d"><option>384</option><option>512</option><option>768</option><option>1024</option><option>1536</option><option>3072</option></select></label>
+      <label>dtype <select id="em-t"><option value="4">float32 (4 B)</option><option value="2">float16 (2 B)</option><option value="1">int8 (1 B)</option></select></label>
+    </div>
+    <div class="readout" id="em-out"></div>
+    <p class="note">Modelled arithmetic: bytes = documents × dimensions × bytes per value. Not from the book; useful when sizing a vector store.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>An embedding is like a 384-question survey every document fills in: "how much are you about speech? about medicine? about sentiment?…" (the real questions are not human-readable). Two documents that answer similarly are about similar things.</p><p><i>Where it breaks:</i> no single dimension means "speech". Meaning is spread across all 384 numbers together.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Sentence-embedding models like gte-small are encoder models trained (Chapter 10 shows how) so that texts with similar meaning end up with a high <b>cosine similarity</b>. That training objective is why "optimised for semantic similarity" matters: a model trained for, say, next-token prediction does not promise that distance equals meaning, so clusters built on it would be noisier.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"How do you choose an embedding model?"</i> — "Look at MTEB for the task family I care about (clustering, retrieval, classification), then weigh size and latency. For clustering 45k abstracts a 384-dim small model like gte-small is plenty and fast. Then validate on my own data, because leaderboard scores don't always transfer." Same reasoning applies to choosing the embedder for a RAG memory store.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>MTEB and <code>all-mpnet-base-v2</code>: <a href="ch04_text_classification.html">Ch.4</a>.</li><li>How embedding models are trained: <a href="ch10_creating_text_embedding_models.html">Ch.10</a>.</li><li>Embeddings for retrieval: <a href="ch08_semantic_search_and_rag.html">Ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>, <a href="../llm_engineers_handbook/ch04_rag_feature_pipeline.html">LLM Engineer's Handbook Ch.4</a>.</li></ul></div>
+</section>
+
+<!-- ============ 05 ============ -->
+<section class="plate" id="s5">
+  <div class="plate-head"><h2><span class="secno">05</span> Step 2: reducing the dimensionality of embeddings</h2><span class="chip">pdf p162–164 · Fig 5-4, 5-5</span></div>
+  <p>Before clustering we must deal with the <b>high dimensionality</b> of the embeddings. As the number of dimensions grows, the number of possible values grows <b>exponentially</b>, and finding all the subspaces within each dimension gets more and more complex. So high-dimensional data is troublesome for many clustering techniques: it gets harder to find <b>meaningful clusters</b>.</p>
+  <p>The fix is <b>dimensionality reduction</b>: represent the same data with <b>fewer dimensions</b> (Figure 5-4). These techniques try to <b>preserve the global structure</b> of the high-dimensional data while finding a low-dimensional representation.</p>
+  <figure class="bookfig"><img src="figs/fig-5-4.png" alt="Left: purple and green points in a 3D box with axes x, y, z. Right: the same points on a flat 2D grid with axes a and b; purple points sit mostly left, green points mostly right." loading="lazy"><figcaption>Figure 5-4 (book, pdf p163): Dimensionality reduction allows data in high-dimensional space to be compressed to a lower-dimensional representation.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left: points live in 3 dimensions (x, y, z). Right: the same points after reduction, now with only 2 coordinates, called <i>a</i> and <i>b</i> (new axes, not x and y). The purple group stays mostly on the left and green mostly on the right: the <b>structure survived</b>. But look closely: one purple point now sits among green ones near the bottom. That is the information loss the book warns about.</p>
+  <p>Important: this is <b>compression</b>. The algorithm does <b>not</b> arbitrarily delete dimensions (it doesn't just throw away z). It builds new axes that keep as much of the structure as possible. So the second step of our pipeline is dimensionality reduction (Figure 5-5).</p>
+  <figure class="bookfig"><img src="figs/fig-5-5.png" alt="A wide orange table with e.g. 512 values per row becomes a narrower pale table with e.g. 3 values per row after 'Reduce dimensionality'." loading="lazy"><figcaption>Figure 5-5 (book, pdf p163): Step 2: The embeddings are reduced to a lower-dimensional space using dimensionality reduction.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same number of rows (documents) on both sides; only the <b>width</b> changes, from "e.g. 512 values" to "e.g. 3 values" of <i>compressed dimensions</i>. The paler colour hints that each compressed row carries a squeezed, lossy version of the original meaning. (In the actual code it's 384 → 5.)</p>
+  <p><b>Well-known methods:</b> <b>PCA</b> (Principal Component Analysis, Hotelling 1933) and <b>UMAP</b> (Uniform Manifold Approximation and Projection, McInnes, Healy &amp; Melville 2018). The authors pick <b>UMAP</b> because it tends to handle <b>nonlinear</b> relationships and structures a bit better than PCA.</p>
+  <div class="box behind"><b>Book warning</b><p>Dimensionality reduction is <b>not flawless</b>. It cannot perfectly capture high-dimensional data in fewer dimensions; <b>information will always be lost</b>. There's a balance between reducing dimensions and keeping as much information as possible.</p></div>
+  <pre class="code"><code>from umap import UMAP
+
+# We reduce the input embeddings from 384 dimensions to 5 dimensions
+umap_model = UMAP(
+    n_components=5, min_dist=0.0, metric='cosine', random_state=42
+)
+reduced_embeddings = umap_model.fit_transform(embeddings)</code></pre>
+  <div class="tablewrap"><table>
+    <tr><th>Parameter</th><th>Value</th><th>What it does and why (book)</th></tr>
+    <tr><td><code>n_components</code></td><td class="num">5</td><td>Size of the lower-dimensional space. Generally <b>5 to 10</b> works well to capture high-dimensional <b>global</b> structure.</td></tr>
+    <tr><td><code>min_dist</code></td><td class="num">0.0</td><td>Minimum distance between embedded points. 0 generally gives <b>tighter clusters</b> (points may pack together), which helps the clusterer.</td></tr>
+    <tr><td><code>metric</code></td><td class="num">'cosine'</td><td>Euclidean-based methods have issues with high-dimensional data, so measure closeness by angle (cosine) in the 384-dim input.</td></tr>
+    <tr><td><code>random_state</code></td><td class="num">42</td><td>Makes results <b>reproducible</b> across sessions, but <b>disables parallelism</b>, so training is slower.</td></tr>
+  </table></div>
+  <p><code>fit_transform</code> learns the low-dimensional layout <i>and</i> returns it: <code>reduced_embeddings</code> is a 44,949 × 5 array.</p>
+  <div class="fig">
+    <h3>Try it: squash 3-D points onto 2-D (modelled)</h3>
+    <p class="note">Two groups of points live in 3-D. Turn the "camera" to choose which 2-D view to keep. Some views keep the groups apart; some pile them on top of each other. A good reduction method searches for a view (or a bent, nonlinear map, in UMAP's case) that keeps the groups apart. This toy uses a straight projection, closer in spirit to PCA.</p>
+    <div class="controls"><label>rotate <input type="range" id="dr-a" min="0" max="180" value="20"><output id="dr-ao">20°</output></label><label>tilt <input type="range" id="dr-b" min="0" max="90" value="15"><output id="dr-bo">15°</output></label><button id="dr-best">find best view</button><button id="dr-drop">just drop z</button></div>
+    <div class="two">
+      <div class="scat"><svg viewBox="0 0 300 220" id="dr-3d" role="img" aria-label="3D point cloud"></svg></div>
+      <div class="scat"><svg viewBox="0 0 300 220" id="dr-2d" role="img" aria-label="2D projection"></svg></div>
+    </div>
+    <div class="readout" id="dr-out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A shadow puppet. Your 3-D hand becomes a 2-D shadow on the wall. Hold it at the right angle and the shadow is clearly a deer; at the wrong angle it's a blob. Dimensionality reduction is choosing (or bending) the light so the shadow keeps the shape. From 384 dimensions down to 5 the "shadow" is still a lossy copy.</p><p><i>Where it breaks:</i> a shadow is a straight (linear) projection, like PCA. UMAP can bend space, more like unfolding a crumpled paper, which is why it copes better with nonlinear structure.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p><b>PCA</b> finds the straight directions along which the data varies most and keeps the top few. <b>UMAP</b> (beyond the book's detail) first builds a graph of each point's nearest neighbours in the original space, then lays out points in the small space so that the same neighbours stay neighbours. That keeps local groups intact even if the data lies on a curved surface. <code>min_dist=0</code> lets UMAP pack neighbours very close, which is ideal for a density-based clusterer that looks for crowded regions.</p></div>
+  <div class="box work"><b>Worked example</b><p>Input 44,949 × 384 = 17.3 million numbers. Output 44,949 × 5 = 224,745 numbers, about <b>77× fewer</b>. HDBSCAN now measures distances in 5-D, where "near" and "far" are much more distinct than in 384-D. (Arithmetic is modelled from the book's shapes.)</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Why not cluster the raw 384-dim embeddings?"</i> — "In high dimensions distances concentrate, so density-based clustering struggles to tell dense from sparse. UMAP to 5–10 dims with cosine metric and min_dist=0 keeps neighbourhood structure and makes clusters tight. The cost is some information loss, so I'd still sanity-check clusters by reading samples. And setting random_state makes it reproducible but single-threaded."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Same UMAP reused for 2-D plots: <a href="#s7">07</a>, and inside BERTopic: <a href="#s9">09</a>.</li><li>PCA can be swapped in as a block: <a href="#s11">11</a>.</li></ul></div>
+</section>
+
+<!-- ============ 06 ============ -->
+<section class="plate" id="s6">
+  <div class="plate-head"><h2><span class="secno">06</span> Step 3: clustering the reduced embeddings</h2><span class="chip">pdf p164–166 · Fig 5-6, 5-7</span></div>
+  <p>The third step clusters the reduced embeddings (Figure 5-6).</p>
+  <figure class="bookfig"><img src="figs/fig-5-6.png" alt="The compressed table (e.g. 3 values per row) goes through 'Cluster reduced embeddings' and becomes points on a grid with purple, blue and green blobs and two lone points outside any blob." loading="lazy"><figcaption>Figure 5-6 (book, pdf p164): Step 3: We cluster the documents using the embeddings with reduced dimensionality.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Each row of the small table becomes a point. The clusterer draws three blobs around crowded areas. Notice the two points that stay <b>outside</b> any blob (top middle and bottom right): they are already a preview of <b>outliers</b>.</p>
+  <p><b>Centroid vs density.</b> A common choice is a <b>centroid-based</b> algorithm such as <b>k-means</b>, which needs you to say how many clusters to make. We don't know the number of clusters beforehand. A <b>density-based</b> algorithm instead works out the number of clusters itself and does <b>not force every point</b> into a cluster (Figure 5-7).</p>
+  <figure class="bookfig"><img src="figs/fig-5-7.png" alt="Left 'Centroid-based': the whole grid is split into three coloured regions so every point, even stray ones, belongs to a cluster. Right 'Density-based': three tight blobs, and two stray points labelled Outlier, not assigned to any cluster." loading="lazy"><figcaption>Figure 5-7 (book, pdf p165): The clustering algorithm not only impacts how clusters are generated but also how they are viewed.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same points, two algorithms. <b>Left (centroid-based)</b>: the space is cut into regions like a map of states; every point, even the lonely one at the top or bottom-right, is forced into the nearest region. <b>Right (density-based)</b>: only crowded areas become clusters; the lonely points are labelled <b>Outlier (not assigned to any cluster)</b>. The caption's point: the algorithm changes not just the groups but how you <i>see</i> the data.</p>
+  <p>A common density-based model is <b>HDBSCAN</b> (Hierarchical Density-Based Spatial Clustering of Applications with Noise; McInnes, Healy &amp; Astels 2017). It is a hierarchical version of <b>DBSCAN</b> (Ester et al., KDD 1996) and finds dense (micro-)clusters <b>without</b> you specifying the number of clusters. Being density-based, it also detects <b>outliers</b>: points that belong to no cluster. They are not assigned or forced anywhere; in other words, they are <b>ignored</b>. Since ArXiv contains some niche papers, a model that detects outliers is helpful.</p>
+  <pre class="code"><code>from hdbscan import HDBSCAN
+
+# We fit the model and extract the clusters
+hdbscan_model = HDBSCAN(
+    min_cluster_size=50, metric="euclidean", cluster_selection_method="eom"
+).fit(reduced_embeddings)
+clusters = hdbscan_model.labels_
+
+# How many clusters did we generate?
+len(set(clusters))
+156</code></pre>
+  <ul class="plain">
+    <li><code>min_cluster_size=50</code>: the <b>smallest a cluster may be</b>. Lower it to get more (smaller) clusters.</li>
+    <li><code>metric="euclidean"</code>: plain straight-line distance is fine now, because we are in the 5-D space (the high-dimension problem was handled by UMAP).</li>
+    <li><code>cluster_selection_method="eom"</code>: "excess of mass", HDBSCAN's default rule for choosing which clusters from its hierarchy to keep (the book doesn't explain it; this gloss is beyond the book).</li>
+    <li><code>labels_</code>: one integer per document; <b>-1 means outlier</b>.</li>
+    <li><code>len(set(clusters))</code> = <b>156</b> distinct labels. As the topic table later shows (<a href="#s13">13</a>), that is 155 real clusters (0 to 154) plus the -1 outlier label.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: centroid-based vs density-based (modelled)</h3>
+    <p class="note">Toy 2-D data: three groups plus a few stray points. k-means must use exactly <i>k</i> clusters and places every point. The density rule (a simplified DBSCAN-style rule, not full HDBSCAN) calls a point "core" if at least <i>min size</i> points lie within the radius, grows clusters from core points, and leaves the rest as grey outliers.</p>
+    <div class="controls">
+      <span class="seg"><button id="cl-km" class="on">k-means</button><button id="cl-db">density</button></span>
+      <label id="cl-kl">k <input type="range" id="cl-k" min="2" max="6" value="3"><output id="cl-ko">3</output></label>
+      <label id="cl-ml" hidden>min size <input type="range" id="cl-m" min="2" max="12" value="5"><output id="cl-mo">5</output></label>
+      <label id="cl-el" hidden>radius <input type="range" id="cl-e" min="10" max="60" value="26"><output id="cl-eo">26</output></label>
+    </div>
+    <div class="scat"><svg viewBox="0 0 400 260" id="cl-svg" role="img" aria-label="Clustering toy"></svg></div>
+    <div class="readout" id="cl-out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>k-means is a school principal who says "we have exactly 3 houses, every student joins one", so even the new kid who knows nobody gets assigned. HDBSCAN is a college fest: groups form around people who already hang out together, and the loner by the chai stall is simply left alone.</p><p><i>Where it breaks:</i> HDBSCAN's "loners" can be a big share of the data (here about a third of the papers), which is more than you'd expect at a fest.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>DBSCAN uses one fixed radius: a region is a cluster if it has enough neighbours within that radius. One radius can't fit both very dense and loose groups. HDBSCAN avoids picking a radius by trying <i>all</i> of them, building a hierarchy (a tree) of how clusters split as density increases, and then keeping the clusters that are stable over a wide range of densities, subject to <code>min_cluster_size</code>. That is why you only give it a minimum size and it finds the count itself.</p></div>
+  <div class="box work"><b>Worked example</b><p>With 44,949 documents and <code>min_cluster_size=50</code>, the maximum possible number of clusters is 44,949 ÷ 50 ≈ 898. HDBSCAN found 155 (plus outliers), so most clusters are well above the minimum: the topic table shows the largest real cluster has 2,290 papers and the smallest has 50.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"k-means or HDBSCAN?"</i> — "k-means if I know or must fix the number of groups and want every item assigned, for example routing every ticket to one of 8 queues. HDBSCAN when I'm exploring: it finds the number of clusters, handles uneven densities, and marks noise as -1 instead of polluting clusters. The trade-off is many outliers, which I can reassign later if needed."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Outlier topic -1 and <code>reduce_outliers()</code>: <a href="#s13">13</a>.</li><li>Swapping HDBSCAN for k-means: <a href="#s11">11</a>.</li></ul></div>
+</section>
+
+<!-- ============ 07 ============ -->
+<section class="plate" id="s7">
+  <div class="plate-head"><h2><span class="secno">07</span> Inspecting the clusters</h2><span class="chip">pdf p166–168 · Fig 5-8</span></div>
+  <p>Now we inspect each cluster by hand: read some of its documents to understand its content. For example, print the first three documents of cluster 0:</p>
+  <pre class="code"><code>import numpy as np
+
+# Print first three documents in cluster 0
+cluster = 0
+for index in np.where(clusters==cluster)[0][:3]:
+    print(abstracts[index][:300] + "... \n")</code></pre>
+  <div class="fig">
+    <h3>Step through the line <code>np.where(clusters==cluster)[0][:3]</code></h3>
+    <div class="stepbar"><button id="nw-prev">◀ Back</button><button id="nw-next">Next ▶</button><span id="nw-n">1 / 4</span></div>
+    <div class="caption" id="nw-cap"></div>
+    <p class="note">Toy array of 10 labels, modelled; the real one has 44,949.</p>
+  </div>
+  <p><b>What came out</b> (paraphrased, not quoted): the first abstract describes a <b>statistical machine translation system from English to American Sign Language (ASL)</b>, built on the Moses toolkit and shown through a 3-D avatar. The second is about how <b>sign-language research</b> splits linguistic issues (phonology, phonetics) from gesture studies, and focuses on combining motion and meaning. The third says current software <b>misses important aspects of sign-language translation</b> when it generates animation. Conclusion: cluster 0 is mostly about <b>translation from and to sign language</b>.</p>
+  <p><b>Visualising instead of reading.</b> To see all clusters at once, reduce the embeddings to <b>two</b> dimensions so we can plot them on an x/y plane:</p>
+  <pre class="code"><code>import pandas as pd
+
+# Reduce 384-dimensional embeddings to two dimensions for easier visualization
+reduced_embeddings = UMAP(
+    n_components=2, min_dist=0.0, metric="cosine", random_state=42
+).fit_transform(embeddings)
+
+# Create dataframe
+df = pd.DataFrame(reduced_embeddings, columns=["x", "y"])
+df["title"] = titles
+df["cluster"] = [str(c) for c in clusters]
+
+# Select outliers and non-outliers (clusters)
+to_plot = df.loc[df.cluster != "-1", :]
+outliers = df.loc[df.cluster == "-1", :]</code></pre>
+  <ul class="plain">
+    <li>A <b>second</b> UMAP, now with <code>n_components=2</code>, purely for plotting. The clusters themselves still come from the 5-D run. Note that this overwrites the variable <code>reduced_embeddings</code>; from here on it holds the 2-D version (BERTopic's plot uses it in <a href="#s14">14</a>).</li>
+    <li>The dataframe has x, y, the title and the cluster label (as a string). Rows with label <code>"-1"</code> are split off as outliers.</li>
+    <li>Small inconsistency in the book: the prose says it creates <code>clusters_df</code> and <code>outliers_df</code>, and the plotting code below uses those names, but this code names them <code>to_plot</code> and <code>outliers</code>. Rename one or the other if you run it.</li>
+  </ul>
+  <div class="box behind"><b>Book warning</b><p>Using <b>any</b> dimensionality reduction for visualisation loses information. The plot is only an <b>approximation</b> of the original embeddings: it may push clusters together or drive them further apart than they really are. So <b>human evaluation</b>, inspecting the clusters yourself, is a key part of cluster analysis.</p></div>
+  <pre class="code"><code>import matplotlib.pyplot as plt
+
+# Plot outliers and non-outliers separately
+plt.scatter(outliers_df.x, outliers_df.y, alpha=0.05, s=2, c="grey")
+plt.scatter(
+    clusters_df.x, clusters_df.y, c=clusters_df.cluster.astype(int),
+    alpha=0.6, s=2, cmap="tab20b"
+)
+plt.axis("off")</code></pre>
+  <ul class="plain">
+    <li>Outliers drawn first, in grey, almost transparent (<code>alpha=0.05</code>), tiny (<code>s=2</code>), so they form a faint background.</li>
+    <li>Clustered points drawn on top, coloured by cluster number with the <code>tab20b</code> colour map (20 colours), more opaque (<code>alpha=0.6</code>).</li>
+    <li><code>plt.axis("off")</code> hides the axes: UMAP coordinates have no meaning in themselves.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-5-8.png" alt="A scatter plot of about 45 thousand tiny dots: many coloured patches (clusters) with a grey haze of outliers between them, and a few isolated small patches at the edges." loading="lazy"><figcaption>Figure 5-8 (book, pdf p168): The generated clusters (colored) and outliers (gray) are represented as a 2D visualization.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Each dot is one abstract. Dots of the same colour <i>in the same patch</i> were put together by HDBSCAN. The grey haze is the outliers. It captures major clusters quite well (e.g. the big lavender patch at top right). Careful: with 155 clusters and only 20 colours, the colours <b>repeat</b>, so not all green points are one cluster. And by the warning above, distances between patches are approximate.</p>
+  <p>This is visually appealing but doesn't show what is <b>inside</b> the clusters. To fix that, we go from text clustering to <b>topic modeling</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>A night-time satellite photo of India: bright patches are cities (clusters), the faint glow between them is scattered villages (outliers). You can see where people are, but the photo doesn't tell you which city is Pune and which is Surat. For that you need labels, which is the next section.</p><p><i>Where it breaks:</i> the photo's distances are real. UMAP's 2-D distances are distorted, so two "cities" next to each other may not be similar at all.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The 2-D UMAP is fit separately from the 5-D one. Both preserve neighbourhoods, so the same clusters usually show up as patches, but squeezing to 2-D forces some overlap and stretching. That's why the clusters come from the 5-D space and the picture from the 2-D one: never cluster on the plotting projection, and never trust the plot alone.</p></div>
+  <div class="box work"><b>Worked example</b><p>From the topic table in <a href="#s13">13</a>: 14,520 of 44,949 papers are outliers, which is <b>32%</b> (computed from the book's numbers). So about a third of the dots in Figure 5-8 are the grey haze. That's normal for HDBSCAN on text, and it's one reason the book later mentions <code>reduce_outliers()</code>.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"How do you evaluate clusters without labels?"</i> — "Mostly by inspection: read samples from each cluster, check the outlier share, look at a 2-D map but don't trust its distances. If I have a few labels I can check purity, and there are internal metrics, but the book's point stands: human evaluation is a key part of cluster analysis."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Interactive version of this plot with BERTopic: <a href="#s14">14</a>.</li><li>Automatic naming of clusters: <a href="#s8">08</a> onwards.</li></ul></div>
+</section>
+
+<!-- ============ 08 ============ -->
+<section class="plate" id="s8">
+  <div class="plate-head"><h2><span class="secno">08</span> From text clustering to topic modeling</h2><span class="chip">pdf p168–170 · Fig 5-9, 5-10</span></div>
+  <p>Clustering finds structure in large collections. We could inspect each cluster by hand and name it, as we did with the sign-language cluster: its <b>topic</b> is "sign language".</p>
+  <p>Finding themes or <b>latent topics</b> (hidden, not written anywhere explicitly) in a collection of text is called <b>topic modeling</b>. Traditionally it means finding a set of <b>keywords or phrases</b> that best represent the meaning of each topic (Figure 5-9).</p>
+  <figure class="bookfig"><img src="figs/fig-5-9.png" alt="Documents go through topic modeling and come out as three rows of keyword chips: Topic 1 dog, cat, animal shelter, breeds, pet; Topic 2 pasta, pizza, rice, recipes, cooking; Topic 3 sport, soccer, basketball, game, athletes. A note says representations can take many forms: keywords, bi-grams, labels." loading="lazy"><figcaption>Figure 5-9 (book, pdf p169): Traditionally, topics are represented by a number of keywords but can take other forms.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The output of topic modeling is not a picture of points but a list of <b>topic representations</b>, one row of keyword chips per topic. The dotted bracket at the bottom says representations can be <b>keywords, bi-grams (two-word phrases), labels, etc.</b>: BERTopic will later produce all of these.</p>
+  <p>Instead of the label "sign language", such techniques give keywords like "sign", "language", "translation". That doesn't give a <b>single label</b>; the user has to work out the meaning from the keywords.</p>
+  <p><b>Classic approaches</b> such as <b>latent Dirichlet allocation (LDA)</b> (Blei, Ng &amp; Jordan, 2003) assume each topic is a <b>probability distribution over the words</b> of the corpus's vocabulary. Figure 5-10 shows every vocabulary word scored for its relevance to each topic.</p>
+  <figure class="bookfig"><img src="figs/fig-5-10.png" alt="Three columns of horizontal bars, one per topic, over the same nine words. Topic 1 has long bars for cat, dog, pet; Topic 2 for cooking, pasta, recipes; Topic 3 for athletes, game, soccer. Other words have tiny bars." loading="lazy"><figcaption>Figure 5-10 (book, pdf p169): Keywords are extracted based on their distribution over a single topic.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Rows are the whole vocabulary (athletes, cat, cooking, …). Each column is one topic; bar length is how strongly that word belongs to that topic. Every word has <i>some</i> weight in every topic (tiny bars), but each topic's <b>keywords</b> are the few with long, dark bars. Reading down a column gives you the topic's keyword list.</p>
+  <p>These approaches generally use <b>bag-of-words</b> as the main features, which ignores <b>context and meaning</b> of words and phrases. Our clustering example takes both into account, because it uses <b>Transformer-based embeddings</b> trained for semantic similarity and contextual meaning through <b>attention</b>.</p>
+  <p>Next: extend clustering into topic modeling with a highly modular framework, <b>BERTopic</b>.</p>
+  <div class="fig">
+    <h3>Try it: a topic is a ranking of the vocabulary (modelled)</h3>
+    <p class="note">Weights are modelled to look like Figure 5-10. Pick a topic to see its vocabulary sorted by weight; the top 3 become its keywords.</p>
+    <div class="tabsrow" id="lda-tabs"><button class="on" data-t="0">Topic 1</button><button data-t="1">Topic 2</button><button data-t="2">Topic 3</button></div>
+    <div class="bars" id="lda-bars"></div>
+    <div class="readout" id="lda-out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A topic as keywords is like the Swiggy search tags on a restaurant: "biryani, kebab, haleem". You can guess it's a Hyderabadi place, but nobody wrote "Hyderabadi" for you. A label would be the sign board.</p><p><i>Where it breaks:</i> a restaurant chooses its tags; topic keywords are computed from word statistics and can include junk words like "the" (we'll see this happen).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>LDA imagines each document as a mix of topics and each topic as a bag of word probabilities, then fits those probabilities to the word counts. Because it only sees counts, "bank" in "river bank" and "bank loan" is the same feature. Embedding-based clustering sees the whole sentence through attention, so the two uses land in different places. BERTopic's trick (next plates) is to group with embeddings but <i>describe</i> with counts.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"LDA vs BERTopic?"</i> — "LDA is a generative model over bag-of-words: fast, well understood, but it ignores context and needs the number of topics. BERTopic clusters contextual embeddings, so groups follow meaning, finds the topic count via HDBSCAN, and then uses class-based TF-IDF to pick keywords. It's also modular: I can add an LLM to write labels."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Bag-of-words and attention: <a href="ch01_introduction_to_llms.html">Ch.1</a>, <a href="ch03_looking_inside_llms.html">Ch.3</a>.</li><li>BERTopic in detail: <a href="#s9">09</a>–<a href="#s11">11</a>.</li></ul></div>
+</section>
+
+<!-- ============ 09 ============ -->
+<section class="plate" id="s9">
+  <div class="plate-head"><h2><span class="secno">09</span> BERTopic part 1: clusters of similar documents</h2><span class="chip">pdf p170 · Fig 5-11</span></div>
+  <p><b>BERTopic</b> (Grootendorst, 2022; one of this book's authors) is a topic modeling technique that uses <b>clusters of semantically similar texts</b> to extract various kinds of <b>topic representations</b>. Think of the algorithm in <b>two steps</b>.</p>
+  <p><b>Step one</b> is exactly what we just did: embed the documents, reduce their dimensionality, and cluster the reduced embeddings, giving groups of semantically similar documents (Figure 5-11).</p>
+  <figure class="bookfig"><img src="figs/fig-5-11.png" alt="Three connected boxes: SBERT (embed documents, e.g. 512 values), UMAP (reduce dimensionality, e.g. 3 values), HDBSCAN (cluster compressed embeddings, shown as coloured blobs with outlier dots)." loading="lazy"><figcaption>Figure 5-11 (book, pdf p170): The first part of BERTopic's pipeline is to create clusters of semantically similar documents.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> It is Figures 5-3, 5-5 and 5-6 stitched into one line, now with the default algorithm names: <b>SBERT</b> (Sentence-BERT, i.e. a sentence-transformers embedding model) → <b>UMAP</b> → <b>HDBSCAN</b>. Below each box: what the data looks like after that box (wide table → narrow table → clusters with outliers).</p>
+  <div class="box picture"><b>Picture it</b><p>A library volunteer first stacks returned books into piles by feel ("these all look like cooking books"). That's part 1. Part 2 (next plate) is writing a shelf label for each pile.</p><p><i>Where it breaks:</i> the volunteer reads covers; the algorithm reads meaning vectors, and never looks at the words again until part 2.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Part 1's only output is a cluster id per document. Nothing about words survives it: embeddings are not readable. That's the gap part 2 fills by going <b>back to the raw text</b> of each cluster and counting words.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The three steps in detail: <a href="#s4">04</a>, <a href="#s5">05</a>, <a href="#s6">06</a>.</li></ul></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="plate" id="s10">
+  <div class="plate-head"><h2><span class="secno">10</span> BERTopic part 2: from bag-of-words to c-TF-IDF</h2><span class="chip">pdf p170–172 · Fig 5-12, 5-13, 5-14, 5-15</span></div>
+  <p><b>Step two</b> models a <b>distribution over the words</b> of the corpus's vocabulary using a classic method, <b>bag-of-words</b>. As briefly covered in Chapter 1, bag-of-words does what its name says: it <b>counts how many times each word appears</b> in a document (Figure 5-12). The result can be used to find the most frequent words of a document.</p>
+  <figure class="bookfig"><img src="figs/fig-5-12.png" alt="Two sentences, 'My cat is cute' and 'That is a cute dog', each become a row of 0s and 1s over the vocabulary that, is, a, cute, dog, my, cat." loading="lazy"><figcaption>Figure 5-12 (book, pdf p171): A bag-of-words counts the number of times each word appears inside a document.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The yellow chips at the bottom are the <b>vocabulary of all input documents</b>: that, is, a, cute, dog, my, cat. Each sentence becomes one row with a count per vocabulary word. "My cat is cute" → 0 1 0 1 0 1 1 (no "that", one "is", no "a", one "cute", no "dog", one "my", one "cat"). Purple cells are non-zero. Word order is gone; only counts remain. This is also called <b>term frequency</b>.</p>
+  <div class="fig">
+    <h3>Try it: your own bag-of-words</h3>
+    <div class="controls" style="display:grid;gap:6px">
+      <label>doc A <input type="text" id="bw-a" value="My cat is cute" style="width:min(320px,70vw)"></label>
+      <label>doc B <input type="text" id="bw-b" value="That is a cute dog" style="width:min(320px,70vw)"></label>
+    </div>
+    <div class="tablewrap" id="bw-out"></div>
+    <p class="note">Lower-cased, split on spaces and punctuation; vocabulary in order of first appearance across B then A, like the figure. (scikit-learn's <code>CountVectorizer</code> sorts the vocabulary alphabetically and, by default, drops one-letter words like "a"; the toy keeps them.)</p>
+  </div>
+  <p><b>Two caveats.</b></p>
+  <ol class="plain">
+    <li><b>Document level vs cluster level.</b> Bag-of-words describes one document; we want to describe a <b>cluster</b>. Fix: count word frequencies across the <b>entire cluster</b> instead of per document (Figure 5-13). This is <b>c-TF</b>, class-based term frequency.</li>
+    <li><b>Stop words.</b> Words like "the" and "I" appear everywhere and carry little meaning. BERTopic uses a <b>class-based variant of TF-IDF</b> (term frequency–inverse document frequency), <b>c-TF-IDF</b>, to put <b>more weight</b> on words meaningful to one cluster and <b>less weight</b> on words used across all clusters.</li>
+  </ol>
+  <figure class="bookfig"><img src="figs/fig-5-13.png" alt="The two example sentences are merged into one purple cluster row with counts 1 2 1 2 1 1 1; a blue cluster row shows 4 6 3 18 0 5 0 and a green cluster row 4 1 3 2 0 3 0, over the same vocabulary. Formula: frequency (tf) of word x in cluster c equals ||tf x,c||." loading="lazy"><figcaption>Figure 5-13 (book, pdf p171): Generating c-TF by counting the frequency of words per cluster instead of per document.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The two sentences from Figure 5-12 are now one <b>cluster</b> (purple). Their counts are <b>added</b>: "is" appears once in each, so 2; "cute" too, so 2; the rest 1. Two more clusters (blue, green; their documents shown as "…") have their own rows. The blue cluster says "cute" 18 times. Bottom left: the notation <b>‖tf<sub>x,c</sub>‖</b> = frequency of word <i>x</i> in cluster <i>c</i>. Each row is now a "mega-document" for one cluster.</p>
+  <p><b>The IDF part.</b> Each word's c-TF is multiplied by that word's <b>IDF</b> value. As Figure 5-14 shows, IDF is the <b>logarithm of the average frequency of all words across all clusters divided by the total frequency of each word</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-5-14.png" alt="Inverse document frequency: log of 29 divided by each word's total count across clusters (that 9, is 9, a 7, cute 22, dog 1, my 9, cat 1), plus 1. Formula: log(A / cf_x + 1), where A is the average frequency and cf_x is the total frequency of word x." loading="lazy"><figcaption>Figure 5-14 (book, pdf p172): Creating a weighting scheme.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The coloured boxes are each word's <b>total count across all clusters</b> (cf<sub>x</sub>): the column sums of Figure 5-13 (that 1+4+4 = 9, cute 2+18+2 = 22, cat 1+0+0 = 1, …). The big number on top, <b>A = 29</b>, is the "average frequency". The formula is <b>IDF<sub>x</sub> = log(A / cf<sub>x</sub> + 1)</b>. Rare words (dog, cat: total 1) get a big weight; common words (cute: 22) get a small one. The <b>+1</b> appears only in the figure, not in the prose; it keeps the weight positive. Note: 29 is the number the figure draws; it isn't obviously the mean of the figure's own counts (the three cluster totals are 9, 36 and 13, mean ≈ 19.3), so treat it as illustrative.</p>
+  <p>The result is a weight ("IDF") per word, multiplied by its frequency ("c-TF") to get the weighted values ("<b>c-TF-IDF</b>"). This second part (Figure 5-15) produces a distribution over words, like the topic distributions we saw for LDA. The bag-of-words (term frequency) can be made with scikit-learn's <b><code>CountVectorizer</code></b>. Here, each cluster is treated as a <b>topic</b> that has its own ranking of the corpus's vocabulary.</p>
+  <figure class="bookfig"><img src="figs/fig-5-15.png" alt="Step 4 CountVectorizer 'Create a class-based bag-of-words' produces the cluster-by-word count matrix ||tf x,c||; step 5 c-TF-IDF 'Weigh terms' multiplies c-TF by IDF = log(A / cf_x + 1)." loading="lazy"><figcaption>Figure 5-15 (book, pdf p172): The second part of BERTopic's pipeline is representing the topics: the calculation of the weight of term x in a class c.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Numbering continues from part 1 (steps 1–3): <b>4. CountVectorizer</b> builds the class-based bag-of-words matrix (rows = clusters), <b>5. c-TF-IDF</b> weighs it. The formula on the right in full: <b>W<sub>x,c</sub> = ‖tf<sub>x,c</sub>‖ × log(A / cf<sub>x</sub> + 1)</b>, with the c-TF part and the IDF part bracketed separately.</p>
+  <div class="formula">W(x, c) = c-TF × IDF = ‖tf(x,c)‖ × log( A / cf(x) + 1 )
+
+tf(x,c) = count of word x in all documents of cluster c
+cf(x)   = count of word x across all clusters
+A       = average frequency (the book's figure uses 29)</div>
+  <p>Putting it together: the higher a word's weight in a topic, the more <b>representative</b> it is of that topic.</p>
+  <div class="fig">
+    <h3>Try it: c-TF-IDF calculator (seeded with Figure 5-13)</h3>
+    <p class="note">Edit any count. The page recomputes column totals cf<sub>x</sub>, IDF and the c-TF-IDF weights, and outlines each cluster's top 2 words. Natural log. Values are computed by this page (modelled), not printed in the book.</p>
+    <div class="controls"><span>A =</span><span class="seg"><button id="ct-a29" class="on">29 (figure)</button><button id="ct-aavg">avg words per cluster</button></span><button id="ct-reset">reset</button></div>
+    <div class="tablewrap" id="ct-in"></div>
+    <div class="tablewrap" id="ct-idf"></div>
+    <div class="tablewrap" id="ct-w"></div>
+    <div class="readout" id="ct-out"></div>
+  </div>
+  <div class="box work"><b>Worked example (from the figure's numbers)</b><p>IDF(cat) = ln(29/1 + 1) = ln 30 ≈ <b>3.40</b>. IDF(cute) = ln(29/22 + 1) = ln 2.32 ≈ <b>0.84</b>. In the purple cluster, cat has c-TF 1 and cute has c-TF 2, so W(cat) = 1 × 3.40 = 3.40 and W(cute) = 2 × 0.84 = 1.68. Even though "cute" appears twice as often in that cluster, "cat" wins (tied with "dog", which also appears once in total and so gets the same 3.40), because "cute" is everywhere (22 times overall, mostly in the blue cluster). In the blue cluster, cute has c-TF 18, so W = 18 × 0.84 ≈ 15.2: it is still that cluster's top word, because it's so dominant there.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>In the BERTopic library, the ‖·‖ bars in the formula mean the c-TF row is <b>L1-normalised</b> (each cluster's counts are divided by that cluster's total, so big clusters don't get bigger weights just for having more text), and <b>A</b> is the <b>average number of words per class</b>. The library's IDF is computed as log(1 + A / f<sub>x</sub>). This is why real topic weights in <a href="#s13">13</a> are small numbers like 0.028.</p></div>
+  <div class="box picture"><b>Picture it</b><p>Each cluster is a WhatsApp group; c-TF is how often each word is said in that group. "Good morning" is posted in every family group, so it tells you nothing (low IDF). "Fantasy XI captain" is said a lot in only one group: that's the cricket group. c-TF-IDF finds the words that are common <i>here</i> and rare <i>elsewhere</i>.</p><p><i>Where it breaks:</i> c-TF-IDF only counts words. It can't tell that "captain" and "skipper" mean the same, and abbreviations stay unexpanded.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Classic <b>TF-IDF</b> asks "how special is this word to this <i>document</i>?" and divides by how many documents contain it. c-TF-IDF does the same at <b>cluster</b> level: glue each cluster's documents into one big document, count, then down-weight words that are frequent across clusters. Because it only needs counts per cluster, it's very fast and doesn't care how the clusters were made (embedding, k-means, even hand labels).</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"How does BERTopic name its topics?"</i> — "After clustering, it concatenates all documents in a cluster, builds a bag-of-words with CountVectorizer, and weights each word with class-based TF-IDF: term frequency in the cluster times log(1 + average frequency / the word's frequency across all clusters). Top-weighted words become the topic's keywords. It's cheap and independent of the clustering model."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Bag-of-words origin: <a href="ch01_introduction_to_llms.html">Ch.1</a>. TF-IDF-like sparse retrieval (BM25) in search: <a href="ch08_semantic_search_and_rag.html">Ch.8</a>.</li><li>c-TF-IDF also picks "representative documents" for KeyBERTInspired and LLM prompts: <a href="#s16">16</a>, <a href="#s18">18</a>.</li></ul></div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="plate" id="s11">
+  <div class="plate-head"><h2><span class="secno">11</span> The full pipeline and its Lego blocks</h2><span class="chip">pdf p172–173 · Fig 5-16, 5-17</span></div>
+  <p>Put the two steps together, <b>clustering</b> and <b>topic representation</b>, and you have the full BERTopic pipeline (Figure 5-16): cluster semantically similar documents, then generate topics represented by several keywords.</p>
+  <figure class="bookfig"><img src="figs/fig-5-16.png" alt="Two dashed groups: Clustering (SBERT → UMAP → HDBSCAN) and Topic representation (CountVectorizer → c-TF-IDF)." loading="lazy"><figcaption>Figure 5-16 (book, pdf p173): The full pipeline of BERTopic, roughly, consists of two steps, clustering and topic representation.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Five boxes in a row, grouped in two dashed frames. The left frame makes the groups; the right frame names them. The only thing passed between the frames is the cluster label of each document.</p>
+  <p>A major advantage: the two steps are <b>largely independent</b>. c-TF-IDF does not depend on which models made the clusters. That gives <b>modularity throughout every component</b>, and it's a great starting point for <b>fine-tuning the topic representations</b> later in the chapter.</p>
+  <p>As Figure 5-17 shows, sentence-transformers is the default embedding model, but you can swap it for <b>any</b> embedding technique. The same goes for every other step. Don't want outliers from HDBSCAN? Use <b>k-means</b> instead.</p>
+  <figure class="bookfig"><img src="figs/fig-5-17.png" alt="Three Lego towers. Topic model 1 (default): SBERT, UMAP, HDBSCAN, CountVectorizer, c-TF-IDF. Topic model 2 (customized): Bag-of-words, PCA, k-Means, CountVectorizer, c-TF-IDF. Topic model n: blank blocks." loading="lazy"><figcaption>Figure 5-17 (book, pdf p173): The modularity of BERTopic is a key component and allows you to build your own topic model however you want.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Read each tower <b>bottom-up</b>, like the pipeline order. Layer colours are the same "slots" as in Figure 5-16 (blue = embed, pink = reduce, green = cluster, yellow = tokenize, grey = weigh). Tower 1 is the default; tower 2 replaces three blocks (bag-of-words embeddings, PCA, k-means) but keeps the top two; tower <i>n</i> is "your own". Every block in a slot is replaceable by any similar algorithm.</p>
+  <p>Think of it as <b>building with Lego</b>: each part of the pipeline is fully replaceable. Thanks to that, newly released models can be plugged in. "As the field of Language AI grows, so does BERTopic."</p>
+  <div class="fig">
+    <h3>Try it: build your own tower</h3>
+    <div class="lego" id="lg">
+      <div class="blk l6"><b>6 · fine-tune (optional)</b><select id="lg6"><option value="none">none</option><option value="kb">KeyBERTInspired</option><option value="mmr">MaximalMarginalRelevance</option><option value="tg">TextGeneration (Flan-T5)</option><option value="oa">OpenAI (GPT-3.5)</option></select></div>
+      <div class="blk l5"><b>5 · weigh</b><span>c-TF-IDF</span></div>
+      <div class="blk l4"><b>4 · tokenize</b><span>CountVectorizer</span></div>
+      <div class="blk l3"><b>3 · cluster</b><select id="lg3"><option value="hdb">HDBSCAN</option><option value="km">k-means</option></select></div>
+      <div class="blk l2"><b>2 · reduce</b><select id="lg2"><option value="umap">UMAP</option><option value="pca">PCA</option></select></div>
+      <div class="blk l1"><b>1 · embed</b><select id="lg1"><option value="sbert">SBERT (gte-small)</option><option value="other">another sentence-transformers model</option></select></div>
+    </div>
+    <div class="verdict" id="lg-v"></div>
+    <pre class="code"><code id="lg-code"></code></pre>
+    <p class="note">The <code>BERTopic(...)</code> arguments <code>embedding_model</code>, <code>umap_model</code>, <code>hdbscan_model</code> and <code>representation_model</code> appear in the chapter. Passing scikit-learn's <code>PCA</code> as <code>umap_model</code> or <code>KMeans</code> as <code>hdbscan_model</code> is documented BERTopic usage but the chapter doesn't show the code: <b>beyond the book</b>.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A thali. The plate (pipeline) has fixed katoris: dal, sabzi, rice, roti, sweet. Each katori can hold any dish of its kind; swap paneer for aloo and the rest of the thali doesn't change. BERTopic's slots are the katoris.</p><p><i>Where it breaks:</i> some swaps change behaviour of later steps: drop HDBSCAN for k-means and there are no more outliers (topic -1 disappears).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each slot only promises an interface: the embedder gives a matrix, the reducer has <code>fit</code>/<code>transform</code>, the clusterer exposes labels, the vectorizer gives counts. Any object that honours the interface fits. That's classic software design (dependency injection, strategy pattern) applied to ML, and why a backend engineer finds BERTopic easy to extend.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Why is BERTopic popular?"</i> — "Two independent stages, clustering and representation, each with swappable components. I can use a domain embedding model, k-means if I need every document assigned, and plug an LLM in only for labelling. Like a strategy pattern, new models drop in without touching the rest."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The optional sixth block: <a href="#s15">15</a>–<a href="#s18">18</a>.</li><li>Variants built on this modularity: <a href="#s12">12</a>.</li></ul></div>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="plate" id="s12">
+  <div class="plate-head"><h2><span class="secno">12</span> The modularity of BERTopic (sidebar)</h2><span class="chip">pdf p174</span></div>
+  <p>Modularity has another advantage: the <b>same base model</b> can be adapted to many use cases. BERTopic supports a wide variety of <b>algorithmic variants</b>. The book lists them; the one-line glosses in the right column are <b>beyond the book</b> (from BERTopic's documentation, to make the names concrete).</p>
+  <div class="tablewrap"><table>
+    <tr><th>Variant (book's list)</th><th>What it means (beyond the book)</th></tr>
+    <tr><td>Guided topic modeling</td><td>You give seed words for topics you expect; the model nudges toward them.</td></tr>
+    <tr><td>(Semi-)supervised topic modeling</td><td>Some or all documents have labels that steer the clustering.</td></tr>
+    <tr><td>Hierarchical topic modeling</td><td>Topics are merged into a tree of parent and child topics.</td></tr>
+    <tr><td>Dynamic topic modeling</td><td>Track how a topic's keywords change over time.</td></tr>
+    <tr><td>Multimodal topic modeling</td><td>Documents can be images or image + text.</td></tr>
+    <tr><td>Multi-aspect topic modeling</td><td>Several representations of the same topic side by side (keywords, label, …).</td></tr>
+    <tr><td>Online and incremental topic modeling</td><td>Update the model as new documents stream in.</td></tr>
+    <tr><td>Zero-shot topic modeling</td><td>Predefined topic names are matched to documents; the rest are clustered freely.</td></tr>
+    <tr><td>Etc.</td><td></td></tr>
+  </table></div>
+  <p>This flexibility is the foundation of the author's aim: make BERTopic the <b>one-stop shop for topic modeling</b>. The full overview is in its documentation and repository.</p>
+  <div class="box picture"><b>Picture it</b><p>One Activa scooter, many uses: delivery boxes for Zomato, a child seat for school runs, a rack for a vegetable vendor. Same engine, different attachments.</p><p><i>Where it breaks:</i> attachments on a scooter are rarely combined; BERTopic variants often are (e.g. dynamic + multi-aspect).</p></div>
+  <div class="box behind"><b>Interview angle</b><p>If asked "how would you track how customer complaints change month to month?", name <b>dynamic topic modeling</b>; for "new tickets arrive every hour", name <b>online/incremental</b> topic modeling. Knowing these names shows you know the tool beyond the default.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Multimodal models: <a href="ch09_multimodal_llms.html">Ch.9</a>.</li><li>Multi-aspect = several representations at once, recommended in <a href="#s18">18</a>.</li></ul></div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="plate" id="s13">
+  <div class="plate-head"><h2><span class="secno">13</span> Running BERTopic and exploring the topics</h2><span class="chip">pdf p174–176</span></div>
+  <p>To run BERTopic on the ArXiv data we can reuse the models and embeddings defined earlier (not mandatory; BERTopic has defaults):</p>
+  <pre class="code"><code>from bertopic import BERTopic
+
+# Train our model with our previously defined models
+topic_model = BERTopic(
+    embedding_model=embedding_model,
+    umap_model=umap_model,
+    hdbscan_model=hdbscan_model,
+    verbose=True
+).fit(abstracts, embeddings)</code></pre>
+  <ul class="plain">
+    <li>Each keyword argument fills one Lego slot with the objects from plates 04–06 (gte-small, the 5-D UMAP, HDBSCAN with min size 50).</li>
+    <li><code>.fit(abstracts, embeddings)</code>: passing the <b>pre-computed embeddings</b> skips step 1 (no need to embed 44,949 abstracts again). The abstracts are still needed for the bag-of-words.</li>
+    <li><code>verbose=True</code> prints progress per step.</li>
+  </ul>
+  <p><b>Overview of topics</b> with <code>get_topic_info()</code>:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>Count</th><th>Name</th><th>Representation</th></tr>
+    <tr><td class="num">-1</td><td class="num">14,520</td><td class="num">-1_the_of_and_to</td><td>[the, of, and, to, in, we, that, language, for…</td></tr>
+    <tr><td class="num">0</td><td class="num">2,290</td><td class="num">0_speech_asr_recognition_end</td><td>[speech, asr, recognition, end, acoustic, spea…</td></tr>
+    <tr><td class="num">1</td><td class="num">1,403</td><td class="num">1_medical_clinical_biomedical_patient</td><td>[medical, clinical, biomedical, patient, healt…</td></tr>
+    <tr><td class="num">2</td><td class="num">1,156</td><td class="num">2_sentiment_aspect_analysis_reviews</td><td>[sentiment, aspect, analysis, reviews, opinion…</td></tr>
+    <tr><td class="num">3</td><td class="num">986</td><td class="num">3_translation_nmt_machine_neural</td><td>[translation, nmt, machine, neural, bleu, engl…</td></tr>
+    <tr><td class="num">…</td><td class="num">…</td><td class="num">…</td><td>…</td></tr>
+    <tr><td class="num">150</td><td class="num">54</td><td class="num">150_coherence_discourse_paragraph_text</td><td>[coherence, discourse, paragraph, text, cohesi…</td></tr>
+    <tr><td class="num">151</td><td class="num">54</td><td class="num">151_prompt_prompts_optimization_prompting</td><td>[prompt, prompts, optimization, prompting, llm…</td></tr>
+    <tr><td class="num">152</td><td class="num">53</td><td class="num">152_sentence_sts_embeddings_similarity</td><td>[sentence, sts, embeddings, similarity, embedd…</td></tr>
+    <tr><td class="num">153</td><td class="num">53</td><td class="num">153_counseling_mental_health_therapy</td><td>[counseling, mental, health, therapy, psychoth…</td></tr>
+    <tr><td class="num">154</td><td class="num">50</td><td class="num">154_backdoor_attacks_attack_triggers</td><td>[backdoor, attacks, attack, triggers, poisoned…</td></tr>
+  </table></div>
+  <ul class="plain">
+    <li>Each topic is represented by several keywords. The <b>Name</b> column joins the <b>four best keywords</b> with "_", so you get a quick feel for each topic.</li>
+    <li>Topics are numbered by size: 0 is the biggest (2,290 papers), 154 the smallest (50, exactly <code>min_cluster_size</code>).</li>
+    <li>Topic <b>-1</b> holds all documents that couldn't be fitted into a topic: the <b>outliers</b>. That's a result of HDBSCAN not forcing every point into a cluster. Its keywords are stop words ("the, of, and, to"), because outliers share nothing except ordinary English.</li>
+    <li>To remove outliers, either use a non-outlier algorithm like <b>k-means</b>, or call BERTopic's <b><code>reduce_outliers()</code></b> to <b>reassign</b> outliers to topics.</li>
+  </ul>
+  <p><b>Inspect one topic</b> with <code>get_topic</code>. Topic 0's keywords and their c-TF-IDF weights:</p>
+  <div class="bars" id="t0-bars"></div>
+  <p>"speech", "asr" and "recognition" suggest topic 0 is about <b>automatic speech recognition (ASR)</b>. Notice "the" still sneaks in at rank 8: plain c-TF-IDF doesn't remove every stop word.</p>
+  <p><b>Search for a topic</b> with <code>find_topics()</code>:</p>
+  <pre class="code"><code>topic_model.find_topics("topic modeling")
+([22, -1, 1, 47, 32],
+ [0.95456535, 0.91173744, 0.9074769, 0.9067007, 0.90510106])</code></pre>
+  <p>It returns topic ids and their <b>similarity</b> to the search term. Topic 22 scores relatively high (0.95). Its keywords confirm it is about topic modeling: topic, topics, lda, latent, document, documents, modeling, dirichlet, word, allocation (weights from 0.066 down to 0.0079). Finally, check that the BERTopic paper's own abstract lands in that topic:</p>
+  <pre class="code"><code>topic_model.topics_[titles.index("BERTopic: Neural topic modeling with a class-based TF-IDF procedure")]
+22</code></pre>
+  <p>It does. <code>topics_</code> is the list of topic ids, one per document, in the same order as the input, so <code>titles.index(...)</code> finds the paper's position and <code>topics_[...]</code> its topic.</p>
+  <div class="box behind"><b>Book note</b><p>BERTopic's modularity gives many choices, which can be overwhelming. The author wrote a <b>best practices guide</b> covering common practices to speed up training, improve representations, and more.</p></div>
+  <div class="box beyond"><b>Beyond the book: how find_topics scores</b><p><code>find_topics</code> embeds the search term with the topic model's embedding model and compares it by cosine similarity to each topic's embedding. That's why the scores are all close to 0.9: small embedding models give fairly high cosine values to most scientific text. Rank matters more than the absolute value.</p></div>
+  <div class="box picture"><b>Picture it</b><p><code>get_topic_info()</code> is the index page of a newspaper's archive: section, number of articles, a headline-style name. <code>get_topic(0)</code> opens one section. <code>find_topics("topic modeling")</code> is asking the librarian "which section would this be in?"</p><p><i>Where it breaks:</i> a newspaper index is written by editors; this one is auto-generated keywords, so section -1 is literally "the of and to".</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Your topic model put 32% of documents in -1. Is that bad?"</i> — "Not necessarily; HDBSCAN is conservative. I'd look at the outliers' keywords (mostly stop words here), then either lower min_cluster_size, use reduce_outliers() to reassign them to the nearest topic, or switch to k-means if every document must have a topic, like for routing."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Better keywords than these: <a href="#s16">16</a>, <a href="#s17">17</a>; labels: <a href="#s18">18</a>.</li><li>Semantic search with embeddings: <a href="ch08_semantic_search_and_rag.html">Ch.8</a>.</li></ul></div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="plate" id="s14">
+  <div class="plate-head"><h2><span class="secno">14</span> Visualizing topics and documents</h2><span class="chip">pdf p176–178 · Fig 5-18</span></div>
+  <p>Earlier we made a static plot. BERTopic can make an <b>interactive</b> one to quickly explore which topics exist and which documents they contain. It uses the <b>two-dimensional</b> <code>reduced_embeddings</code> from UMAP, and when you hover over a point it shows the <b>title</b> (not the abstract), so you quickly understand the documents in a topic.</p>
+  <pre class="code"><code># Visualize topics and documents
+fig = topic_model.visualize_documents(
+    titles,
+    reduced_embeddings=reduced_embeddings,
+    width=1200,
+    hide_annotations=True
+)
+
+# Update fonts of legend for easier visualization
+fig.update_layout(font=dict(size=16))</code></pre>
+  <ul class="plain">
+    <li><code>titles</code>: hover text for each point.</li>
+    <li><code>reduced_embeddings=</code>: the 2-D coordinates, so BERTopic doesn't have to run UMAP again.</li>
+    <li><code>hide_annotations=True</code>: don't print topic names on the map itself (the legend lists them).</li>
+    <li>The result is a Plotly figure, so <code>update_layout</code> changes its fonts.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-5-18.png" alt="An interactive scatter with axes D1 and D2: coloured patches over grey outliers, a hover tooltip reading 'Large Language Models are Complex Table Parsers', and a legend listing topics 0_speech_asr_recognition through 22_adversarial_attacks_attack." loading="lazy"><figcaption>Figure 5-18 (book, pdf p177): The output when we visualize documents and topics.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> D1 and D2 are the two UMAP axes (no meaning beyond position). Grey = outliers; colours = topics; the legend on the right names topics with their top three keywords. The green tooltip shows the hover feature: one paper's title. You can <b>zoom in</b> to individual documents or <b>double-click</b> a topic in the legend to show only that one. Note: the topic numbers in this legend (e.g. 1_translation_nmt_machine) don't match the <code>get_topic_info()</code> table (where 1 is medical), so the screenshot likely comes from a different run; the idea is the same.</p>
+  <p>BERTopic has a wide range of visualisations. Three are worth exploring for the <b>relationships between topics</b>:</p>
+  <pre class="code"><code># Visualize barchart with ranked keywords
+topic_model.visualize_barchart()
+
+# Visualize relationships between topics
+topic_model.visualize_heatmap(n_clusters=30)
+
+# Visualize the potential hierarchical structure of topics
+topic_model.visualize_hierarchy()</code></pre>
+  <div class="tablewrap"><table>
+    <tr><th>Call</th><th>Shows</th></tr>
+    <tr><td><code>visualize_barchart()</code></td><td>Bar charts of the ranked keywords per topic (like Figure 5-10, but real).</td></tr>
+    <tr><td><code>visualize_heatmap(n_clusters=30)</code></td><td>A topic-by-topic similarity heatmap; <code>n_clusters=30</code> groups similar topics together so blocks are visible.</td></tr>
+    <tr><td><code>visualize_hierarchy()</code></td><td>A tree (dendrogram) of how topics could merge into broader topics.</td></tr>
+  </table></div>
+  <p class="note">The "Shows" descriptions are the method names read plainly; the book doesn't print these plots.</p>
+  <div class="box picture"><b>Picture it</b><p>Google Maps for your dataset: zoom into a "city" (topic), tap a "shop" (paper) to see its name, toggle layers in the legend.</p><p><i>Where it breaks:</i> as with Figure 5-8, the map's distances are UMAP's approximation, not real road distances.</p></div>
+  <div class="box behind"><b>Interview angle</b><p>When presenting a clustering result to product people, show the interactive document map and the barchart; they make the topics tangible. For engineers, show the heatmap to argue which topics are near-duplicates worth merging.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The static version: <a href="#s7">07</a>. The labelled version: <a href="#s19">19</a>.</li></ul></div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section class="plate" id="s15">
+  <div class="plate-head"><h2><span class="secno">15</span> Adding a special Lego block (representation models)</h2><span class="chip">pdf p178–180 · Fig 5-19, 5-20, 5-21</span></div>
+  <p>The pipeline so far is fast and modular, but it has a <b>disadvantage</b>: a topic is still represented by a <b>bag-of-words</b>, with no regard for semantic structure.</p>
+  <p>The solution keeps bag-of-words' strength, its <b>speed</b> at producing a meaningful first representation, and then <b>tweaks</b> that first representation with more powerful but slower techniques such as embedding models. Figure 5-19: <b>rerank</b> the initial word distribution to improve it. This idea of reranking an initial set of results is a staple of <b>neural search</b>, covered in Chapter 8.</p>
+  <figure class="bookfig"><img src="figs/fig-5-19.png" alt="Left: original topic with c-TF-IDF, ten bars from Summarization, Summaries, Summary, Abstractive, Document, Extractive, Rouge, Documents, Factual to Evaluation. Middle: a blue Reranker (representation) block. Right: reranked topic: Summarization, Summaries, Abstractive, Evaluation, Sentences, Text, Metrics, Datasets, Neural, Model." loading="lazy"><figcaption>Figure 5-19 (book, pdf p178): Fine-tune the topic representations by reranking the original c-TF-IDF distributions.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left: a summarization topic's top words from c-TF-IDF, longest bar first. Blue bars are words the reranker will keep near the top (Summarization, Summaries, Abstractive, Evaluation); grey ones get pushed down or out. Right: the reranked list. "Evaluation", which was <i>last</i>, jumps to fourth; near-duplicates like "Summary" and "Documents" are gone. The reranker can bring in words like "Metrics" and "Datasets" that were further down the original ranking. Same topic, better order.</p>
+  <p>So we design a new Lego block (Figure 5-20) that takes the first topic representation and outputs an improved one. In BERTopic these reranker models are called <b>representation models</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-5-20.png" alt="A tower of six steps with block names: 1 Embed documents (SBERT), 2 Reduce dimensionality (UMAP), 3 Cluster embeddings (HDBSCAN) grouped as Clustering / topic creation; 4 Tokenize words (CountVectorizer), 5 Weight words (c-TF-IDF) grouped as Representation / label topics; 6 Fine-tune representation (Reranker) on top." loading="lazy"><figcaption>Figure 5-20 (book, pdf p179): The reranker (representation) block sits on top of the c-TF-IDF representation.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Read bottom-up. Left column: what each step does (1 Embed documents … 6 Fine-tune representation). Middle: which block does it. Right brackets: the three stages, <b>Clustering</b> (topic creation), <b>Representation</b> (label topics), and the new <b>Reranker</b> (fine-tune representation). The arrow from step 3 to 4 skips nothing: only cluster labels go up. The new block 6 only sees the output of block 5.</p>
+  <p><b>Key benefit:</b> the topic representation only needs to be optimised <b>as many times as there are topics</b>. With millions of documents and a hundred topics, the block runs once per topic, not once per document.</p>
+  <div class="fig">
+    <h3>Try it: per-document vs per-topic cost (modelled)</h3>
+    <div class="controls">
+      <label>documents <input type="range" id="co-d" min="3" max="8" step="0.1" value="6"><output id="co-do">1,000,000</output></label>
+      <label>topics <input type="range" id="co-t" min="10" max="1000" step="10" value="100"><output id="co-to">100</output></label>
+      <label>seconds per model call <input type="number" id="co-s" value="1" min="0.01" step="0.1"></label>
+    </div>
+    <div class="readout" id="co-out"></div>
+    <p class="note">Only the "once per topic vs once per document" idea is from the book; the call time is your own guess.</p>
+  </div>
+  <p>A wide variety of representation blocks exist (Figure 5-21), and they can be <b>stacked</b> to fine-tune with several methods in a row.</p>
+  <figure class="bookfig"><img src="figs/fig-5-21.png" alt="Top half repeats Figure 5-20. Bottom: 'Fine-tune topics with representation blocks': KeyBERT, MMR, spaCy blocks; 'Choose a single block': a tower topped by KeyBERT; 'Or stack multiple blocks': a tower topped by KeyBERT then MMR." loading="lazy"><figcaption>Figure 5-21 (book, pdf p179): After applying the c-TF-IDF weighting, topics can be fine-tuned with a wide variety of representation models, many of which are large language models.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> On its left, a shelf of blue representation blocks: <b>KeyBERT</b>, <b>MMR</b>, <b>spaCy</b>. Middle tower: the usual five blocks ("…") with <b>one</b> block (KeyBERT) on top. Right tower: <b>two stacked</b> blocks, KeyBERT then MMR on top. The caption adds that many representation models are LLMs.</p>
+  <p><b>Two preparations</b> before trying blocks. First, save the original representations so we can compare:</p>
+  <pre class="code"><code># Save original representations
+from copy import deepcopy
+original_topics = deepcopy(topic_model.topic_representations_)</code></pre>
+  <p><code>deepcopy</code> matters: <code>update_topics</code> will change the model's representations in place, and a plain assignment would just point at the same, soon-changed object. Second, a small helper that shows the top 5 words per topic before and after:</p>
+  <pre class="code"><code>def topic_differences(model, original_topics, nr_topics=5):
+    """Show the differences in topic representations between two models """
+    df = pd.DataFrame(columns=["Topic", "Original", "Updated"])
+    for topic in range(nr_topics):
+        # Extract top 5 words per topic per model
+        og_words = " | ".join(list(zip(*original_topics[topic]))[0][:5])
+        new_words = " | ".join(list(zip(*model.get_topic(topic)))[0][:5])
+        df.loc[len(df)] = [topic, og_words, new_words]
+    return df</code></pre>
+  <ul class="plain">
+    <li>Each topic is a list of <code>(word, weight)</code> pairs. <code>zip(*pairs)</code> splits it into a tuple of words and a tuple of weights; <code>[0]</code> keeps the words; <code>[:5]</code> the top five.</li>
+    <li>The words are joined with " | " and added as one row per topic (topics 0 to 4 by default).</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>An IRCTC Tatkal queue: a fast clerk first prints a shortlist of 30 candidate trains by simple filters (c-TF-IDF). Then a senior clerk, slower but smarter, reorders that shortlist by what you actually need (reranker). The senior clerk only looks at 30 trains, not all 13,000.</p><p><i>Where it breaks:</i> a reranker can only reorder what the shortlist contains (KeyBERTInspired, MMR). The LLM block in <a href="#s18">18</a> goes further and writes something new.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is the two-stage <b>retrieve-then-rerank</b> pattern: a cheap, high-recall first stage narrows the options; an expensive, high-precision second stage reorders them. In BERTopic the expensive stage is cheap overall because its input count is the number of topics.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Where else have you seen retrieve-then-rerank?"</i> — "In RAG: BM25 or vector search returns top-50 chunks, a cross-encoder reranks them, and only the top 5 go to the LLM. BERTopic does the same with words: c-TF-IDF shortlists candidates, an embedding or LLM block reranks. The design rule is the same: put the expensive model where the input count is smallest."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Reranking in search: <a href="ch08_semantic_search_and_rag.html">Ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>, <a href="../llm_engineers_handbook/ch09_rag_inference_pipeline.html">LLM Engineer's Handbook Ch.9</a>.</li></ul></div>
+</section>
+
+<!-- ============ 16 ============ -->
+<section class="plate" id="s16">
+  <div class="plate-head"><h2><span class="secno">16</span> KeyBERTInspired</h2><span class="chip">pdf p180–181 · Fig 5-22</span></div>
+  <p>The first representation block is <b>KeyBERTInspired</b>, inspired by the keyword-extraction package <b>KeyBERT</b> (Grootendorst, 2020). KeyBERT extracts keywords by comparing <b>word embeddings</b> and <b>document embeddings</b> through <b>cosine similarity</b>.</p>
+  <p>BERTopic does something similar:</p>
+  <ol class="plain">
+    <li>Use c-TF-IDF to find the <b>most representative documents</b> per topic: the documents whose c-TF-IDF values are most similar to those of their topic.</li>
+    <li>Embed those documents and take their <b>average embedding</b> per topic.</li>
+    <li>Embed the <b>candidate keywords</b> (from c-TF-IDF) and compare them to that average.</li>
+    <li><b>Rerank</b> the keywords by that similarity.</li>
+  </ol>
+  <figure class="bookfig"><img src="figs/fig-5-22.png" alt="Three representative documents of a topic (My cat is cute, That is a cute dog, I love pets) are embedded and averaged. Three keywords (cat, that, cute) are embedded. Cosine similarity between the average and each keyword gives reranked keywords: cat highest, cute next, that lowest." loading="lazy"><figcaption>Figure 5-22 (book, pdf p180): KeyBERTInspired representation model procedure.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Purple = documents (each row an embedding), averaged into one purple vector for the topic. Grey = keyword embeddings. Cosine similarity of the purple vector against each grey row gives the bars on the right: <b>cat</b> is most similar to what the documents are about, <b>cute</b> next, <b>that</b> barely. A word like "that" might score well on counts but is meaningless semantically, so it drops.</p>
+  <p>Because of BERTopic's modularity we can update the representations <b>without</b> redoing dimensionality reduction and clustering:</p>
+  <pre class="code"><code>from bertopic.representation import KeyBERTInspired
+
+# Update our topic representations using KeyBERTInspired
+representation_model = KeyBERTInspired()
+topic_model.update_topics(abstracts, representation_model=representation_model)
+
+# Show topic differences
+topic_differences(topic_model, original_topics)</code></pre>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>Original (c-TF-IDF)</th><th>Updated (KeyBERTInspired)</th></tr>
+    <tr><td class="num">0</td><td>speech | asr | recognition | end | acoustic</td><td>speech | encoder | phonetic | language | trans…</td></tr>
+    <tr><td class="num">1</td><td>medical | clinical | biomedical | patient | he…</td><td>nlp | ehr | clinical | biomedical | language</td></tr>
+    <tr><td class="num">2</td><td>sentiment | aspect | analysis | reviews | opinion</td><td>aspect | sentiment | aspects | sentiments | cl…</td></tr>
+    <tr><td class="num">3</td><td>translation | nmt | machine | neural | bleu</td><td>translation | translating | translate | transl…</td></tr>
+    <tr><td class="num">4</td><td>summarization | summaries | summary | abstract…</td><td>summarization | summarizers | summaries | summ…</td></tr>
+  </table></div>
+  <p><b>Reading the result.</b> The updated topics are <b>easier to read</b>. But it also shows the <b>downside</b> of embedding-based techniques: words like <b>nmt</b> (topic 3; neural machine translation) are <b>removed</b>, because the embedding model couldn't properly represent that abbreviation. For domain experts such abbreviations are highly informative. Also notice the new redundancy: "translation | translating | translate" are almost the same word, which motivates the next block.</p>
+  <div class="fig">
+    <h3>Try it: KeyBERTInspired on Figure 5-22's toy (modelled vectors)</h3>
+    <p class="note">Each item has a made-up 3-number embedding: [about pets, positive feeling, function word]. Toggle which representative documents are included and watch the reranking.</p>
+    <div class="controls" id="kb-docs"></div>
+    <div class="bars" id="kb-bars"></div>
+    <div class="readout" id="kb-out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Choosing hashtags for a set of travel reels. You watch the three best reels, form a "vibe" in your head (average embedding), then pick from the suggested hashtags those that match the vibe: #himachal wins, #the loses.</p><p><i>Where it breaks:</i> if your "vibe" model doesn't know a niche tag (#nmt), you'll drop a tag that experts would search for.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>c-TF-IDF ranks by <b>counts</b>; KeyBERTInspired ranks by <b>meaning</b>: closeness of the keyword's embedding to the topic's centre. Stop words have embeddings far from any topical centre, so KeyBERTInspired removes nearly all of them (the book's note in <a href="#s17">17</a>). Abbreviations suffer because a small embedding model has seen "nmt" rarely, so its vector is unreliable.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"What's a failure mode of embedding-based keyword reranking?"</i> — "It favours words the embedding model represents well, so domain abbreviations like NMT or EHR can be dropped even though experts rely on them, and it can return near-synonyms (translate, translating). I'd keep the c-TF-IDF keywords alongside, or add MMR for diversity."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Cosine similarity: <a href="ch02_tokens_and_embeddings.html">Ch.2</a>, <a href="ch08_semantic_search_and_rag.html">Ch.8</a>.</li><li>Representative documents are also fed to LLM prompts: <a href="#s18">18</a>.</li></ul></div>
+</section>
+
+<!-- ============ 17 ============ -->
+<section class="plate" id="s17">
+  <div class="plate-head"><h2><span class="secno">17</span> Maximal marginal relevance (MMR)</h2><span class="chip">pdf p181–182</span></div>
+  <p>With c-TF-IDF and KeyBERTInspired there's still significant <b>redundancy</b>: e.g. both "summaries" and "summary" in one topic, which are nearly the same.</p>
+  <p><b>Maximal marginal relevance (MMR)</b> <b>diversifies</b> the representation. It looks for keywords that are <b>diverse from one another</b> but still <b>related to the documents</b>. It embeds a set of candidate keywords and <b>iteratively</b> picks the next best keyword to add. You set a <b>diversity</b> parameter: how different the keywords must be.</p>
+  <p>In BERTopic, MMR goes from an initial set of keywords, say <b>30</b>, to a smaller but more diverse set, say <b>10</b>. It filters out redundant words and keeps only words that add something new.</p>
+  <pre class="code"><code>from bertopic.representation import MaximalMarginalRelevance
+
+# Update our topic representations to MaximalMarginalRelevance
+representation_model = MaximalMarginalRelevance(diversity=0.2)
+topic_model.update_topics(abstracts, representation_model=representation_model)
+
+# Show topic differences
+topic_differences(topic_model, original_topics)</code></pre>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>Original (c-TF-IDF)</th><th>Updated (MMR, diversity 0.2)</th></tr>
+    <tr><td class="num">0</td><td>speech | asr | recognition | end | acoustic</td><td>speech | asr | error | model | training</td></tr>
+    <tr><td class="num">1</td><td>medical | clinical | biomedical | patient | he…</td><td>clinical | biomedical | patient | healthcare | …</td></tr>
+    <tr><td class="num">2</td><td>sentiment | aspect | analysis | reviews | opinion</td><td>sentiment | analysis | reviews | absa | polarity</td></tr>
+    <tr><td class="num">3</td><td>translation | nmt | machine | neural | bleu</td><td>translation | nmt | bleu | parallel | multilin…</td></tr>
+    <tr><td class="num">4</td><td>summarization | summaries | summary | abstract…</td><td>summarization | document | extractive | rouge …</td></tr>
+  </table></div>
+  <p>The topics are more <b>diverse</b>. Topic 4 now has only one "summary"-like word and adds others (document, extractive, rouge) that contribute more. And unlike KeyBERTInspired, "nmt" survives in topic 3, because MMR starts from the c-TF-IDF ranking.</p>
+  <div class="box behind"><b>Book note</b><p>Both KeyBERTInspired and MMR are excellent for improving the first set of representations. KeyBERTInspired especially tends to remove <b>nearly all stop words</b>, since it focuses on semantic relationships between words and documents.</p></div>
+  <div class="fig">
+    <h3>Try it: MMR picks 5 keywords for the summarization topic (modelled vectors)</h3>
+    <p class="note">Candidate words are the ten from Figure 5-19 with made-up embeddings. Score for each remaining word = (1 − diversity) × similarity to topic − diversity × (highest similarity to an already-picked word). The word with the best score is picked; repeat. Formula form is BERTopic's MMR (beyond the book); vectors and scores are modelled.</p>
+    <div class="controls"><label>diversity <input type="range" id="mm-d" min="0" max="1" step="0.05" value="0.2"><output id="mm-do">0.20</output></label></div>
+    <div class="kw" id="mm-kw"></div>
+    <div class="caption" id="mm-cap"></div>
+  </div>
+  <div class="box work"><b>Worked example (modelled, the toy's own numbers)</b><p>"summarization" is picked first (most relevant, 0.94). Next candidates, with diversity 0.2: "summaries" has relevance 0.84 but similarity 0.97 to "summarization", so score = 0.8 × 0.84 − 0.2 × 0.97 ≈ <b>0.48</b>. "document" has relevance 0.87 and similarity 0.78: 0.8 × 0.87 − 0.2 × 0.78 ≈ <b>0.54</b>. "document" wins, and "summaries" keeps losing to less redundant words, so the final five hold only one summary-like word, as in the book's topic 4. Set diversity to 0 and "summaries" comes back. At diversity 0.5 "summaries" scores 0.5 × 0.84 − 0.5 × 0.97 ≈ −0.06: novelty now dominates. Diversity is a dial between "relevant" and "new".</p></div>
+  <div class="box picture"><b>Picture it</b><p>Picking a cricket XI. The best 11 batsmen by average would be a terrible team (all similar). MMR picks the best player, then each next pick is "good <i>and</i> different from who we already have": a keeper, a spinner, a fast bowler.</p><p><i>Where it breaks:</i> a selector knows roles; MMR only knows embedding similarity, so two different words with similar vectors still count as redundant.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>MMR is <b>greedy</b>: one pick at a time, each pick trading off relevance against the maximum similarity to what's already chosen. diversity = 0 is plain top-k by relevance; diversity = 1 ignores relevance and just maximises novelty. A small value like 0.2 removes near-duplicates without wandering off topic.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"Your RAG retriever returns five near-identical chunks. Fix?"</i> — "Use MMR at retrieval: fetch top-30 by similarity, then greedily select 5 that are relevant but dissimilar to each other, with a diversity around 0.2–0.5. It's the same algorithm BERTopic uses to deduplicate topic keywords." LangChain and most vector stores offer an MMR search option (beyond the book).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Retrieval diversity in RAG: <a href="ch08_semantic_search_and_rag.html">Ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>, <a href="../llm_engineers_handbook/ch09_rag_inference_pipeline.html">LLM Engineer's Handbook Ch.9</a>.</li></ul></div>
+</section>
+
+<!-- ============ 18 ============ -->
+<section class="plate" id="s18">
+  <div class="plate-head"><h2><span class="secno">18</span> The text generation Lego block</h2><span class="chip">pdf p182–185 · Fig 5-23</span></div>
+  <p>So far the representation block has been a <b>reranker</b>. But, as Chapter 4 showed, <b>generative models</b> are useful for many tasks. We can use them in BERTopic efficiently by following part of the reranking idea: instead of asking a generative model for the topic of <b>every document</b> (possibly millions), we ask it to generate a <b>label for each topic</b>. Figure 5-23: instead of generating or reranking keywords, the model writes a <b>short label</b> from the keywords already found and a <b>small set of representative documents</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-5-23.png" alt="An LLM block sits on top of a tower of five blocks. Keywords (attention, text, nlp, transformer) plus documents go into a prompt: I have a topic that contains the following documents: [DOCUMENTS]. The topic is described by the following keywords: [KEYWORDS]. Based on the above information, give a short label of the topic. Output label: Pre-trained transformer models in NLP." loading="lazy"><figcaption>Figure 5-23 (book, pdf p183): Use text generative LLMs and prompt engineering to create labels for topics from keywords and documents related to each topic.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The blue <b>LLM</b> block is the sixth Lego block on the usual tower. Two inputs, keywords ("attention, text, nlp, transformer") and a few documents, are pasted into a prompt template at the bold placeholders <b>[DOCUMENTS]</b> and <b>[KEYWORDS]</b>. The model's answer is the green <b>Label</b>: "Pre-trained transformer models in NLP". A list of words became one human-readable name.</p>
+  <p><b>The two parts of the prompt:</b></p>
+  <ul class="plain">
+    <li><b>[DOCUMENTS]</b>: a small subset, typically <b>four</b> documents, that best represent the topic: those with the <b>highest cosine similarity</b> between their c-TF-IDF values and the topic's.</li>
+    <li><b>[KEYWORDS]</b>: the topic's keywords, from c-TF-IDF or from any of the other representations (KeyBERTInspired, MMR…).</li>
+  </ul>
+  <p>So the generative model runs <b>once per topic</b> (maybe hundreds) instead of <b>once per document</b> (maybe millions). Many generative models fit here, open source and proprietary. Start with <b>Flan-T5</b> from Chapter 4:</p>
+  <pre class="code"><code>from transformers import pipeline
+from bertopic.representation import TextGeneration
+
+prompt = """I have a topic that contains the following documents:
+[DOCUMENTS]
+
+The topic is described by the following keywords: '[KEYWORDS]'.
+
+Based on the documents and keywords, what is this topic about?"""
+
+# Update our topic representations using Flan-T5
+generator = pipeline("text2text-generation", model="google/flan-t5-small")
+representation_model = TextGeneration(
+    generator, prompt=prompt, doc_length=50, tokenizer="whitespace"
+)
+topic_model.update_topics(abstracts, representation_model=representation_model)
+
+# Show topic differences
+topic_differences(topic_model, original_topics)</code></pre>
+  <ul class="plain">
+    <li><code>pipeline("text2text-generation", model="google/flan-t5-small")</code>: a Hugging Face pipeline around the small Flan-T5 (an encoder-decoder model, so "text2text").</li>
+    <li><code>TextGeneration(generator, prompt=...)</code>: BERTopic's wrapper that fills [DOCUMENTS] and [KEYWORDS] for each topic and calls the generator.</li>
+    <li><code>doc_length=50, tokenizer="whitespace"</code>: each representative document is <b>cut to 50 words</b> (split on whitespace) before going into the prompt, to keep prompts short for a small model.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: what the prompt actually looks like</h3>
+    <p class="note">Pick a topic; keywords are the book's c-TF-IDF keywords; documents are placeholder text (the real ones are the topic's 4 most representative abstracts). Change doc_length to see whitespace truncation.</p>
+    <div class="controls"><label>topic <select id="pr-t"><option value="0">0 speech</option><option value="1">1 medical</option><option value="2">2 sentiment</option><option value="3">3 translation</option><option value="4">4 summarization</option></select></label><label>doc_length <input type="range" id="pr-l" min="5" max="60" value="12"><output id="pr-lo">12</output></label></div>
+    <div class="prompt" id="pr-out"></div>
+  </div>
+  <p><b>Flan-T5 results:</b></p>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>Original (c-TF-IDF)</th><th>Updated (Flan-T5 small)</th></tr>
+    <tr><td class="num">0</td><td>speech | asr | recognition | end | acoustic</td><td>Speech-to-description</td></tr>
+    <tr><td class="num">1</td><td>medical | clinical | biomedical | patient | he…</td><td>Science/Tech</td></tr>
+    <tr><td class="num">2</td><td>sentiment | aspect | analysis | reviews | opinion</td><td>Review</td></tr>
+    <tr><td class="num">3</td><td>translation | nmt | machine | neural | bleu</td><td>Attention-based neural machine translation</td></tr>
+    <tr><td class="num">4</td><td>summarization | summaries | summary | abstract…</td><td>Summarization</td></tr>
+  </table></div>
+  <p class="note">The PDF's table text came out with columns interleaved; rows 3 and 4 are placed by the book's prose ("Summarization" is called logical), so treat that pairing as my reading.</p>
+  <p>Some labels, like "Summarization", look logical. Others, like "<b>Science/Tech</b>", are <b>too broad</b> and don't do the topic justice. So try OpenAI's <b>GPT-3.5</b>, a larger model expected to have more linguistic ability:</p>
+  <pre class="code"><code>import openai
+from bertopic.representation import OpenAI
+
+prompt = """
+I have a topic that contains the following documents:
+[DOCUMENTS]
+
+The topic is described by the following keywords: [KEYWORDS]
+
+Based on the information above, extract a short topic label in the following format:
+topic: &lt;short topic label&gt;
+"""
+
+# Update our topic representations using GPT-3.5
+client = openai.OpenAI(api_key="YOUR_KEY_HERE")
+representation_model = OpenAI(
+    client, model="gpt-3.5-turbo", exponential_backoff=True, chat=True,
+    prompt=prompt
+)
+topic_model.update_topics(abstracts, representation_model=representation_model)
+
+# Show topic differences
+topic_differences(topic_model, original_topics)</code></pre>
+  <ul class="plain">
+    <li>The prompt now fixes an <b>output format</b> (<code>topic: &lt;short topic label&gt;</code>) so the answer is easy to parse (prompt-engineering ideas from Chapter 6). Beyond the book: BERTopic's OpenAI block removes the leading "topic: " from the reply so only the label is stored.</li>
+    <li><code>exponential_backoff=True</code>: on rate-limit errors, retry with growing waits instead of failing.</li>
+    <li><code>chat=True</code>: use the chat-completions style API, which <code>gpt-3.5-turbo</code> requires.</li>
+  </ul>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>Updated (GPT-3.5), as printed</th><th>Full label (from Figure 5-24)</th></tr>
+    <tr><td class="num">0</td><td>Leveraging External Data for Improving Low-Res…</td><td>Leveraging External Data for Improving Low-Resource Speech Recognition Models</td></tr>
+    <tr><td class="num">1</td><td>Improved Representation Learning for Biomedica…</td><td>Improved Representation Learning for Biomedical Terms Using HiPrBERT</td></tr>
+    <tr><td class="num">2</td><td>Advancements in Aspect-Based Sentiment Analys…</td><td>"Advancements in Aspect-Based Sentiment Analysis using Neural Models"</td></tr>
+    <tr><td class="num">3</td><td>Neural Machine Translation Enhancements</td><td>Neural Machine Translation Enhancements</td></tr>
+    <tr><td class="num">4</td><td>Document Summarization Techniques</td><td>Document Summarization Techniques</td></tr>
+  </table></div>
+  <p>The labels are "quite impressive", and that's not even GPT-4; they are more informative than Flan-T5's. BERTopic isn't limited to OpenAI; it also has <b>local backends</b>.</p>
+  <div class="box behind"><b>Book note</b><p>It may seem the keywords aren't needed any more, but they <b>still represent the input documents</b>. No model is perfect, and it's generally advised to generate <b>multiple topic representations</b>. BERTopic lets all topics carry different representations, e.g. <b>KeyBERTInspired, MMR and GPT-3.5 side by side</b> for different perspectives on the same topic.</p></div>
+  <div class="fig">
+    <h3>Compare all representations for one topic</h3>
+    <div class="tabsrow" id="cmp-tabs"><button class="on" data-t="0">Topic 0</button><button data-t="1">Topic 1</button><button data-t="2">Topic 2</button><button data-t="3">Topic 3</button><button data-t="4">Topic 4</button></div>
+    <div class="tablewrap" id="cmp-out"></div>
+    <p class="note">All values are the book's printed outputs (truncated where the book truncates).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding photographer's assistant groups 5,000 photos into albums (clustering) and tags each with words: "mehendi, hands, green" (c-TF-IDF). The photographer then looks at the four best photos of each album and writes the album title: "Mehendi ceremony, day 1" (LLM label). She writes 30 titles, not 5,000 captions.</p><p><i>Where it breaks:</i> a small assistant-level model (Flan-T5 small) may write "Photos" for an album, as it wrote "Science/Tech". Label quality depends on model size.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The LLM never sees all documents. It sees a compressed summary of the topic: top keywords (statistics over thousands of documents) plus four exemplars (concrete evidence), each cut to a fixed length. Keywords give breadth, exemplars give specificity. That's why GPT-3.5's labels can be very specific ("…Using HiPrBERT"), sometimes <i>too</i> specific: one representative abstract can dominate the label, which is another reason to keep keywords alongside.</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>Prompt size per topic ≈ 4 documents × 50 words + 10 keywords + ~40 template words ≈ 250 words ≈ 330 tokens. For 155 topics that's ≈ 51,000 input tokens in total, small change for any API. Labelling all 44,949 abstracts one by one at ~300 tokens each would be ≈ 13.5 million tokens, about 260× more.</p></div>
+  <div class="box behind"><b>Interview angle</b><p><i>"How would you use an LLM to make sense of 1M customer chats cheaply?"</i> — "Don't send 1M chats to the LLM. Embed and cluster them, compute c-TF-IDF keywords, pick ~4 representative chats per cluster, and ask the LLM once per cluster for a short label with a fixed output format and backoff on rate limits. Keep keywords next to the labels because LLM labels can be too broad or overfit to one exemplar." That is exactly how you'd mine a voice agent's call logs for intents.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Flan-T5 and GPT-3.5 as classifiers: <a href="ch04_text_classification.html">Ch.4</a>. Prompt templates and output formats: <a href="ch06_prompt_engineering.html">Ch.6</a>, <a href="../ai_engineering/ch05_prompt_engineering.html">AI Engineering Ch.5</a>.</li><li>Local generation backends: <a href="ch07_advanced_text_generation.html">Ch.7</a>.</li></ul></div>
+</section>
+
+<!-- ============ 19 ============ -->
+<section class="plate" id="s19">
+  <div class="plate-head"><h2><span class="secno">19</span> The final map: datamapplot</h2><span class="chip">pdf p185–186 · Fig 5-24</span></div>
+  <p>With the GPT-3.5 labels we can make "beautiful illustrations" with the <b>datamapplot</b> package:</p>
+  <pre class="code"><code># Visualize topics and documents
+fig = topic_model.visualize_document_datamap(
+    titles,
+    topics=list(range(20)),
+    reduced_embeddings=reduced_embeddings,
+    width=1200,
+    label_font_size=11,
+    label_wrap_width=20,
+    use_medoids=True,
+)</code></pre>
+  <ul class="plain">
+    <li><code>topics=list(range(20))</code>: only label the 20 biggest topics (0–19).</li>
+    <li><code>reduced_embeddings=</code>: the same 2-D UMAP coordinates as before.</li>
+    <li><code>label_font_size</code>, <code>label_wrap_width=20</code>: label text size and wrapping after about 20 characters, so long GPT labels fit.</li>
+    <li><code>use_medoids=True</code>: place each label's pointer at the topic's <b>medoid</b> (its most central actual document) rather than the plain average position (gloss beyond the book).</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-5-24.png" alt="A dark-dotted document map with 20 coloured glowing patches, each connected by a line to a GPT-3.5 label such as Topic-0 Leveraging External Data for Improving Low-Resource Speech Recognition Models, Topic-4 Document Summarization Techniques (large font), Topic-9 Multi-agent Systems using Large Language Models, Topic-15 Parameter-efficient fine-tuning methods for downstream tasks in specific domains." loading="lazy"><figcaption>Figure 5-24 (book, pdf p186): The top 20 topics visualized.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Grey specks are all documents; the 20 labelled topics glow in colour. Each label is a GPT-3.5 title connected by a line to its topic's patch. Related topics sit near each other: machine translation (Topic-3) and translation quality estimation (Topic-14) are neighbours near speech (Topic-0) on the upper right; named-entity recognition (Topic-8) and relation extraction (Topic-7) are close on the left. Topic-4 (summarization) is drawn bigger only as a styling choice. Compare with Figure 5-18: same map, but now readable by a human with no keyword decoding.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Topic</th><th>GPT-3.5 label in Figure 5-24</th></tr>
+    <tr><td class="num">0</td><td>Leveraging External Data for Improving Low-Resource Speech Recognition Models</td></tr>
+    <tr><td class="num">1</td><td>Improved Representation Learning for Biomedical Terms Using HiPrBERT</td></tr>
+    <tr><td class="num">2</td><td>"Advancements in Aspect-Based Sentiment Analysis using Neural Models"</td></tr>
+    <tr><td class="num">3</td><td>Neural Machine Translation Enhancements</td></tr>
+    <tr><td class="num">4</td><td>Document Summarization Techniques</td></tr>
+    <tr><td class="num">5</td><td>Advances in Hate Speech Detection and Analysis</td></tr>
+    <tr><td class="num">6</td><td>Gender Bias in AI Language Models</td></tr>
+    <tr><td class="num">7</td><td>Advanced Techniques in Relation Extraction and Entity Graph Modeling</td></tr>
+    <tr><td class="num">8</td><td>Advancements in Named Entity Recognition (NER) Technologies</td></tr>
+    <tr><td class="num">9</td><td>Multi-agent Systems using Large Language Models</td></tr>
+    <tr><td class="num">10</td><td>Multimodal Integration in Natural Language Processing</td></tr>
+    <tr><td class="num">11</td><td>Evaluating Language Models in the Legal Domain</td></tr>
+    <tr><td class="num">12</td><td>Efficient Neural Dependency Parsing with Improved Performance</td></tr>
+    <tr><td class="num">13</td><td>Understanding Human Explanations in NLP with Self-Explanations</td></tr>
+    <tr><td class="num">14</td><td>Quality Estimation for Machine Translation</td></tr>
+    <tr><td class="num">15</td><td>Parameter-efficient fine-tuning methods for downstream tasks in specific domains</td></tr>
+    <tr><td class="num">16</td><td>Advanced Techniques for Text Classification with Multi-label Hierarchical Neural Networks</td></tr>
+    <tr><td class="num">17</td><td>Controllable Language Generation with Attribute Alignment</td></tr>
+    <tr><td class="num">18</td><td>Robustness of Multilingual NLP Models Against Adversarial Attacks</td></tr>
+    <tr><td class="num">19</td><td>Comparison of Different Word Embedding Methods in Natural Language Processing</td></tr>
+  </table></div>
+  <p class="note">Read off the figure. Topic 2's label keeps the quotation marks GPT-3.5 put around it, a small example of why output parsing matters.</p>
+  <div class="box picture"><b>Picture it</b><p>The metro map at Rajiv Chowk: you don't need to know every street; colour lines and station names tell you where things are and what's next to what.</p><p><i>Where it breaks:</i> metro maps are intentionally distorted for readability, and so is UMAP's 2-D layout.</p></div>
+  <div class="box behind"><b>Interview angle</b><p>A labelled data map is a strong artefact for stakeholders ("here are the 20 biggest themes in our user feedback this quarter"). Mention you'd generate it from the 2-D UMAP and LLM labels, and that you'd show the keyword lists too, because labels can overfit to one example (Topic-1 names a specific model, HiPrBERT).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Earlier maps: <a href="#s7">07</a>, <a href="#s14">14</a>.</li><li>Parameter-efficient fine-tuning (Topic-15's theme): <a href="ch12_fine_tuning_generation_models.html">Ch.12</a>. Multi-agent LLM systems (Topic-9): <a href="ch07_advanced_text_generation.html">Ch.7</a>.</li></ul></div>
+</section>
+
+<!-- ============ 20 ============ -->
+<section class="plate" id="s20">
+  <div class="plate-head"><h2><span class="secno">20</span> Summary and key terms</h2><span class="chip">pdf p186–187</span></div>
+  <p>The chapter showed how LLMs, both <b>generative</b> and <b>representative</b> (embedding), work in <b>unsupervised learning</b>. Supervised methods like classification dominated recent years, but unsupervised approaches such as text clustering have great potential because they group texts by meaning <b>without prior labels</b>.</p>
+  <p>It covered a common <b>clustering pipeline</b>: convert text to <b>embeddings</b>, apply <b>dimensionality reduction</b> to simplify the high-dimensional data for better clustering, then run a <b>clustering algorithm</b> on the reduced embeddings. <b>Manually inspecting</b> the clusters showed which documents they held and how to interpret them.</p>
+  <p>To move beyond manual inspection, <b>BERTopic</b> extends the pipeline with an automatic way to <b>represent</b> clusters. This is <b>topic modeling</b>: uncovering themes in large amounts of documents. BERTopic builds the representations with a <b>bag-of-words</b> enhanced by <b>c-TF-IDF</b>, which weighs words by their relevance to a cluster and their frequency across all clusters.</p>
+  <p>A major benefit is BERTopic's <b>modularity</b>: any model in the pipeline can be chosen, which allows extra representations and <b>multiple perspectives</b> on the same topic. <b>Maximal marginal relevance</b> and <b>KeyBERTInspired</b> fine-tune the c-TF-IDF representations, and the same generative LLMs as Chapter 4 (<b>Flan-T5</b> and <b>GPT-3.5</b>) generate highly interpretable <b>labels</b>.</p>
+  <p>Next chapter: improving generative models' output with <b>prompt engineering</b>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Plain meaning</th></tr>
+    <tr><td>Supervised / unsupervised</td><td>Learning with labelled examples / without any labels.</td></tr>
+    <tr><td>Text clustering</td><td>Grouping texts by similarity of meaning.</td></tr>
+    <tr><td>Topic modeling</td><td>Finding the hidden themes in a collection and describing each (keywords, label).</td></tr>
+    <tr><td>Embedding</td><td>A fixed-length list of numbers that captures a text's meaning (384 values for gte-small).</td></tr>
+    <tr><td>MTEB</td><td>Massive Text Embedding Benchmark; leaderboard to compare embedding models per task.</td></tr>
+    <tr><td>Dimensionality reduction</td><td>Compressing many dimensions into a few while keeping structure; always loses some information.</td></tr>
+    <tr><td>PCA</td><td>Principal Component Analysis; linear reduction along the directions of most variance.</td></tr>
+    <tr><td>UMAP</td><td>Uniform Manifold Approximation and Projection; nonlinear reduction that keeps neighbourhoods.</td></tr>
+    <tr><td>Centroid-based clustering (k-means)</td><td>You choose k; every point goes to the nearest of k centres.</td></tr>
+    <tr><td>Density-based clustering</td><td>Clusters are crowded regions; count is discovered; sparse points become outliers.</td></tr>
+    <tr><td>DBSCAN / HDBSCAN</td><td>Density-based clustering with one radius / its hierarchical version that needs only a minimum cluster size.</td></tr>
+    <tr><td>Outlier (topic -1)</td><td>A document not assigned to any cluster.</td></tr>
+    <tr><td>LDA</td><td>Latent Dirichlet allocation; classic topic model: topics are word-probability distributions over bag-of-words.</td></tr>
+    <tr><td>Bag-of-words / term frequency</td><td>Count of each vocabulary word in a text, ignoring order.</td></tr>
+    <tr><td>c-TF</td><td>Class-based term frequency: word counts per cluster instead of per document.</td></tr>
+    <tr><td>IDF</td><td>Inverse document frequency: weight that is high for rare words and low for common ones; here log(A/cf<sub>x</sub> + 1).</td></tr>
+    <tr><td>c-TF-IDF</td><td>c-TF × IDF: how characteristic a word is of one cluster compared with all clusters.</td></tr>
+    <tr><td>CountVectorizer</td><td>scikit-learn class that builds bag-of-words counts.</td></tr>
+    <tr><td>BERTopic</td><td>Modular topic model: embed → reduce → cluster → c-TF-IDF → optional fine-tuning.</td></tr>
+    <tr><td>Representation model</td><td>BERTopic's name for a block that improves topic representations (reranker or LLM).</td></tr>
+    <tr><td>KeyBERTInspired</td><td>Reranks keywords by cosine similarity to the average embedding of the topic's representative documents.</td></tr>
+    <tr><td>MMR</td><td>Maximal marginal relevance: greedy choice of keywords that are relevant but different from each other (diversity parameter).</td></tr>
+    <tr><td>TextGeneration / OpenAI blocks</td><td>Representation models that prompt a generative LLM with [DOCUMENTS] and [KEYWORDS] to write a label.</td></tr>
+    <tr><td>datamapplot</td><td>Package for labelled document maps (Figure 5-24).</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ 21 ============ -->
+<section class="plate" id="s21">
+  <div class="plate-head"><h2><span class="secno">21</span> Where you meet this in real systems</h2><span class="chip">named in the chapter</span></div>
+  <div class="grid2">
+    <div class="card"><b>Hugging Face (datasets, Hub)</b><span>Hosts the <code>maartengr/arxiv_nlp</code> dataset and the models; <code>load_dataset</code> fetches it.</span></div>
+    <div class="card"><b>sentence-transformers</b><span>Default embedding library in BERTopic ("SBERT"); used here with <code>thenlper/gte-small</code> (replacing <code>all-mpnet-base-v2</code>).</span></div>
+    <div class="card"><b>MTEB leaderboard</b><span>Used to choose an embedding model that is good at clustering and small.</span></div>
+    <div class="card"><b>umap-learn</b><span><code>from umap import UMAP</code>: 384 → 5 dimensions for clustering, 384 → 2 for plots.</span></div>
+    <div class="card"><b>hdbscan</b><span>Density-based clustering with outliers; 156 labels on the ArXiv data.</span></div>
+    <div class="card"><b>scikit-learn</b><span><code>CountVectorizer</code> for bag-of-words; also k-means and PCA as swap-in blocks.</span></div>
+    <div class="card"><b>NumPy, pandas, matplotlib</b><span>Selecting cluster members, building the plotting dataframe, the static scatter (Figure 5-8).</span></div>
+    <div class="card"><b>BERTopic</b><span>The modular topic-modeling framework: <code>get_topic_info</code>, <code>get_topic</code>, <code>find_topics</code>, <code>update_topics</code>, <code>reduce_outliers</code>, visualisations.</span></div>
+    <div class="card"><b>KeyBERT</b><span>Keyword-extraction package that inspired the KeyBERTInspired block.</span></div>
+    <div class="card"><b>spaCy</b><span>Shown in Figure 5-21 as another available representation block (part-of-speech based keywords; beyond the book).</span></div>
+    <div class="card"><b>transformers + Flan-T5 (Google)</b><span><code>pipeline("text2text-generation", model="google/flan-t5-small")</code> writes topic labels locally.</span></div>
+    <div class="card"><b>OpenAI GPT-3.5</b><span><code>gpt-3.5-turbo</code> through BERTopic's <code>OpenAI</code> block writes much better labels; GPT-4 mentioned as an even stronger option.</span></div>
+    <div class="card"><b>datamapplot</b><span><code>visualize_document_datamap</code> draws the labelled map of the top 20 topics.</span></div>
+    <div class="card"><b>ArXiv</b><span>Open-access paper archive; cs.CL section is the 44,949-abstract dataset.</span></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: where the same ideas show up</b><ul>
+    <li><b>Vector databases</b> (Qdrant, Weaviate, pgvector) store the same embeddings; many offer MMR search for diverse retrieval results.</li>
+    <li><b>LangChain / LlamaIndex</b> expose an MMR retriever option; rerankers (e.g. cross-encoders) follow the same retrieve-then-rerank pattern as the representation block.</li>
+    <li>Product analytics and support tooling commonly cluster feedback or tickets with embeddings and label clusters with an LLM, the pattern of <a href="#s18">18</a>.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 22 ============ -->
+<section class="plate" id="s22">
+  <div class="plate-head"><h2><span class="secno">22</span> Check yourself</h2><span class="chip">click to reveal</span></div>
+  <details class="ans"><summary>1. What are the three steps of the common text-clustering pipeline, and which algorithm does the chapter use for each?</summary><p>Embed (sentence-transformers <code>thenlper/gte-small</code>, 384 dims) → reduce dimensionality (UMAP to 5 dims) → cluster (HDBSCAN, min_cluster_size 50).</p></details>
+  <details class="ans"><summary>2. Why reduce dimensionality before clustering, and what is the cost?</summary><p>In high dimensions the space of possible values grows exponentially and meaningful clusters get hard to find. Reduction compresses data while keeping global structure, but information is always lost; there's a balance between fewer dimensions and keeping information.</p></details>
+  <details class="ans"><summary>3. What do UMAP's n_components=5, min_dist=0.0, metric='cosine' and random_state=42 do?</summary><p>5 output dimensions (5–10 generally works well); min distance 0 for tighter clusters; cosine because Euclidean methods struggle with high-dimensional data; reproducible results but no parallelism, so slower.</p></details>
+  <details class="ans"><summary>4. What would happen if you used k-means instead of HDBSCAN?</summary><p>You'd have to choose the number of clusters in advance, and every document would be forced into a cluster: no outliers, no topic -1. Stray documents would pollute clusters.</p></details>
+  <details class="ans"><summary>5. HDBSCAN gave 156 clusters. How do you get more?</summary><p>Lower <code>min_cluster_size</code>, which is the minimum size a cluster can have. (156 includes the -1 outlier label.)</p></details>
+  <details class="ans"><summary>6. Why shouldn't you trust the 2-D plot alone?</summary><p>Any reduction for visualisation loses information; the plot can push clusters together or apart more than they really are. Human evaluation, reading the clusters, is a key part of cluster analysis.</p></details>
+  <details class="ans"><summary>7. How do classic topic models like LDA differ from embedding-based clustering?</summary><p>LDA treats topics as probability distributions over the vocabulary and uses bag-of-words, ignoring context and meaning. Embedding-based clustering uses Transformer embeddings that capture context through attention.</p></details>
+  <details class="ans"><summary>8. What two problems of plain bag-of-words does c-TF-IDF solve?</summary><p>(1) Bag-of-words is per document; c-TF counts words per cluster. (2) Stop words dominate; the IDF factor log(A/cf<sub>x</sub> + 1) gives less weight to words common across all clusters.</p></details>
+  <details class="ans"><summary>9. Using Figure 5-14's numbers, why does "cat" outrank "cute" in the purple cluster?</summary><p>IDF(cat) = ln(29/1 + 1) ≈ 3.40, IDF(cute) = ln(29/22 + 1) ≈ 0.84. Weights: 1 × 3.40 = 3.40 vs 2 × 0.84 = 1.68. "cute" is common in other clusters, so it's down-weighted.</p></details>
+  <details class="ans"><summary>10. Why can a representation model be expensive per call yet cheap overall?</summary><p>It runs once per topic, not once per document: e.g. a hundred topics instead of millions of documents.</p></details>
+  <details class="ans"><summary>11. KeyBERTInspired dropped "nmt" from the translation topic. Why, and is that good?</summary><p>It ranks keywords by embedding similarity to the topic's average document embedding; the embedding model can't represent the abbreviation well. It's bad for domain experts, for whom abbreviations are highly informative.</p></details>
+  <details class="ans"><summary>12. What does MMR's diversity parameter control? What happens at 0?</summary><p>How different the selected keywords must be from each other. At 0 it's just top-k by relevance (keeps "summary" and "summaries"); higher values remove redundancy, at the risk of drifting from the topic.</p></details>
+  <details class="ans"><summary>13. What goes into the [DOCUMENTS] and [KEYWORDS] tags of the TextGeneration prompt?</summary><p>[DOCUMENTS]: typically four most representative documents, chosen by highest cosine similarity of their c-TF-IDF values to the topic's (cut to doc_length words). [KEYWORDS]: the topic's keywords from c-TF-IDF or another representation.</p></details>
+  <details class="ans"><summary>14. Interview: Flan-T5 labelled the medical topic "Science/Tech". What would you do?</summary><p>Use a larger model (GPT-3.5 gave "Improved Representation Learning for Biomedical…"), improve the prompt with a fixed output format, and keep multiple representations (c-TF-IDF keywords, KeyBERTInspired, MMR) next to the label, since no model is perfect.</p></details>
+  <details class="ans"><summary>15. Interview: how do you remove the -1 topic without re-clustering?</summary><p>BERTopic's <code>reduce_outliers()</code> reassigns outliers to existing topics. Alternatively, swap HDBSCAN for a non-outlier algorithm like k-means (but that does re-cluster).</p></details>
+</section>
+
+<!-- ============ 23 ============ -->
+<section class="plate" id="s23">
+  <div class="plate-head"><h2><span class="secno">23</span> References</h2><span class="chip">chapter footnotes 1–7</span></div>
+  <details><summary>The chapter's 7 references</summary>
+    <ol class="refs">
+      <li>Harold Hotelling. "Analysis of a complex of statistical variables into principal components." <i>Journal of Educational Psychology</i> 24.6 (1933). (PCA)</li>
+      <li>Leland McInnes, John Healy, James Melville. "UMAP: Uniform Manifold Approximation and Projection for dimension reduction." arXiv:1802.03426 (2018).</li>
+      <li>Leland McInnes, John Healy, Steve Astels. "hdbscan: Hierarchical density based clustering." <i>J. Open Source Softw.</i> 2.11 (2017).</li>
+      <li>Martin Ester et al. "A density-based algorithm for discovering clusters in large spatial databases with noise." KDD'96 (1996). (DBSCAN)</li>
+      <li>David M. Blei, Andrew Y. Ng, Michael I. Jordan. "Latent Dirichlet allocation." <i>JMLR</i> 3 (2003).</li>
+      <li>Maarten Grootendorst. "BERTopic: Neural topic modeling with a class-based TF-IDF procedure." arXiv:2203.05794 (2022).</li>
+      <li>Maarten Grootendorst. "KeyBERT: Minimal keyword extraction with BERT." (2020).</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Alammar &amp; Grootendorst, O'Reilly 2024), Chapter 5. Figures are the book's, cropped for personal study. Numbers marked "modelled" are illustrations made for this page, not the book's.</footer>
+
+</div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+  function rng(seed) { var s = seed >>> 0; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+  function gauss(r) { var u = r() || 1e-9, v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function tabs(rowId, cb) {
+    var row = $(rowId); if (!row) return;
+    var bs = row.querySelectorAll("button");
+    bs.forEach(function (b) {
+      b.addEventListener("click", function () {
+        bs.forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on"); cb(+b.getAttribute("data-t"));
+      });
+    });
+    cb(0);
+  }
+
+  /* ---------- 03 pipeline step-through ---------- */
+  (function () {
+    var step = 0;
+    var outs = [
+      "shape of the data at this step: list of 44,949 strings",
+      "shape: (44949, 384) float array — one embedding per abstract",
+      "shape: (44949, 5) — same rows, compressed columns",
+      "shape: (44949,) integer labels — 155 clusters (0…154) and -1 for outliers"
+    ];
+    var caps = [
+      "Press <b>Next</b> to push the documents through the pipeline.",
+      "<b>Step 1 · embed.</b> gte-small reads each abstract and outputs 384 numbers that capture its meaning. Similar abstracts get similar vectors.",
+      "<b>Step 2 · reduce.</b> UMAP compresses 384 → 5 dimensions with cosine distance and min_dist=0, keeping neighbours as neighbours so clusters are tight.",
+      "<b>Step 3 · cluster.</b> HDBSCAN finds dense regions of at least 50 documents. It decides the number of clusters itself and labels sparse points -1."
+    ];
+    function draw() {
+      for (var i = 0; i <= 3; i++) $("pp-b" + i).setAttribute("class", i === step ? "hi" : (i < step ? "f" : "s"));
+      $("pp-out").textContent = outs[step];
+      $("pp-cap").innerHTML = caps[step];
+      $("pp-n").textContent = "step " + step + " / 3";
+    }
+    $("pp-prev").addEventListener("click", function () { step = Math.max(0, step - 1); draw(); });
+    $("pp-next").addEventListener("click", function () { step = Math.min(3, step + 1); draw(); });
+    draw();
+  })();
+
+  /* ---------- 04 embedding size ---------- */
+  (function () {
+    function draw() {
+      var n = Math.max(0, +$("em-n").value || 0), d = +$("em-d").value, b = +$("em-t").value;
+      var bytes = n * d * b;
+      var mb = bytes / 1048576;
+      $("em-out").innerHTML = "values <b>" + fmt(n * d) + "</b> · size <b>" + (mb < 1024 ? mb.toFixed(1) + " MB" : (mb / 1024).toFixed(2) + " GB") + "</b> · per document <b>" + fmt(d * b) + " bytes</b>";
+    }
+    ["em-n", "em-d", "em-t"].forEach(function (id) { $(id).addEventListener("input", draw); $(id).addEventListener("change", draw); });
+    draw();
+  })();
+
+  /* ---------- 05 dimensionality reduction toy ---------- */
+  (function () {
+    var r = rng(7), pts = [];
+    for (var i = 0; i < 40; i++) {
+      var g = i < 20 ? 0 : 1;
+      pts.push({ g: g, x: gauss(r) * 0.9 + (g ? 0.35 : -0.35), y: gauss(r) * 0.45 + (g ? 0.15 : -0.15), z: gauss(r) * 0.3 + (g ? 0.9 : -0.9) });
+    }
+    function project(a, b) {
+      var ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+      return pts.map(function (p) {
+        var x1 = p.x * ca + p.z * sa, z1 = -p.x * sa + p.z * ca;
+        var y1 = p.y * cb - z1 * sb;
+        return { g: p.g, u: x1, v: y1 };
+      });
+    }
+    function score(P) {
+      var ok = 0;
+      for (var i = 0; i < P.length; i++) {
+        var best = 1e9, bg = -1;
+        for (var j = 0; j < P.length; j++) {
+          if (i === j) continue;
+          var d = (P[i].u - P[j].u) * (P[i].u - P[j].u) + (P[i].v - P[j].v) * (P[i].v - P[j].v);
+          if (d < best) { best = d; bg = P[j].g; }
+        }
+        if (bg === P[i].g) ok++;
+      }
+      return ok / P.length;
+    }
+    function plot(svg, P, title) {
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      var t = el("text", { x: 8, y: 16 }, svg); t.textContent = title;
+      P.forEach(function (p) {
+        el("circle", { cx: 150 + p.u * 55, cy: 120 - p.v * 55, r: 5, "class": "pt " + (p.g ? "k1" : "k2") }, svg);
+      });
+    }
+    // fixed oblique view of the 3D cloud
+    var svg3 = $("dr-3d");
+    (function () {
+      var O = { x: 150, y: 130 };
+      function iso(x, y, z) { return { u: O.x + x * 50 - z * 30, v: O.y - y * 50 - z * -22 }; }
+      var ax = [[2.2, 0, 0, "x"], [0, 1.6, 0, "y"], [0, 0, 2.2, "z"]];
+      ax.forEach(function (a) {
+        var p0 = iso(0, 0, 0), p1 = iso(a[0], a[1], a[2]);
+        el("line", { x1: p0.u, y1: p0.v, x2: p1.u, y2: p1.v, stroke: "currentColor", "stroke-opacity": 0.4 }, svg3);
+        var t = el("text", { x: p1.u + 3, y: p1.v }, svg3); t.textContent = a[3];
+      });
+      var t0 = el("text", { x: 8, y: 16 }, svg3); t0.textContent = "3-D (fixed view)";
+      pts.forEach(function (p) { var q = iso(p.x, p.y, p.z); el("circle", { cx: q.u, cy: q.v, r: 4.5, "class": "pt " + (p.g ? "k1" : "k2") }, svg3); });
+    })();
+    function draw() {
+      var a = +$("dr-a").value, b = +$("dr-b").value;
+      $("dr-ao").textContent = a + "°"; $("dr-bo").textContent = b + "°";
+      var P = project(a * Math.PI / 180, b * Math.PI / 180);
+      plot($("dr-2d"), P, "2-D view kept");
+      var s = score(P);
+      $("dr-out").innerHTML = "points whose nearest 2-D neighbour is from the same group: <b class='" + (s > 0.85 ? "good" : "bad") + "'>" + Math.round(s * 100) + "%</b> " + (s > 0.85 ? "(groups survive)" : "(groups pile up: information lost)");
+    }
+    $("dr-a").addEventListener("input", draw); $("dr-b").addEventListener("input", draw);
+    $("dr-drop").addEventListener("click", function () { $("dr-a").value = 0; $("dr-b").value = 0; draw(); });
+    $("dr-best").addEventListener("click", function () {
+      var best = -1, ba = 0, bb = 0;
+      for (var a = 0; a <= 180; a += 5) for (var b = 0; b <= 90; b += 5) {
+        var s = score(project(a * Math.PI / 180, b * Math.PI / 180));
+        if (s > best) { best = s; ba = a; bb = b; }
+      }
+      $("dr-a").value = ba; $("dr-b").value = bb; draw();
+    });
+    draw();
+  })();
+
+  /* ---------- 06 clustering toy ---------- */
+  (function () {
+    var r = rng(42), pts = [];
+    var centers = [[95, 75], [290, 85], [190, 195]];
+    centers.forEach(function (c) { for (var i = 0; i < 18; i++) pts.push({ x: c[0] + gauss(r) * 18, y: c[1] + gauss(r) * 15 }); });
+    [[200, 40], [370, 230], [30, 220], [200, 120], [350, 160], [40, 140]].forEach(function (p) { pts.push({ x: p[0], y: p[1] }); });
+    var mode = "km";
+    function d2(a, b) { return (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y); }
+    function kmeans(k) {
+      var cs = [{ x: pts[0].x, y: pts[0].y }];
+      while (cs.length < k) {
+        var bi = 0, bd = -1;
+        pts.forEach(function (p, i) { var m = Math.min.apply(null, cs.map(function (c) { return d2(p, c); })); if (m > bd) { bd = m; bi = i; } });
+        cs.push({ x: pts[bi].x, y: pts[bi].y });
+      }
+      var lab = [];
+      for (var it = 0; it < 25; it++) {
+        lab = pts.map(function (p) { var bi = 0, bd = 1e12; cs.forEach(function (c, j) { var d = d2(p, c); if (d < bd) { bd = d; bi = j; } }); return bi; });
+        cs = cs.map(function (c, j) {
+          var sx = 0, sy = 0, n = 0;
+          pts.forEach(function (p, i) { if (lab[i] === j) { sx += p.x; sy += p.y; n++; } });
+          return n ? { x: sx / n, y: sy / n } : c;
+        });
+      }
+      return { lab: lab, cs: cs };
+    }
+    function dbscan(eps, minPts) {
+      var e2 = eps * eps, lab = pts.map(function () { return -2; }), c = -1;
+      function nb(i) { var o = []; pts.forEach(function (p, j) { if (d2(pts[i], p) <= e2) o.push(j); }); return o; }
+      for (var i = 0; i < pts.length; i++) {
+        if (lab[i] !== -2) continue;
+        var N = nb(i);
+        if (N.length < minPts) { lab[i] = -1; continue; }
+        c++; lab[i] = c;
+        var q = N.slice();
+        while (q.length) {
+          var j = q.shift();
+          if (lab[j] === -1) lab[j] = c;
+          if (lab[j] !== -2) continue;
+          lab[j] = c;
+          var M = nb(j);
+          if (M.length >= minPts) q = q.concat(M);
+        }
+      }
+      return lab;
+    }
+    function draw() {
+      var svg = $("cl-svg"); while (svg.firstChild) svg.removeChild(svg.firstChild);
+      var k = +$("cl-k").value, m = +$("cl-m").value, e = +$("cl-e").value;
+      $("cl-ko").textContent = k; $("cl-mo").textContent = m; $("cl-eo").textContent = e;
+      var lab, cs = [];
+      if (mode === "km") { var res = kmeans(k); lab = res.lab; cs = res.cs; }
+      else lab = dbscan(e, m);
+      pts.forEach(function (p, i) {
+        el("circle", { cx: p.x, cy: p.y, r: 4.5, "class": "pt " + (lab[i] < 0 ? "out" : "k" + (lab[i] % 6)) }, svg);
+      });
+      cs.forEach(function (c) {
+        el("path", { d: "M" + (c.x - 7) + " " + (c.y - 7) + "L" + (c.x + 7) + " " + (c.y + 7) + "M" + (c.x + 7) + " " + (c.y - 7) + "L" + (c.x - 7) + " " + (c.y + 7), "class": "cen" }, svg);
+      });
+      var nC = 0, nO = 0, seen = {};
+      lab.forEach(function (l) { if (l < 0) nO++; else if (!seen[l]) { seen[l] = 1; nC++; } });
+      $("cl-out").innerHTML = (mode === "km" ? "k-means (you chose k) · " : "density rule (count discovered) · ") + "clusters <b>" + nC + "</b> · outliers <b>" + nO + "</b> of " + pts.length + (mode === "km" ? " · ✕ = centroids; the 6 stray points are forced into clusters" : "");
+    }
+    function setMode(m) {
+      mode = m;
+      $("cl-km").classList.toggle("on", m === "km"); $("cl-db").classList.toggle("on", m === "db");
+      $("cl-kl").hidden = m !== "km"; $("cl-ml").hidden = m === "km"; $("cl-el").hidden = m === "km";
+      draw();
+    }
+    $("cl-km").addEventListener("click", function () { setMode("km"); });
+    $("cl-db").addEventListener("click", function () { setMode("db"); });
+    ["cl-k", "cl-m", "cl-e"].forEach(function (id) { $(id).addEventListener("input", draw); });
+    draw();
+  })();
+
+  /* ---------- 07 np.where step-through ---------- */
+  (function () {
+    var labels = [3, 0, -1, 0, 2, 0, 1, 0, -1, 0];
+    function arr(hl) {
+      return "[" + labels.map(function (v, i) { var s = String(v); return hl(i, v) ? "<b>" + s + "</b>" : s; }).join(", ") + "]";
+    }
+    var steps = [
+      function () { return "<b>clusters</b> = " + arr(function () { return false; }) + " — one label per document (toy: 10 docs)."; },
+      function () { return "<b>clusters == 0</b> → [" + labels.map(function (v) { return v === 0 ? "<b>True</b>" : "False"; }).join(", ") + "] — a True/False mask."; },
+      function () { return "<b>np.where(mask)[0]</b> → [1, 3, 5, 7, 9] — the positions where the mask is True. np.where returns a tuple (one array per dimension), so [0] takes the first."; },
+      function () { return "<b>[:3]</b> → [1, 3, 5] — the first three documents of cluster 0. The loop then prints abstracts[1][:300], abstracts[3][:300], abstracts[5][:300] (first 300 characters each)."; }
+    ];
+    var i = 0;
+    function draw() { $("nw-cap").innerHTML = steps[i](); $("nw-n").textContent = (i + 1) + " / 4"; }
+    $("nw-prev").addEventListener("click", function () { i = Math.max(0, i - 1); draw(); });
+    $("nw-next").addEventListener("click", function () { i = Math.min(3, i + 1); draw(); });
+    draw();
+  })();
+
+  /* ---------- 08 LDA-style topic bars ---------- */
+  (function () {
+    var vocab = ["athletes", "cat", "cooking", "dog", "game", "pasta", "pet", "recipes", "soccer"];
+    var W = [
+      [0.04, 0.20, 0.02, 0.18, 0.04, 0.02, 0.22, 0.04, 0.02],
+      [0.03, 0.02, 0.24, 0.05, 0.04, 0.21, 0.01, 0.18, 0.02],
+      [0.18, 0.05, 0.01, 0.04, 0.24, 0.01, 0.03, 0.02, 0.24]
+    ];
+    tabs("lda-tabs", function (t) {
+      var rows = vocab.map(function (w, i) { return { w: w, v: W[t][i] }; }).sort(function (a, b) { return b.v - a.v; });
+      var mx = rows[0].v;
+      $("lda-bars").innerHTML = rows.map(function (o, i) {
+        return "<div class='r" + (i < 3 ? " hi" : "") + "'><span>" + o.w + "</span><i style='width:" + (o.v / mx * 100) + "%'></i><em>" + o.v.toFixed(2) + "</em></div>";
+      }).join("");
+      $("lda-out").innerHTML = "keywords of Topic " + (t + 1) + ": <b>" + rows.slice(0, 3).map(function (o) { return o.w; }).join(", ") + "</b> — but no single label";
+    });
+  })();
+
+  /* ---------- 10 bag-of-words ---------- */
+  (function () {
+    function toks(s) { return (s.toLowerCase().match(/[a-z0-9']+/g) || []); }
+    function draw() {
+      var A = toks($("bw-a").value), B = toks($("bw-b").value), vocab = [];
+      B.concat(A).forEach(function (w) { if (vocab.indexOf(w) < 0) vocab.push(w); });
+      function row(T) { return vocab.map(function (w) { return T.filter(function (x) { return x === w; }).length; }); }
+      var ra = row(A), rb = row(B);
+      var h = "<table class='mat'><tr><th></th>" + vocab.map(function (w) { return "<th>" + esc(w) + "</th>"; }).join("") + "</tr>";
+      h += "<tr><th>A</th>" + ra.map(function (v) { return "<td" + (v ? " class='hot'" : "") + ">" + v + "</td>"; }).join("") + "</tr>";
+      h += "<tr><th>B</th>" + rb.map(function (v) { return "<td" + (v ? " class='hot'" : "") + ">" + v + "</td>"; }).join("") + "</tr>";
+      h += "<tr><th>A+B (c-TF)</th>" + ra.map(function (v, i) { return "<td>" + (v + rb[i]) + "</td>"; }).join("") + "</tr></table>";
+      $("bw-out").innerHTML = h;
+    }
+    $("bw-a").addEventListener("input", draw); $("bw-b").addEventListener("input", draw);
+    draw();
+  })();
+
+  /* ---------- 10 c-TF-IDF calculator ---------- */
+  (function () {
+    var vocab = ["that", "is", "a", "cute", "dog", "my", "cat"];
+    var seed = [[1, 2, 1, 2, 1, 1, 1], [4, 6, 3, 18, 0, 5, 0], [4, 1, 3, 2, 0, 3, 0]];
+    var names = ["purple", "blue", "green"];
+    var M = seed.map(function (r) { return r.slice(); });
+    var useFig = true;
+    function buildInputs() {
+      var h = "<table class='mat'><tr><th>c-TF</th>" + vocab.map(function (w) { return "<th>" + w + "</th>"; }).join("") + "<th>total</th></tr>";
+      M.forEach(function (r, i) {
+        h += "<tr><th>" + names[i] + "</th>" + r.map(function (v, j) { return "<td><input type='number' min='0' value='" + v + "' data-i='" + i + "' data-j='" + j + "' aria-label='" + names[i] + " " + vocab[j] + "'></td>"; }).join("") + "<td class='rt' id='ct-rt" + i + "'></td></tr>";
+      });
+      $("ct-in").innerHTML = h + "</table>";
+      $("ct-in").querySelectorAll("input").forEach(function (inp) {
+        inp.addEventListener("input", function () { M[+inp.getAttribute("data-i")][+inp.getAttribute("data-j")] = Math.max(0, +inp.value || 0); calc(); });
+      });
+    }
+    function calc() {
+      var cf = vocab.map(function (w, j) { return M[0][j] + M[1][j] + M[2][j]; });
+      var rt = M.map(function (r) { return r.reduce(function (a, b) { return a + b; }, 0); });
+      rt.forEach(function (t, i) { $("ct-rt" + i).textContent = t; });
+      var A = useFig ? 29 : (rt[0] + rt[1] + rt[2]) / 3;
+      var idf = cf.map(function (c) { return c > 0 ? Math.log(A / c + 1) : null; });
+      $("ct-idf").innerHTML = "<table class='mat'><tr><th>word</th>" + vocab.map(function (w) { return "<th>" + w + "</th>"; }).join("") + "</tr><tr><th>cf (total)</th>" + cf.map(function (c) { return "<td>" + c + "</td>"; }).join("") + "</tr><tr><th>IDF</th>" + idf.map(function (v) { return "<td>" + (v === null ? "–" : v.toFixed(2)) + "</td>"; }).join("") + "</tr></table>";
+      var h = "<table class='mat'><tr><th>c-TF-IDF</th>" + vocab.map(function (w) { return "<th>" + w + "</th>"; }).join("") + "</tr>";
+      var tops = [];
+      M.forEach(function (r, i) {
+        var w = r.map(function (v, j) { return idf[j] === null ? 0 : v * idf[j]; });
+        var order = w.map(function (v, j) { return j; }).sort(function (a, b) { return w[b] - w[a]; }).slice(0, 2);
+        tops.push(names[i] + ": " + order.map(function (j) { return vocab[j]; }).join(", "));
+        h += "<tr><th>" + names[i] + "</th>" + w.map(function (v, j) { return "<td" + (order.indexOf(j) >= 0 && v > 0 ? " class='top'" : "") + ">" + v.toFixed(2) + "</td>"; }).join("") + "</tr>";
+      });
+      $("ct-w").innerHTML = h + "</table>";
+      $("ct-out").innerHTML = "A = <b>" + A.toFixed(2) + "</b> · top words → <b>" + tops.join(" · ") + "</b>";
+    }
+    $("ct-a29").addEventListener("click", function () { useFig = true; $("ct-a29").classList.add("on"); $("ct-aavg").classList.remove("on"); calc(); });
+    $("ct-aavg").addEventListener("click", function () { useFig = false; $("ct-aavg").classList.add("on"); $("ct-a29").classList.remove("on"); calc(); });
+    $("ct-reset").addEventListener("click", function () { M = seed.map(function (r) { return r.slice(); }); buildInputs(); calc(); });
+    buildInputs(); calc();
+  })();
+
+  /* ---------- 11 Lego builder ---------- */
+  (function () {
+    function draw() {
+      var e = $("lg1").value, rd = $("lg2").value, c = $("lg3").value, f = $("lg6").value;
+      var imp = ["from bertopic import BERTopic"], lines = [], args = [];
+      if (e === "sbert") { imp.push("from sentence_transformers import SentenceTransformer"); lines.push('embedding_model = SentenceTransformer("thenlper/gte-small")'); }
+      else { imp.push("from sentence_transformers import SentenceTransformer"); lines.push('embedding_model = SentenceTransformer("<another model from MTEB>")'); }
+      args.push("embedding_model=embedding_model");
+      if (rd === "umap") { imp.push("from umap import UMAP"); lines.push("umap_model = UMAP(n_components=5, min_dist=0.0, metric='cosine', random_state=42)"); }
+      else { imp.push("from sklearn.decomposition import PCA"); lines.push("umap_model = PCA(n_components=5)          # beyond the book"); }
+      args.push("umap_model=umap_model");
+      if (c === "hdb") { imp.push("from hdbscan import HDBSCAN"); lines.push('hdbscan_model = HDBSCAN(min_cluster_size=50, metric="euclidean", cluster_selection_method="eom")'); }
+      else { imp.push("from sklearn.cluster import KMeans"); lines.push("hdbscan_model = KMeans(n_clusters=50)      # beyond the book"); }
+      args.push("hdbscan_model=hdbscan_model");
+      if (f === "kb") { imp.push("from bertopic.representation import KeyBERTInspired"); lines.push("representation_model = KeyBERTInspired()"); }
+      if (f === "mmr") { imp.push("from bertopic.representation import MaximalMarginalRelevance"); lines.push("representation_model = MaximalMarginalRelevance(diversity=0.2)"); }
+      if (f === "tg") { imp.push("from transformers import pipeline"); imp.push("from bertopic.representation import TextGeneration"); lines.push('generator = pipeline("text2text-generation", model="google/flan-t5-small")'); lines.push('representation_model = TextGeneration(generator, prompt=prompt, doc_length=50, tokenizer="whitespace")'); }
+      if (f === "oa") { imp.push("import openai"); imp.push("from bertopic.representation import OpenAI"); lines.push('client = openai.OpenAI(api_key="YOUR_KEY_HERE")'); lines.push('representation_model = OpenAI(client, model="gpt-3.5-turbo", exponential_backoff=True, chat=True, prompt=prompt)'); }
+      if (f !== "none") args.push("representation_model=representation_model");
+      $("lg-code").textContent = imp.join("\n") + "\n\n" + lines.join("\n") + "\n\ntopic_model = BERTopic(\n    " + args.join(",\n    ") + "\n).fit(abstracts, embeddings)";
+      var notes = [];
+      notes.push(c === "hdb" ? "HDBSCAN finds the number of topics and keeps a -1 outlier topic." : "k-means: you fix the number of topics (here 50) and every document gets one: no outlier topic.");
+      notes.push(rd === "umap" ? "UMAP handles nonlinear structure a bit better." : "PCA is linear and fast; may separate clusters less well.");
+      if (f === "none") notes.push("Topics are described by raw c-TF-IDF keywords.");
+      if (f === "kb") notes.push("Keywords reranked by meaning; stop words mostly vanish, abbreviations may too.");
+      if (f === "mmr") notes.push("Keywords deduplicated for diversity.");
+      if (f === "tg") notes.push("Flan-T5 small writes a label per topic; can be too broad.");
+      if (f === "oa") notes.push("GPT-3.5 writes a label per topic; one paid API call per topic, not per document.");
+      if (e === "other") notes.push("Passing precomputed embeddings to fit() requires they came from this same model.");
+      $("lg-v").textContent = notes.join(" ");
+    }
+    ["lg1", "lg2", "lg3", "lg6"].forEach(function (id) { $(id).addEventListener("change", draw); });
+    draw();
+  })();
+
+  /* ---------- 13 topic 0 weights ---------- */
+  (function () {
+    var t0 = [["speech", 0.028177697715245358], ["asr", 0.018971184497453525], ["recognition", 0.013457745472471012], ["end", 0.00980445092749381], ["acoustic", 0.009452082794507863], ["speaker", 0.0068822647060204885], ["audio", 0.006807649923681604], ["the", 0.0063343444687017645], ["error", 0.006320144717019838], ["automatic", 0.006290216996043161]];
+    var mx = t0[0][1];
+    $("t0-bars").innerHTML = t0.map(function (p, i) {
+      return "<div class='r" + (p[0] === "the" ? "" : (i < 3 ? " hi" : "")) + "'><span>" + p[0] + "</span><i style='width:" + (p[1] / mx * 100) + "%'></i><em>" + p[1].toFixed(4) + "</em></div>";
+    }).join("");
+  })();
+
+  /* ---------- 15 cost calculator ---------- */
+  (function () {
+    function draw() {
+      var d = Math.round(Math.pow(10, +$("co-d").value)), t = +$("co-t").value, s = Math.max(0, +$("co-s").value || 0);
+      $("co-do").textContent = fmt(d); $("co-to").textContent = fmt(t);
+      function hrs(n) { var h = n * s / 3600; return h < 1 ? (n * s / 60).toFixed(1) + " min" : (h < 48 ? h.toFixed(1) + " h" : (h / 24).toFixed(1) + " days"); }
+      $("co-out").innerHTML = "per document: <b class='bad'>" + fmt(d) + " calls ≈ " + hrs(d) + "</b> · per topic: <b class='good'>" + fmt(t) + " calls ≈ " + hrs(t) + "</b> · <b>" + fmt(d / t) + "×</b> fewer";
+    }
+    ["co-d", "co-t", "co-s"].forEach(function (id) { $(id).addEventListener("input", draw); });
+    draw();
+  })();
+
+  /* ---------- 16 KeyBERTInspired toy ---------- */
+  (function () {
+    var docs = [["My cat is cute", [0.9, 0.6, 0.1]], ["That is a cute dog", [0.8, 0.6, 0.15]], ["I love pets", [0.9, 0.5, 0.05]]];
+    var kws = [["cat", [1, 0.1, 0]], ["cute", [0.4, 1, 0]], ["that", [0, 0, 1]]];
+    var on = [true, true, true];
+    function cos(a, b) { var d = 0, na = 0, nb = 0; for (var i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; } return d / (Math.sqrt(na * nb) || 1); }
+    var box = $("kb-docs");
+    docs.forEach(function (d, i) {
+      var lab = document.createElement("label");
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
+      cb.addEventListener("change", function () { on[i] = cb.checked; draw(); });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + d[0])); box.appendChild(lab);
+    });
+    function draw() {
+      var used = docs.filter(function (d, i) { return on[i]; });
+      if (!used.length) { $("kb-bars").innerHTML = ""; $("kb-out").innerHTML = "pick at least one document"; return; }
+      var avg = [0, 0, 0];
+      used.forEach(function (d) { for (var k = 0; k < 3; k++) avg[k] += d[1][k] / used.length; });
+      var rows = kws.map(function (k) { return { w: k[0], v: cos(avg, k[1]) }; }).sort(function (a, b) { return b.v - a.v; });
+      $("kb-bars").innerHTML = rows.map(function (o, i) { return "<div class='r" + (i === 0 ? " hi" : "") + "'><span>" + o.w + "</span><i style='width:" + Math.max(2, o.v * 100) + "%'></i><em>" + o.v.toFixed(2) + "</em></div>"; }).join("");
+      $("kb-out").innerHTML = "average doc embedding <b>[" + avg.map(function (v) { return v.toFixed(2); }).join(", ") + "]</b> · reranked: <b>" + rows.map(function (o) { return o.w; }).join(" > ") + "</b>";
+    }
+    draw();
+  })();
+
+  /* ---------- 17 MMR ---------- */
+  (function () {
+    var topic = [0.75, 0.4, 0.5, 0.55];
+    var C = [
+      ["summarization", [1, 0.2, 0.35, 0.4]], ["summaries", [0.97, 0.08, 0.25, 0.15]], ["summary", [0.96, 0.06, 0.27, 0.13]],
+      ["abstractive", [0.6, 0.1, 0.1, 0.8]], ["document", [0.5, 0.15, 0.9, 0.35]], ["extractive", [0.6, 0.1, 0.15, 0.75]],
+      ["rouge", [0.45, 0.9, 0.1, 0.3]], ["documents", [0.38, 0, 0.92, 0.1]], ["factual", [0.25, 0.6, 0.2, 0.15]], ["evaluation", [0.3, 0.9, 0.1, 0.2]]
+    ];
+    function cos(a, b) { var d = 0, na = 0, nb = 0; for (var i = 0; i < a.length; i++) { d += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; } return d / Math.sqrt(na * nb); }
+    function draw() {
+      var div = +$("mm-d").value; $("mm-do").textContent = div.toFixed(2);
+      var rel = C.map(function (c) { return cos(c[1], topic); });
+      var first = 0; rel.forEach(function (v, i) { if (v > rel[first]) first = i; });
+      var picked = [first], trace = ["1. <b>" + C[first][0] + "</b> (most relevant, " + rel[first].toFixed(2) + ")"];
+      while (picked.length < 5) {
+        var best = -1, bs = -1e9, bred = 0;
+        for (var i = 0; i < C.length; i++) {
+          if (picked.indexOf(i) >= 0) continue;
+          var red = Math.max.apply(null, picked.map(function (p) { return cos(C[i][1], C[p][1]); }));
+          var s = (1 - div) * rel[i] - div * red;
+          if (s > bs) { bs = s; best = i; bred = red; }
+        }
+        picked.push(best);
+        trace.push(picked.length + ". <b>" + C[best][0] + "</b> (rel " + rel[best].toFixed(2) + ", max sim to picked " + bred.toFixed(2) + ", score " + bs.toFixed(2) + ")");
+      }
+      $("mm-kw").innerHTML = C.map(function (c, i) { var k = picked.indexOf(i); return "<span class='" + (k >= 0 ? "pick" : "drop") + "'>" + (k >= 0 ? (k + 1) + " · " : "") + c[0] + "</span>"; }).join("");
+      $("mm-cap").innerHTML = trace.join("<br>");
+    }
+    $("mm-d").addEventListener("input", draw);
+    draw();
+  })();
+
+  /* ---------- 18 prompt builder ---------- */
+  (function () {
+    var K = [
+      "speech, asr, recognition, end, acoustic, speaker, audio, the, error, automatic",
+      "medical, clinical, biomedical, patient",
+      "sentiment, aspect, analysis, reviews, opinion",
+      "translation, nmt, machine, neural, bleu",
+      "summarization, summaries, summary"
+    ];
+    var D = [
+      "We study automatic speech recognition for languages with little transcribed audio and show that adding external text data to an end-to-end acoustic model lowers the word error rate on several public benchmarks while keeping decoding fast enough for real-time use on commodity hardware.",
+      "We present a language model adapted to clinical notes and biomedical literature and evaluate it on entity normalisation and patient record classification, where it outperforms general-domain models on most tasks and handles rare medical terms better.",
+      "Aspect-based sentiment analysis aims to find the opinion expressed toward each aspect of a product in customer reviews; we propose a neural model that links aspects to opinion words and improves accuracy on restaurant and laptop review datasets.",
+      "We improve neural machine translation for low-resource language pairs by combining back-translation with an attention-based encoder-decoder, reporting gains in BLEU on several English-centric benchmarks.",
+      "We compare extractive and abstractive summarization of long documents and find that abstractive models produce more fluent summaries but are less factual, which we measure with ROUGE and a new factual-consistency metric."
+    ];
+    function draw() {
+      var t = +$("pr-t").value, L = +$("pr-l").value; $("pr-lo").textContent = L;
+      var words = D[t].split(/\s+/), cut = words.slice(0, L).join(" ") + (words.length > L ? " …" : "");
+      var p = "I have a topic that contains the following documents:\n<mark>- " + esc(cut) + "\n- [3 more representative documents, each cut to " + L + " words]</mark>\n\nThe topic is described by the following keywords: '<mark>" + esc(K[t]) + "</mark>'.\n\nBased on the documents and keywords, what is this topic about?";
+      $("pr-out").innerHTML = p + "\n\n<span class='note'>(document text above is an invented placeholder, not a real abstract; " + words.length + " words before truncation)</span>";
+    }
+    $("pr-t").addEventListener("change", draw); $("pr-l").addEventListener("input", draw);
+    draw();
+  })();
+
+  /* ---------- 18 comparison tabs ---------- */
+  (function () {
+    var R = [
+      ["speech | asr | recognition | end | acoustic", "speech | encoder | phonetic | language | trans…", "speech | asr | error | model | training", "Speech-to-description", "Leveraging External Data for Improving Low-Res…"],
+      ["medical | clinical | biomedical | patient | he…", "nlp | ehr | clinical | biomedical | language", "clinical | biomedical | patient | healthcare | …", "Science/Tech", "Improved Representation Learning for Biomedica…"],
+      ["sentiment | aspect | analysis | reviews | opinion", "aspect | sentiment | aspects | sentiments | cl…", "sentiment | analysis | reviews | absa | polarity", "Review", "Advancements in Aspect-Based Sentiment Analys…"],
+      ["translation | nmt | machine | neural | bleu", "translation | translating | translate | transl…", "translation | nmt | bleu | parallel | multilin…", "Attention-based neural machine translation", "Neural Machine Translation Enhancements"],
+      ["summarization | summaries | summary | abstract…", "summarization | summarizers | summaries | summ…", "summarization | document | extractive | rouge …", "Summarization", "Document Summarization Techniques"]
+    ];
+    var H = ["c-TF-IDF (original)", "KeyBERTInspired", "MMR (diversity 0.2)", "Flan-T5 small", "GPT-3.5"];
+    tabs("cmp-tabs", function (t) {
+      $("cmp-out").innerHTML = "<table><tr><th>Representation</th><th>Topic " + t + "</th></tr>" + H.map(function (h, i) { return "<tr><td>" + h + "</td><td>" + esc(R[t][i]) + "</td></tr>"; }).join("") + "</table>";
+    });
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1954 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Twin Data Engineering</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.1) ---- */
+.toks { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.toks span { border: 1px solid var(--rule); border-radius: 4px; padding: 2px 7px; background: var(--paper); }
+.toks span.a { background: var(--tint2); border-color: var(--c2); }
+.toks span.b { background: var(--tint3); border-color: var(--c3); }
+.toks span.v { background: var(--tint); border-color: var(--c1); }
+.toks span.gen { background: var(--tint); border-color: var(--c1); font-weight: 600; }
+.toks span.mask { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.toks span.dim { opacity: .45; }
+.vec { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vec i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--rule); border-radius: 2px; }
+.heat { border-collapse: separate; border-spacing: 3px; width: auto; font-family: var(--mono); font-size: 12px; }
+.heat th, .heat td { border: 0; padding: 0; text-align: center; }
+.heat th { font-family: var(--mono); font-weight: 600; font-size: 12px; padding: 2px 6px; }
+.heat td.cell { width: 52px; height: 34px; border-radius: 3px; border: 1px solid var(--rule); cursor: pointer; font-size: 11px; }
+.heat td.cell.blocked { background: repeating-linear-gradient(45deg, var(--paper), var(--paper) 4px, var(--rule) 4px, var(--rule) 6px) !important; color: var(--muted); }
+.heat td.cell.sel { outline: 2px solid var(--c1); }
+.bar { height: 12px; background: var(--c2); border-radius: 2px; }
+.barrow { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+.barrow .track { background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; height: 14px; overflow: hidden; }
+.barrow .track div { height: 100%; background: var(--c2); }
+.barrow .track div.warn { background: var(--c1); }
+.barrow .track div.bad { background: var(--sell); }
+.legendc { display: flex; flex-wrap: wrap; gap: 6px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legendc span::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; background: var(--sw); }
+.out { font-family: var(--mono); font-size: 13px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 3em; }
+.out .p { color: var(--muted); }
+.out .g { color: var(--c2); font-weight: 600; }
+.tl { display: grid; gap: 6px; }
+.tl .yr { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.mrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.mbtn { font-family: var(--mono); font-size: 12.5px; border-radius: 99px; padding: 3px 10px; }
+.mbtn.dec { border-color: #d98b8b; }
+.mbtn.enc { border-color: #b98bd9; }
+.mbtn.non { border-color: var(--rule); }
+.mbtn.ed  { border-color: #7fc3a3; }
+.mbtn.prop { border-color: #6ea6d6; }
+.mbtn.open { border-color: #e6aa62; }
+.mbtn.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.sw-dec { --sw: #e6a3a3; } .sw-enc { --sw: #cf9be8; } .sw-non { --sw: #d8d8d8; } .sw-ed { --sw: #9fd8bd; }
+.sw-prop { --sw: #8dbde6; } .sw-open { --sw: #f3c99a; }
+.box.interview { background: var(--paper); border-left: 3px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+pre.code code { background: none; border: 0; padding: 0; font-size: 12.5px; }
+.qa { display: grid; gap: 8px; }
+.matrix { overflow-x: auto; }
+.scatter circle { stroke: var(--ink); stroke-width: 1.2; cursor: pointer; }
+.scatter circle.sel { stroke: var(--c1); stroke-width: 3; }
+.scatter line.nn { stroke: var(--c1); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.scatter text { font-size: 12px; pointer-events: none; }
+.scatter rect.bg { fill: var(--plate); stroke: var(--rule); }
+.scatter line.g { stroke: var(--grid); }
+</style>
+<style>
+/* ---- page-specific additions (LLM Engineer's Handbook ch.1) ---- */
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.pipe .stage { border: 1.5px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; line-height: 1.45; transition: border-color .2s, background .2s; }
+.pipe .stage b { font-family: var(--display); font-size: 13.5px; display: block; }
+.pipe .stage.on { border-color: var(--c1); background: var(--tint); }
+.pipe .stage.done { border-color: var(--buy); }
+.pipe .stage.off { opacity: .45; }
+.feat { display: flex; flex-wrap: wrap; gap: 6px; }
+.feat label { font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; background: var(--paper); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.feat label.must { border-color: var(--c2); }
+.meter { height: 14px; border: 1px solid var(--rule); border-radius: 3px; background: var(--paper); overflow: hidden; }
+.meter div { height: 100%; background: var(--c2); transition: width .2s; }
+.meter div.over { background: var(--sell); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-family: var(--mono); font-size: 12.5px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.arch svg { width: 100%; min-width: 600px; height: auto; display: block; }
+.arch { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.arch rect.blk { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.arch rect.blk.on { fill: var(--tint); stroke: var(--c1); stroke-width: 2.6; }
+.arch rect.grp { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.arch rect.grp.on { stroke: var(--c1); stroke-width: 2; }
+.arch path, .arch line { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.arch path.on, .arch line.on { stroke: var(--c1); stroke-width: 3; }
+.arch text.g { font-family: var(--display); font-weight: 700; font-size: 13px; }
+.arch text.m { fill: var(--muted); font-size: 11px; }
+.req { font-family: var(--mono); font-size: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.bad-t { color: var(--sell); font-weight: 600; } .good-t { color: var(--buy); font-weight: 600; }
+.vers { display: grid; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+.vers .vrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vers .f { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 7px; background: var(--paper); }
+.vers .f.use { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.vers .live { color: var(--buy); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch02_tooling_and_installation.html">← Ch.2 Tooling and Installation</a><a href="ch04_rag_feature_pipeline.html">Ch.4 RAG Feature Pipeline →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 3 · PDF p84–127</div>
+  <h1>Data engineering for the LLM Twin: crawl your own posts, articles and code into a <em>MongoDB data warehouse</em></h1>
+  <p class="lede">Toy projects start from a ready-made dataset; real products have to <b>collect their own</b>. This chapter builds the LLM Twin's <b>data collection pipeline</b>, an <b>ETL</b> (extract, transform, load) job: it takes one author and a list of links, crawls each link, cleans the content and saves it as a <b>raw document</b> in a MongoDB "data warehouse". The pipeline is orchestrated by <b>ZenML</b> as two steps (find-or-create the user, then crawl the links). A <b>dispatcher</b> looks at each link's domain and hands it to the right <b>crawler</b> (GitHub via <code>git clone</code>, generic articles via LangChain helpers, Medium/LinkedIn via a scripted Chrome browser with Selenium), all sharing one <code>extract()</code> interface. Everything crawled is reduced to just three <b>data categories</b> (articles, posts, repositories), stored through a home-made <b>ODM</b> (object-document mapper) base class that gives every document class save/find for free. The chapter ends by running the pipeline with YAML configs, reading the run's artifacts in the ZenML dashboard, querying MongoDB, and fixing the usual Selenium problems.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Each row reacts to the one before it. Orange boxes are the key ideas you should be able to explain in an interview.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 3">
+    <div class="row"><span class="tag">Problem</span><span class="node">no static dataset: we must gather the author's own content</span><span class="arr">→</span><span class="node key">ETL pipeline: extract (crawl) → transform (clean, standardise) → load (MongoDB)</span></div>
+    <div class="row"><span class="tag">Design</span><span class="node">many sources (Medium, Substack, GitHub, LinkedIn…)</span><span class="arr">→</span><span class="node key">only 3 data categories: article · repository · post</span><span class="arr">→</span><span class="node">new source = one new crawler, nothing else changes</span></div>
+    <div class="row"><span class="tag">Store</span><span class="node">unstructured text, hundreds of docs</span><span class="arr">→</span><span class="node key">MongoDB as a (small) NoSQL data warehouse</span><span class="arr">→</span><span class="node">feature pipeline reads it later, on its own schedule</span></div>
+    <div class="row"><span class="tag">Orchestrate</span><span class="node key">ZenML pipeline <code>digital_data_etl</code></span><span class="arr">→</span><span class="node">step 1: get_or_create_user</span><span class="arr">→</span><span class="node">step 2: crawl_links (+ metadata per domain)</span></div>
+    <div class="row"><span class="tag">Route</span><span class="node key">CrawlerDispatcher (builder + regex registry)</span><span class="arr">→</span><span class="node">BaseCrawler.extract() → polymorphism</span><span class="arr">→</span><span class="node">GitHub (git clone) · Custom article (LangChain) · Medium/LinkedIn (Selenium)</span></div>
+    <div class="row"><span class="tag">Model</span><span class="node">dicts are fragile</span><span class="arr">→</span><span class="node key">ODM base class NoSQLBaseDocument (Pydantic + generics)</span><span class="arr">→</span><span class="node">Article/Post/Repository/User documents get CRUD for free</span></div>
+    <div class="row"><span class="tag">Run</span><span class="node">YAML config per author</span><span class="arr">→</span><span class="node">artifacts + metadata in the dashboard</span><span class="arr">→</span><span class="node">query with 2 lines of ODM code</span><span class="arr">→</span><span class="node">troubleshoot Selenium / import the backup</span></div>
+  </div>
+  <svg viewBox="0 0 660 190" class="dg" role="img" aria-label="The whole data collection pipeline in one picture: links go through the dispatcher to one of four crawlers, which save three document types into MongoDB, which the feature pipeline reads" style="width:100%;height:auto;max-width:660px">
+    <rect x="8" y="70" width="96" height="50" rx="5" class="s"/><text x="56" y="91" text-anchor="middle" class="b">author +</text><text x="56" y="108" text-anchor="middle" class="m">list of links</text>
+    <rect x="128" y="70" width="104" height="50" rx="5" class="hi"/><text x="180" y="91" text-anchor="middle" class="b">Crawler</text><text x="180" y="108" text-anchor="middle" class="m">Dispatcher</text>
+    <rect x="262" y="8" width="128" height="34" rx="5" class="f"/><text x="326" y="30" text-anchor="middle">Medium (Selenium)</text>
+    <rect x="262" y="52" width="128" height="34" rx="5" class="f"/><text x="326" y="74" text-anchor="middle">Custom article</text>
+    <rect x="262" y="96" width="128" height="34" rx="5" class="f"/><text x="326" y="118" text-anchor="middle">GitHub (git clone)</text>
+    <rect x="262" y="140" width="128" height="34" rx="5" class="f"/><text x="326" y="162" text-anchor="middle">LinkedIn (Selenium)</text>
+    <line x1="104" y1="95" x2="128" y2="95"/>
+    <path d="M232 95 L262 25"/><path d="M232 95 L262 69"/><path d="M232 95 L262 113"/><path d="M232 95 L262 157"/>
+    <rect x="420" y="40" width="110" height="110" rx="6" class="vbox"/><text x="475" y="64" text-anchor="middle" class="b">MongoDB</text><text x="475" y="84" text-anchor="middle" class="m">articles</text><text x="475" y="102" text-anchor="middle" class="m">repositories</text><text x="475" y="120" text-anchor="middle" class="m">posts · users</text>
+    <path d="M390 25 L420 70"/><path d="M390 69 L420 80"/><path d="M390 113 L420 105"/><path d="M390 157 L420 130"/>
+    <rect x="556" y="70" width="98" height="50" rx="5" class="s"/><text x="605" y="91" text-anchor="middle" class="b">Feature</text><text x="605" y="108" text-anchor="middle" class="m">pipeline (ch.4)</text>
+    <line x1="530" y1="95" x2="556" y2="95"/>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening</a>
+    <a href="#s2"><span>02</span>Designing the pipeline: ETL</a>
+    <a href="#s3"><span>03</span>Three data categories, four crawlers</a>
+    <a href="#s4"><span>04</span>Scale, the feature pipeline, why MongoDB</a>
+    <a href="#s5"><span>05</span>Implementing: the ZenML pipeline</a>
+    <a href="#s6"><span>06</span>The two ZenML steps</a>
+    <a href="#s7"><span>07</span>The dispatcher</a>
+    <a href="#s8"><span>08</span>The crawlers: base classes</a>
+    <a href="#s9"><span>09</span>GitHubCrawler</a>
+    <a href="#s10"><span>10</span>CustomArticleCrawler</a>
+    <a href="#s11"><span>11</span>MediumCrawler (+ LinkedIn, newer tools)</a>
+    <a href="#s12"><span>12</span>The NoSQL data warehouse documents</a>
+    <a href="#s13"><span>13</span>The ORM and ODM patterns</a>
+    <a href="#s14"><span>14</span>Implementing the ODM class</a>
+    <a href="#s15"><span>15</span>Data categories and user documents</a>
+    <a href="#s16"><span>16</span>Gathering raw data into the warehouse</a>
+    <a href="#s17"><span>17</span>Troubleshooting</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<script>
+/* shared helpers for the widgets on this page */
+var CH3 = (function () {
+  "use strict";
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+  function stepper(prefix, count, render) {
+    var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+    function draw() { if (lab) lab.textContent = "step " + (i + 1) + " / " + count; prev.disabled = i === 0; next.disabled = i >= count - 1; render(i); }
+    prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+    next.addEventListener("click", function () { if (i < count - 1) { i++; draw(); } });
+    draw();
+    return { reset: function () { i = 0; draw(); } };
+  }
+  /* highlight stage k of a .pipe and set caption */
+  function stages(prefix, caps) {
+    var st = document.querySelectorAll("#" + prefix + "_stages .stage");
+    stepper(prefix, caps.length, function (k) {
+      for (var j = 0; j < st.length; j++) { st[j].className = "stage" + (j === k ? " on" : (j < k ? " done" : "")); }
+      $(prefix + "_cap").innerHTML = caps[k];
+    });
+  }
+  return { $: $, esc: esc, run: run, stepper: stepper, stages: stages };
+})();
+</script>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Why a chapter on data engineering in an LLM book</h2></div><span class="chip">pdf p84–85</span></div>
+  <p>This chapter starts the hands-on work on the <b>LLM Twin</b> (the AI that writes like you, designed in Chapter 1). Its job is narrow: build the <b>data collection pipeline</b> that gathers the <b>raw data</b> every later use case needs, such as <b>fine-tuning</b> (continuing to train a model on your data) and <b>inference</b> (answering requests with the trained model plus RAG).</p>
+  <p>The authors say plainly that this is <b>not a data engineering book</b>, so they keep the chapter short and cover only what is strictly needed to collect the raw data. From Chapter 4 on, the focus moves to LLMs and <b>GenAI</b> (generative AI) theory and code.</p>
+  <p>Why bother with collection at all? In research or toy projects you usually get a <b>static dataset</b> (a fixed file someone else prepared). The LLM Twin copies a <b>real-world</b> situation instead: you must <b>gather and curate the data yourself</b>. Building this pipeline "connects the dots" of an end-to-end ML project: data has to come from somewhere before any model can learn from it.</p>
+  <p>Concretely, the chapter designs and builds an <b>ETL</b> pipeline (<b>Extract, Transform, Load</b>) that <b>crawls</b> (automatically visits and downloads) several platforms such as <b>Medium</b>, <b>Substack</b> and <b>GitHub</b>, and gathers the results into a <b>MongoDB data warehouse</b>. Along the way you see different crawling methods, how to <b>standardise</b> the data, and how to load it.</p>
+  <p>The order of the chapter:</p>
+  <ol class="plain">
+    <li><b>Design</b> the LLM Twin's data collection pipeline and its ETL architecture.</li>
+    <li><b>Implement</b> it, starting with <b>ZenML</b>, which <b>orchestrates</b> (runs and tracks) the whole process.</li>
+    <li>The <b>crawlers</b>: a <b>dispatcher layer</b> that picks the right crawler class from the link's <b>domain</b> (for example <code>medium.com</code>), following software best practice; then each crawler one by one.</li>
+    <li>A <b>data layer on top of MongoDB</b> that gives structure to all documents and handles talking to the database.</li>
+    <li><b>Run</b> the pipeline with ZenML and <b>query</b> the collected data in MongoDB.</li>
+  </ol>
+  <p>The three official topics are: <b>designing</b> the pipeline, <b>implementing</b> it, and <b>gathering raw data into the data warehouse</b>. By the end you should be able to design and implement an ETL pipeline that extracts, transforms and loads raw data, ready to be <b>ingested</b> (taken in) by the ML application.</p>
+
+  <div class="fig">
+    <h3>Step through the chapter's journey</h3>
+    <div class="pipe" id="w1_stages">
+      <div class="stage"><b>1 · Design</b>ETL shape, data categories, why MongoDB</div>
+      <div class="stage"><b>2 · Orchestrate</b>ZenML pipeline + 2 steps</div>
+      <div class="stage"><b>3 · Crawl</b>dispatcher + 4 crawlers</div>
+      <div class="stage"><b>4 · Store</b>ODM base class + documents</div>
+      <div class="stage"><b>5 · Run &amp; fix</b>YAML configs, artifacts, queries, troubleshooting</div>
+    </div>
+    <div class="caption" id="w1_cap"></div>
+    <div class="stepbar"><button id="w1_prev" type="button">◀ Back</button><button id="w1_next" type="button">Next ▶</button><span id="w1_n"></span></div>
+  </div>
+  <script>
+  CH3.run("w1", function () {
+    CH3.stages("w1", [
+      "<b>Design (plates 02–04).</b> Input = author + links; output = raw documents in MongoDB. All sources are squeezed into three categories so the rest of the system never cares where a document came from.",
+      "<b>Orchestrate (plates 05–06).</b> A ZenML <code>@pipeline</code> calls two <code>@step</code>s. Each step's output becomes a tracked <i>artifact</i> with metadata you can inspect later.",
+      "<b>Crawl (plates 07–11).</b> The dispatcher matches each URL against registered domain patterns and returns a crawler object. Every crawler has the same <code>extract()</code> method, so the step does not care which one it got.",
+      "<b>Store (plates 12–15).</b> A small ODM base class turns Pydantic models into MongoDB documents and back, and gives every document class save / find / get_or_create.",
+      "<b>Run &amp; fix (plates 16–17).</b> One YAML file per author, one CLI command per run. Results are checked in the ZenML dashboard and in MongoDB; Selenium problems are side-stepped by commenting out Medium links or importing a backup."
+    ]);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A restaurant can buy ready-cut vegetables (a static dataset), or it can run its own morning trip to the mandi: visit several stalls, pick produce, wash and sort it, and stack it in the cold room by type. This chapter is that morning trip. <i>Where it breaks:</i> vegetables go bad if you store them too long; raw documents in a warehouse can sit for months and be re-processed again and again, which is exactly why you keep them raw.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In the FTI design from Chapter 1, the feature, training and inference pipelines all assume data already exists somewhere. The data collection pipeline is that "somewhere". Making it its own pipeline, with its own storage, means you can crawl new content today and reprocess old content tomorrow with better cleaning or chunking, without crawling again.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Your model needs data nobody has packaged for you. How do you start?" Say: "I build a small ETL first: crawlers per source, a common schema, and a raw store I can replay from. I make it idempotent (skip what's already stored) and observable (count successes per source), then iterate on coverage." That maps well to ingesting user documents into a RAG memory store.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Where this pipeline sits in the whole system: <a href="ch01_llm_twin_concept_and_architecture.html">ch01 (the four pipelines)</a>.</li>
+    <li>ZenML, MongoDB and Docker setup: <a href="ch02_tooling_and_installation.html">ch02 Tooling and Installation</a>.</li>
+    <li>What reads this data next: <a href="ch04_rag_feature_pipeline.html">ch04 RAG feature pipeline</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SECTION</div><h2>Designing the LLM Twin's data collection pipeline: it is an ETL</h2></div><span class="chip">pdf p85–87 · Fig 3.1</span></div>
+  <p>Before writing code, the authors map the pipeline onto the classic <b>ETL</b> shape. An ETL pipeline has three fundamental steps:</p>
+  <ol class="plain">
+    <li><b>Extract</b>: pull data out of various sources. Here: crawl platforms such as Medium, Substack and GitHub to gather raw data.</li>
+    <li><b>Transform</b>: clean and <b>standardise</b> the data into one consistent format that is fit for storage and analysis.</li>
+    <li><b>Load</b>: write the transformed data into a <b>data warehouse</b> or database.</li>
+  </ol>
+  <p>The project uses <b>MongoDB</b> as its <b>NoSQL data warehouse</b> (NoSQL = a database that does not use fixed SQL tables; MongoDB stores JSON-like documents). The authors admit this is <b>not a standard choice</b> and explain why in plate <a href="#s4">04</a>.</p>
+
+  <figure class="bookfig"><img src="figs/fig-3-1.png" alt="Data Collection Pipeline diagram. On the left, Digital Data Sources with a list of links to crawl and four source boxes: Medium, Custom Article, GitHub, LinkedIn. Medium and Custom Article feed an Articles ETL row: Login User, Crawl Article, Parse HTML, Clean and Normalize, Load to NoSQL DB. GitHub feeds a Repository ETL row: an empty first box, Clone Repository, Parse Repository File Tree, Clean and Normalize, Load to NoSQL DB. LinkedIn feeds a Posts ETL row: Login User, Crawl Feed, Parse HTML, Clean and Normalize, Load to NoSQL DB. All three rows write to a NoSQL Data Warehouse. Below a dotted line, Raw Data flows into the RAG Feature Pipeline with Articles, Repository and Posts lanes, which outputs Fine-Tuning and RAG Data as embeddings plus metadata and text into a Vector DB." loading="lazy"><figcaption>Figure 3.1 (book, pdf p86): LLM Twin's data collection ETL pipeline architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Read left to right, then down. On the left is the input: a list of links (<code>medium_link_1</code>, <code>github_link_2</code> … <code>substack_link_N</code>) sorted into four sources. Each source feeds one horizontal <b>ETL row</b>, coloured by the data category it produces: orange for <b>articles</b> (Medium and Custom Article share one row), green for <b>repository</b> (GitHub) and yellow for <b>posts</b> (LinkedIn). Each row has the same five-step rhythm: <b>access</b> (log in; for GitHub the first box is empty "–" because no login is needed), <b>crawl</b> (article, feed, or clone repository), <b>parse</b> (HTML or the repository file tree), <b>clean &amp; normalize</b>, <b>load to NoSQL DB</b>. Dotted arrows land in the <b>NoSQL Data Warehouse</b>. Below the dotted line is the <i>next</i> chapter: raw data flows into the <b>RAG Feature Pipeline</b> (three lanes for the three categories), which produces <b>fine-tuning &amp; RAG data</b> (vectors plus metadata and text) stored in a <b>Vector DB</b>.</p>
+
+  <p>The pipeline's contract is small. It takes a <b>user</b> and a <b>list of links</b>, crawls each link on its own, standardises what it collected, and saves it <b>under that author</b> in MongoDB. Its signature:</p>
+  <div class="two">
+    <div class="card"><b>Input</b><span>A list of links plus the user they belong to (the author).</span></div>
+    <div class="card"><b>Output</b><span>A list of raw documents stored in the NoSQL data warehouse.</span></div>
+  </div>
+  <p class="note">The book uses <b>"user"</b> and <b>"author"</b> as the same thing, because in most of the ETL the user is the author of the content. Inside the warehouse there is only one collection for them: a <b>user</b> collection.</p>
+
+  <div class="fig">
+    <h3>Step through one link's ETL journey (Medium example)</h3>
+    <div class="pipe" id="w2_stages">
+      <div class="stage"><b>Input</b>(author, medium link)</div>
+      <div class="stage"><b>Extract · access</b>open browser page</div>
+      <div class="stage"><b>Extract · crawl</b>scroll, grab HTML</div>
+      <div class="stage"><b>Transform · parse</b>HTML → title, subtitle, text</div>
+      <div class="stage"><b>Transform · clean</b>one standard dict</div>
+      <div class="stage"><b>Load</b>articles collection</div>
+    </div>
+    <div class="caption" id="w2_cap"></div>
+    <pre class="req" id="w2_data"></pre>
+    <div class="stepbar"><button id="w2_prev" type="button">◀ Back</button><button id="w2_next" type="button">Next ▶</button><span id="w2_n"></span></div>
+  </div>
+  <script>
+  CH3.run("w2", function () {
+    var caps = [
+      "The pipeline receives the author's full name and one of their links. (All values below are <b>modelled</b> for illustration.)",
+      "Medium needs a real browser session, so the crawler drives a headless Chrome to the page (login would happen here for sites that need it).",
+      "It scrolls so lazy-loaded parts appear, then reads the whole page HTML: tens of kilobytes of tags, scripts and menus around a few paragraphs of real text.",
+      "An HTML parser picks out the title and subtitle by their tags and pulls all visible text.",
+      "Everything becomes one small, predictable dictionary. Every crawler, whatever its source, ends in a shape like this.",
+      "The dictionary is wrapped in an ArticleDocument (with author id, link, platform) and inserted into MongoDB's <code>articles</code> collection."
+    ];
+    var data = [
+      'user_full_name = "Paul Iusztin"\nlink = "https://medium.com/decodingml/some-article"',
+      'GET https://medium.com/decodingml/some-article\n(headless browser session open)',
+      '<html><head>…</head><body>\n  <nav>…</nav>\n  <h1 class="pw-post-title">Some title</h1>\n  <h2 class="pw-subtitle-paragraph">Some subtitle</h2>\n  <p>First paragraph…</p> … <footer>…</footer>\n</body></html>   (~80 KB, modelled)',
+      'title    = "Some title"\nsubtitle = "Some subtitle"\ntext     = "Some title Some subtitle First paragraph …"',
+      '{"Title": "Some title",\n "Subtitle": "Some subtitle",\n "Content": "Some title Some subtitle First paragraph …"}',
+      'db.articles ← {\n  "_id": "3f2c…", "platform": "medium",\n  "link": "https://medium.com/decodingml/some-article",\n  "author_id": "900f…", "author_full_name": "Paul Iusztin",\n  "content": {"Title": …, "Subtitle": …, "Content": …}\n}'
+    ];
+    var st = document.querySelectorAll("#w2_stages .stage");
+    CH3.stepper("w2", caps.length, function (k) {
+      for (var j = 0; j < st.length; j++) st[j].className = "stage" + (j === k ? " on" : (j < k ? " done" : ""));
+      CH3.$("w2_cap").innerHTML = caps[k];
+      CH3.$("w2_data").textContent = data[k];
+    });
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A dabbawala route. <b>Extract</b>: pick up tiffins from many homes, each with its own lid and bag. <b>Transform</b>: at the station, mark each with one standard code. <b>Load</b>: stack them in the right train crate. <i>Where it breaks:</i> dabbawalas never open the tiffin; an ETL's transform step changes the contents (strips HTML, normalises text), so a bad transform silently damages your data.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every source has its own access method and its own messy format. The transform step's job is to hide that variety: after it, every record has the same fields (content, platform, link, author). That uniformity is what lets one feature pipeline later process all sources with the same code. Saving <i>raw-but-standardised</i> data (not yet chunked or embedded) keeps the option to reprocess later.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"ETL or ELT?" <i>Beyond the book:</i> in ELT you load raw data first and transform inside the warehouse. Here the T is light (strip HTML, standardise fields), and heavier processing happens later in the feature pipeline, so in practice it is "light ETL, then a separate transform pipeline". Say that you keep a replayable raw layer so you can re-run downstream logic.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The categories in the figure's rows: <a href="#s3">03</a>. The warehouse choice: <a href="#s4">04</a>.</li>
+    <li>The bottom half of the figure: <a href="ch04_rag_feature_pipeline.html">ch04 RAG feature pipeline</a>.</li>
+    <li>Data collection and processing in general: <a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering ch.8 Dataset engineering</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · DESIGN</div><h2>Three data categories, four crawlers</h2></div><span class="chip">pdf p87–88 · Fig 3.2</span></div>
+  <p>The ETL looks at each link's <b>domain</b> and calls a <b>specialised crawler</b> for it. The codebase has <b>four crawlers</b> but only <b>three data categories</b>. Every collected document is reduced to one of:</p>
+  <div class="grid2">
+    <div class="card"><b>Article</b><span>Long-form text: Medium, Substack, personal blogs.</span></div>
+    <div class="card"><b>Repository (code)</b><span>A code repository: GitHub.</span></div>
+    <div class="card"><b>Post</b><span>Short social posts: LinkedIn.</span></div>
+  </div>
+  <p>The key design choice: <b>where the data comes from does not matter; its format does</b>. Each category usually needs different processing later (for example, code is chunked differently from prose), so each gets its own <b>domain entity</b>, meaning its own Python class and its own <b>MongoDB collection</b>. The <b>source URL</b> is still saved in each document's metadata, so you always know where a document came from and can reference it in GenAI use cases (for example, citing the source).</p>
+
+  <figure class="bookfig"><img src="figs/fig-3-2.png" alt="Three-level diagram. Data Sources row: Medium, Blogs and Substack, GitHub, LinkedIn. Crawlers row: Medium Crawler, Custom Article Crawler, GitHub Crawler, LinkedIn Crawler. Data Categories row: Article Document (fed by both Medium Crawler and Custom Article Crawler), Repository Document, Post Document. All three documents flow into one NoSQL Data Warehouse." loading="lazy"><figcaption>Figure 3.2 (book, pdf p87): The relationship between the crawlers and the data categories</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three layers from top to bottom: <b>Data Sources</b> → <b>Crawlers</b> → <b>Data Categories</b>, then one shared <b>NoSQL Data Warehouse</b>. Notice the funnel on the left: two crawlers (Medium, and the Custom Article crawler that handles Blogs and Substack) both produce the <b>same</b> Article Document. GitHub maps one-to-one to Repository Document and LinkedIn to Post Document. The colours follow the data category (orange = articles).</p>
+
+  <p>The four crawlers:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Crawler</th><th>Outputs</th><th>How it works</th></tr>
+    <tr><td><b>Medium crawler</b></td><td>an article document</td><td>Logs in to Medium, crawls the HTML of the article link, then extracts, cleans and normalises the text and loads the standardised article into the warehouse.</td></tr>
+    <tr><td><b>Custom article crawler</b></td><td>an article document</td><td>Same steps as Medium but <b>generic</b>: no platform-specific tricks, <b>no login</b>; it simply grabs all the HTML at the link. Good enough for freely available articles such as Substack and personal blogs. It is the <b>safety net</b>: used whenever a link's domain has no dedicated crawler. A Substack link falls back to it; a Medium link goes to the Medium crawler.</td></tr>
+    <tr><td><b>GitHub crawler</b></td><td>a repository document</td><td>Clones the repository, parses its file tree, cleans and normalises the files, and loads them into the database.</td></tr>
+    <tr><td><b>LinkedIn crawler</b></td><td><b>multiple</b> post documents</td><td>Logs in to LinkedIn, goes to the user's feed and crawls all their latest posts. For each post: extract HTML, clean, normalise, load into MongoDB.</td></tr>
+  </table></div>
+  <p>Each crawler reaches its platform in its own way and pulls HTML (or files). After that they all do the same thing: <b>parse</b>, extract text, <b>clean and normalise</b>, and store under the <b>same interface</b>.</p>
+  <p><b>Why only three categories?</b> Because it makes the system easy to extend. To add X (Twitter), you write <b>one new crawler that outputs a post document</b>, and nothing else changes. If instead the <b>source</b> were part of the class and document structure (a <code>TwitterDocument</code>, a <code>MediumDocument</code> …), every new source would force changes in <b>all downstream layers</b>: a new document class, and new handling in the feature pipeline.</p>
+
+  <div class="fig">
+    <h3>Try it: add a new data source, count the places you must change</h3>
+    <p class="note">Pick a design and add sources. The counter shows how many places need new code. The numbers are <b>modelled</b> (we assume the feature pipeline has one handler per document class), but the shape of the result is the book's argument.</p>
+    <div class="controls">
+      <label><input type="radio" name="w3_mode" value="cat" checked> Design A: by category (book)</label>
+      <label><input type="radio" name="w3_mode" value="src"> Design B: by source</label>
+    </div>
+    <div class="controls">
+      <button type="button" id="w3_x">+ X (Twitter)</button>
+      <button type="button" id="w3_gl">+ GitLab</button>
+      <button type="button" id="w3_dev">+ dev.to blog</button>
+      <button type="button" id="w3_reset">reset</button>
+    </div>
+    <div class="out" id="w3_out"></div>
+  </div>
+  <script>
+  CH3.run("w3", function () {
+    var added = [];
+    var srcs = { x: { name: "X (Twitter)", cls: "XCrawler", cat: "post" }, gl: { name: "GitLab", cls: "GitLabCrawler", cat: "repository" }, dev: { name: "dev.to blog", cls: "", cat: "article" } };
+    function mode() { return document.querySelector('input[name="w3_mode"]:checked').value; }
+    function draw() {
+      var m = mode(), lines = [], total = 0;
+      if (!added.length) { CH3.$("w3_out").textContent = "Add a source to see what changes."; return; }
+      added.forEach(function (k) {
+        var s = srcs[k];
+        if (m === "cat") {
+          if (k === "dev") { lines.push("+ " + s.name + ": nothing! unknown domains already fall back to CustomArticleCrawler → article"); }
+          else { lines.push("+ " + s.name + ": 1 new crawler (" + s.cls + " → " + s.cat + " document); document classes: 0; feature pipeline: 0"); total += 1; }
+        } else {
+          lines.push("+ " + s.name + ": 1 crawler + 1 new document class + 1 new collection + 1 new feature-pipeline handler");
+          total += 4;
+        }
+      });
+      lines.push("");
+      lines.push("Places changed so far: " + total + (m === "cat" ? "   (downstream code untouched)" : "   (every layer grows with every source)"));
+      CH3.$("w3_out").textContent = lines.join("\n");
+    }
+    function add(k) { return function () { if (added.indexOf(k) < 0) added.push(k); draw(); }; }
+    CH3.$("w3_x").addEventListener("click", add("x"));
+    CH3.$("w3_gl").addEventListener("click", add("gl"));
+    CH3.$("w3_dev").addEventListener("click", add("dev"));
+    CH3.$("w3_reset").addEventListener("click", function () { added = []; draw(); });
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="w3_mode"]'), function (r) { r.addEventListener("change", draw); });
+    draw();
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A kirana shop shelves goods by <b>type</b> (rice, oil, soap), not by which wholesaler delivered them. A new supplier's rice goes on the rice shelf; the billing counter and the shelf labels don't change. <i>Where it breaks:</i> sometimes the source really matters (a LinkedIn post vs an X post differ in length limits and hashtags); the book keeps that information in the <code>platform</code> and <code>link</code> fields instead of in the class.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is <b>programming to an interface</b> on the data side. Downstream code depends on a small, stable set of types (article, post, repository). Crawlers are <b>adapters</b> that convert each platform's mess into one of those types. The number of adapters can grow freely; the number of types (which everything else depends on) stays at three.</p></div>
+  <div class="box work"><b>Worked example</b><p>Maxime's config (plate <a href="#s16">16</a>) has blog links on <code>mlabonne.github.io</code> and many Substack links. Neither domain is registered with the dispatcher, so both go through the Custom Article crawler and become <b>ArticleDocuments</b>, alongside Paul's Medium articles that went through the Medium crawler. The feature pipeline later sees one <code>articles</code> collection and processes all of them the same way.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you design ingestion for many document sources?" Say: "Normalise to a few content types based on how they must be processed, not on where they come from; keep the source as metadata; make each source a plug-in that outputs one of those types. Adding a source then touches only its connector." In a RAG memory system the same idea is 'PDF / web page / chat transcript' types with per-type chunking.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Per-category processing later: <a href="ch04_rag_feature_pipeline.html">ch04</a> (chunking differs per category).</li>
+    <li>The crawler code: <a href="#s8">08</a>–<a href="#s11">11</a>. The document classes: <a href="#s15">15</a>.</li>
+    <li>Chapter 1's version of this idea: <a href="ch01_llm_twin_concept_and_architecture.html">ch01 data collection pipeline</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · DESIGN</div><h2>How much data, how it links to the feature pipeline, and why MongoDB</h2></div><span class="chip">pdf p89</span></div>
+  <h3>Is a few hundred documents enough?</h3>
+  <p>For the <b>proof of concept</b>, crawling a <b>few hundred documents</b> is enough. A real product would need more sources: LLMs are <b>data-hungry</b>, and ideal results need <b>thousands</b> of documents, not hundreds. Still, the authors recommend a common strategy: ship an <b>end-to-end version that is not the most accurate</b>, then iterate. Because this architecture makes new sources cheap to add, a bigger dataset can come in later iterations. (The book says fine-tuning and dataset size are covered "in the next chapter"; in this book that material is in <a href="ch05_supervised_fine_tuning.html">ch05</a>.)</p>
+  <h3>How does the ETL connect to the feature pipeline?</h3>
+  <p>The <b>feature pipeline</b> reads raw data from the MongoDB warehouse, cleans it further, turns it into <b>features</b>, and stores them in the <b>Qdrant</b> vector database, where the training and inference pipelines can use them (Chapter 4). The two pipelines are <b>independent</b>: they talk <b>only through MongoDB</b>. So the collection pipeline can write whenever it runs, and the feature pipeline can read whenever it runs, on <b>different schedules</b>.</p>
+  <svg viewBox="0 0 640 120" class="dg" role="img" aria-label="Two pipelines decoupled by MongoDB: the data collection pipeline writes at its own times, the feature pipeline reads at different times" style="width:100%;height:auto;max-width:640px">
+    <rect x="10" y="35" width="160" height="50" rx="5" class="hi"/><text x="90" y="56" text-anchor="middle" class="b">Data collection</text><text x="90" y="73" text-anchor="middle" class="m">runs e.g. weekly</text>
+    <rect x="240" y="30" width="160" height="60" rx="6" class="vbox"/><text x="320" y="56" text-anchor="middle" class="b">MongoDB</text><text x="320" y="74" text-anchor="middle" class="m">raw documents</text>
+    <rect x="470" y="35" width="160" height="50" rx="5" class="hi"/><text x="550" y="56" text-anchor="middle" class="b">Feature pipeline</text><text x="550" y="73" text-anchor="middle" class="m">its own schedule</text>
+    <line x1="170" y1="60" x2="240" y2="60"/><text x="205" y="52" text-anchor="middle" class="m">write</text>
+    <line x1="400" y1="60" x2="470" y2="60"/><text x="435" y="52" text-anchor="middle" class="m">read</text>
+    <text x="320" y="112" text-anchor="middle" class="m">the only contact point (schedules are modelled examples)</text>
+  </svg>
+  <h3>Why MongoDB as a data warehouse?</h3>
+  <p>Using a <b>transactional database</b> (one built for many small reads and writes, like MongoDB) as a <b>data warehouse</b> (normally a system built for big analytical queries) is <b>uncommon</b>. The authors' reasons:</p>
+  <ul class="plain">
+    <li><b>Small data.</b> The twin has hundreds of documents. MongoDB handles that easily, even if you compute statistics over the collections.</li>
+    <li><b>Unstructured data.</b> The main reason: the data is text crawled from the internet. A NoSQL database that <b>does not enforce a schema</b> made development easier and faster.</li>
+    <li><b>Easy and stable.</b> MongoDB is stable and simple; its Python SDK is intuitive.</li>
+    <li><b>Runs anywhere.</b> There is a <b>Docker image</b> that works locally out of the box and a <b>free cloud tier</b> that suits proofs of concept, so the same setup works locally and in the cloud.</li>
+  </ul>
+  <p>The caveat: for <b>big data</b> (millions of documents or more), use a <b>dedicated data warehouse</b> such as <b>Snowflake</b> or <b>BigQuery</b>.</p>
+
+  <div class="fig">
+    <h3>Try it: which store fits?</h3>
+    <p class="note">Slide the number of documents and pick the data shape. The advice follows the book's rule of thumb; the exact cut-offs are <b>modelled</b>.</p>
+    <div class="controls">
+      <label>documents <input type="range" id="w4_n" min="2" max="8" step="0.1" value="2.5"> <output id="w4_nv"></output></label>
+      <label>shape <select id="w4_shape"><option value="u">unstructured text</option><option value="t">tabular, analytics-heavy</option></select></label>
+    </div>
+    <div class="verdict" id="w4_out"></div>
+  </div>
+  <script>
+  CH3.run("w4", function () {
+    function fmt(n) { return n >= 1e6 ? (n / 1e6).toFixed(1) + " M" : n >= 1e3 ? (n / 1e3).toFixed(1) + " K" : String(Math.round(n)); }
+    function draw() {
+      var n = Math.pow(10, +CH3.$("w4_n").value), shape = CH3.$("w4_shape").value, out = CH3.$("w4_out");
+      CH3.$("w4_nv").textContent = fmt(n);
+      if (n < 1e5) { out.className = "verdict good"; out.innerHTML = "<b>MongoDB is fine.</b> " + (shape === "u" ? "Schema-less documents suit crawled text at small scale; this is the LLM Twin's situation (hundreds of docs)." : "Small enough that even analytics queries run fine, though a relational DB would also work."); }
+      else if (n < 1e6) { out.className = "verdict warn"; out.innerHTML = "<b>Grey zone (modelled).</b> MongoDB still stores it well; heavy statistics across whole collections start to hurt. Plan the move."; }
+      else { out.className = "verdict bad"; out.innerHTML = "<b>Use a dedicated warehouse</b> (the book names Snowflake or BigQuery) for millions of documents" + (shape === "u" ? ", maybe keeping a document store for serving." : "."); }
+    }
+    CH3.$("w4_n").addEventListener("input", draw); CH3.$("w4_shape").addEventListener("change", draw); draw();
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A small family business keeping accounts in a cupboard of labelled files: perfect for a few hundred bills, quick to search, no special software. When it has lakhs of invoices a year and the CA wants quarterly analytics, it moves to proper accounting software. <i>Where it breaks:</i> moving files is boring paperwork; moving a warehouse can force changes in every pipeline that reads it, so keep reads behind a small interface (the ODM in plate <a href="#s14">14</a> helps).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Decoupling through storage is a classic pattern: the writer and the reader agree only on the stored format, not on timing. If crawling breaks for a day, the feature pipeline still runs on yesterday's data; if the feature pipeline changes, crawling does not care. The cost is that MongoDB's schema-free nature moves validation into code, which is why the chapter adds Pydantic document classes.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why would you (not) use MongoDB as a warehouse?" Answer: "At hundreds to thousands of unstructured documents, a document DB is the fastest path and its flexible schema fits scraped text. It's not built for large analytical scans, so at millions of rows I'd land data in Snowflake or BigQuery and keep Mongo for operational reads." Add that you'd enforce the schema in the application layer.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The Qdrant side: <a href="ch04_rag_feature_pipeline.html">ch04</a>. MongoDB in the cloud: <a href="ch11_mlops_and_llmops.html">ch11</a>.</li>
+    <li>Document vs relational models: <a href="../../system_design/ddia/ch02_data_models_and_query_languages.html">DDIA ch.2 Data models</a>; OLTP vs warehouses: <a href="../../system_design/ddia/ch03_storage_and_retrieval.html">DDIA ch.3</a>.</li>
+    <li>How much data fine-tuning needs: <a href="ch05_supervised_fine_tuning.html">ch05</a>, <a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering ch.8</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SECTION</div><h2>Implementing the pipeline: the ZenML entry point</h2></div><span class="chip">pdf p90–91 · Fig 3.3</span></div>
+  <p>As set up in Chapter 2, every pipeline in the LLM Twin project starts as a <b>ZenML pipeline</b>. ZenML is an <b>orchestrator</b>: it runs the steps in order, records every input and output, and lets you configure runs at runtime through <b>YAML files</b>. The data collection pipeline is called <code>digital_data_etl</code>; it is the same pipeline Chapter 2 used as its ZenML example, but now the chapter digs into what happens inside. After the pipeline, the chapter covers each crawler and then the MongoDB documents used to store and query the warehouse.</p>
+  <p>The pipeline function takes two inputs: the <b>user's full name</b> and the <b>list of links</b> to crawl under that user (who is treated as the author of everything at those links). Inside, it calls two <b>steps</b>:</p>
+  <ol class="plain">
+    <li>look up the user in the database by full name (creating them if missing);</li>
+    <li>loop over all the links and crawl each one independently.</li>
+  </ol>
+  <p>In the repository it lives at <code>pipelines/digital_data_etl.py</code>. The shape, in our own illustrative names:</p>
+  <pre class="code"><code>from zenml import pipeline
+from steps.etl import find_or_add_author, crawl_all_links   # our names; the book's are get_or_create_user, crawl_links
+
+@pipeline
+def collect_author_content(full_name: str, urls: list[str]) -> str:
+    author = find_or_add_author(full_name)          # step 1 → artifact "user"
+    done = crawl_all_links(author=author, urls=urls)  # step 2 → artifact "crawled_links"
+    return done.invocation_id                        # id of the last step's run</code></pre>
+  <ul class="plain">
+    <li><code>@pipeline</code> turns a plain function into a ZenML pipeline: calling it builds a <b>DAG</b> (directed acyclic graph: boxes connected by one-way arrows, no loops) of steps and runs it.</li>
+    <li>The output of step 1 is passed straight into step 2. That data dependency is what draws the arrow between them in the dashboard.</li>
+    <li>The pipeline returns the <b>invocation id</b> of the last step, a handle to that step's run.</li>
+  </ul>
+
+  <figure class="bookfig"><img src="figs/fig-3-3.png" alt="ZenML dashboard for a digital data ETL run dated 26 September 2024. Left: a vertical graph of get_or_create_user (green check) producing artifact user of type UserDocument, then crawl_links (green check) producing artifact crawled_links of type builtins.list. Right: Run Insights panel, Overview tab, with Id, Status completed, Pipeline digital_data_etl, Author default, Start and End time 26/09/2024 15:38:51, and a Stack section showing default." loading="lazy"><figcaption>Figure 3.3 (book, pdf p91): Example of a digital_data_etl pipeline run from ZenML's dashboard</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The left half is the run's <b>DAG</b>, read top to bottom. White boxes with a green tick are <b>steps</b> that finished: <code>get_or_create_user</code>, then <code>crawl_links</code>. Purple pills are <b>artifacts</b> (the outputs ZenML stored): <code>user</code>, typed as the project's <code>UserDocument</code> class, and <code>crawled_links</code>, typed as a plain Python <code>list</code>. The arrow from <code>user</code> into <code>crawl_links</code> is the data dependency from the code. The right half is <b>Run Insights</b>: run id, status <b>completed</b>, pipeline name <code>digital_data_etl</code>, author <code>default</code>, start and end time, and the <b>stack</b> used (the <code>default</code> local stack).</p>
+
+  <div class="fig">
+    <h3>Step through what ZenML does for one run</h3>
+    <div class="pipe" id="w5_stages">
+      <div class="stage"><b>Read config</b>YAML → parameters</div>
+      <div class="stage"><b>Build DAG</b>2 steps, 1 edge</div>
+      <div class="stage"><b>Run step 1</b>user artifact + metadata</div>
+      <div class="stage"><b>Run step 2</b>crawled_links artifact + metadata</div>
+      <div class="stage"><b>Record</b>run, status, times, stack</div>
+    </div>
+    <div class="caption" id="w5_cap"></div>
+    <div class="stepbar"><button id="w5_prev" type="button">◀ Back</button><button id="w5_next" type="button">Next ▶</button><span id="w5_n"></span></div>
+  </div>
+  <script>
+  CH3.run("w5", function () {
+    CH3.stages("w5", [
+      "A YAML config (one per author, plate <a href=\"#s16\">16</a>) supplies <code>user_full_name</code> and <code>links</code>. Changing who you crawl is a config change, not a code change.",
+      "Calling the decorated function does not crawl immediately: ZenML first records the graph of steps and which output feeds which input.",
+      "<code>get_or_create_user</code> runs. Its return value is saved as the artifact <code>user</code>, with extra metadata (the query and the retrieved user) attached.",
+      "<code>crawl_links</code> receives that artifact, crawls every link, and returns the list of links as the artifact <code>crawled_links</code>, with per-domain success counts as metadata.",
+      "ZenML stores the run (id, status, start and end time, stack). That is exactly what the dashboard in Figure 3.3 shows, and what lets you debug a single run later."
+    ]);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A railway control chart: each train (step) has a slot, the chart records when it left, when it arrived and what it carried (artifacts). If a passenger complains later, the control office looks up that exact run. <i>Where it breaks:</i> trains run on fixed timetables; a ZenML pipeline can be run by hand, on a schedule, or by an event (the book defers that to Chapter 11).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Wrapping plain Python in <code>@pipeline</code> / <code>@step</code> gives you three things for free: <b>lineage</b> (which data produced which output), <b>caching</b> (a step can be skipped if inputs didn't change; the run command later passes <code>--no-cache</code> to force a fresh crawl), and <b>portability</b> (the same code can run on a local stack or a cloud orchestrator such as SageMaker by switching the stack).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why use an orchestrator instead of a cron job running a script?" Say: "Cron only starts things. An orchestrator gives me a DAG with retries, cached steps, versioned artifacts and run metadata, so I can see which input produced which output and re-run one step. I keep business logic in plain functions and let the orchestrator handle when and where they run."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>ZenML basics and stacks: <a href="ch02_tooling_and_installation.html">ch02</a>. Scheduling and triggers: <a href="ch11_mlops_and_llmops.html">ch11</a>.</li>
+    <li>The two steps in detail: <a href="#s6">06</a>. Running it: <a href="#s16">16</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SUB-SECTION</div><h2>The two ZenML steps: get_or_create_user and crawl_links</h2></div><span class="chip">pdf p91–94</span></div>
+  <p>The steps live in <code>steps/etl</code>. Both follow the same recipe: do the work, then <b>attach metadata</b> to the output artifact so the dashboard shows what happened.</p>
+
+  <h3>Step 1: get_or_create_user</h3>
+  <p>It imports <b>loguru</b> (a logging library), <code>Annotated</code> (to give the output a name), ZenML's <code>step</code> and <code>get_step_context</code>, a utils module and the <code>UserDocument</code> class. The step takes a full name and returns a <code>UserDocument</code> whose output is named <code>"user"</code>. Inside:</p>
+  <ol class="plain">
+    <li>log that it is looking up the user;</li>
+    <li><b>split</b> the full name into first and last name with a utility function;</li>
+    <li>call <code>UserDocument.get_or_create(first_name=…, last_name=…)</code>: fetch the user from MongoDB, or create and save them if they don't exist (this method comes from the ODM base class, plate <a href="#s14">14</a>);</li>
+    <li>get the current <b>step context</b> and <b>add output metadata</b> to the <code>user</code> artifact;</li>
+    <li>return the user.</li>
+  </ol>
+  <p>A private helper (<code>_get_metadata</code> in the book) builds the metadata dictionary with two parts: <b>query</b> (the full name that was asked for) and <b>retrieved</b> (the user's id as a string, first name, last name). Our sketch:</p>
+  <pre class="code"><code>@step
+def find_or_add_author(full_name: str) -> Annotated[UserDocument, "user"]:
+    first, last = split_full_name(full_name)               # "Maxime Labonne" → ("Maxime", "Labonne")
+    author = UserDocument.get_or_create(first_name=first, last_name=last)
+    get_step_context().add_output_metadata(
+        output_name="user",
+        metadata={"query": {"user_full_name": full_name},
+                  "retrieved": {"user_id": str(author.id), "first_name": first, "last_name": last}},
+    )
+    return author</code></pre>
+  <p class="note">The <code>Annotated[..., "user"]</code> return type is how ZenML learns the artifact's name. The metadata is exactly what you see later in Figure 3.5 (plate <a href="#s16">16</a>).</p>
+
+  <h3>Step 2: crawl_links</h3>
+  <p>It imports <code>urlparse</code> (to get a link's domain), loguru, <b>tqdm</b> (a progress bar), <code>Annotated</code>, ZenML's step tools, the <code>CrawlerDispatcher</code> and <code>UserDocument</code>. The step takes the user and the list of links and returns the list of links, named <code>"crawled_links"</code>. Inside:</p>
+  <ol class="plain">
+    <li><b>Build the dispatcher</b> and register the LinkedIn, Medium and GitHub crawlers in one chained line (the builder pattern, plate <a href="#s7">07</a>).</li>
+    <li>Log how many links it is starting to crawl.</li>
+    <li>Start an empty metadata dict and a <b>success counter</b> at 0.</li>
+    <li>For each link (wrapped in tqdm for a progress bar): call a helper that crawls it and returns <code>(success, domain)</code>; add the success (True counts as 1) to the counter; update the metadata for that domain.</li>
+    <li>Attach the metadata to the <code>crawled_links</code> artifact via the step context.</li>
+    <li>Log "successfully crawled X / N links" and return the links.</li>
+  </ol>
+  <p>Two helpers do the real work:</p>
+  <ul class="plain">
+    <li><b>Crawl one link</b> (<code>_crawl_link</code>): ask the dispatcher for a crawler for this link; get the domain with <code>urlparse(link).netloc</code> (the "network location", e.g. <code>maximelabonne.substack.com</code>); then in a <code>try</code> call <code>crawler.extract(link=…, user=…)</code> and return <code>(True, domain)</code>. If <b>any exception</b> happens, log the error and return <code>(False, domain)</code>. So one broken link never kills the whole run.</li>
+    <li><b>Update the metadata</b> (<code>_add_to_metadata</code>): make sure the domain has an entry, then increase its <code>successful</code> count by the success value and its <code>total</code> count by 1.</li>
+  </ul>
+  <pre class="code"><code>def crawl_one(router, url, author) -> tuple[bool, str]:
+    crawler = router.crawler_for(url)          # dispatcher picks the class
+    domain = urlparse(url).netloc
+    try:
+        crawler.extract(link=url, user=author) # same call for every crawler
+        return True, domain
+    except Exception as err:                   # isolate failures per link
+        logger.error(f"crawl failed: {err!s}")
+        return False, domain
+
+def tally(stats: dict, domain: str, ok: bool) -> dict:
+    row = stats.setdefault(domain, {"successful": 0, "total": 0})
+    row["successful"] += int(ok)
+    row["total"] += 1
+    return stats</code></pre>
+  <p>Notice what the step does <i>not</i> know: which crawler class it got. That is decided by the dispatcher, and the crawling logic is hidden behind <code>extract()</code>. That is the topic of the next plate.</p>
+
+  <div class="fig">
+    <h3>Try it: run crawl_links on a list of links</h3>
+    <p class="note">Each link is routed to a crawler; some fail at random (failure rate is <b>modelled</b>; tick "Selenium broken" to make every Medium and LinkedIn link fail, as on a machine with a bad ChromeDriver). Watch the metadata dict build up exactly as the helper builds it.</p>
+    <div class="controls">
+      <label><input type="checkbox" id="w6_sel"> Selenium broken</label>
+      <label>random failure rate <input type="range" id="w6_fail" min="0" max="50" value="10"> <output id="w6_fv"></output></label>
+      <button type="button" id="w6_run">▶ Run step</button>
+    </div>
+    <div class="two">
+      <pre class="req" id="w6_log"></pre>
+      <pre class="req" id="w6_meta"></pre>
+    </div>
+  </div>
+  <script>
+  CH3.run("w6", function () {
+    var links = [
+      "https://mlabonne.github.io/blog/posts/finetune.html",
+      "https://mlabonne.github.io/blog/posts/agentic-data.html",
+      "https://maximelabonne.substack.com/p/abliteration",
+      "https://maximelabonne.substack.com/p/mixture-of-experts",
+      "https://maximelabonne.substack.com/p/mergekit",
+      "https://medium.com/decodingml/llm-twin-framework",
+      "https://medium.com/decodingml/realtime-rag",
+      "https://github.com/mlabonne/llm-course",
+      "https://www.linkedin.com/in/some-author"
+    ];
+    function crawlerFor(u) {
+      if (/^https:\/\/(www\.)?medium\.com\/*/.test(u)) return "MediumCrawler";
+      if (/^https:\/\/(www\.)?linkedin\.com\/*/.test(u)) return "LinkedInCrawler";
+      if (/^https:\/\/(www\.)?github\.com\/*/.test(u)) return "GithubCrawler";
+      return "CustomArticleCrawler";
+    }
+    function draw() { CH3.$("w6_fv").textContent = CH3.$("w6_fail").value + "%"; }
+    function runIt() {
+      var sel = CH3.$("w6_sel").checked, p = +CH3.$("w6_fail").value / 100, meta = {}, ok = 0, log = [];
+      log.push("Starting to crawl " + links.length + " link(s).");
+      links.forEach(function (u) {
+        var c = crawlerFor(u), dom = u.split("/")[2];
+        var good = !(sel && (c === "MediumCrawler" || c === "LinkedInCrawler")) && Math.random() >= p;
+        ok += good ? 1 : 0;
+        if (!meta[dom]) meta[dom] = { successful: 0, total: 0 };
+        meta[dom].successful += good ? 1 : 0; meta[dom].total += 1;
+        log.push((good ? "✓ " : "✗ ") + c + "  " + u.replace("https://", ""));
+        if (!good) log.push("   ERROR An error occurred while crawling: " + (sel && c !== "CustomArticleCrawler" && c !== "GithubCrawler" ? "ChromeDriver session failed (modelled)" : "timeout (modelled)"));
+      });
+      log.push("Successfully crawled " + ok + " / " + links.length + " links.");
+      CH3.$("w6_log").textContent = log.join("\n");
+      CH3.$("w6_meta").textContent = "crawled_links metadata =\n" + JSON.stringify(meta, null, 2);
+    }
+    CH3.$("w6_fail").addEventListener("input", draw);
+    CH3.$("w6_run").addEventListener("click", runIt);
+    draw(); runIt();
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A courier delivery boy with a list of 25 parcels. If one address is locked, he notes "failed" on his sheet and moves on; he doesn't return all 25 to the warehouse. At the end his sheet says "Koramangala 8/8, Indiranagar 6/7". <i>Where it breaks:</i> the courier will retry tomorrow; this step does not retry failed links, it only records them (you re-run the pipeline, and already-stored links are skipped by each crawler).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two habits make this step robust: <b>failure isolation</b> (catch per item, so one bad page cannot stop the batch) and <b>observability</b> (count success and total per domain and store the counts with the run). Combined with crawlers that skip links already in the database, re-running the whole pipeline is safe: it behaves <b>idempotently</b>, meaning repeating it doesn't create duplicates.</p></div>
+  <div class="box work"><b>Worked example</b><p>Maxime's run (Figure 3.6, plate 16) recorded <code>mlabonne.github.io</code>: 2 successful of 2, and <code>maximelabonne.substack.com</code>: 24 of 24. If 3 Substack pages had timed out, the dashboard would show 21 / 24 and the log would print 23 / 26 overall, without any extra code.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"A batch job processes 10,000 URLs and one throws. What should happen?" Say: "Catch per item, log with context, count failures per source, and finish the batch. Emit those counts as run metadata or metrics and alert on the failure rate, not on single errors. Make the writes idempotent so a re-run only fills the gaps." Same pattern as ingesting many documents into a RAG index.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>get_or_create</code> itself: <a href="#s14">14</a>. The dispatcher: <a href="#s7">07</a>.</li>
+    <li>The artifacts these steps produce, seen in the dashboard: <a href="#s16">16</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SUB-SECTION</div><h2>The dispatcher: how the right crawler gets picked</h2></div><span class="chip">pdf p95–97 · Fig 3.4</span></div>
+  <p>The entry point to all crawling is the <b>CrawlerDispatcher</b> class. It sits <b>between the links and the crawlers</b>: it knows how to pull the domain out of each link and create the right crawler for that site. Example: if a link is on <code>https://medium.com</code>, it builds a <code>MediumCrawler</code>. All crawling code is in the repo under <code>llm_engineering/application/crawlers</code>.</p>
+
+  <figure class="bookfig"><img src="figs/fig-3-4.png" alt="Links at the top: a mixed list of medium.com, substack.com, linkedin.com and github.com URLs, gathered as xN links into a black Crawler Dispatcher box. From the dispatcher, branches labelled with URL prefixes lead to four crawler boxes at the bottom, each showing an extract method: Medium Crawler for medium.com, Custom Article Crawler for substack.com, GitHub Crawler for github.com, LinkedIn Crawler for linkedin.com." loading="lazy"><figcaption>Figure 3.4 (book, pdf p95): The relationship between the provided links, the CrawlerDispatcher, and the crawlers</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: a mixed bag of links in random order ("xN links"). They all go into one <b>Crawler Dispatcher</b> box. Each branch out of it is labelled with a URL prefix: <code>medium.com</code> → Medium Crawler, <code>substack.com</code> → Custom Article Crawler, <code>github.com</code> → GitHub Crawler, <code>linkedin.com</code> → LinkedIn Crawler. The key detail is the line <code>.extract()</code> in <b>every</b> crawler box: they all share one method, which is what makes the dispatcher possible (plate <a href="#s8">08</a>).</p>
+
+  <h3>The code, piece by piece</h3>
+  <ul class="plain">
+    <li><b>Imports:</b> <code>re</code> (regular expressions), <code>urlparse</code>, loguru, the base class and the four crawler classes.</li>
+    <li><b>Constructor:</b> creates an empty dictionary, the <b>registry</b>, mapping a domain pattern to a crawler class.</li>
+    <li><b><code>build()</code> class method:</b> returns a new dispatcher. This is the start of the <b>builder</b> pattern (a creational design pattern where you configure an object step by step, often by chaining calls).</li>
+    <li><b><code>register_medium()</code>, <code>register_linkedin()</code>, <code>register_github()</code>:</b> each calls a generic <code>register()</code> with the site's base URL and crawler class, then <b>returns <code>self</code></b>. Returning self is what allows chaining: <code>CrawlerDispatcher.build().register_linkedin().register_medium()</code>.</li>
+    <li><b><code>register(domain, crawler)</code>:</b> normalises the domain with <code>urlparse(...).netloc</code> (so <code>"https://medium.com"</code> becomes <code>"medium.com"</code>), then stores a <b>regex pattern</b> as the dictionary key: <code>https://</code>, an optional <code>www.</code>, the escaped domain, then optional slashes. The book calls this normalisation critical, because the keys are later matched against every incoming link.</li>
+    <li><b><code>get_crawler(url)</code>:</b> loops over the registry; the first pattern that <code>re.match</code>es the URL wins and a <b>new instance</b> of that crawler class is returned. If none match, it logs a warning and returns a <code>CustomArticleCrawler</code> (the safety net).</li>
+  </ul>
+  <pre class="code"><code>class CrawlerRouter:                         # our name for CrawlerDispatcher
+    def __init__(self):
+        self._routes = {}                      # regex pattern → crawler class
+
+    @classmethod
+    def build(cls):
+        return cls()
+
+    def add(self, base_url, crawler_cls):
+        host = urlparse(base_url).netloc       # "https://medium.com" → "medium.com"
+        pattern = r"https://(www\.)?{}/*".format(re.escape(host))
+        self._routes[pattern] = crawler_cls
+
+    def with_medium(self):
+        self.add("https://medium.com", MediumCrawler)
+        return self                            # returning self enables chaining
+
+    def crawler_for(self, url):
+        for pattern, crawler_cls in self._routes.items():
+            if re.match(pattern, url):
+                return crawler_cls()           # a fresh crawler per link
+        logger.warning(f"no crawler for {url}, using the generic one")
+        return CustomArticleCrawler()
+
+router = CrawlerRouter.build().with_linkedin().with_medium().with_github()</code></pre>
+  <p class="note">Two small details worth knowing: <code>re.escape</code> turns the dot in <code>medium.com</code> into a literal dot (otherwise <code>.</code> means "any character"), and <code>re.match</code> only checks the <b>start</b> of the string, so <code>https://medium.com/@someone/post</code> matches but a Substack URL that merely contains "medium.com" later in the path does not.</p>
+
+  <div class="fig">
+    <h3>Try it: route a URL through the dispatcher</h3>
+    <p class="note">Type or pick a URL. The widget runs the same matching logic in JavaScript: it shows each registered pattern, whether it matched, and which crawler would be built.</p>
+    <div class="controls">
+      <label>URL <input type="text" id="w7_url" style="width:min(420px,70vw)" value="https://www.medium.com/decodingml/some-post"></label>
+    </div>
+    <div class="controls" id="w7_pick">
+      <button type="button" data-u="https://medium.com/decodingml/llm-twin">Medium</button>
+      <button type="button" data-u="https://decodingml.substack.com/p/real-time-feature-pipelines">Substack</button>
+      <button type="button" data-u="https://github.com/PacktPublishing/LLM-Engineers-Handbook">GitHub</button>
+      <button type="button" data-u="https://www.linkedin.com/in/someone">LinkedIn</button>
+      <button type="button" data-u="http://medium.com/old-http-link">http:// Medium</button>
+      <button type="button" data-u="https://mlabonne.github.io/blog/posts/x.html">github.io blog</button>
+    </div>
+    <pre class="req" id="w7_out"></pre>
+  </div>
+  <script>
+  CH3.run("w7", function () {
+    function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+    var reg = [["linkedin.com", "LinkedInCrawler"], ["medium.com", "MediumCrawler"], ["github.com", "GithubCrawler"]];
+    var pats = reg.map(function (r) { return { src: "https://(www\\.)?" + escRe(r[0]) + "/*", re: new RegExp("^https://(www\\.)?" + escRe(r[0]) + "/*"), cls: r[1] }; });
+    function route() {
+      var u = CH3.$("w7_url").value.trim(), lines = [], hit = null;
+      pats.forEach(function (p) {
+        var m = p.re.test(u);
+        lines.push((m ? "✓ " : "· ") + p.src.padEnd(34, " ") + " → " + p.cls + (m && !hit ? "   ← first match wins" : ""));
+        if (m && !hit) hit = p.cls;
+      });
+      lines.push("");
+      if (hit) lines.push("get_crawler() returns: " + hit + "()");
+      else lines.push("WARNING No crawler found for " + u + ". Defaulting to CustomArticleCrawler.\nget_crawler() returns: CustomArticleCrawler()");
+      if (/^http:\/\//.test(u)) lines.push("\nNote: the patterns require https://, so plain http:// links fall back too.");
+      if (/github\.io/.test(u)) lines.push("\nNote: 'mlabonne.github.io' is not 'github.com', so a GitHub Pages blog is treated as an article.");
+      CH3.$("w7_out").textContent = lines.join("\n");
+    }
+    CH3.$("w7_url").addEventListener("input", route);
+    Array.prototype.forEach.call(document.querySelectorAll("#w7_pick button"), function (b) {
+      b.addEventListener("click", function () { CH3.$("w7_url").value = b.getAttribute("data-u"); route(); });
+    });
+    route();
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>The enquiry counter at a big railway station. You show your ticket; the clerk reads the train number and points you to the right platform. If your train isn't on his board, he sends you to the general waiting hall. <i>Where it breaks:</i> the clerk reads the whole ticket intelligently; the dispatcher only looks at the start of the URL with a regex, so odd URLs (http://, mobile subdomains like <code>m.medium.com</code>) quietly fall to the default.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The dispatcher is a <b>registry + factory</b>: a table of "pattern → class", and a method that creates the right object. The builder-style <code>register_*()</code> calls let the caller choose which crawlers are active without editing the dispatcher. Because every crawler has the same <code>extract()</code> signature, the caller can treat the returned object generically. Adding a platform = one crawler class + one <code>register_x()</code> line.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you avoid a giant if/elif over sources?" Answer: "A registry that maps a key (here a URL pattern) to a handler class, plus a common interface, with a sensible default handler. New handlers register themselves; the dispatch code never changes. It's the strategy pattern chosen by a factory." In an agent, tool routing by name works the same way.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Why the common <code>extract()</code> matters: <a href="#s8">08 base classes</a>.</li>
+    <li>The step that uses the dispatcher: <a href="#s6">06</a>. The fallback crawler: <a href="#s10">10</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · SUB-SECTION</div><h2>The crawlers: one interface, a Selenium base class, and infinite scroll</h2></div><span class="chip">pdf p98–101</span></div>
+  <p>The dispatcher only works because <b>every crawler has the same signature</b>: each class implements <code>extract()</code>. That lets the code use <b>polymorphism</b> (an OOP, object-oriented programming, idea: call the same method on objects of different classes and each does its own thing) and work with an <b>abstract</b> crawler without knowing the concrete subclass. In the ZenML step, the code just asks the dispatcher for "a crawler" and calls <code>extract(link=…, user=…)</code> on it, never checking which type it is. Working against abstract interfaces gives <b>reusability</b> and <b>easy extension</b>.</p>
+
+  <h3>BaseCrawler: the interface</h3>
+  <p>Found in the repo at <code>llm_engineering/application/crawlers/base.py</code>. It is an <b>abstract base class</b> (ABC: a class you cannot instantiate, only inherit from) with two things:</p>
+  <ul class="plain">
+    <li>an <b>abstract method</b> <code>extract(link, **kwargs)</code>: every subclass must implement it;</li>
+    <li>a <b>class-level attribute</b> <code>model</code>: the <b>document class</b> (data category) the crawler saves into MongoDB, e.g. <code>ArticleDocument</code>. Each subclass sets its own, while all keep the same attribute name. Its type is "a subclass of <code>NoSQLBaseDocument</code>" (the ODM base, plate <a href="#s14">14</a>).</li>
+  </ul>
+  <pre class="code"><code>from abc import ABC, abstractmethod
+
+class Scraper(ABC):                               # our name for BaseCrawler
+    model: type[NoSQLBaseDocument]                # which document class to save into
+
+    @abstractmethod
+    def extract(self, link: str, **kwargs) -> None: ...</code></pre>
+
+  <h3>BaseSeleniumCrawler: shared browser automation</h3>
+  <p><b>Selenium</b> is a tool for <b>automating web browsers</b>: code can open pages, click buttons, log in, scroll. It can drive Chrome, Firefox or Brave. Medium and LinkedIn need it because you must log in and/or scroll through the feed or article before the full HTML exists. Sites without login, where the whole page loads at once, can use simpler methods than Selenium.</p>
+  <p class="note">Requirement from the book: for the Selenium crawlers to work you must have <b>Chrome</b> (or a Chromium-based browser such as <b>Brave</b>) installed.</p>
+  <p>Setup at import time: <code>chromedriver_autoinstaller.install()</code> checks whether a <b>ChromeDriver</b> matching your installed Chrome version exists, downloads it if not, and adds it to the system <b>path</b>. ChromeDriver is the small program Selenium talks to in order to control the browser; it opens a <b>headless</b> session (a browser with no visible window) that the code can steer to URLs, buttons and the news feed. Versions must match Chrome's, which is why the auto-installer is used.</p>
+  <p>The constructor (with a <code>scroll_limit</code> default of <b>5</b>) builds <b>Chrome options</b>, described in the book as standard settings for headless crawling that improve performance and security and remove features that interfere with automation:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Option</th><th>What it does</th></tr>
+    <tr><td><code>--no-sandbox</code></td><td>Turn off Chrome's process sandbox (often needed in containers).</td></tr>
+    <tr><td><code>--headless=new</code></td><td>Run without a window, using the newer headless mode.</td></tr>
+    <tr><td><code>--disable-dev-shm-usage</code></td><td>Don't rely on the small shared-memory area (<code>/dev/shm</code>) that Docker gives by default.</td></tr>
+    <tr><td><code>--log-level=3</code></td><td>Only log serious errors.</td></tr>
+    <tr><td><code>--disable-popup-blocking</code>, <code>--disable-notifications</code>, <code>--disable-extensions</code>, <code>--disable-background-networking</code></td><td>Remove pop-up handling, notifications, extensions and background traffic that could get in the way.</td></tr>
+    <tr><td><code>--ignore-certificate-errors</code></td><td>Don't stop on TLS certificate problems.</td></tr>
+    <tr><td><code>--user-data-dir</code>, <code>--data-path</code>, <code>--disk-cache-dir</code> (each a fresh <code>mkdtemp()</code>)</td><td>Use brand-new temporary folders for profile, data and cache, so every run starts clean.</td></tr>
+    <tr><td><code>--remote-debugging-port=9226</code></td><td>Open a debugging port on 9226.</td></tr>
+  </table></div>
+  <p class="note">The "what it does" column is our plain-English gloss of standard Chrome flags; the book lists them and says they are the usual headless-crawling configuration.</p>
+  <p>Then the constructor calls <b><code>set_extra_driver_options(options)</code></b> so a subclass can add its own flags, stores the scroll limit, and creates the Chrome driver with the options. Two <b>placeholder methods</b> do nothing by default and are meant to be overridden: <code>set_extra_driver_options()</code> and <code>login()</code>. This keeps things modular, since every platform's login page has different HTML.</p>
+  <p>Finally, <b><code>scroll_page()</code></b> handles <b>infinite-scroll</b> pages such as the LinkedIn feed, where content appears only as you scroll:</p>
+  <ol class="plain">
+    <li>read the current page height (<code>document.body.scrollHeight</code>) through JavaScript;</li>
+    <li>loop: scroll to the bottom, <b>wait 5 seconds</b> for new content to load, read the height again;</li>
+    <li><b>stop</b> if the height did not change (nothing new loaded, end of page) <b>or</b> if a scroll limit is set and the number of scrolls has reached it;</li>
+    <li>otherwise remember the new height, count one more scroll, repeat.</li>
+  </ol>
+  <pre class="code"><code>def scroll_to_end(self):
+    scrolls = 0
+    old_h = self.driver.execute_script("return document.body.scrollHeight")
+    while True:
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(5)                                         # let lazy content load
+        new_h = self.driver.execute_script("return document.body.scrollHeight")
+        if new_h == old_h or (self.scroll_limit and scrolls >= self.scroll_limit):
+            break                                             # end of page, or budget used up
+        old_h, scrolls = new_h, scrolls + 1</code></pre>
+  <p>The specific crawlers covered next: <code>GithubCrawler(BaseCrawler)</code>, <code>CustomArticleCrawler(BaseCrawler)</code> and <code>MediumCrawler(BaseSeleniumCrawler)</code> (code in the repo's <code>crawlers</code> folder).</p>
+  <svg viewBox="0 0 640 170" class="dg" role="img" aria-label="Class tree: BaseCrawler with extract and model; children GithubCrawler, CustomArticleCrawler and BaseSeleniumCrawler; BaseSeleniumCrawler's children MediumCrawler and LinkedInCrawler" style="width:100%;height:auto;max-width:640px">
+    <rect x="240" y="8" width="160" height="40" rx="5" class="hi"/><text x="320" y="26" text-anchor="middle" class="b">BaseCrawler (ABC)</text><text x="320" y="41" text-anchor="middle" class="m">model · extract()</text>
+    <rect x="10" y="74" width="150" height="34" rx="5" class="f"/><text x="85" y="96" text-anchor="middle">GithubCrawler</text>
+    <rect x="180" y="74" width="170" height="34" rx="5" class="f"/><text x="265" y="96" text-anchor="middle">CustomArticleCrawler</text>
+    <rect x="380" y="70" width="230" height="42" rx="5" class="hi"/><text x="495" y="88" text-anchor="middle" class="b">BaseSeleniumCrawler</text><text x="495" y="104" text-anchor="middle" class="m">driver · login() · scroll_page()</text>
+    <rect x="380" y="128" width="110" height="34" rx="5" class="f"/><text x="435" y="150" text-anchor="middle">MediumCrawler</text>
+    <rect x="500" y="128" width="120" height="34" rx="5" class="f"/><text x="560" y="150" text-anchor="middle">LinkedInCrawler</text>
+    <path d="M320 48 L85 74"/><path d="M320 48 L265 74"/><path d="M320 48 L495 70"/><path d="M470 112 L435 128"/><path d="M520 112 L560 128"/>
+  </svg>
+
+  <div class="fig">
+    <h3>Try it: simulate <code>scroll_page()</code> on a feed</h3>
+    <p class="note">Each scroll loads one more "page" of posts until the feed runs out. Set the feed size and the scroll limit and watch which stop condition fires. Feed sizes and timings are <b>modelled</b>; the 5-second wait is the book's.</p>
+    <div class="controls">
+      <label>pages of content in the feed <input type="range" id="w8_feed" min="1" max="15" value="9"> <output id="w8_fv"></output></label>
+      <label>scroll_limit <input type="range" id="w8_lim" min="0" max="10" value="5"> <output id="w8_lv"></output></label>
+    </div>
+    <pre class="req" id="w8_out"></pre>
+  </div>
+  <script>
+  CH3.run("w8", function () {
+    function draw() {
+      var feed = +CH3.$("w8_feed").value, lim = +CH3.$("w8_lim").value;
+      CH3.$("w8_fv").textContent = feed; CH3.$("w8_lv").textContent = lim === 0 ? "0 (off)" : lim;
+      var pageH = 1200, loaded = 1, last = pageH, cur = 0, lines = ["start: height = " + last + "px (1 page loaded)"], secs = 0, why = "";
+      while (true) {
+        secs += 5;
+        if (loaded < feed) loaded++;
+        var h = loaded * pageH;
+        lines.push("scroll #" + (cur + 1) + ": wait 5 s → height " + h + "px");
+        if (h === last) { why = "height unchanged → end of the feed reached"; break; }
+        if (lim && cur >= lim) { why = "scroll limit reached (current_scroll = " + cur + " ≥ " + lim + ")"; break; }
+        last = h; cur++;
+        if (lines.length > 40) { why = "(stopped the demo)"; break; }
+      }
+      lines.push("STOP: " + why);
+      lines.push("pages loaded: " + loaded + " of " + feed + " · time spent waiting ≈ " + secs + " s");
+      CH3.$("w8_out").textContent = lines.join("\n");
+    }
+    CH3.$("w8_feed").addEventListener("input", draw); CH3.$("w8_lim").addEventListener("input", draw); draw();
+  });
+  </script>
+  <p class="note">Play with it and you'll see two things the code implies: with the limit on, the loop does one extra scroll beyond the limit count before stopping (it checks the counter after scrolling), and with the limit at 0 (falsy in Python) it scrolls until the page stops growing, which on an endless feed could be very long.</p>
+
+  <div class="box picture"><b>Picture it</b><p>An Instagram reel binge with a self-imposed rule: "stop after 5 swipes, or when the app says you're all caught up". Each swipe waits for the next item to load. <i>Where it breaks:</i> you can see when content stops; the crawler only compares page heights, so a page that grows for unrelated reasons (an ad loading) can fool it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two OOP tools work together. <b>Abstract base class</b>: fixes the contract (<code>extract</code>, <code>model</code>) so the dispatcher and the step can treat all crawlers alike. <b>Template-method-style hooks</b>: the Selenium base does all the heavy setup once and leaves small hooks (<code>set_extra_driver_options</code>, <code>login</code>) for subclasses, so Medium and LinkedIn only write what is different about them.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why is the browser-based crawler a separate base class?" Say: "Most sources don't need a browser; spinning up headless Chrome is slow and fragile. I put browser setup, driver options and scrolling in one intermediate base class used only by sites that need login or JS rendering, and keep the plain HTTP/git crawlers light." Mention that a headless browser is the heaviest dependency, so it fails most often (see plate <a href="#s17">17</a>).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The concrete crawlers: <a href="#s9">09</a>, <a href="#s10">10</a>, <a href="#s11">11</a>. The <code>model</code> types: <a href="#s15">15</a>.</li>
+    <li>Selenium troubleshooting: <a href="#s17">17</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · SUB-SECTION</div><h2>GitHubCrawler: clone, walk the file tree, save one repository document</h2></div><span class="chip">pdf p102–104</span></div>
+  <p><code>GithubCrawler</code> extends <code>BaseCrawler</code>. It doesn't need a browser or a login, because <b>git's clone</b> command fetches the whole repository. Its <code>model</code> is <code>RepositoryDocument</code>. Its constructor takes an <b>ignore</b> tuple, by default <code>.git</code>, <code>.toml</code>, <code>.lock</code> and <code>.png</code>, so standard noise (git internals, config, lock files, images) is skipped.</p>
+  <p><code>extract()</code> does, in order:</p>
+  <ol class="plain">
+    <li><b>Duplicate check:</b> <code>self.model.find(link=link)</code>; if the repository is already stored, log it and return. (This is what makes re-runs safe.)</li>
+    <li><b>Repo name:</b> strip a trailing <code>/</code> from the link and take the last path piece.</li>
+    <li><b>Temporary folder:</b> <code>tempfile.mkdtemp()</code>, so the clone is cleaned up afterwards.</li>
+    <li>Inside <code>try</code>: <b>change directory</b> into the temp folder and run <code>git clone &lt;link&gt;</code> in a separate process (<code>subprocess.run</code>).</li>
+    <li><b>Walk the tree</b> with <code>os.walk</code>: compute each folder's path relative to the repo; skip folders whose path <b>starts with</b> an ignore pattern and files whose name <b>ends with</b> one; read each remaining file (ignoring decoding errors), <b>remove spaces</b> from its content, and store it in a dict keyed by file path.</li>
+    <li><b>Save:</b> build a <code>RepositoryDocument</code> with the content dict, name, link, <code>platform="github"</code>, the author's id and full name (from <code>kwargs["user"]</code>), and call <code>save()</code>.</li>
+    <li><code>except</code>: re-raise the error (so the ZenML step counts the link as failed). <code>finally</code>: <b>always</b> delete the temp folder with <code>shutil.rmtree</code>, then log that it finished.</li>
+  </ol>
+  <pre class="code"><code>class RepoScraper(Scraper):                         # our name for GithubCrawler
+    model = RepositoryDocument
+
+    def __init__(self, skip=(".git", ".toml", ".lock", ".png")):
+        super().__init__()
+        self._skip = skip
+
+    def extract(self, link, **kwargs):
+        if self.model.find(link=link) is not None:
+            return                                   # already stored → do nothing
+        name = link.rstrip("/").split("/")[-1]
+        workdir = tempfile.mkdtemp()
+        try:
+            os.chdir(workdir)
+            subprocess.run(["git", "clone", link])
+            root_dir = os.path.join(workdir, os.listdir(workdir)[0])
+            files = {}
+            for folder, _, names in os.walk(root_dir):
+                rel = folder.replace(root_dir, "").lstrip("/")
+                if rel.startswith(self._skip):
+                    continue
+                for fname in names:
+                    if fname.endswith(self._skip):
+                        continue
+                    path = os.path.join(rel, fname)
+                    with open(os.path.join(folder, fname), errors="ignore") as fh:
+                        files[path] = fh.read().replace(" ", "")
+            author = kwargs["user"]
+            self.model(content=files, name=name, link=link, platform="github",
+                       author_id=author.id, author_full_name=author.full_name).save()
+        finally:
+            shutil.rmtree(workdir)                   # clean up no matter what</code></pre>
+
+  <div class="fig">
+    <h3>Try it: which files survive the ignore filter?</h3>
+    <p class="note">A <b>modelled</b> repository tree. Edit the ignore list (comma separated) and see which paths end up as keys in the content dict. Folders are skipped with <code>startswith</code> on the relative folder path; files with <code>endswith</code> on the file name, exactly as described in the book.</p>
+    <div class="controls"><label>ignore <input type="text" id="w9_ign" style="width:min(320px,60vw)" value=".git, .toml, .lock, .png"></label></div>
+    <pre class="req" id="w9_out"></pre>
+  </div>
+  <script>
+  CH3.run("w9", function () {
+    var tree = [
+      ["", "README.md"], ["", "pyproject.toml"], ["", "poetry.lock"], ["", ".gitignore"],
+      [".git", "config"], [".git/objects", "a1b2c3"],
+      ["src", "app.py"], ["src", "utils.py"], ["src/assets", "logo.png"],
+      ["docs", "diagram.png"], ["docs", "guide.md"], [".github/workflows", "ci.yaml"]
+    ];
+    function draw() {
+      var ign = CH3.$("w9_ign").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean), kept = [], lines = [];
+      tree.forEach(function (t) {
+        var dir = t[0], f = t[1], path = (dir ? dir + "/" : "") + f;
+        var dirHit = ign.filter(function (p) { return dir.indexOf(p) === 0; })[0];
+        var fileHit = ign.filter(function (p) { return f.slice(-p.length) === p; })[0];
+        if (dirHit) lines.push("✗ " + path.padEnd(28, " ") + " folder starts with '" + dirHit + "'");
+        else if (fileHit) lines.push("✗ " + path.padEnd(28, " ") + " file ends with '" + fileHit + "'");
+        else { lines.push("✓ " + path); kept.push(path); }
+      });
+      lines.push("\ncontent dict keys: " + kept.length + " of " + tree.length + " files");
+      if (kept.indexOf(".gitignore") >= 0) lines.push("note: '.gitignore' survives: it starts with '.git' but the file check uses endswith.");
+      if (kept.some(function (p) { return p.indexOf(".github") === 0; })) lines.push("note: '.github/...' survives only if '.git' is not in the list (startswith '.git' also catches '.github').");
+      CH3.$("w9_out").textContent = lines.join("\n");
+    }
+    CH3.$("w9_ign").addEventListener("input", draw); draw();
+  });
+  </script>
+  <p class="note">Notice from the widget: with <code>.git</code> in the list, the folder check also drops <code>.github/</code> (it starts with ".git"). That is a consequence of the <code>startswith</code> logic, not something the book discusses.</p>
+
+  <div class="box picture"><b>Picture it</b><p>Photocopying a friend's whole notebook at the Xerox shop, then sitting at home and copying only the pages with actual notes into your own register, skipping the doodles and the timetable, and finally throwing the photocopies away. <i>Where it breaks:</i> you'd keep the formatting; this crawler deletes <b>every space</b> in the file content, which squashes code (<code>def main()</code> becomes <code>defmain()</code>), a trade-off to save tokens that you might not want for every use.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Using <code>git clone</code> instead of scraping GitHub's web pages is the robust choice: git is a stable protocol, gives every file at once and needs no HTML parsing. The <code>try/finally</code> guarantees cleanup of possibly large clones even if parsing fails. The early <code>find(link=…)</code> check gives <b>idempotency</b> per link.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you ingest a code repository for RAG?" Say: "Clone it rather than scrape it, walk the tree with an allow/deny list (skip lock files, binaries, vendored code), keep the file path as metadata, and store files as a path → content map. Clean up temp clones in a finally block, and skip repos already ingested. Later, chunk by file or function, not by fixed characters."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The document it saves: <a href="#s15">15 RepositoryDocument</a>. How code is chunked later: <a href="ch04_rag_feature_pipeline.html">ch04</a>.</li>
+    <li>The duplicate check uses the ODM's <code>find</code>: <a href="#s14">14</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · SUB-SECTION</div><h2>CustomArticleCrawler: the LangChain-powered fallback</h2></div><span class="chip">pdf p104–106</span></div>
+  <p>This crawler takes a different route. It uses two classes from the <b>langchain_community</b> Python package:</p>
+  <ul class="plain">
+    <li><b><code>AsyncHtmlLoader</code></b>: downloads the full HTML of a link;</li>
+    <li><b><code>Html2TextTransformer</code></b>: turns that HTML into plain text (it returns a list of documents; we only need the first).</li>
+  </ul>
+  <p>Like the GitHub crawler, it inherits from <code>BaseCrawler</code>, needs no login and no Selenium scrolling. Its <code>model</code> is <code>ArticleDocument</code>. <code>extract()</code>:</p>
+  <ol class="plain">
+    <li>Check whether the article is already in the database; if so, log and return.</li>
+    <li>Load the HTML with <code>AsyncHtmlLoader([link]).load()</code>, transform it with <code>Html2TextTransformer().transform_documents(docs)</code>, and take the first result.</li>
+    <li>Build a content dict from the result's metadata and text: <b>Title</b> (metadata "title"), <b>Subtitle</b> (metadata "description"), <b>Content</b> (the page text) and <b>language</b> (metadata "language").</li>
+    <li>Get the <b>platform</b> from the link's domain (<code>urlparse(link).netloc</code>), e.g. <code>decodingml.substack.com</code>.</li>
+    <li>Create an <code>ArticleDocument</code> with content, link, platform, author id and full name, and <code>save()</code> it to MongoDB.</li>
+  </ol>
+  <pre class="code"><code>class GenericArticleScraper(Scraper):              # our name for CustomArticleCrawler
+    model = ArticleDocument
+
+    def extract(self, link, **kwargs):
+        if self.model.find(link=link) is not None:
+            return
+        raw_docs = AsyncHtmlLoader([link]).load()                       # fetch HTML
+        page = Html2TextTransformer().transform_documents(raw_docs)[0]  # HTML → text
+        content = {
+            "Title": page.metadata.get("title"),
+            "Subtitle": page.metadata.get("description"),
+            "Content": page.page_content,
+            "language": page.metadata.get("language"),
+        }
+        author = kwargs["user"]
+        self.model(content=content, link=link, platform=urlparse(link).netloc,
+                   author_id=author.id, author_full_name=author.full_name).save()</code></pre>
+  <p><b>The trade-off the authors point out.</b> Because the whole job is delegated to two library classes, <b>you don't control</b> how the content is extracted and parsed. That is why this crawler is only the <b>fallback</b> for domains with no custom crawler. Both classes follow the <b>LangChain</b> style: high-level helpers that work decently in most cases, <b>fast to implement but hard to customise</b>. The book notes that this is one of the reasons many developers avoid LangChain in production.</p>
+
+  <div class="fig">
+    <h3>Compare: what each crawler style gives you</h3>
+    <div class="controls" id="w10_btns">
+      <button type="button" data-k="0" class="on">GitHub (git)</button>
+      <button type="button" data-k="1">Custom article (LangChain)</button>
+      <button type="button" data-k="2">Medium (Selenium + BeautifulSoup)</button>
+    </div>
+    <div class="verdict" id="w10_v"></div>
+  </div>
+  <script>
+  CH3.run("w10", function () {
+    var a = [
+      ["good", "<b>Access:</b> <code>git clone</code> in a subprocess. <b>Parse:</b> walk the file tree. <b>Control:</b> full. <b>Needs:</b> git installed. <b>Output:</b> RepositoryDocument with path → file content."],
+      ["warn", "<b>Access:</b> plain HTTP fetch of one page. <b>Parse:</b> generic HTML-to-text. <b>Control:</b> low (library decides what text survives). <b>Needs:</b> nothing special. <b>Output:</b> ArticleDocument with Title, Subtitle, Content, language. Best as a safety net."],
+      ["bad", "<b>Access:</b> a real (headless) Chrome via Selenium, with scrolling (and login for LinkedIn). <b>Parse:</b> BeautifulSoup with site-specific tags. <b>Control:</b> high, but tied to the site's HTML. <b>Needs:</b> Chrome + matching ChromeDriver, the most fragile setup. <b>Output:</b> ArticleDocument (Medium) or PostDocuments (LinkedIn)."]
+    ];
+    var btns = document.querySelectorAll("#w10_btns button"), v = CH3.$("w10_v");
+    function pick(k) { for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === k); v.className = "verdict " + a[k][0]; v.innerHTML = a[k][1]; }
+    Array.prototype.forEach.call(btns, function (b) { b.addEventListener("click", function () { pick(+b.getAttribute("data-k")); }); });
+    pick(0);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>Ordering a thali at any roadside dhaba versus cooking at home. The thali (LangChain helpers) arrives fast and is decent almost everywhere, but you can't ask for less salt in the dal. Home cooking (a custom crawler) takes effort but you control every ingredient. <i>Where it breaks:</i> a dhaba meal is the same each time; a generic HTML-to-text tool gives different quality on every site, which you only discover by checking the stored text.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Generic HTML-to-text keeps whatever text it finds: menus, cookie banners, "subscribe" boxes and footers often survive alongside the article. For a fallback that's acceptable, because the feature pipeline cleans further. When a source matters (lots of your content lives there), you write a dedicated crawler that targets the article body by its tags, as the Medium crawler does.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Would you use LangChain loaders in production?" A balanced answer: "For prototypes and long-tail sources, yes, they save time. For core sources I'd own the parsing so I can test it, control what's kept, and not be surprised by library upgrades. I'd wrap either behind the same interface so I can swap them per domain."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The dispatcher's default branch: <a href="#s7">07</a>. Substack/blog links in the configs: <a href="#s16">16</a>.</li>
+    <li>LangChain loaders and RAG tooling elsewhere: <a href="../hands_on_llms/ch07_advanced_text_generation.html">Hands-On LLMs ch.7</a>, <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">ch.8</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · SUB-SECTION</div><h2>MediumCrawler (Selenium + BeautifulSoup), the LinkedIn crawler, and newer tools</h2></div><span class="chip">pdf p106–108</span></div>
+  <p><code>MediumCrawler</code> inherits from <code>BaseSeleniumCrawler</code> and its <code>model</code> is <code>ArticleDocument</code>. It imports <b>BeautifulSoup</b> (<code>bs4</code>), a popular Python library for parsing HTML or XML in web scraping.</p>
+  <ul class="plain">
+    <li><b>Extra driver option:</b> it overrides <code>set_extra_driver_options()</code> to add <code>--profile-directory=Profile 2</code>, i.e. run Chrome with a specific browser profile.</li>
+    <li><b><code>extract()</code>:</b>
+      <ol class="plain">
+        <li>skip if the article already exists in the database;</li>
+        <li>open the link with <code>self.driver.get(link)</code> and call <code>scroll_page()</code> so the whole article loads;</li>
+        <li>parse <code>self.driver.page_source</code> with BeautifulSoup;</li>
+        <li>find the title (<code>h1</code> with class <code>pw-post-title</code>) and subtitle (<code>h2</code> with class <code>pw-subtitle-paragraph</code>); take the first match's text, or <code>None</code> if missing;</li>
+        <li>build a dict with Title, Subtitle and Content (<code>soup.get_text()</code>, all text on the page);</li>
+        <li><b>close the WebDriver</b> to free resources;</li>
+        <li>create an <code>ArticleDocument</code> with <code>platform="medium"</code>, the content, link, author id and name (from <code>kwargs</code>), save it, and log success.</li>
+      </ol>
+    </li>
+  </ul>
+  <pre class="code"><code>class MediumScraper(BrowserScraper):               # our names
+    model = ArticleDocument
+
+    def set_extra_driver_options(self, opts):
+        opts.add_argument(r"--profile-directory=Profile 2")
+
+    def extract(self, link, **kwargs):
+        if self.model.find(link=link) is not None:
+            return
+        self.driver.get(link)
+        self.scroll_page()                          # make sure the full article is rendered
+        soup = BeautifulSoup(self.driver.page_source, "html.parser")
+        h1 = soup.find_all("h1", class_="pw-post-title")
+        h2 = soup.find_all("h2", class_="pw-subtitle-paragraph")
+        body = {"Title": h1[0].string if h1 else None,
+                "Subtitle": h2[0].string if h2 else None,
+                "Content": soup.get_text()}
+        self.driver.close()                         # free the browser
+        author = kwargs["user"]
+        self.model(platform="medium", content=body, link=link,
+                   author_id=author.id, author_full_name=author.full_name).save()</code></pre>
+
+  <div class="fig">
+    <h3>Try it: what BeautifulSoup pulls out</h3>
+    <p class="note">A tiny <b>modelled</b> Medium page. Toggle whether the page uses the expected class names (sites change their HTML). See what the title/subtitle lookups return.</p>
+    <div class="controls">
+      <label><input type="checkbox" id="w11_ok" checked> page still uses <code>pw-post-title</code> / <code>pw-subtitle-paragraph</code></label>
+    </div>
+    <div class="two"><pre class="req" id="w11_html"></pre><pre class="req" id="w11_dict"></pre></div>
+  </div>
+  <script>
+  CH3.run("w11", function () {
+    function draw() {
+      var ok = CH3.$("w11_ok").checked;
+      var t = ok ? "pw-post-title" : "post-heading-xl", s = ok ? "pw-subtitle-paragraph" : "post-dek";
+      var html = '<article>\n  <h1 class="' + t + '">Build an LLM Twin</h1>\n  <h2 class="' + s + '">An end-to-end framework</h2>\n  <p>Most LLM demos stop at a notebook…</p>\n</article>\n<footer>Sign up · Help · Terms</footer>';
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var h1 = doc.querySelector("h1." + "pw-post-title"), h2 = doc.querySelector("h2." + "pw-subtitle-paragraph");
+      var text = doc.body.textContent.replace(/\s+/g, " ").trim();
+      CH3.$("w11_html").textContent = "page_source (simplified)\n\n" + html;
+      CH3.$("w11_dict").textContent = "data = {\n  'Title': " + (h1 ? "'" + h1.textContent + "'" : "None") + ",\n  'Subtitle': " + (h2 ? "'" + h2.textContent + "'" : "None") + ",\n  'Content': '" + text + "'\n}" + (ok ? "" : "\n\nTitle/Subtitle are None: the selectors no longer match.\nContent still has everything, footer included.");
+    }
+    CH3.$("w11_ok").addEventListener("change", draw); draw();
+  });
+  </script>
+
+  <h3>The LinkedIn crawler</h3>
+  <p>Not shown in detail in the book; it follows the Medium pattern. It uses Selenium to <b>log in</b>, open the user's feed of latest posts, extract the posts, and keep <b>scrolling to load the next page until a limit is hit</b>. The full code is in the repo at <code>llm_engineering/application/crawlers/linkedin.py</code>.</p>
+
+  <h3>Newer crawling tools</h3>
+  <p>Because collecting internet data is now a key step in many AI applications, higher-level Python tools have appeared:</p>
+  <ul class="plain">
+    <li><b>Scrapy</b>: crawls websites and extracts structured data from their pages.</li>
+    <li><b>Crawl4AI</b>: highly specialised in crawling data for LLMs and AI applications.</li>
+  </ul>
+  <p><b>Recap of the three crawler styles:</b> (1) run the <b>git</b> executable in a subprocess to clone GitHub repos; (2) use <b>LangChain</b> utilities to grab the HTML of a single page; (3) use <b>Selenium</b> for complex cases where you must log in, scroll to load the full HTML, and then extract it as text. What remains is the document classes (like <code>ArticleDocument</code>) used throughout.</p>
+
+  <div class="box picture"><b>Picture it</b><p>Sending a junior to a government office who must stand in the queue (log in), flip through every page of the file (scroll), and copy out exactly the "Name" and "Subject" boxes (BeautifulSoup selectors). If the office redesigns its form and moves the boxes, he comes back with blanks. <i>Where it breaks:</i> the junior would notice the form changed; the crawler silently stores <code>None</code> for the title and keeps going.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Modern sites render content with JavaScript and load more as you scroll, so a plain HTTP fetch sees an empty shell. A real browser runs the scripts, then the page source contains the article. The price is speed (seconds per page, plus 5-second waits per scroll) and brittleness (selectors like <code>pw-post-title</code> are internal class names the site can change any day). Closing the driver after each article avoids leaking browser processes.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you scrape a JS-heavy site, and what breaks?" Say: "Use a headless browser (Selenium or Playwright) to render, then parse with BeautifulSoup. It breaks when selectors change, when driver and browser versions drift, on logins and bot detection. I'd add monitoring on empty fields and fall back to generic text extraction." <i>Beyond the book:</i> respect robots.txt and terms of service, and prefer official APIs where they exist.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Scrolling and driver setup: <a href="#s8">08</a>. Fixing Selenium problems: <a href="#s17">17</a>.</li>
+    <li>The documents these crawlers save: <a href="#s12">12</a>–<a href="#s15">15</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · SUB-SECTION</div><h2>The NoSQL data warehouse documents: classes, not dictionaries</h2></div><span class="chip">pdf p108–109</span></div>
+  <p>Three <b>document classes</b> give structure to the three data categories. They declare the attributes each document must have: content, author, source link and so on.</p>
+  <p><b>Why classes instead of plain dicts?</b> The authors call it best practice: the expected attributes are spelled out (more <b>verbose</b>, i.e. explicit), which <b>reduces runtime errors</b>. With a Python dictionary you can never be sure a key is there or that its value has the right type. Wrapping each item in a class guarantees every attribute is as expected.</p>
+  <p>With <b>Pydantic</b> (a Python library that validates data against type hints), you get <b>type validation out of the box</b>, which keeps the dataset consistent. The three data-category classes are:</p>
+  <div class="grid2">
+    <div class="card"><b>ArticleDocument</b><span>Medium, Substack, blogs.</span></div>
+    <div class="card"><b>PostDocument</b><span>LinkedIn (and future X) posts.</span></div>
+    <div class="card"><b>RepositoryDocument</b><span>GitHub repositories.</span></div>
+  </div>
+  <p>These are <b>not</b> simple data classes or plain Pydantic models: they can also <b>read from and write to MongoDB</b>. To give all of them that ability <b>without repeating code</b>, the project uses the <b>ODM</b> (<b>Object-Document Mapping</b>) pattern, which is based on <b>ORM</b> (<b>Object-Relational Mapping</b>). The book's order: ORM first, then ODM, then the custom ODM and the document classes.</p>
+
+  <div class="fig">
+    <h3>Try it: dict vs Pydantic-style class on bad data</h3>
+    <p class="note">Pick a crawler output with a mistake in it. A dict happily stores it and fails much later; a validated class rejects it at creation time. (The validation is simulated in JavaScript, mimicking what Pydantic would do for these field types.)</p>
+    <div class="controls" id="w12_btns">
+      <button type="button" data-k="0" class="on">good article</button>
+      <button type="button" data-k="1">link is None</button>
+      <button type="button" data-k="2">typo: "plaform"</button>
+      <button type="button" data-k="3">author_id not a UUID</button>
+    </div>
+    <div class="two"><pre class="req" id="w12_dict"></pre><pre class="req" id="w12_cls"></pre></div>
+  </div>
+  <script>
+  CH3.run("w12", function () {
+    var good = { content: { Title: "Merge LLMs", Content: "…" }, platform: "maximelabonne.substack.com", link: "https://maximelabonne.substack.com/p/merge", author_id: "6d18ebc9-26b4-45d8-85a9-3ff61ebf7a53", author_full_name: "Maxime Labonne" };
+    function variant(k) {
+      var d = JSON.parse(JSON.stringify(good));
+      if (k === 1) d.link = null;
+      if (k === 2) { d.plaform = d.platform; delete d.platform; }
+      if (k === 3) d.author_id = "maxime";
+      return d;
+    }
+    function validate(d) {
+      var errs = [], uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (typeof d.content !== "object" || d.content === null) errs.push("content: Input should be a valid dictionary");
+      if (typeof d.platform !== "string") errs.push("platform: Field required");
+      if (typeof d.link !== "string") errs.push("link: Input should be a valid string");
+      if (!uuid.test(String(d.author_id))) errs.push("author_id: Input should be a valid UUID");
+      if (typeof d.author_full_name !== "string") errs.push("author_full_name: Field required");
+      return errs;
+    }
+    var btns = document.querySelectorAll("#w12_btns button");
+    function pick(k) {
+      for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === k);
+      var d = variant(k), e = validate(d);
+      CH3.$("w12_dict").textContent = "doc = " + JSON.stringify(d, null, 1) + "\n\n→ stored as-is. " + (k === 0 ? "Fine." : (k === 2 ? "Later: doc['platform'] → KeyError, far from the cause." : "Later: some downstream step breaks or silently uses bad data."));
+      CH3.$("w12_cls").textContent = "ArticleDocument(**doc)\n\n" + (e.length ? "ValidationError (simulated):\n  " + e.join("\n  ") + "\n\n→ rejected immediately, at the crawler." : "✓ valid instance; every field has the expected type.");
+    }
+    Array.prototype.forEach.call(btns, function (b) { b.addEventListener("click", function () { pick(+b.getAttribute("data-k")); }); });
+    pick(0);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A paper form with labelled boxes (class) versus a blank sheet where the applicant writes whatever (dict). The bank clerk can instantly spot a missing PAN number on the form; on the blank sheet he finds out only when processing fails a week later. <i>Where it breaks:</i> forms can be too rigid; for truly free-form parts the project still uses a <code>content: dict</code> field, so only the outer shape is enforced.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>MongoDB enforces no schema, so the <b>schema moves into the application</b>. Pydantic classes are that schema: they validate on creation and document the fields for everyone reading the code. Adding the persistence methods to the same classes (the ODM) means one object is both "the validated record" and "the thing you save", so you can't accidentally save an unvalidated dict.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Schema-less DB: where does validation live?" Answer: "In the application layer, at the boundary where data enters: typed models (Pydantic in Python) that reject bad records at ingestion, plus a version field if the shape evolves. Fail fast at the crawler, not deep in the feature pipeline."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>ORM vs ODM: <a href="#s13">13</a>. The base class: <a href="#s14">14</a>. The actual fields: <a href="#s15">15</a>.</li>
+    <li>Schema evolution in general: <a href="../../system_design/ddia/ch04_encoding_and_evolution.html">DDIA ch.4</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · SUB-SECTION</div><h2>The ORM and ODM software patterns</h2></div><span class="chip">pdf p109–111</span></div>
+  <h3>ORM</h3>
+  <p>An <b>ORM</b> lets you query and change database data using <b>objects</b> instead of writing SQL or API-specific queries. All the database complexity is wrapped in an ORM class that knows how to do the operations, most commonly <b>CRUD</b> (<b>create, read, update, delete</b>). This removes manual database handling and <b>boilerplate</b> (repetitive setup code). An ORM talks to a <b>SQL</b> database such as <b>PostgreSQL</b> or <b>MySQL</b>.</p>
+  <p>Most modern Python apps use ORMs. SQL is still popular in data work, but you rarely see raw SQL queries in Python backend code. The most popular Python ORM is <b>SQLAlchemy</b>; with the rise of <b>FastAPI</b>, <b>SQLModel</b> (a wrapper over SQLAlchemy that integrates easily with FastAPI) is a common choice.</p>
+  <p>The book's example: a <code>User</code> ORM class with <code>id</code> and <code>name</code>, mapped to a <code>users</code> table. Creating a user and committing saves it to that table, and the same applies to every CRUD operation. The flow, in our own sketch:</p>
+  <pre class="code"><code>from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+Base = declarative_base()
+
+class Customer(Base):                      # one class ↔ one table
+    __tablename__ = "customers"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+
+engine = create_engine("sqlite:///:memory:")   # throwaway in-memory SQLite
+Base.metadata.create_all(engine)               # create the table
+db = sessionmaker(bind=engine)()
+
+db.add(Customer(name="Asha")); db.commit()     # INSERT, without writing SQL
+first = db.query(Customer).first()             # SELECT ... LIMIT 1
+print(first.id, first.name)</code></pre>
+  <ul class="plain">
+    <li><code>declarative_base()</code> gives a base class; subclasses become mapped tables.</li>
+    <li>The engine points at a database (here SQLite in memory); <code>create_all</code> creates the tables.</li>
+    <li>A <b>session</b> is the unit of work: add objects, then <code>commit</code> to write them.</li>
+    <li>Queries return <b>objects</b> with attributes, not rows of raw values.</li>
+  </ul>
+  <p class="note">The full script is in the book's repo at <code>code_snippets/03_orm.py</code>.</p>
+  <h3>ODM</h3>
+  <p>The <b>ODM</b> pattern is very similar, but it works with <b>NoSQL</b> databases (such as MongoDB) and <b>collections</b> instead of SQL tables. The data lives in collections of <b>JSON-like documents</b> rather than rows. ODM maps object-oriented code to those documents and makes working with document databases simpler. The chapter builds a <b>light ODM on top of MongoDB</b> to show how it works.</p>
+  <div class="tablewrap"><table>
+    <tr><th></th><th>ORM</th><th>ODM</th></tr>
+    <tr><td>Database type</td><td>SQL / relational (PostgreSQL, MySQL, SQLite)</td><td>NoSQL / document (MongoDB)</td></tr>
+    <tr><td>A class maps to</td><td>a <b>table</b></td><td>a <b>collection</b></td></tr>
+    <tr><td>An object maps to</td><td>a <b>row</b></td><td>a <b>JSON-like document</b></td></tr>
+    <tr><td>Schema</td><td>enforced by the database</td><td>not enforced by MongoDB; the classes provide it</td></tr>
+    <tr><td>Python examples named in the chapter</td><td>SQLAlchemy, SQLModel</td><td>mongoengine; the book's own <code>NoSQLBaseDocument</code></td></tr>
+  </table></div>
+
+  <div class="fig">
+    <h3>Step through: the same "save a user" in raw calls vs ORM vs ODM</h3>
+    <div class="pipe" id="w13_stages">
+      <div class="stage"><b>Raw SQL</b>write the query yourself</div>
+      <div class="stage"><b>ORM</b>object → row</div>
+      <div class="stage"><b>Raw MongoDB</b>build a dict yourself</div>
+      <div class="stage"><b>ODM</b>object → document</div>
+    </div>
+    <div class="caption" id="w13_cap"></div>
+    <pre class="req" id="w13_code"></pre>
+    <div class="stepbar"><button id="w13_prev" type="button">◀ Back</button><button id="w13_next" type="button">Next ▶</button><span id="w13_n"></span></div>
+  </div>
+  <script>
+  CH3.run("w13", function () {
+    var caps = [
+      "Without any mapper you build SQL strings and turn result rows back into values by hand. Every table needs this boilerplate.",
+      "With an ORM you work with a class; the library writes the INSERT/SELECT for you.",
+      "With the plain MongoDB driver (PyMongo) you build dictionaries, convert ids yourself and pick collections by name strings.",
+      "With an ODM (the book's NoSQLBaseDocument) the class knows its collection and how to convert itself; you just call save() / find()."
+    ];
+    var code = [
+      'cur.execute("INSERT INTO users (name) VALUES (?)", ("Asha",))\nconn.commit()\nrow = cur.execute("SELECT id, name FROM users LIMIT 1").fetchone()\nuser_id, name = row[0], row[1]',
+      'session.add(User(name="Asha"))\nsession.commit()\nuser = session.query(User).first()\nprint(user.id, user.name)',
+      'db["users"].insert_one({"_id": str(uuid.uuid4()), "first_name": "Asha", "last_name": "Rao"})\nraw = db["users"].find_one({"first_name": "Asha"})\nname = raw["first_name"] + " " + raw["last_name"]   # no validation',
+      'user = UserDocument.get_or_create(first_name="Asha", last_name="Rao")\nprint(user.id, user.full_name)          # validated, typed, same API for every document'
+    ];
+    var st = document.querySelectorAll("#w13_stages .stage");
+    CH3.stepper("w13", caps.length, function (k) {
+      for (var j = 0; j < st.length; j++) st[j].className = "stage" + (j === k ? " on" : (j < k ? " done" : ""));
+      CH3.$("w13_cap").innerHTML = caps[k];
+      CH3.$("w13_code").textContent = code[k];
+    });
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A UPI app. You tap "pay ₹200 to Ravi"; behind it, the app builds the bank messages, formats, signatures and retries. The ORM/ODM is the UPI app; raw SQL or raw driver calls are filling NEFT forms by hand. <i>Where it breaks:</i> when something odd happens (a slow query), you sometimes need to look under the app at the actual query being sent.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A mapper keeps a two-way translation: object attributes ↔ columns (ORM) or fields (ODM), plus a "which table/collection" rule per class. Once the base class implements CRUD generically using those rules, every new entity is just a class with fields. That is the payoff the chapter's custom ODM delivers.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"ORM pros and cons?" Say: "Pros: less boilerplate, type-safe models, one place for DB logic, easier to swap databases. Cons: hides the real queries (N+1 problems, unexpected scans), and complex queries are often clearer in raw SQL. I use the ORM for CRUD and drop to SQL for reporting queries."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The book's ODM implementation: <a href="#s14">14</a>.</li>
+    <li>Data models (relational vs document): <a href="../../system_design/ddia/ch02_data_models_and_query_languages.html">DDIA ch.2</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SUB-SECTION</div><h2>Implementing the ODM class: NoSQLBaseDocument</h2></div><span class="chip">pdf p111–116</span></div>
+  <p>The chapter writes an ODM <b>from scratch</b>, as an exercise in how ODMs work and in writing <b>modular, reusable</b> Python classes. The base class <code>NoSQLBaseDocument</code> lives at <code>llm_engineering/domain/base/nosql.py</code>; every other document inherits from it to talk to MongoDB.</p>
+
+  <h3>Setup</h3>
+  <ul class="plain">
+    <li><b>Imports:</b> <code>uuid</code>, <code>ABC</code>, typing generics (<code>Generic</code>, <code>Type</code>, <code>TypeVar</code>), loguru, Pydantic (<code>UUID4</code>, <code>BaseModel</code>, <code>Field</code>), PyMongo's <code>errors</code>, a project exception <code>ImproperlyConfigured</code>, the Mongo <code>connection</code> and <code>settings</code>.</li>
+    <li><b>Database handle:</b> a module-level <code>_database</code> is opened from the connection using the database name in settings, which by default is <b><code>twin</code></b>.</li>
+    <li><b>Type variable:</b> <code>T = TypeVar("T", bound="NoSQLBaseDocument")</code>. With Python <b>generics</b>, wherever <code>T</code> appears in a method signature, a subclass's own type is substituted. So when <code>ArticleDocument.find()</code> is type-checked, its return type reads as <code>ArticleDocument</code>, not the base class.</li>
+    <li><b>Class declaration:</b> <code>class NoSQLBaseDocument(BaseModel, Generic[T], ABC)</code>: a Pydantic model (validation), generic (the T trick), and abstract (never used directly).</li>
+  </ul>
+
+  <h3>Identity</h3>
+  <p>An <code>id</code> field of type <code>UUID4</code> with a <b>default factory</b> that generates a new random UUID (universally unique identifier) for every new object. The class also defines <b><code>__eq__</code></b> (two documents are equal if they are the same class <b>and</b> have the same id) and <b><code>__hash__</code></b> (hash of the id), so documents can go into sets or be dictionary keys.</p>
+
+  <h3>Converting to and from MongoDB</h3>
+  <ul class="plain">
+    <li><b><code>from_mongo(data)</code></b> (class method): raise an error if the data is empty; pop MongoDB's <code>_id</code> key and pass it as <code>id</code> together with the other fields to build an instance.</li>
+    <li><b><code>to_mongo(**kwargs)</code></b>: dump the model to a dict with Pydantic's <code>model_dump</code> (by default <code>exclude_unset=False</code>, <code>by_alias=True</code>); if there is an <code>id</code> but no <code>_id</code>, rename it to <code>_id</code> as a string; convert <b>any UUID value to a string</b>. The result is ready to insert.</li>
+  </ul>
+
+  <h3>The CRUD methods</h3>
+  <p>Each one first finds its collection with <code>_database[cls.get_collection_name()]</code>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Method</th><th>What it does</th><th>On error</th></tr>
+    <tr><td><code>save()</code></td><td><code>insert_one(self.to_mongo())</code>, returns the instance</td><td><code>WriteError</code> → log the exception, return <code>None</code></td></tr>
+    <tr><td><code>get_or_create(**filters)</code></td><td><code>find_one(filters)</code>; if found, <code>from_mongo</code> it; else build a new instance from the filters, save it and return it</td><td><code>OperationFailure</code> → log and <b>re-raise</b></td></tr>
+    <tr><td><code>bulk_insert(docs)</code></td><td><code>insert_many</code> of every doc's <code>to_mongo()</code>, returns <code>True</code></td><td><code>WriteError</code> or <code>BulkWriteError</code> → log, return <code>False</code></td></tr>
+    <tr><td><code>find(**filters)</code></td><td><code>find_one(filters)</code> → instance, or <code>None</code> if nothing matches</td><td><code>OperationFailure</code> → log, return <code>None</code></td></tr>
+    <tr><td><code>bulk_find(**filters)</code></td><td><code>find(filters)</code> → list of instances (each converted with <code>from_mongo</code>, dropping any that come back <code>None</code>)</td><td><code>OperationFailure</code> → log, return <code>[]</code></td></tr>
+    <tr><td><code>get_collection_name()</code></td><td>returns <code>cls.Settings.name</code></td><td>no nested <code>Settings</code> with a <code>name</code> → raise <code>ImproperlyConfigured</code> telling you to define it</td></tr>
+  </table></div>
+  <p>A compact sketch of the idea with our own names (not the book's listing):</p>
+  <pre class="code"><code>T = TypeVar("T", bound="MongoRecord")
+
+class MongoRecord(BaseModel, Generic[T], ABC):         # our name for NoSQLBaseDocument
+    id: UUID4 = Field(default_factory=uuid.uuid4)
+
+    def __eq__(self, other):                           # same class + same id → equal
+        return isinstance(other, self.__class__) and self.id == other.id
+    def __hash__(self):
+        return hash(self.id)
+
+    @classmethod
+    def _coll(cls):                                    # collection from nested Settings
+        if not hasattr(cls, "Settings") or not hasattr(cls.Settings, "name"):
+            raise ImproperlyConfigured("define class Settings: name = '...'")
+        return _db[cls.Settings.name]
+
+    @classmethod
+    def from_mongo(cls: Type[T], raw: dict) -> T:
+        raw = dict(raw); _id = raw.pop("_id")
+        return cls(**raw, id=_id)                      # Mongo's _id → our id
+
+    def to_mongo(self) -> dict:
+        out = self.model_dump(by_alias=True)
+        out["_id"] = str(out.pop("id"))                # our id → Mongo's _id
+        return {k: str(v) if isinstance(v, uuid.UUID) else v for k, v in out.items()}
+
+    def save(self: T) -> T | None:
+        try:
+            self._coll().insert_one(self.to_mongo()); return self
+        except errors.WriteError:
+            return None
+
+    @classmethod
+    def find(cls: Type[T], **where) -> T | None:
+        hit = cls._coll().find_one(where)
+        return cls.from_mongo(hit) if hit else None</code></pre>
+  <p>Each subclass configures itself with a nested <code>Settings</code> class (the collection name, or anything else subclass-specific). The book notes that a fuller ODM for MongoDB already exists in Python, <b>mongoengine</b>, which follows a similar pattern but does more. The authors wrote their own because it is a great exercise in <b>modular, generic code following OOP principles</b>, which matters for production-level code.</p>
+
+  <div class="fig">
+    <h3>Try it: watch <code>to_mongo()</code> and <code>from_mongo()</code> convert a document</h3>
+    <p class="note">Edit the article's fields; see the Python object, the dict that would be inserted, and the object rebuilt from what MongoDB returns. UUIDs become strings on the way in; <code>_id</code> becomes <code>id</code> on the way out. Values are <b>modelled</b>.</p>
+    <div class="controls">
+      <label>title <input type="text" id="w14_t" style="width:min(240px,55vw)" value="Uncensor any LLM with abliteration"></label>
+      <label>platform <input type="text" id="w14_p" style="width:min(240px,55vw)" value="maximelabonne.substack.com"></label>
+      <button type="button" id="w14_new">new UUID</button>
+    </div>
+    <div class="pipe" id="w14_view" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <pre class="req" id="w14_obj"></pre><pre class="req" id="w14_mongo"></pre><pre class="req" id="w14_back"></pre>
+    </div>
+  </div>
+  <script>
+  CH3.run("w14", function () {
+    function uuid4() {
+      var h = "0123456789abcdef", s = "";
+      for (var i = 0; i < 32; i++) s += h[Math.floor(Math.random() * 16)];
+      return s.slice(0, 8) + "-" + s.slice(8, 12) + "-4" + s.slice(13, 16) + "-" + "89ab"[Math.floor(Math.random() * 4)] + s.slice(17, 20) + "-" + s.slice(20, 32);
+    }
+    var id = uuid4(), author = "6d18ebc9-26b4-45d8-85a9-3ff61ebf7a53";
+    function draw() {
+      var t = CH3.$("w14_t").value, p = CH3.$("w14_p").value;
+      CH3.$("w14_obj").textContent = "Python object\n\nArticleDocument(\n  id=UUID('" + id + "'),\n  content={'Title': '" + t + "', ...},\n  platform='" + p + "',\n  link='https://.../p/...',\n  author_id=UUID('" + author + "'),\n  author_full_name='Maxime Labonne')";
+      CH3.$("w14_mongo").textContent = "to_mongo() → insert_one\n\n{\n  \"_id\": \"" + id + "\",\n  \"content\": {\"Title\": \"" + t + "\", ...},\n  \"platform\": \"" + p + "\",\n  \"link\": \"https://.../p/...\",\n  \"author_id\": \"" + author + "\",\n  \"author_full_name\": \"Maxime Labonne\"\n}\n(collection: articles)";
+      CH3.$("w14_back").textContent = "find_one → from_mongo()\n\npop \"_id\" → id=\"" + id.slice(0, 8) + "…\"\nPydantic turns the strings back\ninto UUID4 objects and validates\nevery field.\n\nArticleDocument(id=UUID('" + id.slice(0, 8) + "…'), ...)\n== original object? " + "True (same class, same id)";
+    }
+    CH3.$("w14_t").addEventListener("input", draw); CH3.$("w14_p").addEventListener("input", draw);
+    CH3.$("w14_new").addEventListener("click", function () { id = uuid4(); draw(); });
+    draw();
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>The government's DigiLocker: every document type (Aadhaar, PAN, driving licence) has its own fields, but they all share the same upload, fetch and verify buttons. The ODM base class is those shared buttons; each subclass is a document type. <i>Where it breaks:</i> DigiLocker validates against issuers; the ODM only validates field types, not whether the content is true.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Three Python mechanisms combine. <b>Pydantic</b> gives fields, validation and <code>model_dump</code>. <b>Class methods</b> (<code>cls</code>) let the base class create instances of whatever subclass called it, so <code>ArticleDocument.find()</code> returns an <code>ArticleDocument</code>. <b>Generics</b> (<code>TypeVar</code> bound to the base) tell type checkers the same thing. The nested <code>Settings</code> class is the per-subclass configuration hook, the same idea used by real ODMs.</p></div>
+  <div class="box work"><b>Worked example</b><p>The GitHub crawler calls <code>RepositoryDocument.find(link=url)</code>. The base class resolves the collection via <code>RepositoryDocument.Settings.name</code> = <code>"repositories"</code>, runs <code>find_one({"link": url})</code>, and if there's a hit, <code>from_mongo</code> returns a validated <code>RepositoryDocument</code>; the crawler sees "not None" and skips the repo. One line in the crawler, zero MongoDB code.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Design a minimal repository/ODM layer." Say: "A base model class with an id, to/from storage conversion, and generic CRUD as class methods that look up the collection from per-class config; subclasses only declare fields. Handle driver errors in one place, decide which ones return None vs re-raise, and keep the DB handle injectable so tests can use a fake." Note the design choice here: <code>get_or_create</code> re-raises, while <code>find</code> swallows errors.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Subclasses: <a href="#s15">15</a>. Callers: crawlers (<a href="#s9">09</a>–<a href="#s11">11</a>) and the user step (<a href="#s6">06</a>).</li>
+    <li>The same pattern reused for vector DB documents: <a href="ch04_rag_feature_pipeline.html">ch04</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SUB-SECTION</div><h2>Data categories and user document classes</h2></div><span class="chip">pdf p116–118</span></div>
+  <p>The last piece: the concrete classes that inherit from <code>NoSQLBaseDocument</code>. They are the article, repository and post classes used by the crawlers.</p>
+  <h3>The DataCategory enum</h3>
+  <p>A <b><code>StrEnum</code></b> in <code>llm_engineering/domain/types.py</code> centralises every data category name. These act as <b>constants</b> for configuring the ODM classes across the whole book:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Constant</th><th>Value</th><th>Used in</th></tr>
+    <tr><td>PROMPT</td><td>"prompt"</td><td>later chapters</td></tr>
+    <tr><td>QUERIES</td><td>"queries"</td><td>later chapters</td></tr>
+    <tr><td>INSTRUCT_DATASET_SAMPLES</td><td>"instruct_dataset_samples"</td><td>later chapters (fine-tuning data)</td></tr>
+    <tr><td>INSTRUCT_DATASET</td><td>"instruct_dataset"</td><td>later chapters</td></tr>
+    <tr><td>PREFERENCE_DATASET_SAMPLES</td><td>"preference_dataset_samples"</td><td>later chapters (preference alignment)</td></tr>
+    <tr><td>PREFERENCE_DATASET</td><td>"preference_dataset"</td><td>later chapters</td></tr>
+    <tr><td><b>POSTS</b></td><td>"posts"</td><td>this chapter: PostDocument collection</td></tr>
+    <tr><td><b>ARTICLES</b></td><td>"articles"</td><td>this chapter: ArticleDocument collection</td></tr>
+    <tr><td><b>REPOSITORIES</b></td><td>"repositories"</td><td>this chapter: RepositoryDocument collection</td></tr>
+  </table></div>
+  <p class="note">The "used in" column is our guide; the book only lists the constants and says they are used throughout.</p>
+  <h3>The class hierarchy</h3>
+  <ul class="plain">
+    <li><b><code>Document</code></b> (abstract, inherits <code>NoSQLBaseDocument</code>): common fields for all content: <code>content: dict</code>, <code>platform: str</code>, <code>author_id: UUID4</code>, <code>author_full_name: str</code> (both author fields declared with a Pydantic <code>Field</code> alias of the same name).</li>
+    <li><b><code>RepositoryDocument(Document)</code></b>: adds <code>name: str</code> and <code>link: str</code>; collection <code>DataCategory.REPOSITORIES</code>.</li>
+    <li><b><code>PostDocument(Document)</code></b>: adds an optional <code>image</code> (default <code>None</code>) and an optional <code>link</code> (<code>str | None</code>, default <code>None</code>); collection <code>DataCategory.POSTS</code>.</li>
+    <li><b><code>ArticleDocument(Document)</code></b>: adds a required <code>link: str</code>; collection <code>DataCategory.ARTICLES</code>.</li>
+    <li><b><code>UserDocument(NoSQLBaseDocument)</code></b>: <code>first_name</code>, <code>last_name</code>; collection <code>"users"</code>; plus a <b><code>full_name</code> property</b> that joins first and last name with a space.</li>
+  </ul>
+  <svg viewBox="0 0 660 200" class="dg" role="img" aria-label="Class diagram: NoSQLBaseDocument at top with id and CRUD; UserDocument and abstract Document inherit from it; RepositoryDocument, PostDocument and ArticleDocument inherit from Document, each with its collection name" style="width:100%;height:auto;max-width:660px">
+    <rect x="200" y="6" width="260" height="44" rx="5" class="hi"/><text x="330" y="25" text-anchor="middle" class="b">NoSQLBaseDocument (ODM)</text><text x="330" y="42" text-anchor="middle" class="m">id · save · find · bulk_find · get_or_create …</text>
+    <rect x="20" y="74" width="190" height="44" rx="5" class="f"/><text x="115" y="93" text-anchor="middle" class="b">UserDocument</text><text x="115" y="110" text-anchor="middle" class="m">first/last name · "users"</text>
+    <rect x="330" y="74" width="230" height="44" rx="5" class="hi"/><text x="445" y="93" text-anchor="middle" class="b">Document (abstract)</text><text x="445" y="110" text-anchor="middle" class="m">content · platform · author_id · author_full_name</text>
+    <rect x="200" y="146" width="140" height="46" rx="5" class="f"/><text x="270" y="165" text-anchor="middle" class="b">RepositoryDocument</text><text x="270" y="182" text-anchor="middle" class="m">name, link · repositories</text>
+    <rect x="360" y="146" width="140" height="46" rx="5" class="f"/><text x="430" y="165" text-anchor="middle" class="b">PostDocument</text><text x="430" y="182" text-anchor="middle" class="m">image?, link? · posts</text>
+    <rect x="520" y="146" width="130" height="46" rx="5" class="f"/><text x="585" y="165" text-anchor="middle" class="b">ArticleDocument</text><text x="585" y="182" text-anchor="middle" class="m">link · articles</text>
+    <path d="M330 50 L115 74"/><path d="M330 50 L445 74"/><path d="M445 118 L270 146"/><path d="M445 118 L430 146"/><path d="M445 118 L585 146"/>
+  </svg>
+  <pre class="code"><code>class Category(StrEnum):                       # our trimmed version of DataCategory
+    ARTICLES = "articles"
+    POSTS = "posts"
+    REPOSITORIES = "repositories"
+
+class Content(MongoRecord, ABC):               # shared fields for every content type
+    content: dict
+    platform: str
+    author_id: UUID4
+    author_full_name: str
+
+class Article(Content):
+    link: str                                  # required for articles
+    class Settings:
+        name = Category.ARTICLES               # → collection "articles"
+
+class Author(MongoRecord):
+    first_name: str
+    last_name: str
+    class Settings:
+        name = "users"
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}"</code></pre>
+  <p>The payoff: each document class only declares its <b>fields</b> and anything special about it; all <b>CRUD is inherited</b>. And because fields are Pydantic, validation is automatic: e.g. creating an <code>ArticleDocument</code> with a <code>link</code> that is <code>None</code> or not a string raises an error saying the data is invalid. That completes the implementation: ZenML steps → crawlers → ODM and documents. What remains is running it.</p>
+
+  <div class="fig">
+    <h3>Try it: which class, which collection, which fields?</h3>
+    <div class="controls" id="w15_btns">
+      <button type="button" data-k="0" class="on">LinkedIn post (no link)</button>
+      <button type="button" data-k="1">Article without link</button>
+      <button type="button" data-k="2">GitHub repo</button>
+      <button type="button" data-k="3">A user</button>
+    </div>
+    <div class="verdict" id="w15_v"></div>
+  </div>
+  <script>
+  CH3.run("w15", function () {
+    var a = [
+      ["good", "<b>PostDocument</b> → collection <code>posts</code>. <code>link</code> and <code>image</code> are optional, so a post without its own URL is valid. Still needs content, platform, author_id, author_full_name."],
+      ["bad", "<b>ArticleDocument</b> requires <code>link: str</code>. Passing <code>None</code> raises a validation error before anything reaches MongoDB (the book's own example)."],
+      ["good", "<b>RepositoryDocument</b> → collection <code>repositories</code>. Needs <code>name</code> and <code>link</code> on top of the shared fields; <code>content</code> is the path → file-text dict."],
+      ["good", "<b>UserDocument</b> → collection <code>users</code>. Only first_name and last_name are stored; <code>full_name</code> is computed by a property, not saved."]
+    ];
+    var btns = document.querySelectorAll("#w15_btns button"), v = CH3.$("w15_v");
+    function pick(k) { for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === k); v.className = "verdict " + a[k][0]; v.innerHTML = a[k][1]; }
+    Array.prototype.forEach.call(btns, function (b) { b.addEventListener("click", function () { pick(+b.getAttribute("data-k")); }); });
+    pick(0);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A school register: every student row has roll number, name and class (shared fields, the abstract <code>Document</code>), and then the science stream adds lab group while commerce adds accounts elective (subclass fields). The register's binding and page layout (CRUD) are the same for all. <i>Where it breaks:</i> a register can't stop you writing a wrong name; Pydantic only checks types and required fields, not meaning.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Putting the category names in one enum avoids "magic strings": a typo like <code>"artciles"</code> becomes impossible because everyone references <code>DataCategory.ARTICLES</code>. Since it is a <code>StrEnum</code>, each member is also a real string, so it can be passed straight to PyMongo as a collection name. Optional vs required fields encode real-world facts (posts may lack a URL; articles never do).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you model heterogeneous content in one system?" Answer: "A shared abstract base with the common fields (content, source, author, ids), one subclass per processing type with its own extra fields and its own collection, and enum constants for type names. Shared behaviour sits in the base; differences are data, not if-statements."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The other enum values in action: <a href="ch05_supervised_fine_tuning.html">ch05 instruct datasets</a>, <a href="ch06_preference_alignment.html">ch06 preference datasets</a>.</li>
+    <li>The categories' origin: <a href="#s3">03</a>. Querying them: <a href="#s16">16</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · SECTION</div><h2>Gathering raw data into the data warehouse</h2></div><span class="chip">pdf p118–123 · Fig 3.5–3.6</span></div>
+  <p>Because ZenML orchestrates the pipeline, it can be run <b>manually</b>, on a <b>schedule</b>, or <b>triggered by events</b>. This chapter shows the manual way; the other two come in Chapter 11 (MLOps).</p>
+  <h3>One config per author</h3>
+  <p>Each author gets their own pipeline run and their own ZenML <b>YAML config file</b>; the repo ships configs for <b>Paul Iusztin</b> and <b>Maxime Labonne</b>. To collect Maxime's data you run a <b>poe</b> task (Poe the Poet: a task runner that gives short names to long commands, set up in Chapter 2):</p>
+  <pre class="code"><code>poetry poe run-digital-data-etl-maxime</code></pre>
+  <p>That runs the pipeline with a YAML file shaped like this (we shortened the links):</p>
+  <pre class="code"><code>parameters:
+  user_full_name: Maxime Labonne   # [First Name(s)] [Last Name]
+  links:
+    # Personal blog
+    - https://mlabonne.github.io/blog/posts/...Finetune_Llama31.html
+    - https://mlabonne.github.io/blog/posts/...Agentic_Data_Generation.html
+    # Substack
+    - https://maximelabonne.substack.com/p/uncensor-any-llm-with-abliteration-...
+    - https://maximelabonne.substack.com/p/create-mixtures-of-experts-with-mergekit-...
+    - https://maximelabonne.substack.com/p/merge-large-language-models-with-mergekit-...
+    # … more Substack links</code></pre>
+  <p>The <code>parameters</code> block maps one-to-one onto the pipeline function's arguments: <code>user_full_name</code> and <code>links</code>. The comment on the name line reminds you of the expected format, because the step splits it into first and last name.</p>
+
+  <h3>Looking at the results in the dashboard</h3>
+  <p>Figure 3.3 (plate <a href="#s5">05</a>) showed a run's DAG. Figure 3.5 shows the <b>user</b> artifact of Maxime's run.</p>
+  <figure class="bookfig"><img src="figs/fig-3-5.png" alt="ZenML dashboard for a digital data ETL run dated 2 October 2024. The user artifact (version 11) is selected; its Metadata tab shows storage_size 103 bytes, a collapsed schema section, a query section with user_full_name Maxime Labonne, and a retrieved section with first_name Maxime, last_name Labonne and a user_id UUID." loading="lazy"><figcaption>Figure 3.5 (book, pdf p120): Example of the user output artifact after running the data collection pipeline using Maxime's configuration file</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> On the left, the familiar DAG with the <code>user</code> artifact highlighted in dark purple. On the right, that artifact's panel: its id, the name <b>user</b> with a version badge (<b>11</b>, so this artifact has been produced 11 times across runs), and the <b>Metadata</b> tab. "Uncategorized" holds automatic info (<code>storage_size</code>: 103 bytes). The <b>query</b> and <b>retrieved</b> sections are exactly the dictionary that the step's metadata helper built (plate <a href="#s6">06</a>): what was asked for (<code>user_full_name</code> = Maxime Labonne) and what came back from MongoDB (first name, last name, <code>user_id</code>).</p>
+  <p>Figure 3.6 shows the <b>crawled_links</b> artifact: every domain crawled, how many links each had, and how many were collected successfully.</p>
+  <figure class="bookfig"><img src="figs/fig-3-6.png" alt="ZenML dashboard with the crawled_links artifact (version 9) selected. Metadata tab: Uncategorized length 26 and storage_size 2.43 KB; mlabonne.github.io successful 2 total 2; maximelabonne.substack.com successful 24 total 24." loading="lazy"><figcaption>Figure 3.6 (book, pdf p121): Example of the crawled_links output artifact after running the data collection pipeline using Maxime's configuration file</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The <code>crawled_links</code> artifact (version <b>9</b>) is selected. "Uncategorized" says the list has <b>length 26</b> (26 links) and takes 2.43 KB. Then one section per domain, built by the tally helper: <code>mlabonne.github.io</code> 2 successful / 2 total, <code>maximelabonne.substack.com</code> 24 / 24. So 2 + 24 = 26 links, all crawled successfully. Both domains went through the Custom Article crawler because neither is registered with the dispatcher.</p>
+  <p>The authors stress how useful these <b>artifacts</b> are: they trace each run's results and metadata, which makes it easy to <b>monitor and debug</b> every run on its own. You can also <b>load an artifact anywhere in code</b> by its version id (unique per artifact version, shown in the dashboard):</p>
+  <pre class="code"><code>from zenml.client import Client
+
+links_artifact = Client().get_artifact_version("<artifact-version-id>")
+links = links_artifact.load()        # the same Python list the step returned</code></pre>
+
+  <h3>Running for another author</h3>
+  <p>Paul's YAML has the same shape with his name and his Medium and Substack links (the Substack links carry a <code>?r=…</code> referral query). Run it with <code>poetry poe run-digital-data-etl-paul</code>, which under the hood calls:</p>
+  <pre class="code"><code>poetry run python -m tools.run --run-etl --no-cache --etl-config-filename digital_data_etl_paul_iusztin.yaml</code></pre>
+  <ul class="plain">
+    <li><code>tools.run</code> is the project's CLI entry point; <code>--run-etl</code> chooses the data collection pipeline.</li>
+    <li><code>--no-cache</code> tells ZenML not to reuse cached step outputs, so the crawl really runs.</li>
+    <li><code>--etl-config-filename</code> picks the YAML file. All configs live in the repo's <code>configs/</code> folder.</li>
+  </ul>
+  <p>There is also one poe command that runs the pipeline for <b>all supported authors</b>: <code>poetry poe run-digital-data-etl</code>.</p>
+
+  <h3>Querying the warehouse with the ODM</h3>
+  <p>With the ODM classes, querying MongoDB takes two lines: get the user, then bulk-find the articles by author id.</p>
+  <pre class="code"><code>author = UserDocument.get_or_create(first_name="Paul", last_name="Iusztin")
+articles = ArticleDocument.bulk_find(author_id=str(author.id))
+print(len(articles), articles[0].link)</code></pre>
+  <p>The book's output: a user id, the name <b>Paul Iusztin</b>, <b>Number of articles: 50</b>, and the first article's link (a Medium post on an end-to-end framework for building an LLM Twin). Note the <code>str(...)</code>: ids are stored as strings in MongoDB (that's what <code>to_mongo</code> does), so the filter must be a string too.</p>
+  <p>To check the data visually, install a <b>MongoDB plugin for your IDE</b> (e.g. the official one for VS Code) or another NoSQL viewer, and connect with the local URI <code>mongodb://llm_engineering:llm_engineering@127.0.0.1:27017</code> (user and password <code>llm_engineering</code>, local port 27017). A cloud cluster needs a different URI (Chapter 11). That wraps up running the pipeline with different configs, viewing artifacts, and querying by category and author.</p>
+
+  <div class="fig">
+    <h3>Try it: run the pipeline for an author, then query</h3>
+    <p class="note">Pick an author and run. The counts per domain for Maxime are from Figure 3.6; Paul's article count (50) is from the book's query output. How Paul's 50 split between Medium and Substack is <b>modelled</b>.</p>
+    <div class="controls">
+      <label>author <select id="w16_a"><option value="m">Maxime Labonne</option><option value="p">Paul Iusztin</option></select></label>
+      <button type="button" id="w16_run">▶ poetry poe run-digital-data-etl-…</button>
+      <button type="button" id="w16_q">query articles</button>
+    </div>
+    <pre class="req" id="w16_out"></pre>
+  </div>
+  <script>
+  CH3.run("w16", function () {
+    var data = {
+      m: { name: "Maxime Labonne", cmd: "run-digital-data-etl-maxime", file: "digital_data_etl_maxime_labonne.yaml", doms: { "mlabonne.github.io": [2, 2], "maximelabonne.substack.com": [24, 24] }, modelled: false },
+      p: { name: "Paul Iusztin", cmd: "run-digital-data-etl-paul", file: "digital_data_etl_paul_iusztin.yaml", doms: { "medium.com": [30, 30], "decodingml.substack.com": [20, 20] }, modelled: true }
+    };
+    var ran = {};
+    function run() {
+      var a = data[CH3.$("w16_a").value], tot = 0, ok = 0, lines = ["$ poetry poe " + a.cmd, "→ python -m tools.run --run-etl --no-cache --etl-config-filename " + a.file, "", "step get_or_create_user  ✓  artifact 'user' {query: {user_full_name: '" + a.name + "'}, retrieved: {...}}", "step crawl_links         ✓  artifact 'crawled_links' metadata:"];
+      Object.keys(a.doms).forEach(function (d) { var v = a.doms[d]; ok += v[0]; tot += v[1]; lines.push("   " + d + ": successful " + v[0] + " / total " + v[1]); });
+      lines.push("Successfully crawled " + ok + " / " + tot + " links." + (a.modelled ? "   (split modelled)" : "   (from Figure 3.6)"));
+      ran[CH3.$("w16_a").value] = ok;
+      CH3.$("w16_out").textContent = lines.join("\n");
+    }
+    function query() {
+      var k = CH3.$("w16_a").value, a = data[k];
+      if (ran[k] === undefined) { CH3.$("w16_out").textContent = "No articles yet for " + a.name + ": run the pipeline first.\n(bulk_find returns [] when nothing matches; indexing [0] would then fail.)"; return; }
+      CH3.$("w16_out").textContent = ">>> user = UserDocument.get_or_create(first_name='" + a.name.split(" ")[0] + "', last_name='" + a.name.split(" ")[1] + "')\n>>> articles = ArticleDocument.bulk_find(author_id=str(user.id))\n>>> len(articles)\n" + ran[k] + (k === "p" ? "      ← the book's output says 50" : "      ← all of Maxime's crawled links are articles");
+    }
+    CH3.$("w16_run").addEventListener("click", run); CH3.$("w16_q").addEventListener("click", query);
+    CH3.$("w16_a").addEventListener("change", function () { CH3.$("w16_out").textContent = "Press run, then query."; });
+    CH3.$("w16_out").textContent = "Press run, then query.";
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>A school bus with one route sheet per child: same bus (pipeline), different sheets (YAML configs). At the end of each trip the conductor files a slip: "Route Maxime: 26 stops, 26 pickups". <i>Where it breaks:</i> a bus can't do two routes at once; ZenML runs are independent and can run back to back (or, on a cloud stack, in parallel).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Separating <b>code</b> (the pipeline) from <b>configuration</b> (who and which links) means adding a new author is a new YAML file, not a code change. Artifact versioning and metadata turn each run into an auditable record; loading an artifact by id lets notebooks and other pipelines reuse exactly that run's output. The ODM keeps the query side just as short as the write side.</p></div>
+  <div class="box work"><b>Worked example</b><p>Maxime's run: 26 links → 2 blog + 24 Substack, all successful, all saved as <b>ArticleDocuments</b> under his user id. The <code>user</code> artifact is only 103 bytes (a tiny pickled user), the <code>crawled_links</code> list 2.43 KB (26 URL strings, roughly 95 bytes each). The actual article text is <i>not</i> in the artifacts; it lives in MongoDB. Artifacts track <i>what happened</i>; the warehouse holds the <i>data</i>.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you know an ingestion run worked?" Say: "Each run records per-source success/total counts as run metadata, and I compare them with the store: number of documents per author and type. I can load the exact run's outputs by artifact id to debug. Config-driven runs mean I can re-run one tenant or source without touching code."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The metadata helpers that produced these panels: <a href="#s6">06</a>. The query methods: <a href="#s14">14</a>.</li>
+    <li>Scheduled and triggered runs, cloud MongoDB: <a href="ch11_mlops_and_llmops.html">ch11</a>. poe and Poetry setup: <a href="ch02_tooling_and_installation.html">ch02</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · SUB-SECTION</div><h2>Troubleshooting: Selenium issues and importing the backup</h2></div><span class="chip">pdf p123–125 · Fig 3.7</span></div>
+  <p>The raw data in MongoDB feeds <b>every later step</b> of the book, so if the crawlers failed for you, this section gets you unstuck.</p>
+  <h3>Selenium issues</h3>
+  <p>Running Selenium is known to cause problems because of the <b>browser driver</b> (ChromeDriver). If the Selenium-based crawlers such as <code>MediumCrawler</code> fail because of ChromeDriver, the easy workaround is to <b>comment out the Medium links</b> in the data collection configs:</p>
+  <ol class="plain">
+    <li>go to the <code>configs/</code> folder;</li>
+    <li>open every YAML file starting with <code>digital_data_etl_*</code> (e.g. <code>digital_data_etl_maxime_labonne.yaml</code>);</li>
+    <li>comment out all the Medium URLs, as in Figure 3.7.</li>
+  </ol>
+  <p>You can <b>keep</b> the Substack and personal blog URLs, because they use the <code>CustomArticleCrawler</code>, which does <b>not</b> depend on Selenium.</p>
+  <figure class="bookfig"><img src="figs/fig-3-7.png" alt="GitHub view of Paul's digital data ETL YAML config in the book's repository, commit 'docs: Comment out Medium urls'. Lines 1 to 6: settings with docker parent_image on an AWS ECR registry, skip_build True, orchestrator.sagemaker synchronous false. Line 8 onward: parameters, user_full_name Paul Iusztin, links. Lines 11 to 16: a Medium comment saying only articles not under the paywall work, followed by five Medium URLs each commented out with a hash. Line 17: Substack comment, lines 18 to 21: four active Substack URLs." loading="lazy"><figcaption>Figure 3.7 (book, pdf p124): Fix Selenium issues when crawling raw data</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> It's Paul's config file on GitHub, after a commit titled "Comment out Medium urls". Lines 1–6 are <b>settings</b> not discussed in this chapter: a Docker parent image hosted on AWS ECR (Elastic Container Registry) with <code>skip_build: True</code>, and an <code>orchestrator.sagemaker</code> block with <code>synchronous: false</code> (used when running on the AWS SageMaker stack, later chapters). From line 8 the <b>parameters</b>: the name, then <b>links</b>. Lines 12–16 start with <code>#</code>, so YAML ignores those five Medium URLs; line 11's comment adds a caveat: only Medium articles <b>not behind the paywall</b> work. Lines 18–21 are live Substack links, which keep working without Selenium.</p>
+
+  <h3>Import our backed-up data</h3>
+  <p>If nothing works, fill MongoDB from the authors' <b>backup</b> in <code>data/data_warehouse_raw_data</code>, so you can continue to the fine-tuning and inference chapters without running the crawlers:</p>
+  <pre class="code"><code>poetry poe run-import-data-warehouse-from-json</code></pre>
+  <p>You then have a <b>one-to-one copy</b> of the dataset the authors used while writing the code. To confirm the import worked, you should see <b>88 articles</b> and <b>3 users</b> in MongoDB.</p>
+
+  <div class="fig">
+    <h3>Try it: a small troubleshooting decision tree</h3>
+    <div class="pipe" id="w17_stages">
+      <div class="stage"><b>1 · Did the run finish?</b>check the ZenML DAG</div>
+      <div class="stage"><b>2 · Which domains failed?</b>crawled_links metadata</div>
+      <div class="stage"><b>3 · Medium/LinkedIn only?</b>Selenium / ChromeDriver</div>
+      <div class="stage"><b>4 · Comment out Medium</b>re-run; Substack still works</div>
+      <div class="stage"><b>5 · Still stuck?</b>import the JSON backup</div>
+      <div class="stage"><b>6 · Verify</b>88 articles, 3 users</div>
+    </div>
+    <div class="caption" id="w17_cap"></div>
+    <div class="stepbar"><button id="w17_prev" type="button">◀ Back</button><button id="w17_next" type="button">Next ▶</button><span id="w17_n"></span></div>
+  </div>
+  <script>
+  CH3.run("w17", function () {
+    CH3.stages("w17", [
+      "Open the run in the ZenML dashboard. Both steps should have a green tick. Remember crawl errors are caught per link, so the step can be green even if many links failed.",
+      "Open the <code>crawled_links</code> artifact's Metadata tab: compare <i>successful</i> with <i>total</i> per domain (like Figure 3.6). The logs show the error message for each failed link.",
+      "If only <code>medium.com</code> (or LinkedIn) links fail, the cause is almost always the Selenium stack: Chrome not installed, or a ChromeDriver that doesn't match. Also: paywalled Medium articles won't work.",
+      "Comment out the Medium URLs in every <code>configs/digital_data_etl_*.yaml</code> (Figure 3.7) and re-run. Already stored links are skipped by each crawler's duplicate check.",
+      "If crawling still fails, run <code>poetry poe run-import-data-warehouse-from-json</code> to load the authors' backup from <code>data/data_warehouse_raw_data</code>.",
+      "Check MongoDB (IDE plugin or a query): <b>88 articles and 3 users</b> means you have the same data as the authors and can move on to Chapter 4."
+    ]);
+  });
+  </script>
+
+  <div class="box picture"><b>Picture it</b><p>Your Ola driver's app crashes on one route, so you take an auto for that stretch and keep going; if the whole trip is a mess, you take the metro you know works. Commenting out Medium links is the auto; importing the backup is the metro. <i>Where it breaks:</i> with the backup you reach the destination, but you didn't learn the route: you still haven't verified your own crawler works.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The pipeline is designed so failure is <b>partial</b>: per-link try/except, per-domain counts, and crawlers independent of each other. So the fix for one broken dependency (Selenium) is to remove its inputs, not to rewrite code. The JSON backup works because the warehouse is just documents: anything that writes the same documents (crawler or import script) is equivalent for every downstream pipeline.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Your scraper depends on a headless browser that keeps breaking in CI. What do you do?" Say: "Pin and auto-match browser and driver versions in a container image, isolate the browser-based sources so they can fail without blocking others, and keep a snapshot of the raw data so downstream work never blocks on scraping. Longer term, replace browser scraping with an API or a lighter fetch where possible."</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Why only Medium is affected: <a href="#s8">08</a>, <a href="#s11">11</a> (Selenium) vs <a href="#s10">10</a> (no Selenium).</li>
+    <li>The SageMaker settings in the config: <a href="ch10_inference_pipeline_deployment.html">ch10</a>, <a href="ch11_mlops_and_llmops.html">ch11</a>.</li>
+  </ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>The chapter in plain words</h2></div><span class="chip">pdf p125</span></div>
+  <p>The chapter designed and built the LLM Twin's <b>data collection pipeline</b>. Instead of using a static dataset, the authors <b>collected their own data</b>, mimicking real-world conditions and preparing you for the challenges of real AI systems.</p>
+  <div class="grid2">
+    <div class="card"><b>1 · Architecture</b><span>The pipeline is an <b>ETL</b>: crawl (extract), clean and standardise (transform), store in MongoDB (load). Many sources, only three categories: article, post, repository.</span></div>
+    <div class="card"><b>2 · Orchestration</b><span>A <b>ZenML</b> pipeline with two steps (get or create the user; crawl the links), each output stored as an artifact with metadata.</span></div>
+    <div class="card"><b>3 · Crawling, three ways</b><span><b>CLI commands in subprocesses</b> (git clone), <b>LangChain utilities</b> (generic articles), or <b>Selenium</b> to drive a browser for custom logic (Medium, LinkedIn). A dispatcher picks the crawler by domain.</span></div>
+    <div class="card"><b>4 · Own ODM</b><span>A home-made ODM base class defines the document hierarchy (articles, posts, repositories, users) with CRUD and validation for free.</span></div>
+    <div class="card"><b>5 · Running it</b><span>Run ZenML pipelines with different YAML configs, inspect results in the dashboard, and query the warehouse through the ODM classes.</span></div>
+    <div class="card"><b>Next: Chapter 4</b><span>The RAG feature pipeline: chunking and embedding documents, loading them into a vector DB, pre-retrieval optimisations, infrastructure with <b>Pulumi</b>, and deploying the RAG ingestion pipeline to <b>AWS</b>.</span></div>
+  </div>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Plain meaning</th><th>Plate</th></tr>
+    <tr><td>ETL (Extract, Transform, Load)</td><td>Pull data from sources, clean and standardise it, write it into a store</td><td><a href="#s2">02</a></td></tr>
+    <tr><td>Data warehouse</td><td>Central store of collected data for later processing/analysis (here MongoDB; at big scale Snowflake/BigQuery)</td><td><a href="#s4">04</a></td></tr>
+    <tr><td>NoSQL / document database</td><td>Stores JSON-like documents in collections, no enforced schema</td><td><a href="#s4">04</a></td></tr>
+    <tr><td>Data category</td><td>Article, post or repository: the format-based type every document is reduced to</td><td><a href="#s3">03</a></td></tr>
+    <tr><td>Crawler</td><td>Code that visits a source and extracts its content</td><td><a href="#s3">03</a>, <a href="#s8">08</a></td></tr>
+    <tr><td>ZenML pipeline / step</td><td>Decorated functions that ZenML runs as a DAG and tracks</td><td><a href="#s5">05</a>, <a href="#s6">06</a></td></tr>
+    <tr><td>Artifact (+ metadata)</td><td>A step's stored, versioned output, with extra info attached</td><td><a href="#s6">06</a>, <a href="#s16">16</a></td></tr>
+    <tr><td>Dispatcher</td><td>Registry that maps a URL's domain to a crawler class and builds it</td><td><a href="#s7">07</a></td></tr>
+    <tr><td>Builder pattern</td><td>Configure an object step by step via chained methods that return <code>self</code></td><td><a href="#s7">07</a></td></tr>
+    <tr><td>Polymorphism / abstract base class</td><td>Call the same method on different classes; an ABC fixes that shared interface</td><td><a href="#s8">08</a></td></tr>
+    <tr><td>Selenium, ChromeDriver, headless</td><td>Browser automation; the driver program that controls Chrome; a browser without a window</td><td><a href="#s8">08</a></td></tr>
+    <tr><td>BeautifulSoup</td><td>Python library to parse HTML/XML and find elements</td><td><a href="#s11">11</a></td></tr>
+    <tr><td>Pydantic</td><td>Typed data models with automatic validation</td><td><a href="#s12">12</a></td></tr>
+    <tr><td>ORM / ODM</td><td>Map objects to SQL rows / to NoSQL documents, hiding queries behind methods</td><td><a href="#s13">13</a></td></tr>
+    <tr><td>CRUD</td><td>Create, read, update, delete</td><td><a href="#s13">13</a></td></tr>
+    <tr><td>NoSQLBaseDocument</td><td>The book's ODM base class: id, to/from Mongo, save, find, bulk ops, get_or_create</td><td><a href="#s14">14</a></td></tr>
+    <tr><td>Generics / TypeVar</td><td>Let methods' types refer to the calling subclass</td><td><a href="#s14">14</a></td></tr>
+    <tr><td>DataCategory (StrEnum)</td><td>Central string constants for collection/category names</td><td><a href="#s15">15</a></td></tr>
+    <tr><td>Idempotent</td><td>Safe to repeat: re-running doesn't create duplicates (crawlers skip stored links)</td><td><a href="#s6">06</a>, <a href="#s9">09</a></td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">tools named in the chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Tool / company</th><th>What the chapter uses it for</th></tr>
+    <tr><td>ZenML</td><td>Orchestrates the <code>digital_data_etl</code> pipeline; stores artifacts, metadata and runs; dashboard; <code>Client().get_artifact_version()</code> to load outputs.</td></tr>
+    <tr><td>MongoDB (+ PyMongo)</td><td>The NoSQL data warehouse (database <code>twin</code>); Docker image locally, free cloud tier; VS Code plugin to inspect.</td></tr>
+    <tr><td>Snowflake, BigQuery</td><td>Named as the right choice for big data (millions of documents).</td></tr>
+    <tr><td>Qdrant</td><td>Vector DB where the feature pipeline (ch.4) stores features.</td></tr>
+    <tr><td>Medium, Substack, GitHub, LinkedIn, personal blogs</td><td>The data sources crawled.</td></tr>
+    <tr><td>git</td><td>Cloning repositories in a subprocess (GitHubCrawler).</td></tr>
+    <tr><td>LangChain (<code>langchain_community</code>)</td><td><code>AsyncHtmlLoader</code> + <code>Html2TextTransformer</code> in the fallback crawler; "fast to implement, hard to customise".</td></tr>
+    <tr><td>Selenium, ChromeDriver, chromedriver_autoinstaller, Chrome/Brave</td><td>Headless browser automation for Medium and LinkedIn.</td></tr>
+    <tr><td>BeautifulSoup</td><td>Parsing Medium's HTML for title, subtitle, text.</td></tr>
+    <tr><td>Scrapy, Crawl4AI</td><td>Newer high-level crawling tools (structured extraction; LLM-focused crawling).</td></tr>
+    <tr><td>Pydantic</td><td>Typed, validated document classes.</td></tr>
+    <tr><td>SQLAlchemy, SQLModel, FastAPI, SQLite, PostgreSQL, MySQL</td><td>The ORM example and its ecosystem.</td></tr>
+    <tr><td>mongoengine</td><td>An existing, fuller Python ODM for MongoDB, similar in spirit to the book's.</td></tr>
+    <tr><td>loguru, tqdm</td><td>Logging and progress bars in the steps.</td></tr>
+    <tr><td>Poetry + poe</td><td>Dependency management and named CLI tasks (<code>poetry poe run-digital-data-etl-…</code>).</td></tr>
+    <tr><td>AWS ECR, SageMaker (in Fig 3.7's config)</td><td>Docker image registry and orchestrator settings for the cloud stack (covered later).</td></tr>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>Playwright is a popular alternative to Selenium for headless browsing, with built-in browser management that avoids many driver-version issues.</li>
+    <li>Firecrawl, Jina Reader and similar services turn a URL into LLM-ready Markdown, the same job as the fallback crawler but hosted.</li>
+    <li>Beanie and ODMantic are Pydantic-based async ODMs for MongoDB, close to what the book builds by hand.</li>
+  </ul></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (tap to reveal)</h2></div><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. What are the input and output of the data collection pipeline?</summary><p>Input: a list of links plus the user (author) they belong to. Output: a list of raw documents stored in the NoSQL (MongoDB) data warehouse.</p></details>
+  <details class="ans"><summary>2. Why reduce all sources to three data categories instead of one class per source?</summary><p>Downstream code depends only on the categories. A new source needs just one new crawler that outputs an existing document type; with per-source classes, every new source would require a new document class and changes in the feature pipeline and other layers.</p></details>
+  <details class="ans"><summary>3. Give the book's reasons for using MongoDB as a data warehouse, and when it would stop being the right choice.</summary><p>Small data (hundreds of docs), unstructured text so a schema-less DB speeds development, stable and easy with an intuitive Python SDK, Docker image locally and a free cloud tier. For millions of documents, use a dedicated warehouse like Snowflake or BigQuery.</p></details>
+  <details class="ans"><summary>4. How do the data collection and feature pipelines communicate?</summary><p>Only through the MongoDB warehouse. The collection pipeline writes, the feature pipeline reads, independently and on different schedules.</p></details>
+  <details class="ans"><summary>5. A link fails with an exception inside <code>extract()</code>. What happens to the run?</summary><p>The helper catches it, logs the error, and returns (False, domain). The loop continues; the domain's "total" goes up but "successful" doesn't. The step still finishes and the counts appear in the crawled_links metadata.</p></details>
+  <details class="ans"><summary>6. What does <code>CrawlerDispatcher.build().register_linkedin().register_medium()</code> rely on, and what pattern is it?</summary><p>Each register method returns <code>self</code>, so calls can be chained. That is the builder (creational) pattern; <code>build()</code> creates the empty dispatcher.</p></details>
+  <details class="ans"><summary>7. Which crawler handles <code>https://decodingml.substack.com/p/...</code>, and why?</summary><p>CustomArticleCrawler. No registered pattern (linkedin.com, medium.com, github.com) matches, so <code>get_crawler</code> logs a warning and returns the default.</p></details>
+  <details class="ans"><summary>8. Why does the dispatcher work with any crawler without checking types?</summary><p>All crawlers inherit from BaseCrawler and implement the same <code>extract(link, **kwargs)</code> method (polymorphism), so the caller just calls <code>extract</code>.</p></details>
+  <details class="ans"><summary>9. When does <code>scroll_page()</code> stop?</summary><p>When the page height doesn't change after scrolling and waiting 5 seconds (end of content), or when a scroll limit is set and the number of scrolls reaches it (default limit 5).</p></details>
+  <details class="ans"><summary>10. What would happen if you ran the pipeline twice with the same links?</summary><p>Each crawler first calls <code>model.find(link=link)</code>; already stored documents are skipped with a log line, so no duplicates are created. (The user is fetched, not recreated, via get_or_create.)</p></details>
+  <details class="ans"><summary>11. Why do the authors use the LangChain crawler only as a fallback?</summary><p>Because the extraction and parsing are delegated to library classes, you can't control how content is extracted. It's fast to implement but hard to customise, which is also why many developers avoid LangChain in production.</p></details>
+  <details class="ans"><summary>12. What's the difference between ORM and ODM?</summary><p>Both map objects to database records and hide CRUD queries. ORM works with SQL databases (tables and rows, e.g. SQLAlchemy); ODM works with NoSQL document databases (collections of JSON-like documents, e.g. MongoDB).</p></details>
+  <details class="ans"><summary>13. What do <code>to_mongo()</code> and <code>from_mongo()</code> do with the id?</summary><p><code>to_mongo</code> renames <code>id</code> to MongoDB's <code>_id</code> and turns UUIDs into strings; <code>from_mongo</code> pops <code>_id</code> and passes it back as <code>id</code> to build a validated instance.</p></details>
+  <details class="ans"><summary>14. Medium crawling fails on your laptop. What are the two fixes the book offers, and how do you check success?</summary><p>Comment out the Medium links in the <code>configs/digital_data_etl_*.yaml</code> files (Substack/blog links still work, no Selenium), or import the backup with <code>poetry poe run-import-data-warehouse-from-json</code>. After the import you should see 88 articles and 3 users.</p></details>
+  <details class="ans"><summary>15. Interview: "Design an ingestion pipeline for a personal RAG assistant over a user's blogs, code and social posts."</summary><p>Orchestrated pipeline per user, config-driven list of sources; a dispatcher maps each URL to a connector sharing one interface; connectors normalise into a few typed document classes (article/post/code) with source metadata; idempotent writes into a raw store; per-source success metrics per run; a separate feature pipeline chunks and embeds from the raw store on its own schedule.</p></details>
+</section>
+
+<!-- references -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's reading list</h2></div><span class="chip">pdf p125–126</span></div>
+  <details><summary>References (7)</summary>
+    <ol class="refs">
+      <li>Breuss, M. "Beautiful Soup: Build a Web Scraper With Python." Real Python, 2023.</li>
+      <li>David, D. "Guide to Web Scraping with Selenium in 2024." Bright Data, 2024.</li>
+      <li>Hjelle, G. A. "Python 3.12 Preview: Static Typing Improvements." Real Python, 2023.</li>
+      <li>"ORM Quick Start." SQLAlchemy 2.0 documentation (n.d.).</li>
+      <li>Ramos, L. P. "Python and MongoDB: Connecting to NoSQL Databases." Real Python, 2023.</li>
+      <li>Refactoring.Guru. "Builder" (design pattern), 2024.</li>
+      <li>Qlik. "What is ETL? A complete guide" (n.d.).</li>
+    </ol>
+  </details>
+  <p class="note">Code mentioned in the chapter lives in the book's GitHub repository (PacktPublishing/LLM-Engineers-Handbook): <code>pipelines/digital_data_etl.py</code>, <code>steps/etl</code>, <code>llm_engineering/application/crawlers</code>, <code>llm_engineering/domain/base/nosql.py</code>, <code>llm_engineering/domain/types.py</code>, <code>code_snippets/03_orm.py</code>, <code>configs/</code>, <code>data/data_warehouse_raw_data</code>. The chapter closes with an invitation to the book's Discord community.</p>
+</section>
+
+</div>
+</body>
+</html>

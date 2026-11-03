@@ -1,0 +1,1807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Twin Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.1) ---- */
+.toks { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.toks span { border: 1px solid var(--rule); border-radius: 4px; padding: 2px 7px; background: var(--paper); }
+.toks span.a { background: var(--tint2); border-color: var(--c2); }
+.toks span.b { background: var(--tint3); border-color: var(--c3); }
+.toks span.v { background: var(--tint); border-color: var(--c1); }
+.toks span.gen { background: var(--tint); border-color: var(--c1); font-weight: 600; }
+.toks span.mask { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.toks span.dim { opacity: .45; }
+.vec { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vec i { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--rule); border-radius: 2px; }
+.heat { border-collapse: separate; border-spacing: 3px; width: auto; font-family: var(--mono); font-size: 12px; }
+.heat th, .heat td { border: 0; padding: 0; text-align: center; }
+.heat th { font-family: var(--mono); font-weight: 600; font-size: 12px; padding: 2px 6px; }
+.heat td.cell { width: 52px; height: 34px; border-radius: 3px; border: 1px solid var(--rule); cursor: pointer; font-size: 11px; }
+.heat td.cell.blocked { background: repeating-linear-gradient(45deg, var(--paper), var(--paper) 4px, var(--rule) 4px, var(--rule) 6px) !important; color: var(--muted); }
+.heat td.cell.sel { outline: 2px solid var(--c1); }
+.bar { height: 12px; background: var(--c2); border-radius: 2px; }
+.barrow { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12.5px; }
+.barrow .track { background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; height: 14px; overflow: hidden; }
+.barrow .track div { height: 100%; background: var(--c2); }
+.barrow .track div.warn { background: var(--c1); }
+.barrow .track div.bad { background: var(--sell); }
+.legendc { display: flex; flex-wrap: wrap; gap: 6px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legendc span::before { content: ""; display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; background: var(--sw); }
+.out { font-family: var(--mono); font-size: 13px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 3em; }
+.out .p { color: var(--muted); }
+.out .g { color: var(--c2); font-weight: 600; }
+.tl { display: grid; gap: 6px; }
+.tl .yr { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.mrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.mbtn { font-family: var(--mono); font-size: 12.5px; border-radius: 99px; padding: 3px 10px; }
+.mbtn.dec { border-color: #d98b8b; }
+.mbtn.enc { border-color: #b98bd9; }
+.mbtn.non { border-color: var(--rule); }
+.mbtn.ed  { border-color: #7fc3a3; }
+.mbtn.prop { border-color: #6ea6d6; }
+.mbtn.open { border-color: #e6aa62; }
+.mbtn.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.sw-dec { --sw: #e6a3a3; } .sw-enc { --sw: #cf9be8; } .sw-non { --sw: #d8d8d8; } .sw-ed { --sw: #9fd8bd; }
+.sw-prop { --sw: #8dbde6; } .sw-open { --sw: #f3c99a; }
+.box.interview { background: var(--paper); border-left: 3px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+pre.code code { background: none; border: 0; padding: 0; font-size: 12.5px; }
+.qa { display: grid; gap: 8px; }
+.matrix { overflow-x: auto; }
+.scatter circle { stroke: var(--ink); stroke-width: 1.2; cursor: pointer; }
+.scatter circle.sel { stroke: var(--c1); stroke-width: 3; }
+.scatter line.nn { stroke: var(--c1); stroke-width: 1.6; stroke-dasharray: 4 3; }
+.scatter text { font-size: 12px; pointer-events: none; }
+.scatter rect.bg { fill: var(--plate); stroke: var(--rule); }
+.scatter line.g { stroke: var(--grid); }
+</style>
+<style>
+/* ---- page-specific additions (LLM Engineer's Handbook ch.1) ---- */
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.pipe .stage { border: 1.5px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; line-height: 1.45; transition: border-color .2s, background .2s; }
+.pipe .stage b { font-family: var(--display); font-size: 13.5px; display: block; }
+.pipe .stage.on { border-color: var(--c1); background: var(--tint); }
+.pipe .stage.done { border-color: var(--buy); }
+.pipe .stage.off { opacity: .45; }
+.feat { display: flex; flex-wrap: wrap; gap: 6px; }
+.feat label { font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--rule); border-radius: 99px; padding: 3px 10px; background: var(--paper); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.feat label.must { border-color: var(--c2); }
+.meter { height: 14px; border: 1px solid var(--rule); border-radius: 3px; background: var(--paper); overflow: hidden; }
+.meter div { height: 100%; background: var(--c2); transition: width .2s; }
+.meter div.over { background: var(--sell); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-family: var(--mono); font-size: 12.5px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+.arch svg { width: 100%; min-width: 600px; height: auto; display: block; }
+.arch { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.arch rect.blk { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+.arch rect.blk.on { fill: var(--tint); stroke: var(--c1); stroke-width: 2.6; }
+.arch rect.grp { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.arch rect.grp.on { stroke: var(--c1); stroke-width: 2; }
+.arch path, .arch line { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+.arch path.on, .arch line.on { stroke: var(--c1); stroke-width: 3; }
+.arch text.g { font-family: var(--display); font-weight: 700; font-size: 13px; }
+.arch text.m { fill: var(--muted); font-size: 11px; }
+.req { font-family: var(--mono); font-size: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.bad-t { color: var(--sell); font-weight: 600; } .good-t { color: var(--buy); font-weight: 600; }
+.vers { display: grid; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+.vers .vrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vers .f { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 7px; background: var(--paper); }
+.vers .f.use { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.vers .live { color: var(--buy); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch00_preface.html">← Preface</a><a href="ch02_tooling_and_installation.html">Ch.2 Tooling and Installation →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 1 · PDF p30–53</div>
+  <h1>The <em>LLM Twin</em>: what we are building, the smallest useful version of it, and the three-pipeline blueprint behind it</h1>
+  <p class="lede">The whole book builds one product end to end: an <b>LLM Twin</b>, an AI character that writes like you because it has been fine-tuned on your own posts, articles and code, and helped by <b>RAG</b> (retrieval-augmented generation) over your old content. This chapter does the planning before any code. First the <b>"why"</b>: what a twin is, why it beats pasting prompts into ChatGPT, and why it is ethical if it uses only your own data. Then the <b>"what"</b>: an <b>MVP</b> (minimum viable product) scoped for a team of three with laptops and personal money. Then the <b>"how"</b>: the <b>FTI</b> (feature / training / inference) pattern, which shrinks a messy ML system into three pipelines that only talk through a <b>feature store</b> and a <b>model registry</b>. Finally the authors apply FTI to the twin, adding a fourth <b>data collection pipeline</b>, and explain each part's job, its hardware and how it scales.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter follows the three planning steps the authors say every new product needs: dream about <b>why</b>, cut it down to <b>what</b> you can really build, then design <b>how</b>. Each row reacts to the row above it. Orange boxes are the key ideas.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 1">
+    <div class="row"><span class="tag">Why</span><span class="node">writing personal-brand content takes too long</span><span class="arr">→</span><span class="node key">LLM Twin = an LLM fine-tuned on <i>your</i> data</span><span class="arr">→</span><span class="node">a writing co-pilot in your voice</span></div>
+    <div class="row"><span class="tag">Why not ChatGPT</span><span class="node">generic voice · hallucinations · manual prompting</span><span class="arr">→</span><span class="node key">build an LLM <i>system</i>, data-centric and model-agnostic</span></div>
+    <div class="row"><span class="tag">What</span><span class="node">3 people, laptops, own money</span><span class="arr">→</span><span class="node key">MVP: crawl 4 sites · fine-tune open LLM · vector DB · LinkedIn posts · simple UI</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">a real ML system has ~a dozen parts besides the model</span><span class="arr">→</span><span class="node">monolith: no skew but no reuse/scale</span><span class="arr">→</span><span class="node">stateless real-time: client must ship the state</span><span class="arr">→</span><span class="node">Google's full MLOps design: correct but hard</span></div>
+    <div class="row"><span class="tag">Idea</span><span class="node key">FTI: feature → training → inference pipelines</span><span class="arr">→</span><span class="node">they only meet at the feature store + model registry</span><span class="arr">→</span><span class="node">each can use its own stack, team, hardware, scaling</span></div>
+    <div class="row"><span class="tag">Apply</span><span class="node key">4 pipelines: data collection + FTI</span><span class="arr">→</span><span class="node">logical feature store = vector DB + artifacts</span><span class="arr">→</span><span class="node">CT/CI/CD, prompt monitoring</span><span class="arr">→</span><span class="node">CPU vs GPU, horizontal vs vertical scaling</span></div>
+  </div>
+  <svg viewBox="0 0 660 170" class="dg" role="img" aria-label="FTI in one picture: three pipelines that talk only through a feature store and a model registry" style="width:100%;height:auto;max-width:660px">
+    <rect x="10" y="10" width="140" height="44" rx="5" class="s"/><text x="80" y="37" text-anchor="middle">raw data</text>
+    <rect x="180" y="10" width="140" height="44" rx="5" class="hi"/><text x="250" y="30" text-anchor="middle" class="b">Feature</text><text x="250" y="46" text-anchor="middle" class="m">pipeline</text>
+    <rect x="350" y="10" width="140" height="44" rx="5" class="hi"/><text x="420" y="30" text-anchor="middle" class="b">Training</text><text x="420" y="46" text-anchor="middle" class="m">pipeline</text>
+    <rect x="520" y="10" width="130" height="44" rx="5" class="hi"/><text x="585" y="30" text-anchor="middle" class="b">Inference</text><text x="585" y="46" text-anchor="middle" class="m">pipeline</text>
+    <line x1="150" y1="32" x2="180" y2="32"/>
+    <rect x="160" y="110" width="200" height="48" rx="5" class="f" style="stroke:var(--c2);stroke-width:2"/><text x="260" y="132" text-anchor="middle" class="b">Feature store</text><text x="260" y="149" text-anchor="middle" class="m">versioned features + labels</text>
+    <rect x="400" y="110" width="200" height="48" rx="5" class="f" style="stroke:var(--c3);stroke-width:2"/><text x="500" y="132" text-anchor="middle" class="b">Model registry</text><text x="500" y="149" text-anchor="middle" class="m">versioned models + metadata</text>
+    <path d="M250 54 L250 110"/><path d="M400 54 L300 110"/><path d="M440 54 L480 110"/><path d="M570 54 L540 110"/><path d="M600 54 C620 90 380 80 340 110"/>
+    <text x="582" y="82" text-anchor="middle" class="m">reads both</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening: why, what, how</a>
+    <a href="#s2"><span>02</span>Understanding the LLM Twin concept</a>
+    <a href="#s3"><span>03</span>What is an LLM Twin?</a>
+    <a href="#s4"><span>04</span>Why building an LLM Twin matters</a>
+    <a href="#s5"><span>05</span>Co-pilot vs LLM Twin · is it moral?</a>
+    <a href="#s6"><span>06</span>Why not use ChatGPT?</a>
+    <a href="#s7"><span>07</span>Planning the MVP</a>
+    <a href="#s8"><span>08</span>What is an MVP?</a>
+    <a href="#s9"><span>09</span>Defining the LLM Twin MVP</a>
+    <a href="#s10"><span>10</span>Building ML systems with FTI pipelines</a>
+    <a href="#s11"><span>11</span>The problem with building ML systems</a>
+    <a href="#s12"><span>12</span>The issue with previous solutions</a>
+    <a href="#s13"><span>13</span>The solution: ML pipelines for ML systems</a>
+    <a href="#s14"><span>14</span>The feature pipeline</a>
+    <a href="#s15"><span>15</span>The training pipeline</a>
+    <a href="#s16"><span>16</span>The inference pipeline</a>
+    <a href="#s17"><span>17</span>Benefits of the FTI architecture</a>
+    <a href="#s18"><span>18</span>Designing the LLM Twin's architecture</a>
+    <a href="#s19"><span>19</span>Listing the technical details</a>
+    <a href="#s20"><span>20</span>Designing it with FTI: four components</a>
+    <a href="#s21"><span>21</span>Data collection pipeline</a>
+    <a href="#s22"><span>22</span>Feature pipeline (LLM Twin)</a>
+    <a href="#s23"><span>23</span>Training pipeline (LLM Twin)</a>
+    <a href="#s24"><span>24</span>Inference pipeline (LLM Twin)</a>
+    <a href="#s25"><span>25</span>Final thoughts: compute and scaling</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>The book's promise, and the three planning steps before any code</h2></div><span class="chip">pdf p30–31</span></div>
+  <p>The authors open with what the whole book will do: walk you through building an <b>end-to-end LLM product</b> (LLM = <b>large language model</b>). Their belief is that you learn LLMs and <b>production ML</b> (machine learning that runs for real users, not just in a notebook) best by actually building a system.</p>
+  <p>The product is an <b>LLM Twin</b>: an AI character that learns to write like one particular person by putting that person's <b>style, voice and personality</b> into an LLM. Using this one example, the book covers the <b>complete ML life cycle</b>, from <b>gathering data</b> all the way to <b>deployment and monitoring</b>. Most of what you learn while building the twin carries over to other LLM or ML applications.</p>
+  <p>Before writing code, an engineer goes through <b>three planning steps</b>:</p>
+  <ol class="plain">
+    <li><b>Understand the problem and the vision ("Why").</b> What exactly is an LLM Twin and why build it? This is the step where you are allowed to dream.</li>
+    <li><b>Design a first iteration with minimum features ("What").</b> To mimic a real project, you define only the core features needed for a product that works and is valuable. The choices depend on the <b>timeline</b>, the <b>resources</b> and what the <b>team knows</b>. This step connects the dream to what is realistic and answers "What are we going to build?"</li>
+    <li><b>System design ("How").</b> Lay out the core architecture and the design choices for the LLM system.</li>
+  </ol>
+  <p>Steps 1 and 2 are mainly <b>product</b> work; step 3 is <b>technical</b>. The authors stress that even though the first two need little ML knowledge, skipping them means you build without a clear vision. These three steps happen naturally in any real product.</p>
+  <p>The chapter's four topics map onto those steps:</p>
+  <div class="grid2">
+    <div class="card"><b>1 · Understanding the LLM Twin concept</b><span>The "why". Plates 02–06.</span></div>
+    <div class="card"><b>2 · Planning the MVP of the LLM Twin</b><span>The "what". Plates 07–09.</span></div>
+    <div class="card"><b>3 · Building ML systems with FTI pipelines</b><span>The general "how" pattern. Plates 10–17.</span></div>
+    <div class="card"><b>4 · Designing the LLM Twin's architecture</b><span>The pattern applied. Plates 18–25.</span></div>
+  </div>
+  <p>By the end you should have a clear picture of everything the rest of the book will build.</p>
+
+  <div class="fig">
+    <h3>Step through the three planning steps</h3>
+    <div class="pipe" id="w1_stages">
+      <div class="stage"><b>1 · Why</b>dream: what is it, why is it valuable?</div>
+      <div class="stage"><b>2 · What</b>cut down: MVP features that fit time, money, skills</div>
+      <div class="stage"><b>3 · How</b>design: architecture, components, interfaces</div>
+    </div>
+    <div class="caption" id="w1_cap"></div>
+    <div class="stepbar"><button id="w1_prev" type="button">◀ Back</button><button id="w1_next" type="button">Next ▶</button><span id="w1_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>Opening a chai stall. <b>Why</b>: office workers near the metro station have nowhere to get good chai at 8 a.m. <b>What</b>: on day one you sell only masala chai and two kinds of biscuits from one cart, not a full café menu. <b>How</b>: where the gas cylinder sits, who buys milk, how you take UPI payments. <i>Where it breaks:</i> a chai stall's "how" is simple and stable; a software ML system's "how" keeps changing as data and models change, which is why the book spends so much time on a flexible architecture.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The order matters because each step limits the next. The "why" decides which users and outputs matter. The "what" turns that into a short list of features that a small team can finish. Only then can the "how" be sized correctly: you design for the features you chose, not for every feature you can imagine. Engineers who jump to step 3 tend to over-build infrastructure for problems nobody has yet.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Walk me through how you'd start a new LLM feature." A crisp answer: "First I pin down the problem and who it is for, then I cut scope to an MVP that is still end-to-end usable given team size, time and budget, and only then I design the architecture around clear component interfaces." In a founding-engineer story (for example a realtime voice agent), say what you deliberately left out of v1 and why.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The MVP step in detail: <a href="#s8">08 What is an MVP?</a> and <a href="#s9">09 Defining the LLM Twin MVP</a>.</li>
+    <li>The "how": <a href="#s13">13 FTI pipelines</a> and <a href="#s20">20 the four components</a>.</li>
+    <li>Chip Huyen's take on when to build an AI application at all: <a href="../ai_engineering/ch01_building_ai_applications.html">AI Engineering ch.1</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SECTION</div><h2>Understanding the LLM Twin concept</h2></div><span class="chip">pdf p31</span></div>
+  <p>The first step is a clear vision of <b>what</b> we want to create and <b>why</b> it is worth building. The authors point out that the LLM Twin idea is <b>new</b>, so before the technical details you need a feel for three things: what it is, what to expect from it, and how it should work.</p>
+  <p>Their argument for doing this first: if you have a solid intuition for the <b>end goal</b>, the theory, code and infrastructure in later chapters become much easier to digest, because you always know which part of the final product each piece serves.</p>
+  <div class="box picture"><b>Picture it</b><p>Seeing the finished photo of a dish before you start a long recipe. Every step (soak the dal, temper the spices) makes sense because you know what you are aiming for. <i>Where it breaks:</i> a recipe photo is fixed; the twin's "finished product" is itself defined in the next plates, and gets narrowed down later by the MVP.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The definition itself: <a href="#s3">03 What is an LLM Twin?</a></li><li>The preface's outline of the book: <a href="ch00_preface.html">ch00_preface.html</a></li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · SUB-SECTION</div><h2>What is an LLM Twin?</h2></div><span class="chip">pdf p31–32</span></div>
+  <p>An <b>LLM Twin</b> is an AI character that carries <b>your writing style, voice and personality</b> inside an LLM (a large, complex AI model). Think of it as a <b>digital version of you, projected into an LLM</b>.</p>
+  <ul class="plain">
+    <li><b>Generic LLM vs twin.</b> A normal LLM is trained on the whole internet. A twin is <b>fine-tuned on you</b> (fine-tuning = continuing to train an already-trained model on a smaller, specific dataset). Because a model mirrors its training data, the twin picks up your style, voice and personality.</li>
+    <li><b>Why the word "projected".</b> The authors chose it on purpose. Like any projection (a 3D object casting a 2D shadow), a lot of information is lost. So the twin is <b>not you</b>; it copies only the side of you that shows up in the data it saw.</li>
+    <li><b>A model reflects its data.</b> Feed it Shakespeare and it writes like Shakespeare; train it on Billie Eilish and it writes songs in her style. This is called <b>style transfer</b>.</li>
+    <li><b>Style transfer in images.</b> The same idea is common in image generation, for example drawing a cat in Van Gogh's style. The twin does style transfer too, but the "style" is your own persona instead of a famous artist's.</li>
+    <li><b>Fine-tuning + RAG.</b> Besides fine-tuning, the twin uses several advanced <b>RAG</b> (retrieval-augmented generation) techniques. RAG means: before generating, look up relevant stored pieces of your past content and put them in the prompt. The book says this conditions the <b>autoregressive</b> process (the model writes one token at a time, each based on the ones before) with earlier <b>embeddings</b> of you (embeddings = number vectors that capture the meaning of a text).</li>
+  </ul>
+  <p class="note">Where the details live, as this page of the book says: fine-tuning in Chapter 5, RAG in Chapters 4 and 9. (Later, on pdf p40, the book points to Chapters 8 and 9 for RAG; the RAG feature pipeline is Chapter 4 and the RAG inference pipeline is Chapter 9 in this book's table of contents.)</p>
+  <p>Examples of what you could fine-tune on to get different twins:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Your data</th><th>What the twin becomes good at</th></tr>
+    <tr><td>LinkedIn posts and X (Twitter) threads</td><td>Writing social media content</td></tr>
+    <tr><td>Messages with friends and family</td><td>An "unfiltered" version of you</td></tr>
+    <tr><td>Academic papers and articles</td><td>Formal, educational writing</td></tr>
+    <tr><td>Code</td><td>Implementing code the way you would</td></tr>
+  </table></div>
+  <p>All four reduce to one strategy: <b>collect your digital data</b> (or part of it) and <b>feed it to an LLM</b> with different algorithms. The LLM ends up reflecting the voice and style of whatever you collected. "Easy, right?", the authors ask, and then list why it is not:</p>
+  <div class="two">
+    <div class="card"><b>Technical questions</b><ul class="plain"><li>How do we get access to this data?</li><li>Do we even have enough digital data to project ourselves into an LLM?</li><li>Which kinds of data are actually valuable?</li></ul></div>
+    <div class="card"><b>Moral questions</b><ul class="plain"><li>Is it OK to do this at all?</li><li>Do we want a copycat of ourselves?</li><li>Will it write <i>with</i> our voice and personality, or only try to imitate it?</li></ul></div>
+  </div>
+  <p>The authors remind you that this section is about the <b>"Why"</b>, not the "What" or "How": why a twin makes sense, why it is valuable, and why it is morally fine <b>if the problem is framed correctly</b> (answered in plates 04–05).</p>
+
+  <div class="fig">
+    <h3>Try it: pick the data, see which twin you get</h3>
+    <p class="note">Tick the data sources you would feed in. The readout says what kind of twin that data produces (from the book's four scenarios) and what it would be bad at. The "share of you" bar is <b>modelled</b> (our toy weights), just to show the projection idea: every source covers only part of you.</p>
+    <div class="feat" id="w3_src">
+      <label><input type="checkbox" value="social" checked> LinkedIn / X posts</label>
+      <label><input type="checkbox" value="chat"> Chats with friends &amp; family</label>
+      <label><input type="checkbox" value="papers"> Papers &amp; articles</label>
+      <label><input type="checkbox" value="code"> Code</label>
+    </div>
+    <div class="meter"><div id="w3_bar"></div></div>
+    <div class="out" id="w3_out"></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A mimicry artist on a comedy show who has studied only a cricket commentator's broadcasts. He nails the commentary voice and catchphrases, but ask him what that commentator says at a family dinner and he has nothing: he only saw the "broadcast side". That is the projection. <i>Where it breaks:</i> a mimic understands what he is copying; an LLM learns statistical patterns in text and can confidently produce things the real person would never say.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two levers shape the twin. <b>Fine-tuning</b> changes the model's weights, so the style becomes the model's default way of writing. <b>RAG</b> does not change weights: at request time it fetches pieces of your old content (found by comparing embeddings) and puts them into the prompt, so the model can reuse your facts, phrases and references. Fine-tuning gives the <i>voice</i>; RAG gives the <i>memory</i>. That split is why the later architecture keeps two copies of the data: cleaned text for fine-tuning and embedded chunks for RAG (plate <a href="#s22">22</a>).</p></div>
+  <div class="box work"><b>Worked example</b><p>You give the twin a skeleton: "post about why we moved our voice agent from REST polling to WebSockets". RAG finds two of your old posts that mention latency budgets and pulls a phrase you like using. The fine-tuned model writes the post with your usual short sentences and closing question. If you had trained only on formal papers, the same request would come out as an essay with section headings, the wrong voice for LinkedIn.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Fine-tuning or RAG for personalisation?" Say: "They solve different things. Fine-tuning bakes in style and format, which is stable; RAG injects facts that change or need citing, at request time and without retraining. A twin uses both: fine-tune on my writing for voice, retrieve my past posts for content." For RAG memory work, mention that retrieval also gives you traceability (you can show which document was used).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Fine-tuning in this book: <a href="ch05_supervised_fine_tuning.html">ch05</a>, <a href="ch06_preference_alignment.html">ch06</a>. RAG: <a href="ch04_rag_feature_pipeline.html">ch04</a>, <a href="ch09_rag_inference_pipeline.html">ch09</a>.</li>
+    <li>What embeddings are: <a href="../hands_on_llms/ch02_tokens_and_embeddings.html">Hands-On LLMs ch.2</a>. RAG basics: <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering ch.6</a>.</li>
+    <li>Fine-tuning a generator on your own data: <a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs ch.12</a>, <a href="../ai_engineering/ch07_finetuning.html">AI Engineering ch.7</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · SUB-SECTION</div><h2>Why building an LLM Twin matters</h2></div><span class="chip">pdf p32–33</span></div>
+  <p>The authors' reasoning, step by step:</p>
+  <ol class="plain">
+    <li><b>A personal brand beats a CV.</b> For an engineer (or any professional), building a personal brand is worth more than a standard CV.</li>
+    <li><b>But content takes time.</b> Writing on LinkedIn, X or Medium is slow. Even if you enjoy writing, you eventually run out of <b>inspiration or time</b> and want help.</li>
+    <li><b>So the scope is clear.</b> They say they don't want to turn this into a sales pitch, but the product's scope must be clear: the twin writes <b>personalised content</b> for LinkedIn, X, Instagram, Substack and Medium (or other blogs) in <b>your style and voice</b>.</li>
+    <li><b>It's a co-pilot, not a ghost.</b> It will not be used for immoral purposes. It acts as your <b>writing co-pilot</b>. You can adapt it creatively to other uses, but the book focuses on one niche: <b>social media content and articles</b>.</li>
+    <li><b>You give the skeleton, it does the grunt work.</b> Instead of writing from scratch, you hand the twin the bones of your main idea and it does the heavy lifting.</li>
+    <li><b>You still review.</b> In the end you must check that everything is correct and format it the way you like (concrete features come in the MVP section).</li>
+    <li><b>It is specialised.</b> Since the LLM is specialised for content writing through <b>fine-tuning, prompt engineering and RAG</b>, it will probably <b>fail</b> if you use it for a different kind of task.</li>
+  </ol>
+  <p>So the twin helps you do three things:</p>
+  <div class="grid2">
+    <div class="card"><b>Create your brand</b><span>Consistent content in your own voice.</span></div>
+    <div class="card"><b>Automate the writing process</b><span>Skeleton in, draft out.</span></div>
+    <div class="card"><b>Brainstorm new ideas</b><span>A partner that knows what you have already written.</span></div>
+  </div>
+  <div class="fig">
+    <h3>The co-pilot loop (step through)</h3>
+    <div class="pipe" id="w4_stages">
+      <div class="stage"><b>1 · You</b>write a skeleton: topic + 3 bullet points</div>
+      <div class="stage"><b>2 · Twin</b>drafts the post in your voice</div>
+      <div class="stage"><b>3 · You</b>fact-check and format</div>
+      <div class="stage"><b>4 · Publish</b>LinkedIn, X, Medium…</div>
+    </div>
+    <div class="caption" id="w4_cap"></div>
+    <div class="stepbar"><button id="w4_prev" type="button">◀ Back</button><button id="w4_next" type="button">Next ▶</button><span id="w4_n"></span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A good junior at a CA (chartered accountant) firm who has read all your past client letters. You tell them "reply to Sharma-ji about the GST notice, polite but firm, mention last year's ruling", and they bring back a draft that sounds like you. You still read and sign it. <i>Where it breaks:</i> the junior would refuse to draft something they know is wrong; the twin can produce a confident, wrong draft, which is why step 3 (review) never goes away.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The narrow scope is a design decision, not a weakness. Specialising (fine-tune on your posts, prompts built for posts, retrieval over your posts) makes the twin much better at one job and worse at others. The authors accept that trade-off openly: a content twin used for, say, legal advice would likely fail.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why build a specialised model instead of using a general one?" Answer: "A specialised system wins on the narrow task (style, format, domain facts) and is cheaper to run, but it fails outside its niche, so the product must keep users inside that niche." Keeping a human review step is the standard safety net for generated content.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s6">06 Why not ChatGPT?</a> for the comparison with a general chatbot.</li><li>Prompt engineering: <a href="../hands_on_llms/ch06_prompt_engineering.html">Hands-On LLMs ch.6</a>, <a href="../ai_engineering/ch05_prompt_engineering.html">AI Engineering ch.5</a>.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SIDEBAR + ETHICS</div><h2>What's the difference between a co-pilot and an LLM Twin? Is it moral?</h2></div><span class="chip">pdf p33</span></div>
+  <p>The book separates two ideas that people often mix up. They are different, but they combine well:</p>
+  <div class="two">
+    <div class="card"><b>Co-pilot</b><span>An <b>AI assistant or tool</b> that helps (augments) a human in tasks like programming, writing or content creation. It is about the <i>job</i>: helping you work.</span></div>
+    <div class="card"><b>Twin (digital twin)</b><span>A <b>1:1 digital representation of a real-world entity</b>, often using AI to bridge the physical and digital worlds. It is about <i>who</i>: copying something real. An LLM Twin is an LLM that learns to imitate your voice, personality and writing style.</span></div>
+  </div>
+  <p>Put them together and you get the book's product: a writing and content-creation assistant that writes like you is your <b>LLM Twin co-pilot</b>.</p>
+  <svg viewBox="0 0 520 150" class="dg" role="img" aria-label="Venn: co-pilot (helps with a task) and twin (copies a real entity) overlap in the LLM Twin co-pilot" style="width:100%;height:auto;max-width:520px">
+    <circle cx="190" cy="75" r="68" style="fill:var(--c2);fill-opacity:.18;stroke:var(--c2)"/>
+    <circle cx="330" cy="75" r="68" style="fill:var(--c3);fill-opacity:.18;stroke:var(--c3)"/>
+    <text x="150" y="72" text-anchor="middle" class="b">Co-pilot</text><text x="150" y="90" text-anchor="middle" class="m">helps with a task</text>
+    <text x="372" y="72" text-anchor="middle" class="b">Twin</text><text x="372" y="90" text-anchor="middle" class="m">copies a real entity</text>
+    <text x="260" y="70" text-anchor="middle" class="b">LLM Twin</text><text x="260" y="86" text-anchor="middle" class="b">co-pilot</text>
+  </svg>
+  <h3>Why the authors say it is moral</h3>
+  <ul class="plain">
+    <li>The LLM is fine-tuned <b>only on your own personal digital data</b>.</li>
+    <li>It will <b>not</b> collect or use other people's data to impersonate anyone.</li>
+    <li>The goal is narrow and clear: <b>your personalised writing copycat</b>.</li>
+    <li>Everyone gets <b>their own</b> twin, with <b>restricted access</b>.</li>
+    <li>Caveat: there are many <b>security concerns</b>, but the authors leave them out because they "could be a book in itself".</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A rubber stamp of your own signature. Using it on your own letters saves time and is fine. Making a stamp of your neighbour's signature is forgery. Keeping your stamp locked in your drawer is the "restricted access" part. <i>Where it breaks:</i> a stamp reproduces exactly; a twin generates new text, so even with your own data it can say things you never meant, which is still your responsibility once you publish.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The ethical line is drawn at the <b>data</b>: whose data trains the model and who can use the result. That is also an engineering requirement: the crawler later must only touch your own accounts (plate <a href="#s21">21</a>), and the deployed twin should be access-controlled per user.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you handle privacy in a personalised LLM?" Answer: "Consent and scope first: train and retrieve only on the user's own data, isolate each user's data and model or index, and restrict access. Then log prompts and outputs for audit." In RAG memory systems the same rule shows up as per-user namespaces in the vector store.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s21">21 Data collection pipeline</a> (crawl only your own accounts).</li><li>Responsible LLM use: <a href="../hands_on_llms/ch01_introduction_to_llms.html">Hands-On LLMs ch.1</a>.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SUB-SECTION</div><h2>Why not use ChatGPT (or a similar chatbot)?</h2></div><span class="chip">pdf p34–35</span></div>
+  <p class="note">The book limits this comparison to one use: generating personalised content.</p>
+  <p>The short answer, which the authors say they already gave: <b>ChatGPT is not personalised</b> to your writing style and voice. Its output is <b>generic, unarticulated and wordy</b>. For a personal brand, keeping an <b>original voice</b> is critical for long-term success, so using ChatGPT or Gemini directly won't give the best results.</p>
+  <p>Even if you don't mind content that doesn't sound like you, using ChatGPT "mindlessly" brings two more problems:</p>
+  <ul class="plain">
+    <li><b>Misinformation from hallucination.</b> (Hallucination = the model states false things confidently.) Checking every result by hand, or with third-party evaluation tools, is tedious and unproductive.</li>
+    <li><b>Tedious manual prompting.</b> You must write prompts and paste in outside information yourself every time. Results are hard to <b>reproduce</b> across sessions because you don't fully control the prompts and the injected data. An <b>API</b> plus a tool like <b>LangChain</b> fixes part of this, but needs programming skills.</li>
+  </ul>
+  <p>From the authors' experience: if you want high-quality content that gives real value, you will spend <b>more time debugging the generated text than writing it yourself</b>.</p>
+  <p>The real value of an LLM Twin lies in five things:</p>
+  <ol class="plain">
+    <li><b>What</b> data we collect</li>
+    <li><b>How</b> we preprocess it</li>
+    <li><b>How</b> we feed it into the LLM</li>
+    <li><b>How</b> we chain multiple prompts to get the result we want</li>
+    <li><b>How</b> we evaluate the generated content</li>
+  </ol>
+  <p>The LLM itself matters, but ChatGPT's web interface is very clumsy for managing and injecting many data sources and for evaluating outputs. The answer is to build an <b>LLM system</b> that wraps and automates all these steps, because repeating them by hand every time is not sustainable:</p>
+  <div class="pipe">
+    <div class="stage"><b>Data collection</b></div>
+    <div class="stage"><b>Data preprocessing</b></div>
+    <div class="stage"><b>Storage, versioning, retrieval</b></div>
+    <div class="stage"><b>LLM fine-tuning</b></div>
+    <div class="stage"><b>RAG</b></div>
+    <div class="stage"><b>Content generation evaluation</b></div>
+  </div>
+  <p>An important nuance: the authors <b>never said not to use OpenAI's GPT API</b>. Their framework is <b>LLM-agnostic</b>: any model you can control from code and that exposes a <b>fine-tuning interface</b> can be plugged in. Their general rule for successful ML products: be <b>data-centric</b> and keep the architecture <b>model-agnostic</b>, so you can quickly try many models on your own data.</p>
+
+  <div class="fig">
+    <h3>Compare: one post, two workflows</h3>
+    <p class="note">Toggle to see the steps a human repeats with a chat UI versus what the LLM system automates. Minutes are <b>modelled</b> (illustrative), not from the book.</p>
+    <div class="seg" id="w6_seg"><button type="button" class="on">Chat web UI by hand</button><button type="button">LLM Twin system</button></div>
+    <div id="w6_rows" class="qa"></div>
+    <div class="readout" id="w6_tot"></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>Ordering from a new restaurant every day and explaining each time "less oil, no onion, extra green chilli, like my mother makes it" versus a tiffin service that already knows your preferences and has your past orders on file. <i>Where it breaks:</i> the tiffin service is a person who remembers; an LLM system "remembers" only because you engineered data storage, retrieval and prompts around it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A chat UI makes the <b>human</b> the pipeline: you are the data loader, the prompt template and the evaluator. Each of those steps has no version, no log and no test, so results drift between sessions. Turning them into code makes them repeatable, measurable and swappable. "Model-agnostic" follows naturally: if the model is just one step behind an interface, changing GPT for Llama or Mistral is a config change, while your data and pipelines (the real asset) stay.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why not just call GPT?" Answer: "You can, behind an interface. The product value is in the data pipeline, retrieval, prompt chaining and evaluation; the model is a replaceable part. I'd keep the system model-agnostic so I can A/B different providers or open models on my own eval set." This is exactly how an LLM gateway works: one internal API, many interchangeable model backends.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Hallucination and evaluation: <a href="ch07_evaluating_llms.html">ch07 Evaluating LLMs</a>, <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering ch.3</a>.</li>
+    <li>Prompt chaining: <a href="../hands_on_llms/ch07_advanced_text_generation.html">Hands-On LLMs ch.7</a> (LangChain).</li>
+    <li>The system that automates the steps: <a href="#s20">20 four components</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SECTION</div><h2>Planning the MVP of the LLM Twin product</h2></div><span class="chip">pdf p35</span></div>
+  <p>Now that the "what is it" and "why" are settled, the next job is to define the product's <b>features</b>. The book builds only the <b>first iteration</b>, usually called the <b>MVP</b> (<b>minimum viable product</b>), because that is the natural cycle of most products.</p>
+  <p>The main goal at this stage: <b>line up your ideas with business objectives that are realistic and doable</b> with the resources you actually have. The authors add that even as an engineer, as you take on more responsibility you will go through these steps yourself, bridging what the business needs and what can actually be built.</p>
+  <div class="box picture"><b>Picture it</b><p>Planning a family trip with a fixed budget and one week of leave. Everyone wants Kashmir, Goa and Kerala; you pick one place you can do properly. <i>Where it breaks:</i> a trip ends; an MVP is the start of a product that should keep growing, so you also pick things that are easy to extend later.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>Senior or founding-engineer interviews often test this: "You have 6 weeks and 2 engineers; what do you ship?" Show you can translate a business goal into a minimal, end-to-end slice and name what you deliberately postpone.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s8">08 What is an MVP?</a> · <a href="#s9">09 the twin's MVP</a></li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · SUB-SECTION</div><h2>What is an MVP?</h2></div><span class="chip">pdf p35</span></div>
+  <p>An <b>MVP</b> is a version of a product with <b>just enough features</b> to attract early users and test whether the product idea works, early in development. Its usual purpose is to <b>learn from the market with minimal effort</b>.</p>
+  <p>Why it is a powerful strategy, four reasons:</p>
+  <div class="grid2">
+    <div class="card"><b>Faster time-to-market</b><span>Launch quickly and get early traction.</span></div>
+    <div class="card"><b>Idea validation</b><span>Test with real users before investing in the full product.</span></div>
+    <div class="card"><b>Market research</b><span>Learn what the target audience actually cares about.</span></div>
+    <div class="card"><b>Risk minimisation</b><span>Spend less time and money on something that might not succeed.</span></div>
+  </div>
+  <p>The authors insist on the <b>"V" (viable)</b>. Even a minimal product must give an <b>end-to-end user journey</b> with <b>no half-built features</b>. It must work, have a good user experience, and be something people love and keep using to watch it grow into its full potential.</p>
+  <div class="fig">
+    <h3>Minimal vs viable: which slice is an MVP?</h3>
+    <p class="note">Each row is one way to cut a first version of the twin. Click a row to see whether it passes the book's "viable" test (a full user journey, nothing half-built).</p>
+    <div class="seg" id="w8_seg"><button type="button" class="on">A · only a great crawler</button><button type="button">B · crawler + fine-tune, no UI</button><button type="button">C · thin slice of every step</button></div>
+    <div class="verdict" id="w8_out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A new dosa cart. A "minimal but not viable" first day is serving batter with no chutney because the chutney grinder isn't ready. A viable MVP is one plain dosa with one chutney and sambar, served hot and fast: small menu, complete meal. <i>Where it breaks:</i> food customers forgive a small menu easily; software users may expect more polish, so "good user experience" is part of viable.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Validation only works if users can actually finish the journey. A half-built feature gives you no signal (people drop off because it is broken, not because the idea is bad). That is why the MVP is a <b>thin vertical slice</b> through all layers, not one perfect layer.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Minimal" is about scope, "viable" is about completeness. A good line: "I'd rather ship one end-to-end flow that works well than three flows that each stop halfway, because only the complete flow tells us whether users want it."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s9">09 Defining the LLM Twin MVP</a></li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · SUB-SECTION</div><h2>Defining the LLM Twin MVP</h2></div><span class="chip">pdf p36–37</span></div>
+  <p>A thought experiment: forget the book and imagine building a <b>real product</b>. What resources would you have? Not many:</p>
+  <ul class="plain">
+    <li>A team of <b>three</b>: <b>two ML engineers</b> and <b>one ML researcher</b></li>
+    <li>Their <b>laptops</b></li>
+    <li><b>Personal funding</b> for compute, such as training LLMs</li>
+    <li>Their <b>enthusiasm</b></li>
+  </ul>
+  <p>That is the reality for most start-ups at the beginning. So the MVP must be chosen <b>strategically</b>. The goal: <b>maximise the product's value relative to the effort and resources</b> put in.</p>
+  <p>The features of the twin's MVP:</p>
+  <ul class="plain">
+    <li><b>Collect data</b> from your <b>LinkedIn, Medium, Substack and GitHub</b> profiles.</li>
+    <li><b>Fine-tune an open-source LLM</b> on the collected data.</li>
+    <li><b>Fill a vector database</b> (vector DB: a database that stores embeddings and finds the most similar ones fast) with your digital data, for RAG.</li>
+    <li><b>Create LinkedIn posts</b> using:
+      <ul class="plain"><li>user prompts,</li><li>RAG, to reuse and reference your old content,</li><li>new posts, articles or papers as extra knowledge for the LLM.</li></ul></li>
+    <li>A <b>simple web interface</b> to talk to the twin, where you can:
+      <ul class="plain"><li>configure your social media links and trigger the collection step,</li><li>send prompts or links to external resources.</li></ul></li>
+  </ul>
+  <p>That is the whole MVP. It may not sound like much, but the system must still be <b>cost-effective, scalable and modular</b>. The authors add a note: even while building only these core features, they use the <b>latest LLM research</b> and <b>best software engineering and MLOps practices</b> (MLOps = the practices for running ML in production: automation, versioning, monitoring). The aim is to show how to engineer a cost-effective, scalable LLM application.</p>
+  <p>Up to here the twin was seen from the <b>user's</b> and the <b>business's</b> view. The last step is the <b>engineering</b> view: a development plan for solving it technically. From here on, the book is about implementation.</p>
+
+  <div class="fig">
+    <h3>Simulator: fit an MVP into a 3-person budget</h3>
+    <p class="note">Tick features to include. Effort points, the team budget and value scores are <b>modelled</b> (made up to illustrate the trade-off), not from the book. The checker also tells you whether the user journey is still complete (the "V" from plate 08). Teal-bordered chips are the book's MVP features.</p>
+    <div class="feat" id="w9_feat"></div>
+    <div class="readout"><span>effort <b id="w9_e"></b> / budget <b>20</b></span><span>value <b id="w9_v"></b></span><span>value per effort <b id="w9_r"></b></span></div>
+    <div class="meter"><div id="w9_bar"></div></div>
+    <div class="verdict" id="w9_out"></div>
+    <div class="topbar"><button type="button" id="w9_book">Load the book's MVP</button><button type="button" id="w9_clear">Clear</button></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A small kirana shop opening in a new colony. With little capital, the owner stocks rice, dal, oil, milk and biscuits (what most people need every day), takes UPI, and lets regulars order on WhatsApp. No frozen section, no home-delivery app. Small, but a customer can complete their daily shopping. <i>Where it breaks:</i> the shop can add a shelf any day; adding a feature to a badly structured software system can mean rewriting it, which is why the twin's MVP is built "modular" from day one.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every MVP feature maps to one part of the future architecture: data collection → the data collection pipeline; fine-tuning → the training pipeline; filling the vector DB → the feature pipeline; generating posts with RAG → the inference pipeline; the web UI → the client of the inference REST API. So the MVP already touches every pipeline once, end to end, which is exactly the "viable" requirement. What is left out (other platforms like X or Instagram, other content types) can be added later by plugging into the same pipelines.</p></div>
+  <div class="box work"><b>Worked example</b><p>The UI flow for one user: (1) paste LinkedIn, Medium, Substack and GitHub URLs and click "collect"; (2) later, type "write a LinkedIn post about our new caching layer" and paste a link to a new article as extra knowledge; (3) the twin retrieves two of your old related posts, reads the link's content, and writes the draft in your style. Every MVP bullet is used once in that flow.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How did you scope v1?" Use the book's frame: list your real resources (people, hardware, money), state the goal as value per unit of effort, then name the smallest feature set that is still end-to-end. Mention you designed it modular so new sources or outputs can be added without rewrites.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The technical version of this list: <a href="#s19">19 technical details</a>.</li><li>How each feature becomes a pipeline: <a href="#s20">20 four components</a>.</li><li>The tools picked to stay cheap: <a href="ch02_tooling_and_installation.html">ch02 Tooling and Installation</a>.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · SECTION</div><h2>Building ML systems with feature/training/inference pipelines</h2></div><span class="chip">pdf p37</span></div>
+  <p>Before the specifics of the twin's architecture, the book introduces the pattern at its core: the <b>feature/training/inference (FTI) architecture</b>. This section gives a general overview of the FTI pipeline design and how it can give structure to any ML application. After that, the book applies it to the twin.</p>
+  <p>The section's path: <a href="#s11">the problem</a> (an ML system is much more than a model) → <a href="#s12">why older designs fall short</a> → <a href="#s13">the FTI solution</a> → its three pipelines → <a href="#s17">benefits</a>.</p>
+  <div class="box picture"><b>Picture it</b><p>Before designing your own house, you learn the standard idea that every house has a kitchen, bedrooms and a bathroom joined by corridors. You still customise, but the template tells you what must exist. <i>Where it breaks:</i> rooms are fixed; FTI's "rooms" can each be split into many services, as plate 17 explains.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>MLOps in full: <a href="ch11_mlops_and_llmops.html">ch11 MLOps and LLMOps</a>, <a href="ch12_appendix_mlops_principles.html">Appendix: MLOps principles</a>.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · SUB-SECTION</div><h2>The problem with building ML systems</h2></div><span class="chip">pdf p37–38 · Fig 1.1</span></div>
+  <p>A production-ready ML system is <b>much more than training a model</b>. From an engineering point of view, training is usually the <b>simplest</b> step. Training does get hard when you must choose the right model architecture and <b>hyperparameters</b> (settings chosen before training, like learning rate), but the authors call that a <b>research</b> problem, not an engineering one.</p>
+  <p>Their focus is <b>designing a production-ready architecture</b>. A highly accurate model is valuable, but if you only train it on a <b>static dataset</b>, you are far from deploying it robustly. You also have to think about how to:</p>
+  <ol class="plain">
+    <li><b>Ingest, clean and validate fresh data</b></li>
+    <li>Handle <b>training versus inference setups</b> (they are different environments)</li>
+    <li><b>Compute and serve features</b> in the right environment</li>
+    <li><b>Serve the model cost-effectively</b></li>
+    <li><b>Version, track and share</b> datasets and models</li>
+    <li><b>Monitor</b> the infrastructure and the models</li>
+    <li><b>Deploy</b> the model on scalable infrastructure</li>
+    <li><b>Automate</b> deployments and training</li>
+  </ol>
+  <p>These are the problems an <b>ML or MLOps engineer</b> handles, while a <b>research or data science team</b> is often responsible for training the model.</p>
+  <figure class="bookfig"><img src="figs/fig-1-1.png" alt="A small black box labelled ML Code in the centre, surrounded by twelve boxes: data collection, testing and debugging, resource management, data verification, configs, model analysis, automation, feature engineering, serving infrastructure, metadata management, process management, monitoring." loading="lazy"><figcaption>Figure 1.1 (book, pdf p38): Common elements from an ML system</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The dark box in the middle, <b>ML Code</b>, is the model code: the part most tutorials teach. Around it float the other components that, according to the Google Cloud team, a mature ML and MLOps system needs: <b>configuration, automation, data collection, data verification, testing and debugging, resource management, model analysis, process and metadata management, serving infrastructure and monitoring</b> (the figure also shows <b>feature engineering</b>). The boxes are not connected on purpose: the point is how many pieces there are, not how they link. The model is one small box among many.</p>
+  <p>That raises the key question: <b>how do we connect all these parts into one consistent system?</b> We need a <b>boilerplate</b> (a standard template) for designing ML systems.</p>
+  <p>Classic software already has one. Zoom out on most applications and they split into three layers: a <b>database</b>, <b>business logic</b> and a <b>UI</b>. Each layer can be as complex as needed, but the high-level shape is always those three. Is there something similar for ML? The first step is to look at earlier solutions and why they don't scale.</p>
+
+  <div class="fig">
+    <h3>Click a box: which part of the system owns it?</h3>
+    <p class="note">The figure's boxes, mapped to where they end up in the FTI design later in this chapter (our mapping, built from plates 14–25; the book does not draw this mapping).</p>
+    <div class="feat" id="w11_box"></div>
+    <div class="out" id="w11_out">Click a component.</div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A wedding. The couple (the model) is at the centre of the photo, but the event only works because of caterers, decorators, the pandit, the sound system, the guest list, parking and the person collecting envelopes. Hire a great couple and nothing else, and there is no wedding. <i>Where it breaks:</i> wedding vendors work once; ML components run continuously and must hand data to each other again and again, which is why they need clear interfaces.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Models need data that keeps changing, an environment to run in, and someone watching whether they still work. Each need creates a component. Without a structure, every component talks to every other one and the system becomes a tangle. The DB / business logic / UI split works in classic software because each layer has one job and a narrow interface; the book is about to look for the ML equivalent.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What's hard about putting ML in production?" Answer: "The model is a small part. The hard parts are fresh data ingestion and validation, keeping training and serving features consistent, versioning data and models, cost-effective serving, monitoring for drift, and automating retraining and deployment." That list is a strong answer on its own.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Monitoring and automation: <a href="ch11_mlops_and_llmops.html">ch11</a>.</li><li>Chip Huyen on the AI engineering stack: <a href="../ai_engineering/ch01_building_ai_applications.html">AI Engineering ch.1</a>, <a href="../ai_engineering/ch10_architecture_and_user_feedback.html">ch.10</a>.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · SUB-SECTION</div><h2>The issue with previous solutions</h2></div><span class="chip">pdf p39–42 · Fig 1.2 · 1.3 · 1.4</span></div>
+  <h3>Design 1: the monolithic batch pipeline</h3>
+  <p>Most ML applications use a <b>monolithic batch architecture</b>: feature creation, model training and inference are all inside <b>one component</b> (monolithic = one big block; batch = runs on a schedule over a pile of data, not per request).</p>
+  <p>This quickly solves one critical ML problem: <b>training-serving skew</b>. Skew happens when the <b>features given to the model are computed differently at training time and at inference time</b>. In the monolith, both use the <b>same code</b>, so skew is solved by default. The pattern works fine for <b>small data</b>: the pipeline runs on a schedule in batch mode and a third-party app, like a <b>dashboard</b>, reads the predictions.</p>
+  <figure class="bookfig"><img src="figs/fig-1-2.png" alt="Training data and inference data both flow into one box containing Create Features, Train Model and Make Predictions; Train Model uploads weights to a model registry, Make Predictions downloads them and writes Predictions." loading="lazy"><figcaption>Figure 1.2 (book, pdf p39): Monolithic batch pipeline architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The big rounded rectangle is the single component. Inside it, left to right: <b>Create Features → Train Model → Make Predictions</b>. Two databases feed the same <b>Create Features</b> box: <b>Training Data</b> from the top and <b>Inference Data</b> from the bottom. The curved line from Create Features to Make Predictions shows the <i>same</i> feature code feeding prediction, which is why there is no skew. Train Model uploads <b>model weights</b> to a <b>Model Registry</b>; Make Predictions downloads them back, then writes to <b>Predictions</b> (a store a dashboard would read).</p>
+  <p>But the monolith creates other problems:</p>
+  <ul class="plain">
+    <li><b>Features are not reusable</b>, either by your own system or by others.</li>
+    <li>If data grows, you must <b>refactor the whole codebase</b> to use something like <b>PySpark</b> or <b>Ray</b> (distributed computing frameworks).</li>
+    <li>It is hard to <b>rewrite the prediction module in a faster language</b> such as C++, Java or Rust.</li>
+    <li>It is hard to <b>split the work between teams</b> across features, training and prediction.</li>
+    <li>It is <b>impossible to switch to streaming</b> for real-time training.</li>
+  </ul>
+
+  <div class="fig">
+    <h3>Demo: how training-serving skew sneaks in</h3>
+    <p class="note">One feature: "average post length in words over the user's last posts". The training job and the serving code each implement it. Pick a design and see the feature value the model gets at training vs at serving for the same user. The posts and the bug are <b>modelled</b>.</p>
+    <div class="seg" id="w12_seg"><button type="button" class="on">Monolith (shared code)</button><button type="button">Separate code, subtle bug</button><button type="button">FTI (read from feature store)</button></div>
+    <pre class="req" id="w12_code"></pre>
+    <div class="readout" id="w12_out"></div>
+  </div>
+
+  <h3>Design 2: the stateless real-time architecture</h3>
+  <p>Figure 1.3 shows the real-time version. It has the same issues as above, plus a new one: to make a prediction, the <b>whole state must travel inside the client's request</b>, so the features can be computed and passed to the model.</p>
+  <ul class="plain">
+    <li><b>Movie recommendation example.</b> Instead of sending just the <b>user ID</b>, the client must send the <b>entire user state</b>: name, age, gender, movie history and more. This is error-prone: the client must know how to get that state, and it becomes <b>tightly coupled</b> to the model service.</li>
+    <li><b>LLM + RAG example.</b> The documents you add as context to a query are <b>external state</b>. Without storing them in a vector DB, you would have to send them along with the user query, so the client would need to know how to search and fetch the documents, which is not feasible.</li>
+  </ul>
+  <p>The authors call it an <b>antipattern</b> for the client application to know how to access or compute features. (The book says RAG is explained in detail in Chapters 8 and 9 here.)</p>
+  <figure class="bookfig"><img src="figs/fig-1-3.png" alt="Training data feeds Create Features and Train Model in one box, which uploads weights to a model registry. A separate Make Predictions box with its own small Create Features part downloads the weights, receives a Request from Predictions and returns a Result." loading="lazy"><figcaption>Figure 1.3 (book, pdf p40): Stateless real-time architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Training now lives in its own box (<b>Create Features → Train Model</b>), uploading weights to the <b>Model Registry</b>. Serving is a separate <b>Make Predictions</b> service that downloads the weights. Look at the small <b>Create Features</b> box stuck on the side of Make Predictions: feature computation is duplicated inside the serving service, and it can only work from what arrives in the <b>Request</b> arrow. The service is <b>stateless</b> (it stores nothing), so everything it needs must be in the request; it sends back a <b>Result</b>.</p>
+  <p>So the core problem is: <b>how do we get the features to make a prediction without the client passing them in?</b> For the movie example: how can we recommend using <b>only the user's ID</b>? The book asks you to keep these questions in mind; FTI answers them.</p>
+
+  <div class="fig">
+    <h3>Compare the request: stateless vs feature store</h3>
+    <div class="seg" id="w12b_seg"><button type="button" class="on">Stateless (client sends state)</button><button type="button">With a feature store (FTI)</button></div>
+    <pre class="req" id="w12b_req"></pre>
+    <div class="readout" id="w12b_out"></div>
+  </div>
+
+  <h3>Design 3: Google Cloud's production architecture</h3>
+  <p>At the other end of the spectrum, Google Cloud provides a <b>production-ready architecture</b> (Figure 1.4). It works, but it is <b>very complex and not intuitive</b>. Unless you have a lot of experience deploying and maintaining ML models in production, it is hard to understand. It is also not obvious how to <b>start small and grow</b> the system over time.</p>
+  <figure class="bookfig"><img src="figs/fig-1-4.png" alt="Google Cloud MLOps diagram with an orchestrated experiment row (data validation, preparation, training, evaluation, validation) above a dashed line and an automated production pipeline below, plus feature store, model registry, ML metadata store, trigger, performance monitoring, CD model serving and prediction service." loading="lazy"><figcaption>Figure 1.4 (book, pdf p41): ML pipeline automation for CT (source: https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning). The book notes it is reproduced from work shared by Google under the Creative Commons 4.0 Attribution License.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A dashed horizontal line splits it into <b>experimentation/development/test</b> (top) and <b>staging/preproduction/production</b> (bottom). Top: data analysis feeds an <b>orchestrated experiment</b> (data validation → data preparation → model training → model evaluation → model validation), with model analysis looping back; the result is <b>source code</b> pushed to a <b>source repository</b> and then to <b>pipeline deployment</b>. Bottom: the deployed <b>automated pipeline</b> repeats the same steps (plus data extraction) on fresh data fetched in batches from the <b>feature store</b>, writes to the <b>model registry</b> and an <b>ML metadata store</b>, and feeds <b>CD: model serving</b> → <b>prediction service</b>. <b>Performance monitoring</b> watches predictions and can fire a <b>trigger</b> that restarts the automated pipeline: that loop is <b>CT</b> (continuous training). Count the boxes: about 20 moving pieces, which is the number FTI will reduce to three.</p>
+  <p>This is where FTI comes in: the next section solves these issues with an intuitive design.</p>
+
+  <div class="box picture"><b>Picture it</b><p><b>Monolith</b>: a one-person dhaba where the cook buys vegetables, cooks and serves. No miscommunication, but it can't grow past ten tables. <b>Stateless real-time</b>: a restaurant where each customer must bring their own spice mix and recipe card, because the kitchen keeps nothing. <b>Google's design</b>: a five-star hotel kitchen manual, correct but overwhelming for someone opening a small restaurant. <i>Where it breaks:</i> kitchens don't suffer "skew" the way ML does: a cook tasting food notices a mistake, while a model silently accepts wrongly computed features.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Skew is dangerous because nothing crashes: the model just gets numbers on a slightly different scale or meaning than it learned and makes worse predictions. Sharing code (monolith) avoids it but couples everything. Splitting services (real-time) decouples them but duplicates feature logic and pushes state onto the client. The way out is to <b>compute features once, store them with versions, and let every consumer read the same stored values by key</b>. That is the feature store in FTI.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What is training-serving skew and how do you prevent it?" Answer: "Features computed differently in training and serving, for example different code, different time windows or different preprocessing. Prevent it by computing features in one pipeline, storing them versioned in a feature store, and having both training and inference read from it; then monitor the feature distributions at serving." For RAG: the same idea means using the same chunking and embedding model at indexing and at query time.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The fix: <a href="#s13">13 FTI</a>, <a href="#s14">14 feature store</a>.</li><li>Same embedding model at index and query time: <a href="ch04_rag_feature_pipeline.html">ch04</a>, <a href="ch09_rag_inference_pipeline.html">ch09</a>.</li><li>CT/CD in detail: <a href="ch11_mlops_and_llmops.html">ch11</a>.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · SUB-SECTION</div><h2>The solution: ML pipelines for ML systems</h2></div><span class="chip">pdf p42–43 · Fig 1.5</span></div>
+  <p>The solution is a <b>clear, simple mind map</b> that any team or person can follow to <b>compute features, train the model and make predictions</b>. Those three steps are needed by every ML system, so the pattern is named after them: the <b>FTI pipeline</b>.</p>
+  <p>The claim: <b>any ML system can be reduced to three pipelines</b>: <b>feature</b>, <b>training</b> and <b>inference</b>. This mirrors the <b>DB / business logic / UI</b> layers of classic software (plate <a href="#s11">11</a>). Why it is powerful:</p>
+  <ul class="plain">
+    <li>You can clearly define each pipeline's <b>scope</b> and <b>interface</b> (what it takes in and what it gives out).</li>
+    <li>It is easier to see how the three parts <b>interact</b>.</li>
+    <li>You work with <b>3 moving pieces instead of ~20</b> (as in Figure 1.4), which is much easier to define and handle.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-1-5.png" alt="Three pipeline boxes: #1 Feature Pipeline (transform data into features and labels; Pandas, Polars, Spark, DBT, Flink, Bytewax) takes Data; #2 Training Pipeline (train models with features and labels; PyTorch, TensorFlow, Scikit-Learn, XGBoost, Jax); #3 Inference Pipeline (make predictions with models and new features) outputs Predictions. All connect through a bar to a Feature Store and a Model Registry." loading="lazy"><figcaption>Figure 1.5 (book, pdf p42): FTI pipelines architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three boxes, left to right. <b>#1 Feature Pipeline</b> takes <b>Data</b> from the top and sends <b>Features &amp; Labels</b> down. <b>#2 Training Pipeline</b> pulls <b>Features &amp; Labels</b> up and pushes <b>Models</b> down. <b>#3 Inference Pipeline</b> pulls both <b>Features</b> and <b>Models</b> up and emits <b>Predictions</b> at the top. The green horizontal bar is the shared storage layer, sitting on two stores: the <b>Feature Store</b> and the <b>Model Registry</b>. No arrow goes directly from one pipeline to another: they only meet through storage. Each box also lists example tools: feature pipeline <b>Pandas, Polars, Spark, DBT, Flink, Bytewax</b>; training and inference <b>PyTorch, TensorFlow, Scikit-Learn, XGBoost, Jax</b>. Different tools per box is the point: each pipeline picks its own stack.</p>
+  <p>One more key point before the details: <b>each pipeline is a separate component</b> that can run in a <b>different process or on different hardware</b>. So each can use a <b>different technology</b>, be built by a <b>different team</b>, or be <b>scaled differently</b>. The design bends to your team's needs; it works as a mind map for structuring your architecture.</p>
+
+  <div class="fig">
+    <h3>Step through FTI: who writes, who reads</h3>
+    <div class="arch"><svg id="w13_svg" viewBox="0 0 640 250" role="img" aria-label="FTI step-through diagram">
+      <rect class="blk" id="w13_data" x="20" y="20" width="110" height="40" rx="5"/><text x="75" y="45" text-anchor="middle">raw data</text>
+      <rect class="blk" id="w13_fp" x="160" y="20" width="130" height="40" rx="5"/><text x="225" y="45" text-anchor="middle" class="g">Feature pipeline</text>
+      <rect class="blk" id="w13_tp" x="320" y="20" width="130" height="40" rx="5"/><text x="385" y="45" text-anchor="middle" class="g">Training pipeline</text>
+      <rect class="blk" id="w13_ip" x="480" y="20" width="140" height="40" rx="5"/><text x="550" y="45" text-anchor="middle" class="g">Inference pipeline</text>
+      <rect class="blk" id="w13_fs" x="120" y="170" width="200" height="50" rx="5"/><text x="220" y="192" text-anchor="middle" class="g">Feature store</text><text x="220" y="210" text-anchor="middle" class="m">features + labels, versioned</text>
+      <rect class="blk" id="w13_mr" x="380" y="170" width="200" height="50" rx="5"/><text x="480" y="192" text-anchor="middle" class="g">Model registry</text><text x="480" y="210" text-anchor="middle" class="m">models + metadata, versioned</text>
+      <rect class="blk" id="w13_pred" x="500" y="100" width="120" height="34" rx="5"/><text x="560" y="122" text-anchor="middle">predictions</text>
+      <line id="w13_a1" x1="130" y1="40" x2="160" y2="40"/>
+      <path id="w13_a2" d="M225 60 L220 170"/>
+      <path id="w13_a3" d="M250 170 L370 60"/>
+      <path id="w13_a4" d="M410 60 L460 170"/>
+      <path id="w13_a5" d="M300 170 C380 120 470 110 500 60"/>
+      <path id="w13_a6" d="M530 170 L545 60"/>
+      <line id="w13_a7" x1="590" y1="60" x2="580" y2="100"/>
+    </svg></div>
+    <div class="caption" id="w13_cap"></div>
+    <div class="stepbar"><button id="w13_prev" type="button">◀ Back</button><button id="w13_next" type="button">Next ▶</button><span id="w13_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>Indian Railways reservations. One team prepares the <b>chart</b> (feature pipeline writing to a shared record), another trains <b>TTEs</b> on the rules (training), and the TTE on the train checks your seat using the chart and his training (inference). The TTE never phones the chart-making team; he just reads the printed chart. <i>Where it breaks:</i> a railway chart is printed once per journey; a feature store is updated continuously and keeps old versions too.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The trick is that <b>storage is the contract</b>. Because pipelines exchange data only through the feature store and the model registry, each pipeline's internals are hidden. This is the same reason microservices talk over well-defined APIs or a message queue: you can rewrite one side without touching the other, as long as the stored format and versions are respected.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Explain the FTI pattern in 30 seconds." Answer: "Three independent pipelines. Feature: raw data in, features and labels out to a feature store. Training: features from the store in, model out to a model registry. Inference: features plus model in, predictions out. They never call each other directly, so each can have its own stack, team, schedule and scaling."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Each pipeline: <a href="#s14">14</a> · <a href="#s15">15</a> · <a href="#s16">16</a>.</li><li>Jim Dowling's article that inspired this section: see <a href="#refs">References</a>.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SUB-SUB-SECTION</div><h2>The feature pipeline</h2></div><span class="chip">pdf p43</span></div>
+  <ul class="plain">
+    <li><b>Input:</b> raw data. <b>Work:</b> process it. <b>Output:</b> the <b>features and labels</b> the model needs for training or inference (features = the input values a model uses; labels = the correct answers it learns from).</li>
+    <li>It does <b>not</b> hand them to the model directly. Instead it stores them in a <b>feature store</b>, whose job is to <b>store, version, track and share</b> features.</li>
+    <li>Because features are saved, we always have a <b>state</b> of our features, so we can easily send them to the training and inference pipelines.</li>
+    <li>Because the data is <b>versioned</b>, we can always make sure training-time and inference-time features <b>match</b>. That avoids <b>training-serving skew</b> (plate <a href="#s12">12</a>).</li>
+  </ul>
+  <div class="box work"><b>Worked example</b><p>Back to the movie recommender. The feature pipeline runs every night: it reads watch logs and writes, per user ID, <code>favourite_genre</code>, <code>avg_rating</code> and <code>watched_last_7d</code> to the feature store as version <code>v3</code>. The training job reads <code>v3</code> for all users; the serving API, given only <code>user_id=42</code>, reads the same <code>v3</code> row. That answers the book's question from plate 12: predict from the ID alone.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A school's report-card office. Teachers' raw marks come in; the office computes percentages and grades and files them in a register by roll number. The scholarship committee and the parent-teacher meeting both read the same register, so nobody computes a different percentage. <i>Where it breaks:</i> a register is rarely re-versioned; a feature store keeps every version so you can retrain on exactly the old one.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The feature store is two things at once: a historical store (all versions, good for training on large batches) and a fast lookup by key (good for serving one request). Versioning turns "features" into a reproducible dataset: "model trained on features v3" means something exact.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What does a feature store give you?" Answer: "One place where features are computed once and stored with versions, so training and serving use identical values, features are reusable across models and teams, and the client only sends an ID." In an LLM system the vector DB of embedded chunks plays this role for RAG.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The twin's version: <a href="#s22">22 feature pipeline + logical feature store</a>, built in <a href="ch04_rag_feature_pipeline.html">ch04</a>.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SUB-SUB-SECTION</div><h2>The training pipeline</h2></div><span class="chip">pdf p43</span></div>
+  <ul class="plain">
+    <li><b>Input:</b> features and labels from the feature store. <b>Output:</b> a trained model, or several.</li>
+    <li>Models are stored in a <b>model registry</b>. It plays the same role as the feature store, but now the <b>model is the first-class citizen</b>: the registry <b>stores, versions, tracks and shares</b> models with the inference pipeline.</li>
+    <li>Most modern registries include a <b>metadata store</b> where you record important facts about how a model was trained. The most important: <b>which features, labels and their versions</b> were used. So you always know <b>what data a model was trained on</b>.</li>
+  </ul>
+  <div class="tablewrap"><table>
+    <tr><th>A registry entry (modelled example)</th><th>Why it matters</th></tr>
+    <tr><td><code>model: twin-llm v2</code></td><td>The version the inference pipeline asks for</td></tr>
+    <tr><td><code>trained_on: instruct-dataset v5</code></td><td>Lineage: you can rebuild or audit it</td></tr>
+    <tr><td><code>hyperparameters: lr=2e-4, epochs=3</code></td><td>Reproducibility</td></tr>
+    <tr><td><code>eval: passed test suite on 2026-11-01</code></td><td>Gate for deployment</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>A pharmacy that keeps each medicine batch with its batch number, manufacturing date and the ingredient lots used. If a batch has a problem, you know exactly what went into it. <i>Where it breaks:</i> a medicine batch is never "rolled back to"; with models you often redeploy an older version.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Metadata creates <b>lineage</b>: model → dataset version → raw data. When a model behaves badly, lineage lets you ask "was it the data or the training?" and reproduce the exact run. Without it, a model file is an unexplained blob of weights.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What goes in a model registry besides the weights?" Answer: "Version, the dataset version and features it was trained on, hyperparameters, evaluation results and stage (candidate, accepted, production), so you have lineage, reproducibility and safe rollback."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The twin's version: <a href="#s23">23 training pipeline</a>. Model registry and experiment tracking tools: <a href="ch02_tooling_and_installation.html">ch02</a>.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · SUB-SUB-SECTION</div><h2>The inference pipeline</h2></div><span class="chip">pdf p43</span></div>
+  <ul class="plain">
+    <li><b>Input:</b> features and labels from the <b>feature store</b> plus the trained model from the <b>model registry</b>. With these two it makes predictions in <b>batch</b> or <b>real-time</b> mode.</li>
+    <li>What happens to predictions is up to you: in a <b>batch</b> system they probably go into a <b>DB</b>; in a <b>real-time</b> system they are <b>served to the client</b> that asked.</li>
+    <li>Because features, labels and models are all <b>versioned</b>, you can easily <b>upgrade or roll back</b> a model deployment. The book's example: you always know <b>model v1 uses features F1, F2, F3</b> and <b>model v2 uses F2, F3, F4</b>, so you can quickly change which model is wired to which features.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: deploy and roll back with versioned features</h3>
+    <p class="note">The book's example. Pick which model version is live; the inference pipeline fetches exactly the features that version was trained on. Then "break" a feature and roll back.</p>
+    <div class="seg" id="w16_seg"><button type="button" class="on">Deploy model v1</button><button type="button">Deploy model v2</button></div>
+    <div class="vers" id="w16_out"></div>
+    <div class="topbar"><button type="button" id="w16_break">Simulate: F4 pipeline breaks</button><button type="button" id="w16_fix">Repair F4</button></div>
+    <div class="verdict" id="w16_v"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A phone app on the Play Store. Version 2 crashes for some users, so the developer pushes version 1 back. That only works because the old APK is stored and everyone knows which server API version it needs. <i>Where it breaks:</i> phone apps rarely depend on a separate stored "feature" dataset; a model rollback must also bring back the matching features.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The registry's metadata records which feature versions a model needs. Inference reads that list and fetches those exact features. So switching models is changing one pointer, not redeploying code. In real-time mode this is usually a small service behind an API; in batch mode it is a scheduled job writing to a table.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How do you roll back a bad model safely?" Answer: "Keep models and feature versions linked in the registry, deploy by pointing the serving layer at a model version, and roll back by repointing to the previous version and its features. Combine with canary or shadow traffic before full rollout." (Canary/shadow is beyond the book here.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The twin's version: <a href="#s24">24 inference pipeline</a>, built in <a href="ch09_rag_inference_pipeline.html">ch09</a> and deployed in <a href="ch10_inference_pipeline_deployment.html">ch10</a>.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · SUB-SECTION</div><h2>Benefits of the FTI architecture</h2></div><span class="chip">pdf p44–45</span></div>
+  <p>The one thing to remember about FTI is its <b>interface</b>:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Pipeline</th><th>Reads</th><th>Writes</th></tr>
+    <tr><td><b>Feature</b></td><td>raw data</td><td>features + labels → feature store</td></tr>
+    <tr><td><b>Training</b></td><td>features + labels ← feature store</td><td>model → model registry</td></tr>
+    <tr><td><b>Inference</b></td><td>features ← feature store, model ← model registry</td><td>predictions</td></tr>
+  </table></div>
+  <p>However complex your ML system gets, <b>these interfaces stay the same</b>.</p>
+  <p>The main benefits:</p>
+  <ol class="plain">
+    <li><b>Only three components</b>, so it is intuitive and easy to understand.</li>
+    <li><b>Each component can use its own tech stack</b>, so you can adapt each to specific needs (big data, streaming) and pick the best tool for each job.</li>
+    <li>A <b>clear interface</b> between components means each can be built by a <b>different team</b> if needed, making development more manageable and scalable.</li>
+    <li>Every component can be <b>deployed, scaled and monitored independently</b>.</li>
+  </ol>
+  <p>Last point: the system <b>doesn't have to have only three pipelines</b>. Usually it has more. For example:</p>
+  <ul class="plain">
+    <li>The feature pipeline can be a service that <b>computes features</b> plus one that <b>validates data</b>.</li>
+    <li>The training pipeline can be a <b>training</b> component plus an <b>evaluation</b> component.</li>
+  </ul>
+  <p>The FTI pipelines are <b>logical layers</b>. Each can be complex and contain many services. What matters is that all of them keep the <b>same interface</b>: they interact only through the feature store and model registries. Then each FTI component can <b>evolve separately</b>, without knowing the others' details and without breaking the system when something changes.</p>
+  <p class="note">The authors point to Jim Dowling's (CEO and co-founder of Hopsworks) article <i>From MLOps to ML Systems with Feature/Training/Inference Pipelines</i> as the inspiration for this section (see <a href="#refs">References</a>). Next they apply FTI to the twin.</p>
+
+  <div class="fig">
+    <h3>Try it: swap a pipeline's internals, keep the interface</h3>
+    <p class="note">Pick a pipeline and a new internal tech. The readout shows what other parts had to change. Tool names come from Figure 1.5 and plate 12; the scenario is ours.</p>
+    <div class="controls">
+      <label>Pipeline <select id="w17_p"><option value="f">Feature</option><option value="t">Training</option><option value="i">Inference</option></select></label>
+      <label>Change <select id="w17_c"></select></label>
+    </div>
+    <div class="seg" id="w17_seg"><button type="button" class="on">FTI design</button><button type="button">Monolith design</button></div>
+    <div class="verdict" id="w17_out"></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A cricket team with batters, bowlers and fielders. The bowling coach can change how bowlers train without asking the batting coach, as long as the bowlers still turn up and bowl in the match. The "interface" is the match itself. <i>Where it breaks:</i> a cricket team shares one captain who decides everything; FTI pipelines have no central decider, only shared storage and an orchestrator that triggers them.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is the classic software idea of <b>loose coupling through stable contracts</b>. The feature store schema and the registry's model format are the contracts. Inside a layer, you can add a validation service, move from Pandas to Spark, or split training and evaluation, and nothing outside notices. Breaking the contract (changing a feature's meaning without a new version) is what breaks systems.</p></div>
+  <div class="box work"><b>Worked example</b><p>Your data grows 50× (modelled). In the monolith (plate 12) you must refactor everything to PySpark. In FTI you rewrite only the feature pipeline in Spark; training still reads "features v6" from the store and inference still reads by ID. One team, one pipeline, one change.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Why split ML into pipelines?" Answer: "Different workloads need different stacks and hardware (CPU batch jobs vs GPU training vs low-latency serving), different teams own them, and they change at different speeds. Fixed interfaces through a feature store and model registry let each evolve and scale independently." Compare it to a backend team's DB / service / API split.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s25">25 compute and scaling per pipeline</a>.</li><li>Orchestrators that trigger the pipelines: <a href="ch02_tooling_and_installation.html">ch02</a>, <a href="ch11_mlops_and_llmops.html">ch11</a>.</li></ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · SECTION</div><h2>Designing the system architecture of the LLM Twin</h2></div><span class="chip">pdf p45</span></div>
+  <p>Now the book lists the twin's concrete technical requirements and shows how to meet them by designing the LLM system with FTI.</p>
+  <p>An important limit for this step: <b>no tools or tech stack yet</b>. The goal is only a <b>high-level architecture</b> that is <b>language-, framework-, platform- and infrastructure-agnostic</b>. The focus is each component's <b>scope</b>, <b>interface</b> and <b>interconnectivity</b> (how the parts connect). Implementation details and the tech stack come in later chapters.</p>
+  <div class="box picture"><b>Picture it</b><p>An architect's floor plan before choosing tiles, paint brands or the contractor. You decide where the rooms and doors go; materials come later. <i>Where it breaks:</i> in software, some tool choices (for example a vector DB that can also act as a NoSQL store, plate 22) do feed back into the design.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>In a system design interview, start exactly like this: requirements, then components with their responsibilities and interfaces, then data flow, and only then specific technologies. Naming tools too early is a common mistake.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The tech stack chosen later: <a href="ch02_tooling_and_installation.html">ch02 Tooling and Installation</a>.</li></ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · SUB-SECTION</div><h2>Listing the technical details of the LLM Twin architecture</h2></div><span class="chip">pdf p45–46</span></div>
+  <p>So far the twin was described from the user's side. Now the ML system's requirements are stated in purely <b>technical</b> terms, in four groups.</p>
+  <div class="grid2">
+    <div class="card"><b>Data side</b><ul class="plain">
+      <li>Collect data from <b>LinkedIn, Medium, Substack and GitHub</b>, fully <b>autonomously</b> and <b>on a schedule</b>.</li>
+      <li><b>Standardise</b> the crawled data and store it in a <b>data warehouse</b>.</li>
+      <li><b>Clean</b> the raw data.</li>
+      <li>Create <b>instruct datasets</b> for fine-tuning (pairs of instruction → desired answer).</li>
+      <li><b>Chunk and embed</b> the cleaned data and store the vectors in a <b>vector DB</b> for RAG.</li>
+    </ul></div>
+    <div class="card"><b>Training</b><ul class="plain">
+      <li>Fine-tune LLMs of several sizes: <b>7B, 14B, 30B or 70B parameters</b> (B = billion).</li>
+      <li>Fine-tune on instruction datasets of <b>several sizes</b>.</li>
+      <li><b>Switch between LLM types</b>, e.g. Mistral, Llama and GPT.</li>
+      <li><b>Track and compare experiments</b>.</li>
+      <li><b>Test</b> potential production LLM candidates before deploying them.</li>
+      <li><b>Start training automatically</b> when new instruction datasets appear.</li>
+    </ul></div>
+    <div class="card"><b>Inference</b><ul class="plain">
+      <li>A <b>REST API</b> for clients to talk to the twin.</li>
+      <li><b>Real-time access to the vector DB</b> for RAG.</li>
+      <li>Inference with LLMs of <b>various sizes</b>.</li>
+      <li><b>Autoscaling</b> based on user requests.</li>
+      <li><b>Automatically deploy</b> the LLMs that pass evaluation.</li>
+    </ul></div>
+    <div class="card"><b>LLMOps features</b><ul class="plain">
+      <li><b>Instruction dataset</b> versioning, lineage and reusability.</li>
+      <li><b>Model</b> versioning, lineage and reusability.</li>
+      <li><b>Experiment tracking</b>.</li>
+      <li><b>CT/CI/CD</b>: continuous training, continuous integration, continuous delivery.</li>
+      <li><b>Prompt and system monitoring</b>.</li>
+    </ul></div>
+  </div>
+  <p class="note">The book says not to worry if some of these don't make sense yet; each is explained in its own chapter to avoid repetition. The list could be more detailed, but it focuses on core functionality. The real question it leaves: <b>how do we apply FTI to implement all of this?</b></p>
+
+  <div class="fig">
+    <h3>Click a requirement: which component meets it?</h3>
+    <p class="note">Our mapping from plates 21–25 (the book's answer to "how do we apply FTI?").</p>
+    <div class="feat" id="w19_req"></div>
+    <div class="out" id="w19_out">Click a requirement.</div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding planner's checklist split into catering, decoration, music and logistics. Each line item must belong to exactly one vendor, or it falls through the cracks. <i>Where it breaks:</i> some ML requirements (like versioning) are shared by several pipelines, so they are cross-cutting rather than owned by one.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Requirements are grouped by <b>lifecycle stage</b> (data, training, inference) plus <b>LLMOps</b>, the operational glue across stages. That grouping already hints at the FTI split. Notice the many "automatically" and "on a schedule" items: the system is meant to run without a human pressing buttons, except for one deliberate approval step (plate 23).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"List the non-functional requirements for an LLM app." Use this list: scheduled ingestion, versioned datasets and models with lineage, experiment tracking, evaluation gates before deploy, autoscaling inference behind an API, real-time retrieval, CT/CI/CD, and prompt monitoring.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Instruct datasets: <a href="ch05_supervised_fine_tuning.html">ch05</a>. CT/CI/CD and monitoring: <a href="ch11_mlops_and_llmops.html">ch11</a>. Autoscaling: <a href="ch10_inference_pipeline_deployment.html">ch10</a>.</li></ul></div>
+</section>
+
+<!-- 20 -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · SUB-SECTION</div><h2>How to design the LLM Twin architecture using FTI: four components</h2></div><span class="chip">pdf p46–47 · Fig 1.6</span></div>
+  <p>The system is split into <b>four</b> core components. Why four, when FTI says three? Because along with the feature, training and inference pipelines we also need a <b>data pipeline</b>. Best practice says:</p>
+  <ul class="plain">
+    <li>the <b>data engineering team</b> owns the data pipeline;</li>
+    <li>the <b>ML engineering team</b> owns the FTI pipelines.</li>
+  </ul>
+  <p>Since the MVP is built by a small team, <b>they implement all of it</b>: data collection plus FTI. Tackling a problem <b>end to end</b> is common in start-ups that can't afford dedicated teams, so engineers "wear many hats" depending on the product's stage. And in any setup, knowing how a whole ML system works helps you understand other people's work.</p>
+  <figure class="bookfig"><img src="figs/fig-1-6.png" alt="Four boxes. Data Collection Pipeline: Medium, Substack, LinkedIn, GitHub into ETL into a NoSQL DB. Feature Pipeline: articles, posts and code processed into a Logical Feature Store containing a vector DB, a retrieval client and an instruct dataset. Training Pipeline: LLM fine-tuning with experiment tracker and test LLM candidate, writing to a model registry. Deploy of the accepted LLM into the Inference Pipeline: REST API, retrieval client reading RAG data, LLM Twin, sending to prompt and system monitoring." loading="lazy"><figcaption>Figure 1.6 (book, pdf p47): LLM Twin high-level architecture</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Start top-left. <b>Data Collection Pipeline</b>: Medium, Substack, LinkedIn and GitHub all go into one <b>ETL</b> box, which loads a <b>NoSQL DB</b>. A thick arrow carries that data into the <b>Feature Pipeline</b> (top-right), which processes three lanes: <b>Articles, Posts, Code</b>. Its output, labelled "Data for Fine-tuning &amp; RAG", lands in the dotted <b>Logical Feature Store</b>: a <b>Vector DB</b>, a <b>Retrieval Client</b> reading from it, and an <b>Instruct Dataset</b>. "Fine-tuning Data" flows left into the <b>Training Pipeline</b>: <b>LLM Fine-tuning</b> logs to an <b>Experiment Tracker</b>, and the "LLM Production Candidate" goes to the <b>Model Registry</b>; <b>Test LLM Candidate</b> reads from and writes back to the registry. The registry sends the "Accepted LLM" to <b>Deploy</b>, which feeds the <b>Inference Pipeline</b> (bottom): <b>REST API → Retrieval Client → LLM Twin</b>, with the retrieval client pulling "RAG Data" from the vector DB (dashed line). The twin's activity goes to <b>Prompt &amp; System Monitoring</b>. The legend bottom-right: a request such as "Write a post about…" comes in, a generated post goes out.</p>
+
+  <div class="fig">
+    <h3>Trace it: from crawling to a generated post (step through)</h3>
+    <p class="note">Our simplified redraw of Figure 1.6. Each step highlights the parts involved and says what moves where.</p>
+    <div class="arch"><svg id="w20_svg" viewBox="0 0 700 330" role="img" aria-label="Simplified LLM Twin architecture, highlighted step by step">
+      <rect class="grp" id="w20_g1" x="8" y="8" width="320" height="110" rx="6"/><text x="18" y="26" class="g">Data collection pipeline</text>
+      <rect class="grp" id="w20_g2" x="340" y="8" width="352" height="180" rx="6"/><text x="350" y="26" class="g">Feature pipeline</text>
+      <rect class="grp" id="w20_g3" x="8" y="130" width="320" height="90" rx="6"/><text x="18" y="148" class="g">Training pipeline</text>
+      <rect class="grp" id="w20_g4" x="180" y="240" width="400" height="82" rx="6"/><text x="190" y="258" class="g">Inference pipeline</text>
+      <rect class="blk" id="w20_src" x="18" y="40" width="96" height="66" rx="5"/><text x="66" y="62" text-anchor="middle" class="m">Medium · Substack</text><text x="66" y="78" text-anchor="middle" class="m">LinkedIn · GitHub</text><text x="66" y="96" text-anchor="middle">sources</text>
+      <rect class="blk" id="w20_etl" x="130" y="56" width="60" height="34" rx="5"/><text x="160" y="78" text-anchor="middle">ETL</text>
+      <rect class="blk" id="w20_nosql" x="210" y="50" width="104" height="46" rx="5"/><text x="262" y="70" text-anchor="middle">NoSQL DB</text><text x="262" y="86" text-anchor="middle" class="m">warehouse</text>
+      <rect class="blk" id="w20_proc" x="352" y="38" width="200" height="40" rx="5"/><text x="452" y="55" text-anchor="middle">clean · chunk · embed</text><text x="452" y="70" text-anchor="middle" class="m">articles / posts / code</text>
+      <rect class="blk" id="w20_vdb" x="580" y="96" width="102" height="40" rx="5"/><text x="631" y="120" text-anchor="middle">Vector DB</text>
+      <rect class="blk" id="w20_inst" x="352" y="96" width="130" height="40" rx="5"/><text x="417" y="120" text-anchor="middle">Instruct dataset</text>
+      <text x="500" y="176" class="m">logical feature store</text>
+      <rect class="blk" id="w20_ft" x="150" y="160" width="110" height="40" rx="5"/><text x="205" y="184" text-anchor="middle">LLM fine-tuning</text>
+      <rect class="blk" id="w20_exp" x="18" y="160" width="120" height="40" rx="5"/><text x="78" y="178" text-anchor="middle" class="m">experiment tracker</text><text x="78" y="193" text-anchor="middle" class="m">+ test candidate</text>
+      <rect class="blk" id="w20_reg" x="18" y="250" width="110" height="44" rx="5"/><text x="73" y="276" text-anchor="middle">Model registry</text>
+      <rect class="blk" id="w20_api" x="470" y="268" width="96" height="40" rx="5"/><text x="518" y="292" text-anchor="middle">REST API</text>
+      <rect class="blk" id="w20_ret" x="340" y="268" width="114" height="40" rx="5"/><text x="397" y="292" text-anchor="middle">Retrieval client</text>
+      <rect class="blk" id="w20_llm" x="200" y="268" width="120" height="40" rx="5"/><text x="260" y="292" text-anchor="middle">LLM Twin</text>
+      <rect class="blk" id="w20_mon" x="596" y="250" width="96" height="58" rx="5"/><text x="644" y="274" text-anchor="middle" class="m">prompt &amp;</text><text x="644" y="290" text-anchor="middle" class="m">monitoring</text>
+      <line id="w20_e1" x1="114" y1="73" x2="130" y2="73"/>
+      <line id="w20_e2" x1="190" y1="73" x2="210" y2="73"/>
+      <path id="w20_e3" d="M314 73 L352 58"/>
+      <path id="w20_e4" d="M552 58 L631 96"/>
+      <path id="w20_e5" d="M452 78 L417 96"/>
+      <path id="w20_e6" d="M352 116 L260 170"/>
+      <path id="w20_e7" d="M150 180 L138 180"/>
+      <path id="w20_e8" d="M205 200 L110 250"/>
+      <path id="w20_e9" d="M128 280 L200 288"/>
+      <line id="w20_e10" x1="470" y1="288" x2="454" y2="288"/>
+      <path id="w20_e11" d="M631 136 L420 268"/>
+      <line id="w20_e12" x1="340" y1="288" x2="320" y2="288"/>
+      <path id="w20_e13" d="M260 308 C300 326 600 326 640 308"/>
+    </svg></div>
+    <div class="caption" id="w20_cap"></div>
+    <div class="stepbar"><button id="w20_prev" type="button">◀ Back</button><button id="w20_next" type="button">Next ▶</button><span id="w20_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A newspaper. <b>Reporters</b> gather stories from many places into one inbox (data collection). The <b>desk</b> cleans, sorts by section and files them in the archive (feature pipeline). The <b>training school</b> teaches new writers the paper's style from the archive (training). The <b>editor on duty</b> takes a reader's request, pulls related archive clippings and has a trained writer produce the piece (inference). <i>Where it breaks:</i> a newspaper has humans checking each article; the twin's checks are automated tests, plus one human approval only when a new model goes live.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The data pipeline is separated from the feature pipeline because it has a different owner and a different job: making raw data <b>available and standardised</b>, with no ML-specific processing. The feature pipeline then turns it into <b>two ML-ready products</b>: an instruct dataset for training and a vector index for RAG. Training and inference each consume one product. Every arrow crosses a storage boundary (NoSQL DB, logical feature store, model registry), which is what keeps the four parts independent.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Design an LLM app that writes in a user's voice." Draw this: crawler + ETL into a document DB; a feature pipeline that cleans, chunks and embeds into a vector DB and also builds an instruct dataset; a training pipeline that fine-tunes, tracks experiments and registers candidates behind an evaluation gate; and an inference service with a REST API, a retrieval client, the fine-tuned model and prompt monitoring. Then talk about scaling per component (plate <a href="#s25">25</a>).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Each part: <a href="#s21">21</a> · <a href="#s22">22</a> · <a href="#s23">23</a> · <a href="#s24">24</a>. Built in <a href="ch03_data_engineering.html">ch03</a>, <a href="ch04_rag_feature_pipeline.html">ch04</a>, <a href="ch05_supervised_fine_tuning.html">ch05</a>, <a href="ch09_rag_inference_pipeline.html">ch09</a>, <a href="ch10_inference_pipeline_deployment.html">ch10</a>.</li></ul></div>
+</section>
+
+<!-- 21 -->
+<section class="plate" id="s21">
+  <div class="plate-head"><div><div class="secno">21 · SUB-SUB-SECTION</div><h2>Data collection pipeline</h2></div><span class="chip">pdf p48</span></div>
+  <ul class="plain">
+    <li><b>Job:</b> crawl <b>your</b> personal data from <b>Medium, Substack, LinkedIn and GitHub</b>.</li>
+    <li><b>Pattern:</b> <b>ETL</b>: extract data from the platforms, standardise (transform) it, and load it into a <b>data warehouse</b>. (The book spells the acronym out as "extract, load, transform"; the usual expansion is extract, <i>transform</i>, load, which also matches the order of steps it describes.)</li>
+    <li><b>Ethics note in the book:</b> the pipeline crawls <b>only your own</b> social media and has no access to other people's. For the book, the authors agreed to make their own collected data available for learning. Using other people's data without consent is not moral.</li>
+    <li><b>Output:</b> a <b>NoSQL DB</b> acting as the data warehouse. Text is naturally <b>unstructured</b>, so NoSQL "fits like a glove".</li>
+    <li><b>Why call MongoDB a "warehouse"?</b> A NoSQL DB like <b>MongoDB</b> is not usually labelled a data warehouse, but here it acts as one because it stores <b>standardised raw data</b> gathered by several ETL pipelines, ready to be fed into an ML system.</li>
+  </ul>
+  <p>The collected data is sorted into <b>three categories</b>:</p>
+  <div class="grid2">
+    <div class="card"><b>Articles</b><span>Medium, Substack</span></div>
+    <div class="card"><b>Posts</b><span>LinkedIn</span></div>
+    <div class="card"><b>Code</b><span>GitHub</span></div>
+  </div>
+  <p>Why group by <b>category</b> and not by <b>source</b>?</p>
+  <ul class="plain">
+    <li>When you feed an article to the LLM, whether it came from Medium or Substack doesn't matter. You can keep the <b>source URL as metadata</b> for references.</li>
+    <li>But for processing, fine-tuning and RAG, the <b>type</b> of data matters a lot, because each category must be processed differently. Example: the <b>chunking strategy</b> for a post, an article and a piece of code look different.</li>
+    <li>Grouping by category lets you <b>plug in new platforms</b> easily: X into posts, or GitLab into code. In a modular system you just attach <b>one more ETL</b> to the data collection pipeline and <b>everything else works without code changes</b>.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: plug in a new platform</h3>
+    <p class="note">Add a source. With category-based storage, only a new ETL is needed. Switch to "group by source" to see what would have to change downstream (our illustration of the book's argument).</p>
+    <div class="seg" id="w21_mode"><button type="button" class="on">Group by category (book)</button><button type="button">Group by source</button></div>
+    <div class="topbar" id="w21_add"><button type="button" data-s="X">+ X (Twitter)</button><button type="button" data-s="GitLab">+ GitLab</button><button type="button" data-s="Dev.to">+ Dev.to blog</button><button type="button" data-s="reset">Reset</button></div>
+    <div class="tablewrap"><table id="w21_tab"></table></div>
+    <div class="verdict" id="w21_out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A dabbawala sorting system. Tiffins are collected from many homes (sources), but at the station they are sorted by <b>destination code</b>, not by which home they came from. A new building on the route just needs one more collector; the sorting and delivery don't change. <i>Where it breaks:</i> tiffins are identical boxes; posts, articles and code really are different and need different processing.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is the <b>adapter pattern</b> applied to data: each ETL adapts one platform's format to a common schema per category. Downstream code depends only on the category schema, so the number of platforms can grow without touching the feature pipeline. Storing the raw, standardised data first (before any ML processing) also lets you re-run cleaning or chunking later with new logic, without crawling again.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you design ingestion from many content sources?" Answer: "One extractor per source that normalises into a small set of content types with a common schema plus source metadata, loaded into a document store. Downstream processing depends on type, not source, so adding a source is one new extractor." Mention scheduling and only crawling consented data.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Built in <a href="ch03_data_engineering.html">ch03 Data Engineering</a> (crawlers, MongoDB).</li><li>Chunking per content type: <a href="ch04_rag_feature_pipeline.html">ch04</a>; <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs ch.8</a>.</li></ul></div>
+</section>
+
+<!-- 22 -->
+<section class="plate" id="s22">
+  <div class="plate-head"><div><div class="secno">22 · SUB-SUB-SECTION</div><h2>Feature pipeline (in the LLM Twin)</h2></div><span class="chip">pdf p48–49</span></div>
+  <p>Its role: take raw <b>articles, posts and code</b> from the data warehouse, <b>process</b> them, and load them into the <b>feature store</b>. So far it is pure FTI. What is specific to the twin:</p>
+  <ul class="plain">
+    <li>It processes the <b>three data types differently</b>.</li>
+    <li>It has <b>three main steps</b> needed for fine-tuning and RAG: <b>cleaning, chunking and embedding</b>.</li>
+    <li>It makes <b>two snapshots</b> of your data: one <b>after cleaning</b> (used for <b>fine-tuning</b>) and one <b>after embedding</b> (used for <b>RAG</b>).</li>
+    <li>It uses a <b>logical feature store</b> instead of a specialised feature store product.</li>
+  </ul>
+  <h3>The logical feature store</h3>
+  <ul class="plain">
+    <li>Any RAG system has a <b>vector DB</b> at its centre. Instead of adding another database (a dedicated feature store), the authors use the vector DB <b>plus some extra logic</b> to provide every feature-store property the system needs.</li>
+    <li>A vector DB has no concept of a <b>training dataset</b>, but it <b>can be used as a NoSQL DB</b>: you can fetch data points by their <b>ID and collection name</b>. So you can query it for new data points <b>without any vector search</b>.</li>
+    <li>The fetched data is then wrapped into a <b>versioned, tracked and shareable artifact</b>. An <b>artifact</b> is an MLOps concept: a wrapper around data that adds those properties (more in Chapter 2).</li>
+    <li>How the rest of the system uses it: the <b>training pipeline</b> uses the <b>instruct datasets as artifacts</b>; the <b>inference pipeline</b> queries the <b>vector DB with vector search</b> for extra context.</li>
+  </ul>
+  <p>Why this is enough here:</p>
+  <ul class="plain">
+    <li><b>Artifacts</b> work very well for <b>offline</b> uses like training.</li>
+    <li>The <b>vector DB</b> is built for <b>online</b> access, which inference needs.</li>
+  </ul>
+  <p>Later chapters explain how each category is cleaned, chunked and embedded. In short: raw article, post or code data comes in, gets processed and lands in a feature store for training and inference. The authors note that trimming away the complexity and keeping only the interface matches FTI perfectly ("Beautiful, right?").</p>
+
+  <div class="fig">
+    <h3>Step through one article: two snapshots</h3>
+    <div class="pipe" id="w22_stages">
+      <div class="stage"><b>raw</b>from the NoSQL warehouse</div>
+      <div class="stage"><b>clean</b>strip HTML, emojis, links noise</div>
+      <div class="stage"><b>snapshot A</b>cleaned text → instruct dataset artifact (fine-tuning)</div>
+      <div class="stage"><b>chunk</b>split into passages (rule per category)</div>
+      <div class="stage"><b>embed</b>each chunk → a vector</div>
+      <div class="stage"><b>snapshot B</b>vectors + text in vector DB (RAG)</div>
+    </div>
+    <pre class="req" id="w22_data"></pre>
+    <div class="caption" id="w22_cap"></div>
+    <div class="stepbar"><button id="w22_prev" type="button">◀ Back</button><button id="w22_next" type="button">Next ▶</button><span id="w22_n"></span></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A library that doesn't buy a separate archive building. It uses its main shelves (vector DB) for readers looking things up, and when the training college wants "all books as of this month", the librarian pulls them by catalogue number, boxes them, and stamps the box with a date and batch number (the artifact). <i>Where it breaks:</i> a real archive building would offer more (time-travel queries, point-in-time joins); the logical store gives only what this system needs.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A feature store is defined by its <b>properties</b> (versioned, tracked, shareable, offline batch access, online low-latency access), not by a product name. The vector DB already gives online access and ID-based lookups; artifacts add versioning and tracking for offline use. Fewer databases means less to run and pay for, which matters for a three-person team. The two snapshots exist because fine-tuning wants whole clean documents, while RAG wants small embedded chunks.</p></div>
+  <div class="box work"><b>Worked example</b><p>Modelled: you have 40 articles, 300 posts and 12 repos. After cleaning, the 352 documents become instruct dataset <code>v1</code> (artifact). After chunking, they become, say, 2,900 chunks, each with a vector, stored in collections like <code>articles</code>, <code>posts</code>, <code>code</code>. Next week the crawler adds 5 posts: the feature pipeline processes them, the vector DB grows, and a new artifact <code>v2</code> is created, which triggers training (plate 23).</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"Do you need a feature store for an LLM app?" Answer: "You need its properties, not necessarily the product: versioned training datasets for offline use and low-latency retrieval for online use. A vector DB plus versioned dataset artifacts can cover both." This maps well onto RAG memory work: the vector store is your online feature store.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Artifacts: <a href="ch02_tooling_and_installation.html">ch02</a>. Cleaning, chunking, embedding: <a href="ch04_rag_feature_pipeline.html">ch04</a>. Instruct datasets: <a href="ch05_supervised_fine_tuning.html">ch05</a>.</li><li>Chunking and embeddings explained: <a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs ch.8</a>, <a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering ch.6</a>.</li></ul></div>
+</section>
+
+<!-- 23 -->
+<section class="plate" id="s23">
+  <div class="plate-head"><div><div class="secno">23 · SUB-SUB-SECTION</div><h2>Training pipeline (in the LLM Twin)</h2></div><span class="chip">pdf p50–51</span></div>
+  <p>It <b>consumes instruct datasets</b> from the feature store, <b>fine-tunes an LLM</b> with them, and stores the tuned <b>LLM weights in a model registry</b>. Concretely: when a <b>new instruct dataset</b> appears in the logical feature store, the training pipeline is <b>triggered</b>, consumes the artifact and fine-tunes the LLM.</p>
+  <h3>Experimentation, then automation</h3>
+  <ol class="plain">
+    <li><b>Experiment phase (data science team owns it at first).</b> Run many experiments to find the best model and hyperparameters, via <b>automatic hyperparameter tuning</b> or by hand.</li>
+    <li><b>Experiment tracker.</b> Log everything useful and compare across experiments to pick the best set of hyperparameters.</li>
+    <li><b>Production candidate.</b> The team picks the best hyperparameters and fine-tuned LLM and proposes it as the <b>LLM production candidate</b>, stored in the model registry.</li>
+    <li><b>Continuous training.</b> Once experimenting is over, the best hyperparameters are stored and reused, removing manual steps. Now training can be <b>fully automated</b>: this is <b>continuous training (CT)</b>.</li>
+    <li><b>Testing pipeline.</b> It is triggered for a <b>more detailed analysis</b> than the checks during fine-tuning. Before pushing to production, the candidate is tested against a <b>stricter set of tests</b> to confirm it is <b>better than the model currently in production</b>.</li>
+    <li><b>Accept and deploy.</b> If it passes, the model is <b>tagged as accepted</b> and deployed to the production inference pipeline.</li>
+    <li><b>Manual approval.</b> Even in a fully automated system, the authors recommend a <b>manual step</b> before accepting a new production model, like pressing a red button before a high-consequence action. An expert reads the <b>report generated by the testing component</b>; if it looks good, they approve and automation continues.</li>
+  </ol>
+  <p>The LLM-specific questions this component raises (all answered later in the book):</p>
+  <ul class="plain">
+    <li>How do you build an <b>LLM-agnostic</b> pipeline?</li>
+    <li>Which <b>fine-tuning techniques</b> should you use?</li>
+    <li>How do you <b>scale fine-tuning</b> across LLMs and datasets of different sizes?</li>
+    <li>How do you <b>pick a production candidate</b> from many experiments?</li>
+    <li>How do you <b>test</b> the LLM to decide whether to push it to production?</li>
+  </ul>
+  <h3>CT with an orchestrator</h3>
+  <p>Because the design is modular, an <b>ML orchestrator</b> (a tool that schedules and triggers pipelines) can schedule and trigger each part. Example: crawl data <b>every week</b>; trigger the <b>feature pipeline</b> when new data lands in the warehouse; trigger the <b>training pipeline</b> when new instruction datasets appear.</p>
+
+  <div class="fig">
+    <h3>Simulator: one week of continuous training</h3>
+    <p class="note">Run the trigger chain. The candidate's score and the production score are <b>modelled</b> (random within a range). The test gate compares them; then you play the expert who approves or rejects.</p>
+    <div class="pipe" id="w23_stages">
+      <div class="stage"><b>weekly crawl</b>data collection</div>
+      <div class="stage"><b>new data</b>→ feature pipeline</div>
+      <div class="stage"><b>new instruct dataset</b>→ training</div>
+      <div class="stage"><b>candidate</b>→ model registry</div>
+      <div class="stage"><b>test pipeline</b>stricter tests vs prod</div>
+      <div class="stage"><b>human approval</b>red button</div>
+      <div class="stage"><b>deploy</b>inference pipeline</div>
+    </div>
+    <div class="topbar"><button type="button" id="w23_run">Run next stage ▶</button><button type="button" id="w23_ok" disabled>Approve</button><button type="button" id="w23_no" disabled>Reject</button><button type="button" id="w23_reset">New week</button></div>
+    <div class="verdict" id="w23_out"></div>
+    <div class="readout" id="w23_hist"></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A new train coach design. Engineers try many prototypes (experiments), the best becomes the candidate, it passes strict RDSO-style trials against the current coach (testing), and a senior officer signs off before it enters passenger service (manual approval). After that, coaches of the approved design roll out of the factory routinely (continuous training). <i>Where it breaks:</i> coach designs change rarely; a twin may get a new candidate every week, so the approval step must be quick to review.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Experimenting and production training are different modes. Experiments explore many settings and need a tracker to compare them. Once settings are fixed, retraining is just "same recipe, new data", which can be automated. The test gate protects production from regressions; the human gate protects against things tests don't catch (an odd tone, a bad sample). Triggers by data arrival (instead of fixed times) keep training aligned with real changes.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you automate retraining safely?" Answer: "Freeze the hyperparameters found in experiments, trigger training on new versioned data via an orchestrator, register each result as a candidate, run a stricter evaluation suite comparing it against production, and require a human approval on the evaluation report before promoting it. Keep the old model for rollback."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Fine-tuning: <a href="ch05_supervised_fine_tuning.html">ch05</a>, <a href="ch06_preference_alignment.html">ch06</a>. Testing LLMs: <a href="ch07_evaluating_llms.html">ch07</a>. CT and orchestration: <a href="ch11_mlops_and_llmops.html">ch11</a>.</li><li><a href="../ai_engineering/ch07_finetuning.html">AI Engineering ch.7 Finetuning</a>, <a href="../ai_engineering/ch04_evaluate_ai_systems.html">ch.4 Evaluate AI systems</a>.</li></ul></div>
+</section>
+
+<!-- 24 -->
+<section class="plate" id="s24">
+  <div class="plate-head"><div><div class="secno">24 · SUB-SUB-SECTION</div><h2>Inference pipeline (in the LLM Twin)</h2></div><span class="chip">pdf p51</span></div>
+  <p>The last piece. It connects to the <b>model registry</b> and the <b>logical feature store</b>:</p>
+  <ul class="plain">
+    <li>It <b>loads a fine-tuned LLM</b> from the model registry.</li>
+    <li>From the logical feature store, it uses the <b>vector DB for RAG</b>.</li>
+    <li>It receives <b>client requests as queries through a REST API</b>.</li>
+    <li>It uses the fine-tuned LLM plus the vector DB to do <b>RAG and answer</b> the queries.</li>
+    <li>All <b>client queries</b>, <b>RAG-enriched prompts</b> and <b>generated answers</b> go to a <b>prompt monitoring</b> system to analyse, debug and understand the system better. Depending on requirements, monitoring can <b>trigger alarms</b> so someone acts, manually or automatically.</li>
+  </ul>
+  <p>At the interface level it is pure FTI. Zoomed in, it has parts unique to an LLM + RAG system:</p>
+  <div class="grid2">
+    <div class="card"><b>Retrieval client</b><span>does the vector searches for RAG</span></div>
+    <div class="card"><b>Prompt templates</b><span>map the user query and retrieved info into the LLM's input</span></div>
+    <div class="card"><b>Prompt monitoring tools</b><span>special tooling to log and inspect prompts and answers</span></div>
+  </div>
+
+  <div class="fig">
+    <h3>Try it: what the pipeline builds from one request</h3>
+    <p class="note">Type a request. The toy retrieval client scores your <b>modelled</b> past posts by shared words (real systems compare embeddings), the template assembles the prompt, and the monitoring log records all three parts the book lists.</p>
+    <div class="controls"><label>Request <input type="text" id="w24_q" value="write a post about caching for low latency" style="width:min(320px,70vw)"></label><label>top-k <select id="w24_k"><option>1</option><option selected>2</option><option>3</option></select></label><button type="button" id="w24_go">Send</button></div>
+    <pre class="req" id="w24_prompt"></pre>
+    <pre class="req" id="w24_log"></pre>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A customer-care call centre. The agent (fine-tuned LLM) takes your call (REST request), pulls up your past tickets (retrieval client), reads from a script template (prompt template), and the call is recorded "for quality and training purposes" (prompt monitoring). <i>Where it breaks:</i> a human agent notices when a ticket is irrelevant; the twin uses whatever the retriever returns, so bad retrieval quietly produces bad posts, which is why monitoring logs the enriched prompt and not only the answer.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The client sends only a query; the pipeline owns all state access (the vector DB). That is the fix for the stateless real-time problem from plate <a href="#s12">12</a>: the client doesn't know how to retrieve documents. Logging query, enriched prompt and answer separately lets you tell whether a bad output came from retrieval, the template or the model.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"What would you log in a RAG service?" Answer: "The raw query, the retrieved chunks with IDs and scores, the final rendered prompt, the model version, the answer, latency and token counts, so I can debug whether a failure was retrieval, prompting or generation, and alert on drift or errors." This is the core of LLM observability in any voice or chat agent.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Built in <a href="ch09_rag_inference_pipeline.html">ch09</a>; deployed with autoscaling in <a href="ch10_inference_pipeline_deployment.html">ch10</a>; prompt monitoring in <a href="ch11_mlops_and_llmops.html">ch11</a>.</li><li><a href="../ai_engineering/ch10_architecture_and_user_feedback.html">AI Engineering ch.10</a> (monitoring and observability).</li></ul></div>
+</section>
+
+<!-- 25 -->
+<section class="plate" id="s25">
+  <div class="plate-head"><div><div class="secno">25 · SUB-SECTION</div><h2>Final thoughts on the FTI design and the LLM Twin architecture</h2></div><span class="chip">pdf p51–52</span></div>
+  <p><b>Don't be rigid about FTI.</b> It is a tool to make ML system design clear. Example: instead of using a dedicated feature store "because that's how it's done", this system uses a cheaper, simpler <b>logical feature store</b> (vector DB + artifacts). What mattered was getting the <b>properties</b> a feature store gives, such as a <b>versioned, reusable training dataset</b>.</p>
+  <h3>Compute needs per component</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Component</th><th>Hardware</th><th>How it scales</th><th>Note</th></tr>
+    <tr><td><b>Data collection</b></td><td>mostly CPU, modest machines</td><td><b>horizontally</b>, on CPU and RAM load</td><td></td></tr>
+    <tr><td><b>Feature</b></td><td>mostly CPU, modest machines</td><td><b>horizontally</b>, on CPU and RAM load</td><td></td></tr>
+    <tr><td><b>Training</b></td><td>powerful <b>GPU</b> machines that can load and fine-tune an LLM</td><td><b>vertically</b>, by adding more GPUs</td><td></td></tr>
+    <tr><td><b>Inference</b></td><td>in the middle: still a powerful machine, but less compute-heavy than training</td><td><b>horizontally</b>, on the number of client requests</td><td>talks directly to users, so <b>latency</b> must meet requirements; test carefully</td></tr>
+  </table></div>
+  <p>With FTI this is easy: you choose the right compute for each component separately. (Horizontal scaling = add more machines; vertical scaling = make one machine bigger.)</p>
+  <h3>Checking the design against the requirements</h3>
+  <ul class="plain">
+    <li>It processes the data as required (plate <a href="#s19">19</a>).</li>
+    <li>Training is <b>modular</b> and quickly adapts to different <b>LLMs, datasets or fine-tuning techniques</b>.</li>
+    <li>Inference supports <b>RAG</b> and is exposed as a <b>REST API</b>.</li>
+    <li>On the LLMOps side: <b>dataset and model versioning, lineage and reusability</b>; a <b>monitoring service</b>; and the whole architecture is designed with <b>CT/CI/CD</b> in mind.</li>
+  </ul>
+  <p>That completes the high-level overview of the LLM Twin architecture.</p>
+
+  <div class="fig">
+    <h3>Simulator: scale each pipeline its own way</h3>
+    <p class="note">All capacities are <b>modelled</b> (illustrative numbers, not from the book). Move the load sliders; each pipeline scales along its own axis, as the book prescribes.</p>
+    <div class="controls">
+      <label>Client requests / s <input type="range" id="w25_rps" min="1" max="200" value="20"><output id="w25_rpso"></output></label>
+      <label>New documents / day <input type="range" id="w25_docs" min="100" max="50000" step="100" value="2000"><output id="w25_docso"></output></label>
+      <label>Model size <select id="w25_m"><option value="7">7B</option><option value="14">14B</option><option value="30">30B</option><option value="70">70B</option></select></label>
+    </div>
+    <div id="w25_out" class="qa"></div>
+  </div>
+
+  <div class="box picture"><b>Picture it</b><p>A wedding caterer. Vegetable chopping (data/feature work) scales by hiring more helpers: horizontal. The one big biryani handi (training) needs a bigger handi and a bigger stove, you can't split it across ten small pots easily: vertical. Serving counters (inference) scale by opening more counters as guests arrive: horizontal, based on the queue. <i>Where it breaks:</i> GPU training can also be spread over many machines with special techniques; the book's MVP-level statement is "add more GPUs".</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each workload has a different bottleneck. Crawling and cleaning are many small independent CPU tasks, so more workers help linearly. Fine-tuning needs the whole model and its gradients in GPU memory, so the machine itself must be bigger. Inference requests are independent of each other, so you add replicas behind a load balancer, but each replica still needs enough GPU memory for the model, and latency is user-facing.</p></div>
+  <div class="box interview"><b>Interview angle</b><p>"How would you scale this system?" Answer per component: "Ingestion and feature jobs scale horizontally on CPU and memory; fine-tuning scales vertically with more GPUs; the inference service autoscales horizontally on request rate with a latency target, because it's the only user-facing part." Then mention cost: GPU replicas are expensive, so autoscaling to load matters (relevant to any realtime voice stack).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Inference optimisation: <a href="ch08_inference_optimization.html">ch08</a>, <a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering ch.9</a>. Autoscaling deployment: <a href="ch10_inference_pipeline_deployment.html">ch10</a>.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>Summary and key terms</h2></div><span class="chip">pdf p52</span></div>
+  <p>The book's own wrap-up, in plain words:</p>
+  <ul class="plain">
+    <li><b>Why this chapter matters.</b> The book is product-oriented: it walks you through building one end-to-end ML system. So you first had to understand the product idea itself, the <b>LLM Twin</b>.</li>
+    <li><b>From idea to plan.</b> Then came what an <b>MVP</b> is and how to plan the twin's MVP around the resources a small team really has.</li>
+    <li><b>From plan to requirements.</b> The concept was translated into a practical technical solution with a concrete list of requirements.</li>
+    <li><b>The pattern.</b> The <b>FTI</b> (feature/training/inference) design pattern was introduced, with its real-world use for designing systems that are both <b>modular</b> and <b>scalable</b>.</li>
+    <li><b>The design.</b> FTI was applied to design the LLM Twin's architecture so that it meets every technical requirement.</li>
+    <li><b>Why big-picture first.</b> Knowing how one component plugs into the rest of the application is very valuable while you work on that component. That is why the architecture was kept abstract, focused on each component's <b>scope</b>, <b>interface</b> and <b>interconnectivity</b>.</li>
+    <li><b>What's next.</b> The following chapters implement and deploy each component. On the MLOps side they cover a computing platform, an orchestrator, a model registry, artifacts and other tools that support MLOps best practices (starting with <a href="ch02_tooling_and_installation.html">ch02 Tooling and Installation</a>).</li>
+  </ul>
+  <div class="box behind"><b>The chapter in one breath</b><p>Dream up the twin (why) → cut it to an MVP a three-person team can ship (what) → design it as four pipelines that only meet through a logical feature store and a model registry (how): data collection → feature → training → inference, each with its own compute and scaling, all versioned, monitored and built for CT/CI/CD.</p></div>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning (plain words)</th></tr>
+    <tr><td>LLM Twin</td><td>An AI character that writes like you: an LLM fine-tuned on your own content and helped by RAG over it. A "projection" of you, so information is lost.</td></tr>
+    <tr><td>Style transfer</td><td>Making a model produce content in a given style (Shakespeare, Van Gogh, or your persona) by training/conditioning on that style.</td></tr>
+    <tr><td>Fine-tuning</td><td>Continuing to train an already-trained model on a smaller, specific dataset.</td></tr>
+    <tr><td>RAG</td><td>Retrieval-augmented generation: fetch relevant stored content and add it to the prompt before generating.</td></tr>
+    <tr><td>Co-pilot</td><td>An AI assistant that helps you write or code; a twin is a co-pilot that copies your own voice.</td></tr>
+    <tr><td>MVP</td><td>Minimum viable product: the smallest version that still delivers a complete, usable user journey.</td></tr>
+    <tr><td>Training-serving skew</td><td>Features computed differently at training time and at inference time, so the model sees different inputs than it learned from.</td></tr>
+    <tr><td>Monolithic batch pipeline</td><td>Features, training and prediction in one scheduled component: no skew, but no reuse, hard to scale or split.</td></tr>
+    <tr><td>Stateless real-time architecture</td><td>A serving service that stores nothing, so the client must send all state in each request (an antipattern).</td></tr>
+    <tr><td>FTI pipelines</td><td>Feature, training and inference pipelines that interact only through a feature store and a model registry.</td></tr>
+    <tr><td>Feature store</td><td>Stores, versions, tracks and shares features and labels for training and inference.</td></tr>
+    <tr><td>Logical feature store</td><td>The twin's cheaper stand-in: a vector DB (online) plus versioned artifacts (offline).</td></tr>
+    <tr><td>Model registry</td><td>Stores, versions, tracks and shares models with metadata (which data and features they were trained on).</td></tr>
+    <tr><td>Artifact</td><td>A wrapper around data that makes it versioned, tracked and shareable.</td></tr>
+    <tr><td>ETL</td><td>Extract, transform, load: pull data from sources, standardise it, store it (here in a NoSQL warehouse).</td></tr>
+    <tr><td>Instruct dataset</td><td>Pairs of instruction and desired answer used to fine-tune the LLM.</td></tr>
+    <tr><td>Chunking / embedding</td><td>Splitting text into passages / turning each passage into a vector that captures its meaning.</td></tr>
+    <tr><td>Vector DB</td><td>A database that stores embeddings and finds the most similar ones quickly.</td></tr>
+    <tr><td>Experiment tracker</td><td>Logs metrics and hyperparameters of training runs so experiments can be compared.</td></tr>
+    <tr><td>CT / CI / CD</td><td>Continuous training / integration / delivery: retrain, test and ship automatically.</td></tr>
+    <tr><td>ML orchestrator</td><td>A tool that schedules and triggers pipelines (e.g. a weekly crawl).</td></tr>
+    <tr><td>Prompt monitoring</td><td>Logging queries, enriched prompts and answers to analyse, debug and alert.</td></tr>
+    <tr><td>Horizontal / vertical scaling</td><td>Add more machines / make one machine bigger (more GPUs).</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">named in the chapter</span></div>
+  <p>The chapter is deliberately tool-agnostic (the stack is picked in Chapter 2), but it names these:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Tool / company</th><th>Role in the chapter</th></tr>
+    <tr><td>LinkedIn · X (Twitter) · Medium · Substack · GitHub</td><td>The data sources the twin crawls (X and GitLab as examples of new platforms to plug in).</td></tr>
+    <tr><td>ChatGPT · Gemini · OpenAI GPT API</td><td>Generic chatbots that don't write in your voice; the GPT API is still fine to plug into the LLM-agnostic design.</td></tr>
+    <tr><td>LangChain</td><td>Named as a way to script prompts over an API, which needs programming skills.</td></tr>
+        <tr><td>Mistral · Llama · GPT</td><td>LLM families the training pipeline must be able to switch between (7B to 70B sizes).</td></tr>
+    <tr><td>Google Cloud</td><td>Source of Figure 1.1 (the many components around "ML code") and of the MLOps continuous-delivery guide in the references.</td></tr>
+    <tr><td>PySpark · Ray</td><td>Distributed frameworks a monolith would need a full refactor to adopt when data grows.</td></tr>
+    <tr><td>C++ · Java · Rust</td><td>Faster languages you might want for the prediction service, hard to adopt in a monolith.</td></tr>
+    <tr><td>Hopsworks (Jim Dowling)</td><td>Origin of the FTI pipeline idea and of the feature-store articles in the references.</td></tr>
+    <tr><td>NoSQL DB (MongoDB-style)</td><td>The data warehouse for raw, standardised crawled text (MongoDB is picked in ch02).</td></tr>
+    <tr><td>Vector DB</td><td>Centre of the logical feature store and of RAG (Qdrant is picked in ch02).</td></tr>
+    <tr><td>Qwak</td><td>Author of the CI/CD for ML and open-source MLOps tooling articles in the references.</td></tr>
+  </table></div>
+  <p class="note">Beyond the book: the generic roles map to the tools chosen in <a href="ch02_tooling_and_installation.html">ch02</a> (ZenML orchestrator, Comet ML tracker, Hugging Face model registry, Opik prompt monitoring, AWS SageMaker for training and serving).</p>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Check yourself</h2></div><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. What is an LLM Twin, and why do the authors use the word "projected"?</summary><p>An AI character that writes with your style, voice and personality, built by fine-tuning an LLM on your data and adding RAG over it. "Projected" because, like a 3D object's 2D shadow, much information is lost: the twin only copies the side of you that appears in the data.</p></details>
+  <details class="ans"><summary>2. Name the four data examples and the twin each one produces.</summary><p>LinkedIn posts/X threads → social media writer; chats with friends and family → an unfiltered you; papers and articles → formal, educational writer; code → codes like you.</p></details>
+  <details class="ans"><summary>3. Why not just use ChatGPT for your posts?</summary><p>Its output is generic and wordy, not your voice; it can hallucinate, so you must fact-check; and manual prompting with pasted context is tedious and hard to reproduce. The real value is in the data, preprocessing, feeding, prompt chaining and evaluation, which a system automates.</p></details>
+  <details class="ans"><summary>4. What makes an MVP "viable" and not just "minimal"?</summary><p>It delivers a complete user journey with no half-built parts, so users get real value. A great crawler alone is minimal but not viable.</p></details>
+  <details class="ans"><summary>5. List the features of the LLM Twin MVP.</summary><p>Crawl LinkedIn, Medium, Substack and GitHub; fine-tune an open-source LLM; fill a vector DB for RAG; generate LinkedIn posts from user prompts + RAG + new links/articles as extra knowledge; a simple web UI to set links, trigger collection and send prompts.</p></details>
+  <details class="ans"><summary>6. What is training-serving skew, and how does the monolithic batch pipeline avoid it?</summary><p>Features computed differently at training and at inference. The monolith uses the same feature code for both, so there is no skew by default.</p></details>
+  <details class="ans"><summary>7. Give three problems of the monolithic batch pipeline.</summary><p>Any three of: features not reusable; growing data forces a rewrite to PySpark/Ray; hard to rewrite prediction in C++/Java/Rust; hard to split work between teams; impossible to switch to streaming for real-time training.</p></details>
+  <details class="ans"><summary>8. What extra problem does the stateless real-time design add?</summary><p>The client must send the full state with each request (e.g. a user's whole movie history, or the RAG documents). The client must know how to fetch features, which is error-prone and couples it to the model service: an antipattern.</p></details>
+  <details class="ans"><summary>9. State the FTI interface in one line per pipeline.</summary><p>Feature: raw data → features + labels into the feature store. Training: features + labels from the store → model into the registry. Inference: features from the store + model from the registry → predictions.</p></details>
+  <details class="ans"><summary>10. Model v1 uses F1–F3, model v2 uses F2–F4, and F4's pipeline breaks. What do you do?</summary><p>Roll back to v1: versioned features and registry metadata tell you v1 doesn't need F4, so you just wire v1 to F1–F3 while F4 is repaired.</p></details>
+  <details class="ans"><summary>11. Why does the data collection pipeline group data by category (articles, posts, code) and not by source?</summary><p>Downstream processing (chunking, fine-tuning, RAG) depends on the type of data, not where it came from; the source URL can stay as metadata. New platforms then plug in with only a new ETL.</p></details>
+  <details class="ans"><summary>12. What is the "logical feature store" and why is it enough here?</summary><p>A vector DB plus versioned artifacts instead of a dedicated feature store. The vector DB can be read like a NoSQL DB by ID and collection, and fetched data is wrapped into artifacts. Artifacts suit offline training; the vector DB suits online inference.</p></details>
+  <details class="ans"><summary>13. What if continuous training deployed every new candidate with no test pipeline or human approval?</summary><p>A worse model could reach users silently. The book's design tests each candidate against stricter tests to prove it beats production, and recommends a manual "red button" approval from an expert reading the test report.</p></details>
+  <details class="ans"><summary>14. How does each pipeline scale, and why does inference need extra care?</summary><p>Data collection and feature: horizontally on CPU/RAM. Training: vertically with more GPUs. Inference: horizontally on request count. Inference faces users directly, so latency must meet requirements and must be tested carefully.</p></details>
+  <details class="ans"><summary>15. Interview: "Design a system that writes LinkedIn posts in a person's voice."</summary><p>Four pipelines: scheduled ETL crawlers into a NoSQL warehouse by category; a feature pipeline that cleans, chunks and embeds into a vector DB and saves versioned instruct datasets; a training pipeline that fine-tunes on new datasets with experiment tracking, tests and approval into a model registry; and a REST inference service doing RAG with the fine-tuned model, prompt monitoring and autoscaling. They only meet through the stores, which gives versioning, lineage and CT/CI/CD.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>References</h2></div><span class="chip">pdf p52–53</span></div>
+  <details><summary>The chapter's 7 references</summary>
+    <ol class="refs">
+      <li>Dowling, J. (2024a). <i>From MLOps to ML Systems with Feature/Training/Inference Pipelines</i>. Hopsworks.</li>
+      <li>Dowling, J. (2024b). <i>Modularity and Composability for AI Systems with AI Pipelines and Shared Storage</i>. Hopsworks.</li>
+      <li>Joseph, M. (2024). <i>The Taxonomy for Data Transformations in AI Systems</i>. Hopsworks.</li>
+      <li>Google Cloud (2024). <i>MLOps: Continuous delivery and automation pipelines in machine learning</i>.</li>
+      <li>Qwak (2024a). <i>CI/CD for Machine Learning in 2024: Best Practices to build, test, and Deploy</i>. Medium (Infer).</li>
+      <li>Qwak (2024b). <i>5 Best Open Source Tools to build End-to-End MLOps Pipeline in 2024</i>. Medium (Infer).</li>
+      <li>Salama, K., Kazmierczak, J., &amp; Schut, D. (2021). <i>Practitioners guide to MLOps: A framework for continuous delivery and automation of machine learning</i>. Google Cloud.</li>
+    </ol>
+    <p class="small">The chapter ends (pdf p53) with an invitation to the book's Discord community (packt.link/llmeng).</p>
+  </details>
+</section>
+</div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function safe(name, fn) { try { fn(); } catch (e) { if (window.console) console.error("widget " + name + ": " + e.message); } }
+  function stepper(prefix, steps, onStep) {
+    var prev = $(prefix + "_prev"), next = $(prefix + "_next"), n = $(prefix + "_n"), cap = $(prefix + "_cap");
+    if (!prev || !next || !cap) return null;
+    var i = 0;
+    function show() {
+      cap.innerHTML = steps[i];
+      if (n) n.textContent = "step " + (i + 1) + " / " + steps.length;
+      prev.disabled = i === 0; next.disabled = i === steps.length - 1;
+      if (onStep) onStep(i);
+    }
+    prev.addEventListener("click", function () { if (i > 0) { i--; show(); } });
+    next.addEventListener("click", function () { if (i < steps.length - 1) { i++; show(); } });
+    show();
+    return { refresh: show };
+  }
+  function lightStages(id, i) {
+    var box = $(id); if (!box) return;
+    var st = box.querySelectorAll(".stage");
+    for (var k = 0; k < st.length; k++) st[k].className = "stage" + (k < i ? " done" : (k === i ? " on" : ""));
+  }
+  // seg: buttons inside a .seg box; calls onPick(index) and toggles .on
+  function seg(id, onPick) {
+    var box = $(id); if (!box) return null;
+    var btns = box.querySelectorAll("button");
+    function pick(k) {
+      for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", j === k);
+      onPick(k);
+    }
+    for (var k = 0; k < btns.length; k++) (function (k) { btns[k].addEventListener("click", function () { pick(k); }); })(k);
+    pick(0);
+    return pick;
+  }
+  function svgOn(prefix, ids) {
+    var all = document.querySelectorAll('[id^="' + prefix + '_"]');
+    for (var k = 0; k < all.length; k++) all[k].classList.remove("on");
+    for (var j = 0; j < ids.length; j++) { var el = $(prefix + "_" + ids[j]); if (el) el.classList.add("on"); }
+  }
+
+  // 01 planning steps
+  safe("w1", function () {
+    stepper("w1", [
+      "<b>1 · Why.</b> Dream first: what is an LLM Twin and why is it worth building? Without a clear why, you can't judge which features matter.",
+      "<b>2 · What.</b> Cut the dream down to an MVP (minimum viable product) that fits the team's time, money and skills, yet still delivers a full user journey.",
+      "<b>3 · How.</b> Design the system: the FTI architecture, its components, their interfaces and how they connect. Code comes after this."
+    ], function (i) { lightStages("w1_stages", i); });
+  });
+
+  // 03 which twin
+  safe("w3", function () {
+    var box = $("w3_src"); if (!box) return;
+    var info = {
+      social: ["social-media writer", "posts and threads in your voice", 30],
+      chat: ["“unfiltered” you", "casual, personal replies", 30],
+      papers: ["formal, educational writer", "academic and article-style text", 20],
+      code: ["coder twin", "code written the way you would write it", 20]
+    };
+    function draw() {
+      var ins = box.querySelectorAll("input"), on = [], share = 0;
+      for (var k = 0; k < ins.length; k++) if (ins[k].checked) { on.push(ins[k].value); share += info[ins[k].value][2]; }
+      $("w3_bar").style.width = share + "%";
+      if (!on.length) { $("w3_out").innerHTML = "No data, no twin. The model can only reflect what you feed it."; return; }
+      var lines = on.map(function (v) { return "<span class=\"g\">" + info[v][0] + "</span>: good at " + info[v][1]; });
+      var missing = Object.keys(info).filter(function (v) { return on.indexOf(v) < 0; });
+      var s = lines.join("\n") + "\n<span class=\"p\">modelled share of you: " + share + "%</span>";
+      if (missing.length) s += "\n<span class=\"p\">Bad at: " + missing.map(function (v) { return info[v][1]; }).join("; ") + " (no data for it, so that side of you is lost in the projection).</span>";
+      else s += "\n<span class=\"p\">Even with all four sources the twin is still a projection: it never sees what you didn't write down.</span>";
+      $("w3_out").innerHTML = s;
+    }
+    box.addEventListener("change", draw); draw();
+  });
+
+  // 04 co-pilot loop
+  safe("w4", function () {
+    stepper("w4", [
+      "<b>You</b> write the skeleton: the topic and a few bullet points of what you want to say. The ideas stay yours.",
+      "<b>The twin</b> turns the skeleton into a full draft in your style and voice (fine-tuned on you, with RAG over your old posts).",
+      "<b>You</b> review: check the facts (LLMs can hallucinate) and fix the formatting. You stay accountable for what gets published.",
+      "<b>Publish</b> on LinkedIn, X, Medium… The twin saved writing time; the human kept the judgement."
+    ], function (i) { lightStages("w4_stages", i); });
+  });
+
+  // 06 chat UI vs system
+  safe("w6", function () {
+    var manual = [
+      ["Find and copy your old posts into the chat", 10],
+      ["Paste outside info (articles, links) by hand", 8],
+      ["Write and tweak the prompt chain each time", 10],
+      ["Read the draft, fix the generic, wordy tone", 12],
+      ["Fact-check for hallucinations by hand", 10],
+      ["Try to reproduce last week's good result (prompts not saved)", 8]
+    ];
+    var system = [
+      ["Data collection: crawled automatically", 0],
+      ["Preprocessing, storage, versioning, retrieval: automatic", 0],
+      ["Fine-tuned model already writes in your voice", 0],
+      ["RAG injects your old content automatically", 0],
+      ["You write a short skeleton prompt", 3],
+      ["Review the draft (evaluation helps flag issues)", 5]
+    ];
+    seg("w6_seg", function (k) {
+      var rows = k === 0 ? manual : system, t = 0, h = "";
+      rows.forEach(function (r) { t += r[1]; h += '<div class="verdict' + (r[1] ? " warn" : " good") + '">' + r[0] + " · <b>" + r[1] + " min</b></div>"; });
+      $("w6_rows").innerHTML = h;
+      $("w6_tot").innerHTML = "<span>total per post <b>" + t + " min</b> (modelled)</span><span>" + (k === 0 ? "repeated by hand every time" : "steps wrapped and automated by the LLM system") + "</span>";
+    });
+  });
+
+  // 08 MVP verdicts
+  safe("w8", function () {
+    var v = $("w8_out");
+    var a = [
+      ["bad", "<b>Not an MVP.</b> Minimal, yes, but not viable: users can't get a post out of a crawler. Half the journey is missing."],
+      ["bad", "<b>Not an MVP.</b> No way for a user to talk to the twin, so the journey stops halfway. Polished parts, unusable product."],
+      ["good", "<b>An MVP.</b> Every step from “connect my profiles” to “get a post” works, even if each is basic. That's what the book's MVP does: crawl → fine-tune → vector DB → generate → simple web UI."]
+    ];
+    seg("w8_seg", function (k) { v.className = "verdict " + a[k][0]; v.innerHTML = a[k][1]; });
+  });
+
+  // 09 MVP budget
+  safe("w9", function () {
+    var box = $("w9_feat"); if (!box) return;
+    var feats = [
+      ["crawl", "Collect LinkedIn/Medium/Substack/GitHub", 4, 8, true, "journey"],
+      ["ft", "Fine-tune an open-source LLM", 5, 8, true, "journey"],
+      ["vdb", "Vector DB for RAG", 3, 6, true, "journey"],
+      ["gen", "Generate LinkedIn posts (prompt + RAG + new links)", 3, 8, true, "journey"],
+      ["ui", "Simple web UI (links, trigger, prompts)", 3, 6, true, "journey"],
+      ["multi", "Twins for many users with logins", 6, 3, false, ""],
+      ["voice", "Voice cloning", 7, 2, false, ""],
+      ["sched", "Auto-post on a schedule", 3, 2, false, ""],
+      ["mobile", "Mobile app", 6, 2, false, ""]
+    ];
+    box.innerHTML = feats.map(function (f) { return '<label class="' + (f[4] ? "must" : "") + '"><input type="checkbox" value="' + f[0] + '"> ' + f[1] + " · " + f[2] + "pt</label>"; }).join("");
+    function draw() {
+      var ins = box.querySelectorAll("input"), e = 0, val = 0, journey = 0;
+      for (var k = 0; k < ins.length; k++) if (ins[k].checked) { e += feats[k][2]; val += feats[k][3]; if (feats[k][5]) journey++; }
+      $("w9_e").textContent = e; $("w9_v").textContent = val; $("w9_r").textContent = e ? (val / e).toFixed(2) : "–";
+      var bar = $("w9_bar"); bar.style.width = Math.min(100, e / 20 * 100) + "%"; bar.className = e > 20 ? "over" : "";
+      var out = $("w9_out");
+      if (e > 20) { out.className = "verdict bad"; out.innerHTML = "Over budget: three people, laptops and personal money can't build all this. Cut the nice-to-haves."; }
+      else if (journey < 5) { out.className = "verdict warn"; out.innerHTML = "Fits the budget, but the user journey is broken: " + (5 - journey) + " core step(s) missing, so it isn't viable yet."; }
+      else if (e === 18) { out.className = "verdict good"; out.innerHTML = "This is the book's MVP: full journey, inside the budget, best value per effort."; }
+      else { out.className = "verdict good"; out.innerHTML = "Full journey and within budget. Extras lower value per effort; the book keeps only the core five."; }
+    }
+    box.addEventListener("change", draw);
+    $("w9_book").addEventListener("click", function () { var ins = box.querySelectorAll("input"); for (var k = 0; k < ins.length; k++) ins[k].checked = feats[k][4]; draw(); });
+    $("w9_clear").addEventListener("click", function () { var ins = box.querySelectorAll("input"); for (var k = 0; k < ins.length; k++) ins[k].checked = false; draw(); });
+    draw();
+  });
+
+  // 11 Figure 1.1 boxes → FTI owner
+  safe("w11", function () {
+    var box = $("w11_box"); if (!box) return;
+    var m = [
+      ["ML code", "Training pipeline (plate 15 / 23): the fine-tuning code. The small box everyone teaches."],
+      ["Data collection", "Data collection pipeline (plate 21): ETL crawlers that fill the NoSQL warehouse."],
+      ["Data verification", "Feature pipeline (plate 17 notes it can include a data-validation service)."],
+      ["Feature engineering", "Feature pipeline (plates 14 / 22): clean, chunk, embed → logical feature store."],
+      ["Configuration", "Every pipeline: settings and hyperparameters; the best ones are stored and reused for CT (plate 23)."],
+      ["Automation", "The ML orchestrator that schedules and triggers pipelines: CT/CI/CD (plate 23)."],
+      ["Testing & debugging", "Training side: the testing pipeline that checks a candidate before production (plate 23)."],
+      ["Resource management", "Per-pipeline compute: CPU for data/feature, GPUs for training, scalable machines for inference (plate 25)."],
+      ["Model analysis", "Experiment tracker + test reports used to pick and approve a candidate (plate 23)."],
+      ["Process & metadata mgmt", "Feature store versions + model registry metadata: lineage and reuse (plates 14–15)."],
+      ["Serving infrastructure", "Inference pipeline behind a REST API (plate 24), scaled on requests (plate 25)."],
+      ["Monitoring", "Prompt monitoring and alarms on the inference side (plate 24)."]
+    ];
+    box.innerHTML = m.map(function (r, k) { return '<label><input type="radio" name="w11r" value="' + k + '"> ' + esc(r[0]) + "</label>"; }).join("");
+    box.addEventListener("change", function (e) { var r = m[+e.target.value]; $("w11_out").innerHTML = '<span class="g">' + esc(r[0]) + "</span> → " + esc(r[1]); });
+  });
+
+  // 12 training-serving skew
+  safe("w12", function () {
+    var posts = [120, 80, 200, 40];
+    var mean = posts.reduce(function (a, b) { return a + b; }, 0) / posts.length;
+    var lastThree = posts.slice(0, 3).reduce(function (a, b) { return a + b; }, 0) / 3;
+    var designs = [
+      ["# one component, one function\ndef avg_len(posts): return mean(len(p) for p in posts)\n# training and prediction both call avg_len()", "train " + mean + " · serve " + mean, "good", "Same code, same value: no skew. But nothing is reusable and it won't scale (plate 12's list)."],
+      ["# training job (Python)\navg_len = mean(lengths[-4:])\n\n# serving service (rewritten)\navg_len = mean(lengths[-3:])   # off-by-one window", "train " + mean + " · serve " + lastThree.toFixed(1), "bad", "Two implementations drift apart: the model sees different numbers at serving than it learned from. That's training-serving skew."],
+      ["# feature pipeline writes once\nstore.put(user_id, 'avg_len', v=3, value=...)\n\n# training and inference both read\nstore.get(user_id, 'avg_len', v=3)", "train " + mean + " · serve " + mean, "good", "Computed once, versioned, read by both sides: no skew, and the features are reusable."]
+    ];
+    seg("w12_seg", function (k) {
+      var d = designs[k];
+      $("w12_code").textContent = d[0];
+      $("w12_out").innerHTML = '<span class="' + d[2] + '">' + d[1] + " words</span><span>" + d[3] + "</span>";
+    });
+  });
+
+  // 12b stateless vs feature store request
+  safe("w12b", function () {
+    var reqs = [
+      ['POST /recommend\n{\n  "user_id": 42,\n  "name": "Asha", "age": 29, "gender": "F",\n  "history": ["Lagaan", "3 Idiots", "Dangal", "..."],\n  "ratings": [...], "last_7d": [...]\n}', "bad", "The client must know how to collect and compute the whole user state. Error-prone and tightly coupled to the model service. For RAG, it would even have to search and send the documents itself."],
+      ['POST /recommend\n{ "user_id": 42 }\n\n# server side\nfeatures = feature_store.get(42, version="v3")\nmodel    = registry.load("recsys", "v2")', "good", "The client sends only an ID. The inference pipeline fetches state from the feature store (for an LLM, the vector DB)."]
+    ];
+    seg("w12b_seg", function (k) {
+      $("w12b_req").textContent = reqs[k][0];
+      $("w12b_out").innerHTML = '<span class="' + reqs[k][1] + '">' + (k ? "stateful lookup" : "stateless service") + "</span><span>" + reqs[k][2] + "</span>";
+    });
+  });
+
+  // 13 FTI step-through
+  safe("w13", function () {
+    var steps = [
+      ["<b>Raw data</b> arrives (logs, documents, posts).", ["data"]],
+      ["<b>Feature pipeline</b> reads the raw data and turns it into features and labels.", ["data", "a1", "fp"]],
+      ["It <b>writes</b> them to the <b>feature store</b>, versioned. It never hands them to the model directly.", ["fp", "a2", "fs"]],
+      ["<b>Training pipeline</b> reads features + labels from the feature store and trains a model.", ["fs", "a3", "tp"]],
+      ["It <b>writes</b> the model (with metadata: which feature versions) to the <b>model registry</b>.", ["tp", "a4", "mr"]],
+      ["<b>Inference pipeline</b> reads features from the feature store <b>and</b> the model from the registry…", ["fs", "a5", "mr", "a6", "ip"]],
+      ["…and produces <b>predictions</b> (batch → a DB; real-time → back to the client). No pipeline talks to another directly: only through the two stores.", ["ip", "a7", "pred"]]
+    ];
+    stepper("w13", steps.map(function (s) { return s[0]; }), function (i) { svgOn("w13", steps[i][1]); });
+  });
+
+  // 16 versioned deploy and rollback
+  safe("w16", function () {
+    var live = 0, broken = false;
+    var models = [["v1", ["F1", "F2", "F3"]], ["v2", ["F2", "F3", "F4"]]];
+    function draw() {
+      var h = "";
+      models.forEach(function (m, k) {
+        h += '<div class="vrow"><span class="' + (k === live ? "live" : "") + '">model ' + m[0] + (k === live ? " (live)" : "") + "</span>";
+        ["F1", "F2", "F3", "F4"].forEach(function (f) {
+          var use = m[1].indexOf(f) >= 0;
+          h += '<span class="f' + (use && k === live ? " use" : "") + '">' + f + (f === "F4" && broken ? " ✗" : "") + "</span>";
+        });
+        h += "</div>";
+      });
+      $("w16_out").innerHTML = h;
+      var v = $("w16_v"), uses4 = models[live][1].indexOf("F4") >= 0;
+      if (broken && uses4) { v.className = "verdict bad"; v.innerHTML = "Live model v2 needs F4, which is broken. Roll back: deploy v1, which the registry says was trained on F1–F3."; }
+      else if (broken) { v.className = "verdict good"; v.innerHTML = "Rolled back to v1: it only reads F1, F2, F3, so the broken F4 doesn't matter. Repair F4, then redeploy v2."; }
+      else { v.className = "verdict"; v.innerHTML = "Model " + models[live][0] + " is wired to " + models[live][1].join(", ") + ". Versioning makes the switch a config change."; }
+    }
+    var pick = seg("w16_seg", function (k) { live = k; draw(); });
+    $("w16_break").addEventListener("click", function () { broken = true; draw(); });
+    $("w16_fix").addEventListener("click", function () { broken = false; draw(); });
+    if (pick) pick(0);
+  });
+
+  // 17 swap internals
+  safe("w17", function () {
+    var opts = {
+      f: ["Pandas → PySpark (data grew)", "Batch → streaming features", "Add a data-validation service"],
+      t: ["Swap the model (e.g. Llama → Mistral)", "Add an evaluation component", "Move training to bigger GPUs"],
+      i: ["Rewrite serving in Rust / C++ / Java", "Batch → real-time REST API", "Add autoscaling replicas"]
+    };
+    var names = { f: "feature", t: "training", i: "inference" }, mode = 0;
+    var p = $("w17_p"), c = $("w17_c");
+    function fill() { c.innerHTML = opts[p.value].map(function (o, k) { return '<option value="' + k + '">' + esc(o) + "</option>"; }).join(""); }
+    function draw() {
+      var out = $("w17_out"), what = c.options[c.selectedIndex] ? c.options[c.selectedIndex].text : "";
+      if (mode === 0) { out.className = "verdict good"; out.innerHTML = "<b>" + esc(what) + "</b>: only the " + names[p.value] + " pipeline changes. It still reads and writes the same feature store / model registry, so the other two pipelines don't change at all."; }
+      else { out.className = "verdict bad"; out.innerHTML = "<b>" + esc(what) + "</b>: in a monolith features, training and prediction share one codebase, so this touches the whole component; it is hard to change one part, split it across teams, or scale it on its own."; }
+    }
+    p.addEventListener("change", function () { fill(); draw(); });
+    c.addEventListener("change", draw);
+    fill();
+    seg("w17_seg", function (k) { mode = k; draw(); });
+  });
+
+  // 19 requirement → component
+  safe("w19", function () {
+    var box = $("w19_req"); if (!box) return;
+    var m = [
+      ["Autonomous scheduled crawling", "Data collection pipeline (21), scheduled by the orchestrator (23)."],
+      ["Standardise + data warehouse", "Data collection pipeline (21): ETL into the NoSQL warehouse."],
+      ["Clean raw data", "Feature pipeline (22): cleaning step."],
+      ["Instruct datasets", "Feature pipeline (22): snapshot after cleaning → versioned artifact."],
+      ["Chunk + embed → vector DB", "Feature pipeline (22): snapshot after embedding, in the logical feature store."],
+      ["7B–70B LLMs, many dataset sizes, LLM types", "Training pipeline (23): LLM-agnostic, scales vertically (25)."],
+      ["Track and compare experiments", "Training pipeline (23): experiment tracker."],
+      ["Test candidates; auto-train on new data", "Training pipeline (23): testing pipeline + continuous training."],
+      ["REST API, real-time vector DB access", "Inference pipeline (24): REST API + retrieval client."],
+      ["Autoscaling; auto-deploy passing LLMs", "Inference pipeline (24, 25) fed by the model registry after acceptance (23)."],
+      ["Dataset/model versioning, lineage, reuse", "Logical feature store artifacts (22) + model registry (23)."],
+      ["CT/CI/CD", "Orchestrator triggering each pipeline (23); the design was built with it in mind (25)."],
+      ["Prompt and system monitoring", "Inference pipeline (24): prompt monitoring + alarms."]
+    ];
+    box.innerHTML = m.map(function (r, k) { return '<label><input type="radio" name="w19r" value="' + k + '"> ' + esc(r[0]) + "</label>"; }).join("");
+    box.addEventListener("change", function (e) { var r = m[+e.target.value]; $("w19_out").innerHTML = '<span class="g">' + esc(r[0]) + "</span> → " + esc(r[1]); });
+  });
+
+  // 20 trace through Figure 1.6
+  safe("w20", function () {
+    var steps = [
+      ["<b>Sources.</b> Your Medium, Substack, LinkedIn and GitHub profiles.", ["g1", "src"]],
+      ["<b>ETL</b> crawlers extract and standardise the data…", ["g1", "src", "e1", "etl"]],
+      ["…and load it into the <b>NoSQL data warehouse</b>, grouped as articles, posts, code.", ["g1", "etl", "e2", "nosql"]],
+      ["<b>Feature pipeline</b> reads the warehouse, then cleans, chunks and embeds each category its own way.", ["g2", "nosql", "e3", "proc"]],
+      ["Snapshot 1: embedded chunks go to the <b>vector DB</b> (for RAG).", ["g2", "proc", "e4", "vdb"]],
+      ["Snapshot 2: cleaned text becomes a versioned <b>instruct dataset</b> artifact (for fine-tuning). Vector DB + artifacts = the logical feature store.", ["g2", "proc", "e5", "inst"]],
+      ["<b>Training pipeline</b> is triggered by a new instruct dataset and fine-tunes the LLM…", ["g3", "inst", "e6", "ft"]],
+      ["…logging runs to the <b>experiment tracker</b> and testing the candidate…", ["g3", "ft", "e7", "exp"]],
+      ["…and the accepted model is stored in the <b>model registry</b>.", ["g3", "ft", "e8", "reg"]],
+      ["<b>Inference pipeline</b> loads the fine-tuned model from the registry (the LLM Twin).", ["g4", "reg", "e9", "llm"]],
+      ["A client sends a query through the <b>REST API</b>; the <b>retrieval client</b> searches the vector DB for your relevant past content.", ["g4", "api", "e10", "ret", "e11", "vdb"]],
+      ["The prompt template merges query + retrieved context and the <b>LLM Twin</b> generates the post.", ["g4", "ret", "e12", "llm"]],
+      ["Query, enriched prompt and answer go to <b>prompt monitoring</b>, which can raise alarms.", ["g4", "llm", "e13", "mon"]]
+    ];
+    stepper("w20", steps.map(function (s) { return s[0]; }), function (i) { svgOn("w20", steps[i][1]); });
+  });
+
+  // 21 plug in a platform
+  safe("w21", function () {
+    var base = [["Medium", "articles"], ["Substack", "articles"], ["LinkedIn", "posts"], ["GitHub", "code"]];
+    var extra = { "X": "posts", "GitLab": "code", "Dev.to": "articles" };
+    var added = [], bySource = false;
+    function draw() {
+      var all = base.concat(added.map(function (s) { return [s, extra[s]]; }));
+      var h = "<tr><th>Source</th><th>Stored as</th><th>New code needed</th></tr>";
+      all.forEach(function (r, k) {
+        var isNew = k >= base.length;
+        var where = bySource ? r[0] + " collection" : r[1];
+        var work = !isNew ? "–" : (bySource ? '<span class="bad-t">new ETL + new cleaning/chunking/embedding + training/RAG changes</span>' : '<span class="good-t">only a new ETL</span>');
+        h += "<tr><td>" + esc(r[0]) + "</td><td>" + esc(where) + "</td><td>" + work + "</td></tr>";
+      });
+      $("w21_tab").innerHTML = h;
+      var out = $("w21_out");
+      if (!added.length) { out.className = "verdict"; out.innerHTML = "Add a platform to see what has to change."; }
+      else if (bySource) { out.className = "verdict bad"; out.innerHTML = "Grouped by source, each new platform is a new kind of data downstream: processing, fine-tuning and RAG must all learn about it."; }
+      else { out.className = "verdict good"; out.innerHTML = "Grouped by category, " + added.join(", ") + " land in existing categories. Everything downstream already knows how to process them: no code changes past the ETL."; }
+    }
+    seg("w21_mode", function (k) { bySource = k === 1; draw(); });
+    $("w21_add").addEventListener("click", function (e) {
+      var s = e.target.getAttribute && e.target.getAttribute("data-s"); if (!s) return;
+      if (s === "reset") added = []; else if (added.indexOf(s) < 0) added.push(s);
+      draw();
+    });
+    draw();
+  });
+
+  // 22 one article, two snapshots
+  safe("w22", function () {
+    var data = [
+      '<p>🚀 Caching <a href="...">matters</a>!! Low latency = happy users. Redis keeps hot data in memory…</p>',
+      "Caching matters. Low latency = happy users. Redis keeps hot data in memory…",
+      '{ "instruction": "Write a short article intro about caching",\n  "output": "Caching matters. Low latency = happy users. …" }\n→ instruct-dataset v6 (artifact, versioned)',
+      'chunk_0: "Caching matters. Low latency = happy users."\nchunk_1: "Redis keeps hot data in memory…"',
+      "chunk_0 → [0.12, -0.40, 0.88, …]\nchunk_1 → [0.05, 0.31, -0.22, …]   (modelled vectors)",
+      'vector DB collection "articles":\n{ id: 7, text: chunk_0, vector: [...], url: "medium.com/..." }\n{ id: 8, text: chunk_1, vector: [...], url: "medium.com/..." }'
+    ];
+    var caps = [
+      "The raw article as crawled: HTML tags, emojis, links.",
+      "<b>Clean</b>: strip the noise. Every category gets its own cleaning rules.",
+      "<b>Snapshot A</b>: the cleaned text is turned into an instruct dataset and saved as a versioned artifact for <b>fine-tuning</b>.",
+      "<b>Chunk</b>: split into passages; posts, articles and code are chunked differently.",
+      "<b>Embed</b>: each chunk becomes a vector that captures its meaning.",
+      "<b>Snapshot B</b>: vectors + text + metadata (source URL) are stored in the vector DB for <b>RAG</b>."
+    ];
+    stepper("w22", caps, function (i) { lightStages("w22_stages", i); $("w22_data").textContent = data[i]; });
+  });
+
+  // 23 continuous training week
+  safe("w23", function () {
+    var st = 0, week = 1, cand = 0, prod = 70, hist = [];
+    var out = $("w23_out"), run = $("w23_run"), ok = $("w23_ok"), no = $("w23_no");
+    var msgs = [
+      "The orchestrator runs the weekly crawl: new posts and articles land in the warehouse.",
+      "New data in the warehouse triggers the feature pipeline: clean, chunk, embed, new instruct dataset.",
+      "A new instruct dataset triggers training with the stored best hyperparameters (continuous training).",
+      "The fine-tuned candidate is stored in the model registry.",
+      "", "", ""
+    ];
+    function draw() {
+      lightStages("w23_stages", st);
+      $("w23_hist").innerHTML = "<span>week <b>" + week + "</b></span><span>production score <b>" + prod + "</b> (modelled)</span>" + (hist.length ? "<span>history: " + hist.join(" · ") + "</span>" : "");
+    }
+    function say(cls, h) { out.className = "verdict " + cls; out.innerHTML = h; }
+    run.addEventListener("click", function () {
+      if (st < 4) { say("", msgs[st]); st++; draw(); return; }
+      if (st === 4) {
+        cand = 62 + Math.floor(Math.random() * 18);
+        if (cand > prod) { say("good", "Test pipeline: candidate scores <b>" + cand + "</b> vs production <b>" + prod + "</b>. It passed the stricter tests. Report ready: an expert must press the red button."); st = 5; ok.disabled = false; no.disabled = false; run.disabled = true; }
+        else { say("bad", "Test pipeline: candidate scores <b>" + cand + "</b> vs production <b>" + prod + "</b>. Not better, so it is not accepted. Production stays as it is."); hist.push("w" + week + " rejected by tests"); run.disabled = true; }
+        draw(); return;
+      }
+    });
+    ok.addEventListener("click", function () { st = 6; prod = cand; hist.push("w" + week + " deployed " + cand); ok.disabled = no.disabled = true; draw(); say("good", "Approved. The model is tagged accepted and deployed to the inference pipeline."); });
+    no.addEventListener("click", function () { hist.push("w" + week + " vetoed by expert"); ok.disabled = no.disabled = true; say("warn", "The expert rejected it after reading the report. Automation stops; production is unchanged."); });
+    $("w23_reset").addEventListener("click", function () { st = 0; week++; run.disabled = false; ok.disabled = no.disabled = true; say("", "New week. Press “Run next stage”."); draw(); });
+    say("", "Press “Run next stage” to start the week."); draw();
+  });
+
+  // 24 inference request
+  safe("w24", function () {
+    var posts = [
+      "Caching with Redis cut our API latency from 300 ms to 40 ms.",
+      "Why I stopped writing microservices for every small feature.",
+      "Low latency voice agents: stream tokens, don't wait for the full answer.",
+      "RAG is retrieval first: bad chunks, bad answers.",
+      "Postgres indexes I wish I had known about earlier."
+    ];
+    function words(s) { return s.toLowerCase().match(/[a-z0-9]+/g) || []; }
+    function go() {
+      var q = $("w24_q").value, k = +$("w24_k").value, qw = words(q);
+      var scored = posts.map(function (p) { var w = words(p); return [p, qw.filter(function (x) { return x.length > 2 && w.indexOf(x) >= 0; }).length]; });
+      scored.sort(function (a, b) { return b[1] - a[1]; });
+      var top = scored.slice(0, k);
+      var ctx = top.map(function (t, i) { return "  [" + (i + 1) + "] " + t[0] + "   (score " + t[1] + ")"; }).join("\n");
+      $("w24_prompt").textContent = "PROMPT TEMPLATE (rendered)\nYou are my LLM Twin. Write in my voice.\nMy past posts for context:\n" + ctx + "\nTask: " + q;
+      $("w24_log").textContent = "PROMPT MONITORING LOG\nquery: " + JSON.stringify(q) + "\nenriched_prompt: <" + (ctx.length + q.length + 70) + " chars, " + k + " chunk(s)>\nanswer: <generated post>\nalarm: " + (top[0][1] === 0 ? "LOW RETRIEVAL SCORE: check the vector DB" : "none");
+    }
+    $("w24_go").addEventListener("click", go);
+    $("w24_q").addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+    go();
+  });
+
+  // 25 scaling
+  safe("w25", function () {
+    function draw() {
+      var rps = +$("w25_rps").value, docs = +$("w25_docs").value, m = +$("w25_m").value;
+      $("w25_rpso").value = rps; $("w25_docso").value = docs;
+      var cpuWorkers = Math.max(1, Math.ceil(docs / 5000));
+      var gpus = m <= 7 ? 1 : m <= 14 ? 2 : m <= 30 ? 4 : 8;
+      var replicas = Math.max(1, Math.ceil(rps / 10));
+      var rows = [
+        ["good", "<b>Data collection + feature</b>: " + cpuWorkers + " CPU worker(s), horizontal (≈5,000 docs/day each)."],
+        ["warn", "<b>Training</b>: one machine with " + gpus + " GPU(s) for a " + m + "B model, vertical (bigger model → more GPUs)."],
+        [rps > 120 ? "bad" : "good", "<b>Inference</b>: " + replicas + " replica(s), horizontal (≈10 req/s each). User-facing, so latency is the target" + (rps > 120 ? "; at this load watch the cost of GPU replicas." : ".")]
+      ];
+      $("w25_out").innerHTML = rows.map(function (r) { return '<div class="verdict ' + r[0] + '">' + r[1] + "</div>"; }).join("") + '<div class="small">All capacities modelled.</div>';
+    }
+    ["w25_rps", "w25_docs", "w25_m"].forEach(function (id) { $(id).addEventListener("input", draw); $(id).addEventListener("change", draw); });
+    draw();
+  });
+})();
+</script>
+</body>
+</html>

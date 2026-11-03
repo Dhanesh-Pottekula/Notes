@@ -1,0 +1,1685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fine-Tuning for Classification</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.11) ---- */
+.chip { white-space: normal; max-width: 100%; }
+.plate-head > div { min-width: 0; }
+.toks { display: flex; flex-wrap: wrap; gap: 5px; font-family: var(--mono); font-size: 13px; }
+.tok { border: 1.5px solid var(--rule); border-radius: 5px; padding: 3px 7px; background: var(--paper); display: inline-grid; gap: 1px; text-align: center; min-width: 34px; }
+.tok small { font-size: 10.5px; color: var(--muted); }
+.tok.sp { color: var(--c2); font-weight: 600; }
+.tok.mask { background: var(--sell); color: var(--plate); border-color: var(--sell); font-weight: 600; }
+.tok.per { border-color: var(--buy); background: color-mix(in srgb, var(--buy) 18%, var(--paper)); }
+.tok.org { border-color: var(--c3); background: color-mix(in srgb, var(--c3) 18%, var(--paper)); }
+.tok.loc { border-color: var(--c2); background: color-mix(in srgb, var(--c2) 18%, var(--paper)); }
+.tok.misc { border-color: var(--c1); background: color-mix(in srgb, var(--c1) 18%, var(--paper)); }
+.tok.ign { opacity: .55; border-style: dashed; }
+.tok.cur { box-shadow: 0 0 0 3px var(--c1); }
+.stack { display: grid; gap: 4px; font-family: var(--mono); font-size: 12.5px; }
+.stack .lyr { display: flex; justify-content: space-between; gap: 8px; border: 1.5px solid var(--rule); border-radius: 4px; padding: 4px 9px; cursor: pointer; background: var(--paper); }
+.stack .lyr.frozen { background: color-mix(in srgb, var(--c2) 14%, var(--paper)); color: var(--muted); border-style: dashed; }
+.stack .lyr.train { border-color: var(--c1); background: var(--tint); color: var(--ink); }
+.stack .lyr span:last-child { white-space: nowrap; }
+.bar { height: 14px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.bar > div { height: 100%; background: var(--c1); }
+.pairgrid { display: grid; gap: 2px; }
+.pairgrid div { display: flex; gap: 2px; }
+.pairgrid span { width: 16px; height: 16px; border-radius: 2px; display: inline-block; }
+.pairgrid .pos { background: var(--buy); opacity: .75; }
+.pairgrid .neg { background: var(--sell); opacity: .6; }
+.pairgrid .self { background: var(--grid); }
+pre.code .cm { color: var(--muted); }
+.anno { display: grid; gap: 6px; }
+.anno div { font-size: 15.5px; border-left: 3px solid var(--rule); padding-left: 10px; }
+.anno div code { font-weight: 600; }
+.errata { font-size: 15px; border: 1px dashed var(--sell); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+.errata > b { color: var(--sell); font-family: var(--display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.interview { background: var(--paper); border-left: 4px solid var(--c3); }
+.interview > b { color: var(--c3); }
+.kv { display: grid; grid-template-columns: max-content minmax(0,1fr); gap: 3px 12px; font-family: var(--mono); font-size: 13px; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.chartbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.chartbox svg { display: block; width: 100%; min-width: 480px; height: auto; }
+.ln { stroke: var(--c2); stroke-width: 2.4; fill: none; }
+.pt { fill: var(--c2); }
+.pt.on { fill: var(--c1); r: 6; }
+.axis { stroke: var(--muted); stroke-width: 1; }
+.gridl { stroke: var(--grid); stroke-width: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch10_creating_text_embedding_models.html">← Ch.10 Creating Text Embedding Models</a><a href="ch12_fine_tuning_generation_models.html">Ch.12 Fine-Tuning Generation Models →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 11 · PDF p345–376</div>
+  <h1>Fine-tuning BERT to <em>classify</em>: whole documents, with few labels, in your own domain, and word by word</h1>
+  <p class="lede">In Chapter 4 the authors classified movie reviews with pretrained models that they never changed ("frozen"). This chapter asks what happens if you <b>do</b> change them. First they fine-tune a whole BERT model plus a small classification head on the Rotten Tomatoes reviews and get an F1 score of 0.85 (Chapter 4 got 0.80), then show that freezing layers saves compute but costs accuracy. Next comes <b>SetFit</b>, which fine-tunes a sentence-embedding model from only 32 labeled reviews and still scores about 0.84. Then <b>continued pretraining</b>: keep training BERT with masked language modeling on your own domain text before fine-tuning, so it learns your vocabulary. Finally, <b>named-entity recognition (NER)</b>: classify every token instead of the whole document, which needs a careful trick to line word labels up with sub-word tokens.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is four experiments on the same base model (<code>bert-base-cased</code>), each answering a "but what if…" left open by the previous one. Read the rows top to bottom; the orange boxes are the ideas each row reacts to.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 11">
+    <div class="row"><span class="tag">Start</span><span class="node">Ch.4: frozen pretrained models</span><span class="arr">→</span><span class="node">F1 0.80</span><span class="arr">→</span><span class="node key">what if we train the model too?</span></div>
+    <div class="row"><span class="tag">Idea 1</span><span class="node key">fine-tune BERT + head together</span><span class="arr">→</span><span class="node">F1 0.85 in minutes</span><span class="arr">→</span><span class="node">cost: full backward pass</span></div>
+    <div class="row"><span class="tag">Trade-off</span><span class="node key">freeze layers</span><span class="arr">→</span><span class="node">head only: 0.63</span><span class="node">last 2 blocks + head: 0.80</span><span class="arr">→</span><span class="node">accuracy vs compute</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">we need thousands of labels</span><span class="arr">→</span><span class="node key">SetFit (few-shot)</span><span class="arr">→</span><span class="node">pairs → contrastive → classifier</span><span class="arr">→</span><span class="node">32 labels ≈ 0.84</span></div>
+    <div class="row"><span class="tag">Problem</span><span class="node">BERT learned Wikipedia, not your domain</span><span class="arr">→</span><span class="node key">continued pretraining (MLM)</span><span class="arr">→</span><span class="node">"horrible idea" → "horrible movie"</span></div>
+    <div class="row"><span class="tag">New task</span><span class="node">label each word, not the doc</span><span class="arr">→</span><span class="node key">NER: token classification</span><span class="arr">→</span><span class="node">B-/I- tags · align to sub-words · −100</span><span class="arr">→</span><span class="node">seqeval F1</span></div>
+    <div class="row"><span class="tag">Next</span><span class="node">Ch.12: fine-tuning <i>generative</i> models</span></div>
+  </div>
+  <svg viewBox="0 0 640 190" class="dg" role="img" aria-label="Four uses of one BERT model" style="width:100%;height:auto;max-width:640px">
+    <rect x="250" y="8" width="140" height="36" rx="5" class="hi"/><text x="320" y="31" text-anchor="middle" class="b">bert-base-cased</text>
+    <line x1="290" y1="44" x2="80" y2="100"/><line x1="305" y1="44" x2="240" y2="100"/><line x1="335" y1="44" x2="400" y2="100"/><line x1="350" y1="44" x2="560" y2="100"/>
+    <rect x="10" y="100" width="140" height="78" rx="5" class="f"/><text x="80" y="120" text-anchor="middle" class="b">1 · Supervised</text><text x="80" y="138" text-anchor="middle" class="m">~8.5k labels</text><text x="80" y="154" text-anchor="middle" class="m">1 label / review</text><text x="80" y="170" text-anchor="middle">F1 0.85</text>
+    <rect x="170" y="100" width="140" height="78" rx="5" class="f"/><text x="240" y="120" text-anchor="middle" class="b">2 · SetFit</text><text x="240" y="138" text-anchor="middle" class="m">32 labels</text><text x="240" y="154" text-anchor="middle" class="m">(mpnet model)</text><text x="240" y="170" text-anchor="middle">F1 ≈ 0.84</text>
+    <rect x="330" y="100" width="140" height="78" rx="5" class="f"/><text x="400" y="120" text-anchor="middle" class="b">3 · Continued MLM</text><text x="400" y="138" text-anchor="middle" class="m">no labels</text><text x="400" y="154" text-anchor="middle" class="m">domain text</text><text x="400" y="170" text-anchor="middle">"horrible movie!"</text>
+    <rect x="490" y="100" width="140" height="78" rx="5" class="f"/><text x="560" y="120" text-anchor="middle" class="b">4 · NER</text><text x="560" y="138" text-anchor="middle" class="m">1 label / token</text><text x="560" y="154" text-anchor="middle" class="m">CoNLL-2003</text><text x="560" y="170" text-anchor="middle">"Ma"=B-PER</text>
+  </svg>
+  <p class="note">SetFit (box 2) actually starts from a different base model, <code>all-mpnet-base-v2</code>; it is drawn under the same root because it is still a BERT-like encoder.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening</a>
+    <a href="#s2"><span>02</span>Supervised classification: frozen vs trainable</a>
+    <a href="#s3"><span>03</span>Fine-tuning a pretrained BERT model</a>
+    <a href="#s4"><span>04</span>Freezing layers</a>
+    <a href="#s5"><span>05</span>Few-shot classification</a>
+    <a href="#s6"><span>06</span>SetFit: the three steps</a>
+    <a href="#s7"><span>07</span>Fine-tuning for few-shot classification</a>
+    <a href="#s8"><span>08</span>Continued pretraining with MLM</a>
+    <a href="#s9"><span>09</span>Masking and running continued pretraining</a>
+    <a href="#s10"><span>10</span>Named-entity recognition</a>
+    <a href="#s11"><span>11</span>Preparing data for NER</a>
+    <a href="#s12"><span>12</span>Fine-tuning for NER</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>From "use the model as it is" to "train it on my task"</h2></div><span class="chip">pdf p345</span></div>
+  <p>In <a href="ch04_text_classification.html">Chapter 4</a> the authors classified text with <b>pretrained models</b> and kept them exactly as they were: no weights changed. That leaves an obvious question: what happens if we <b>fine-tune</b> them, meaning we keep training a pretrained model on our own labeled data so its weights adapt to our task?</p>
+  <p>The book's answer up front: <b>if you have enough data, fine-tuning tends to give some of the best-performing models possible.</b> The chapter then works through several methods and applications of fine-tuning <b>BERT</b> models (BERT = Bidirectional Encoder Representations from Transformers, an encoder-only representation model):</p>
+  <ol class="plain">
+    <li><b>Supervised Classification</b> (book p.323): the general process of fine-tuning a classification model.</li>
+    <li><b>Few-Shot Classification</b> (book p.333): <b>SetFit</b>, a way to fine-tune a high-performing model efficiently from only a small number of training examples.</li>
+    <li><b>Continued Pretraining with Masked Language Modeling</b> (book p.340): how to keep training an already-pretrained model.</li>
+    <li><b>Named-Entity Recognition</b> (book p.345): classification at the <b>token level</b> instead of the document level.</li>
+  </ol>
+  <p>The page numbers in that list are the book's printed numbers; on this page they are plates 2–4, 5–7, 8–9 and 10–12. The chapter sticks to <b>nongenerative</b> tasks (the model outputs a label, not new text). Generative models get their fine-tuning chapter next, in <a href="ch12_fine_tuning_generation_models.html">Chapter 12</a>.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Section</th><th>Labels needed</th><th>What gets trained</th><th>Output</th></tr>
+    <tr><td>Supervised classification</td><td>one per document, thousands</td><td>BERT + classification head</td><td>one label per document</td></tr>
+    <tr><td>SetFit</td><td>a few per class (16 here)</td><td>sentence-embedding model, then a classifier</td><td>one label per document</td></tr>
+    <tr><td>Continued pretraining</td><td>none (raw domain text)</td><td>BERT with its MLM head</td><td>a better starting model</td></tr>
+    <tr><td>NER</td><td>one per word</td><td>BERT + token classification head</td><td>one label per token</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>A new hire who already graduated (pretraining) joins your company. Chapter 4 was asking them questions without any onboarding. Fine-tuning is onboarding: they practise on your real tickets until their instincts match your needs. SetFit is onboarding with only a handful of examples; continued pretraining is making them read your internal wiki first; NER is training them to highlight names in every line instead of just stamping a verdict on the whole document. <i>Where it breaks:</i> a person keeps their old knowledge safely; a model's weights are overwritten during training, so pushing too hard on narrow data can damage general skills.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4 Text Classification</a>: the frozen baselines (task-specific model, embedding model + logistic regression) this chapter improves on.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: contrastive learning and SentenceTransformers, reused by SetFit (plate 6).</li><li><a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7 Finetuning</a>: when to fine-tune at all, from the product side.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SUPERVISED CLASSIFICATION</div><h2>Frozen vs trainable: let the whole model learn</h2></div><span class="chip">pdf p345–347 · Fig 11-1, 11-2, 11-3</span></div>
+  <p>In Chapter 4, supervised classification (learning from labeled examples) used two kinds of pretrained <b>representation models</b> (models that turn text into numbers rather than generate text):</p>
+  <ul class="plain">
+    <li>a <b>task-specific model</b>, already trained to predict sentiment, used directly; and</li>
+    <li>an <b>embedding model</b> that turns each review into a vector (an embedding), followed by a separate, trainable <b>classification head</b> (a small classifier) that predicts the sentiment from that vector.</li>
+  </ul>
+  <p>Both were kept <b>frozen</b>, meaning nontrainable: their weights never changed. The point there was to show how far you can get with pretrained models alone. Only the small classifier after the embedding model learned anything.</p>
+  <figure class="bookfig"><img src="figs/fig-11-1.png" alt="Two frozen models from Chapter 4: a task-specific model that directly outputs Positive, and an embedding model whose output vector feeds a trainable classifier" loading="lazy"><figcaption>Figure 11-1 (book, pdf p346): In Chapter 4, we used pretrained models to perform classification without updating their weight. These models were kept "frozen."</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The snowflake icons and the iceberg mark the parts that are frozen: both the task-specific model (top) and the embedding model (bottom) sit inside the dashed "Nontrainable" box. The top model goes straight to an output ("1, Positive"). The bottom model emits a red embedding vector that feeds a small box with a flame icon (trainable) and an S-shaped curve (a logistic-regression classifier), which then outputs "1, Positive". Flame = learns, snowflake = doesn't.</p>
+  <p>In this chapter the approach is similar, but <b>both the model and the classification head are updated during training</b>. Instead of an embedding model plus a separate classifier, they fine-tune a pretrained BERT model into a task-specific model, like the one used in "Chapter 2" (the book's wording; the task-specific model was used in <a href="ch04_text_classification.html">Chapter 4</a>). Compared with the embedding-model approach, the representation model and the classification head are fine-tuned <b>as a single architecture</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-11-2.png" alt="Left: frozen embedding model with trainable classification head. Right: trainable BERT plus trainable neural-network classification head trained as one architecture" loading="lazy"><figcaption>Figure 11-2 (book, pdf p346): Compared to the "frozen" architecture, we instead train both the pretrained BERT model and the classification head. A backward pass will start at the classification head and go through BERT.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left panel ("Frozen" architecture, only the classification head is fine-tuned): the embedding model has a snowflake; only the logistic-regression head has a flame. Right panel (Trainable architecture, fine-tuned as a single architecture): BERT now has a flame too, and the head is drawn as a small neural network (circles connected by lines). The caption's key phrase is <b>backward pass</b>: during training, the error signal (gradients) starts at the head and flows back <i>through</i> BERT, so BERT's weights change as well.</p>
+  <p>To do this, the model is not frozen: it is allowed to be <b>trainable</b>, so its parameters are updated during training. A pretrained BERT model gets a <b>neural network on top as a classification head</b>, and both are fine-tuned for classification.</p>
+  <figure class="bookfig"><img src="figs/fig-11-3.png" alt="Input 'What a horrible movie!' tokenized with CLS and SEP, passed through BERT, token embeddings fed to a feedforward network that outputs Positive 25% Negative 75%" loading="lazy"><figcaption>Figure 11-3 (book, pdf p347): The architecture of a task-specific model. It contains a pretrained representation model (e.g., BERT) with an additional classification head for the specific task.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top to bottom: the input "What a horrible movie!" is split into tokens, with the special tokens <code>[CLS]</code> (start, "classification") and <code>[SEP]</code> (end, "separator") added. The pretrained BERT block turns each token into a purple embedding vector. The classification head, a <b>feedforward neural network</b>, takes those embeddings and outputs a probability for each class: Positive 25%, Negative 75%. The dashed bracket on the right labelled "Trainable" with a flame covers <i>both</i> BERT and the head.</p>
+  <p>In practice this means the pretrained BERT model and the classification head are <b>updated jointly</b>. They are not independent processes: they learn from one another, which allows for <b>more accurate representations</b>. BERT's vectors shift to make the head's job easier, and the head adapts to the shifting vectors.</p>
+  <div class="box work"><b>Step through · one training step, frozen vs trainable</b>
+    <div class="controls"><span>Mode:</span><span class="seg"><button type="button" id="s2_fr" class="on">Frozen BERT</button><button type="button" id="s2_tr">Trainable BERT</button></span></div>
+    <div class="stepbar"><button id="w2_prev" type="button">◀ Back</button><button id="w2_next" type="button">Next ▶</button><span id="w2_n"></span></div>
+    <div id="w2_box" class="stack"></div>
+    <div class="caption" id="w2_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A cricket team where the batting coach (head) and the batter (BERT) work together. In the frozen setup the batter's technique is locked; the coach can only change where the batter stands. In the trainable setup, the coach's feedback reaches the batter's actual technique: footwork, grip, timing. <i>Where it breaks:</i> real players can push back or ignore advice; in a network, every weight that has <code>requires_grad=True</code> is nudged by every gradient whether that helps in general or not.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Training means: forward pass (text → probabilities), compute a loss against the true label (cross-entropy for classification), then a backward pass that computes, for every trainable weight, how much it contributed to the error, and the optimizer nudges it. A frozen parameter simply gets no update. With BERT trainable, roughly 108 million weights move instead of about 1,500 (beyond the book: computed from the <code>bert-base-cased</code> layer sizes, see plate 4). That is why it is slower but fits the task much better.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What's the difference between using embeddings + a classifier and fine-tuning BERT?"</i> With embeddings + classifier the encoder is frozen, so you only learn a decision boundary in a fixed vector space; it's cheap and you can reuse one embedding for many tasks. Full fine-tuning back-propagates through the encoder, so the vector space itself reshapes around your labels, which usually wins on accuracy when you have a few thousand labels, at the cost of a separate model per task and GPU training.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>: the two frozen setups in Figure 11-1.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a> and <a href="ch03_looking_inside_llms.html">Ch.3</a>: <code>[CLS]</code>/<code>[SEP]</code> and what an encoder outputs.</li><li>Plate 4: what happens when you freeze <i>part</i> of BERT.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · FINE-TUNING A PRETRAINED BERT MODEL</div><h2>The full recipe: data, model, tokenizer, collator, metric, Trainer</h2></div><span class="chip">pdf p347–350</span></div>
+  <p>The data is the same as in Chapter 4: the <b>Rotten Tomatoes</b> dataset, <b>5,331 positive and 5,331 negative</b> movie reviews. It comes already split into train and test sets.</p>
+  <pre class="code"><code>from datasets import load_dataset
+
+<span class="cm"># Prepare data and splits</span>
+tomatoes = load_dataset("rotten_tomatoes")
+train_data, test_data = tomatoes["train"], tomatoes["test"]</code></pre>
+  <h3>Step 1 · choose the model and the number of labels</h3>
+  <p>The base model is <b><code>bert-base-cased</code></b>, pretrained on English Wikipedia plus a large dataset of unpublished books (footnote 1: Devlin et al., the BERT paper, 2018). "Cased" means it keeps capital letters (so "Apple" and "apple" are different tokens).</p>
+  <p>You must say <b>how many labels</b> you want to predict before loading. This is needed to build the feedforward neural network (the head) that goes on top of the pretrained model: its output layer needs one unit per label.</p>
+  <pre class="code"><code>from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+<span class="cm"># Load model and tokenizer</span>
+model_id = "bert-base-cased"
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id, num_labels=2
+)
+tokenizer = AutoTokenizer.from_pretrained(model_id)</code></pre>
+  <div class="anno">
+    <div><code>AutoModelForSequenceClassification</code>: loads BERT's pretrained body and adds a fresh, randomly initialised classification head for whole sequences (documents).</div>
+    <div><code>num_labels=2</code>: positive and negative, so the head outputs 2 numbers (logits).</div>
+    <div><code>AutoTokenizer</code>: the matching tokenizer, which knows BERT's WordPiece vocabulary and adds <code>[CLS]</code>/<code>[SEP]</code>.</div>
+  </div>
+  <h3>Step 2 · tokenize</h3>
+  <pre class="code"><code>from transformers import DataCollatorWithPadding
+
+<span class="cm"># Pad to the longest sequence in the batch</span>
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+def preprocess_function(examples):
+    """Tokenize input data"""
+    return tokenizer(examples["text"], truncation=True)
+
+<span class="cm"># Tokenize train/test data</span>
+tokenized_train = train_data.map(preprocess_function, batched=True)
+tokenized_test = test_data.map(preprocess_function, batched=True)</code></pre>
+  <p>Before creating the trainer, they prepare a <b>DataCollator</b>: a class that <b>builds batches</b> of data and can also apply <b>data augmentation</b>. During tokenization (as shown in <a href="ch09_multimodal_llms.html">Chapter 9</a>) <b>padding</b> is added so every input in a batch has the same length, because tensors must be rectangular. <code>DataCollatorWithPadding</code> does this <b>dynamically</b>: it pads each batch only to the longest sequence <i>in that batch</i>. <code>truncation=True</code> cuts any text longer than the model's maximum length (512 tokens for BERT).</p>
+  <div class="box work"><b>Try it · dynamic padding vs padding everything to the max</b>
+    <p>Each row is one review in a batch of 4 (token counts are modelled). Grey cells are <code>[PAD]</code> tokens: wasted compute.</p>
+    <div class="controls"><label>Strategy <select id="pad_mode"><option value="dyn">pad to longest in batch (DataCollatorWithPadding)</option><option value="max">pad everything to 64</option></select></label><button type="button" id="pad_new">New batch</button></div>
+    <div id="pad_box" style="display:grid;gap:3px;overflow-x:auto"></div>
+    <div class="readout" id="pad_r"></div>
+  </div>
+  <h3>Step 3 · define the metric</h3>
+  <pre class="code"><code>import numpy as np
+from datasets import load_metric
+
+def compute_metrics(eval_pred):
+    """Calculate F1 score"""
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=-1)
+    load_f1 = load_metric("f1")
+    f1 = load_f1.compute(predictions=predictions, references=labels)["f1"]
+    return {"f1": f1}</code></pre>
+  <p>The model outputs <b>logits</b> (raw scores, one per class). <code>np.argmax(..., axis=-1)</code> picks the class with the highest score for each review. The <b>F1 score</b> combines precision and recall (it is their harmonic mean). With <code>compute_metrics</code> you can define <b>any number of metrics</b>, which are printed or logged during training. This is especially helpful because it lets you <b>detect overfitting</b> (training loss keeps dropping while the test metric stops improving or falls).</p>
+  <div class="box beyond"><b>Beyond the book</b><p><code>datasets.load_metric</code> was deprecated and later removed from the <code>datasets</code> library; current code uses <code>evaluate.load("f1")</code>, the same package the book itself uses later for NER (plate 11).</p></div>
+  <div class="box work"><b>Try it · what an F1 of 0.85 means</b>
+    <p>Out of 1,066 test reviews (the Rotten Tomatoes test split has 533 + 533), drag how many of each kind the model gets right. "Positive" is the class F1 is computed for.</p>
+    <div class="controls"><label>positives found (TP of 533) <input id="f1_tp" type="range" min="0" max="533" value="450"><output id="f1_tpo"></output></label><label>negatives wrongly called positive (FP) <input id="f1_fp" type="range" min="0" max="533" value="76"><output id="f1_fpo"></output></label></div>
+    <div class="readout" id="f1_r"></div>
+    <p class="note">Modelled counts; the 450 / 76 defaults are chosen to land near the book's 0.85.</p>
+  </div>
+  <h3>Step 4 · training arguments and the Trainer</h3>
+  <pre class="code"><code>from transformers import TrainingArguments, Trainer
+
+<span class="cm"># Training arguments for parameter tuning</span>
+training_args = TrainingArguments(
+   "model",
+   learning_rate=2e-5,
+   per_device_train_batch_size=16,
+   per_device_eval_batch_size=16,
+   num_train_epochs=1,
+   weight_decay=0.01,
+   save_strategy="epoch",
+   report_to="none"
+)
+
+<span class="cm"># Trainer which executes the training process</span>
+trainer = Trainer(
+   model=model,
+   args=training_args,
+   train_dataset=tokenized_train,
+   eval_dataset=tokenized_test,
+   tokenizer=tokenizer,
+   data_collator=data_collator,
+   compute_metrics=compute_metrics,
+)</code></pre>
+  <p><b><code>TrainingArguments</code></b> holds the <b>hyperparameters</b> you want to tune, such as the learning rate and the number of <b>epochs</b> (rounds through the full training set). The <b><code>Trainer</code></b> runs the training process.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Argument</th><th>Value</th><th>What it means</th></tr>
+    <tr><td><code>"model"</code></td><td class="num">—</td><td>output folder for checkpoints</td></tr>
+    <tr><td><code>learning_rate</code></td><td class="num">2e-5</td><td>how big each weight nudge is (0.00002); small, because the pretrained weights are already good and big steps would wreck them</td></tr>
+    <tr><td><code>per_device_train_batch_size</code></td><td class="num">16</td><td>16 reviews per training step on each GPU</td></tr>
+    <tr><td><code>per_device_eval_batch_size</code></td><td class="num">16</td><td>16 reviews per evaluation step</td></tr>
+    <tr><td><code>num_train_epochs</code></td><td class="num">1</td><td>one pass over the training data</td></tr>
+    <tr><td><code>weight_decay</code></td><td class="num">0.01</td><td>a small pull of weights toward zero, a regulariser against overfitting</td></tr>
+    <tr><td><code>save_strategy</code></td><td class="num">"epoch"</td><td>save a checkpoint after each epoch</td></tr>
+    <tr><td><code>report_to</code></td><td class="num">"none"</td><td>don't send logs to tools like Weights &amp; Biases</td></tr>
+  </table></div>
+  <h3>Step 5 · train and evaluate</h3>
+  <pre class="code"><code>trainer.evaluate()
+
+{'eval_loss': 0.3663691282272339,
+ 'eval_f1': 0.8492366412213741,
+ 'eval_runtime': 4.5792,
+ 'eval_samples_per_second': 232.791,
+ 'eval_steps_per_second': 14.631,
+ 'epoch': 1.0}</code></pre>
+  <p class="note">The printed listing shows only <code>trainer.evaluate()</code>; a <code>trainer.train()</code> call must run first (the book writes "we can train our model and evaluate it", and shows <code>trainer.train()</code> explicitly in the later examples).</p>
+  <p>Result: <b>F1 = 0.85</b>, quite a bit higher than the task-specific model of Chapter 4, which scored <b>0.80</b>. It shows that fine-tuning a model yourself can beat using a pretrained model as is, and it <b>only costs a couple of minutes</b> of training.</p>
+  <div class="box work"><b>Worked example · how many steps is "one epoch"?</b>
+    <p>The training split has about 8,530 reviews (the book later says "roughly 8,500"). With batch size 16: 8,530 / 16 ≈ <b>534 optimisation steps</b> for one epoch. The evaluation output says 232.8 samples/second over 4.58 s ≈ 1,066 test reviews, which is exactly the test split (533 + 533). At 14.6 steps/s × 4.58 s ≈ 67 eval steps of 16.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Setting up the <code>Trainer</code> is like booking a railway journey: <code>TrainingArguments</code> is the ticket (class, train number, date = learning rate, batch size, epochs), the data collator is the porter who packs luggage into equal-sized trolleys, <code>compute_metrics</code> is the TTE (travelling ticket examiner) checking progress at each station, and <code>Trainer.train()</code> is the train actually leaving. <i>Where it breaks:</i> a train's route is fixed; in training you often stop, change the ticket (hyperparameters) and run again.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Why only 2e-5 and 1 epoch? The pretrained weights already encode a lot of language. Fine-tuning only has to make small adjustments so the <code>[CLS]</code>-based sentence representation separates positive from negative reviews. Large learning rates or many epochs on 8.5k examples risk <b>catastrophic forgetting</b> (beyond the book's wording: overwriting general knowledge) and overfitting. The head is new and random, but it is tiny, so it learns quickly even at a small learning rate.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Walk me through fine-tuning BERT for sentiment."</i> Load the dataset; load <code>AutoModelForSequenceClassification</code> with <code>num_labels</code>; tokenize with truncation; use <code>DataCollatorWithPadding</code> for per-batch dynamic padding; define a <code>compute_metrics</code> (F1) to watch for overfitting; set <code>TrainingArguments</code> (lr ≈ 2e-5, batch 16, a few epochs, weight decay); <code>Trainer.train()</code> then <code>evaluate()</code>. On Rotten Tomatoes this goes from 0.80 (off-the-shelf) to 0.85 F1 in a few minutes.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>: the 0.80 baseline.</li><li>Plate 4: same code, but with layers frozen.</li><li><a href="../llm_engineers_handbook/ch05_supervised_fine_tuning.html">LLM Engineer's Handbook Ch.5</a>: the same Trainer-style loop for supervised fine-tuning of a generative model.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · FREEZING LAYERS</div><h2>Freeze part of BERT: faster training, but how much accuracy do you lose?</h2></div><span class="chip">pdf p350–355 · Fig 11-4, 11-5, 11-6, 11-7</span></div>
+  <p>To show why training the <b>entire network</b> matters, the authors next use Hugging Face Transformers to <b>freeze</b> certain layers. First they freeze all of BERT and let updates reach only the classification head. Everything else stays identical (same data, same arguments), so it is a clean comparison: the only change is which layers can learn.</p>
+  <p>They start from scratch by reloading the model (otherwise they would be freezing an already fine-tuned model):</p>
+  <pre class="code"><code><span class="cm"># Load model and tokenizer</span>
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id, num_labels=2
+)
+tokenizer = AutoTokenizer.from_pretrained(model_id)</code></pre>
+  <h3>What is there to freeze? Printing the layer names</h3>
+  <pre class="code"><code><span class="cm"># Print layer names</span>
+for name, param in model.named_parameters():
+    print(name)
+
+bert.embeddings.word_embeddings.weight
+bert.embeddings.position_embeddings.weight
+bert.embeddings.token_type_embeddings.weight
+bert.embeddings.LayerNorm.weight
+bert.embeddings.LayerNorm.bias
+bert.encoder.layer.0.attention.self.query.weight
+bert.encoder.layer.0.attention.self.query.bias
+...
+bert.encoder.layer.11.output.LayerNorm.weight
+bert.encoder.layer.11.output.LayerNorm.bias
+bert.pooler.dense.weight
+bert.pooler.dense.bias
+classifier.weight
+classifier.bias</code></pre>
+  <p>Reading the list top to bottom: <b>embeddings</b> (word, position, token-type, and a LayerNorm), then <b>12 encoder blocks numbered 0–11</b>, each made of attention heads, dense (feedforward) networks and layer normalization, then the <b>pooler</b> (a dense layer over the <code>[CLS]</code> vector) and finally the <b>classifier</b>, which is our classification head.</p>
+  <figure class="bookfig"><img src="figs/fig-11-4.png" alt="Stack of 12 encoder blocks numbered 0 to 11 inside a purple outline, token vectors below them feeding a feedforward neural network that outputs Positive 25% Negative 75%" loading="lazy"><figcaption>Figure 11-4 (book, pdf p351): The basic architecture of BERT with the additional classification head.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> This zooms inside the "BERT" box of Figure 11-3. Each token's vertical line passes through encoder 0, encoder 1, … encoder 11 (the purple outline groups all 12). Out of the last block come one purple vector per token, which feed the feedforward head that produces the class probabilities. Everything in the purple box, plus the embeddings below it, is a candidate for freezing.</p>
+  <div class="box work"><b>Try it · walk through <code>model.named_parameters()</code></b>
+    <p>BERT-base has 201 named parameter tensors in this model. Slide the index to see which tensor each one is; this is what the book's <code>index &lt; 165</code> trick counts.</p>
+    <div class="controls"><label>index <input id="np_i" type="range" min="0" max="200" value="165"><output id="np_io"></output></label></div>
+    <div class="formula" id="np_name"></div>
+    <div class="readout" id="np_r"></div>
+    <p class="note">The list is rebuilt from the layer naming the book prints (5 embedding tensors, 16 per encoder block, 2 pooler, 2 classifier). The shapes are from the standard <code>bert-base-cased</code> configuration (beyond the book).</p>
+  </div>
+  <p>You could freeze only <i>some</i> layers to speed up computing while still letting the main model learn from the classification task. The book's rule of thumb: <b>generally, we want frozen layers to be followed by trainable layers</b> (freeze the bottom, train the top), because gradients flow from the head downward.</p>
+  <h3>Experiment A · freeze everything except the head</h3>
+  <pre class="code"><code>for name, param in model.named_parameters():
+
+     <span class="cm"># Trainable classification head</span>
+     if name.startswith("classifier"):
+        param.requires_grad = True
+
+     <span class="cm"># Freeze everything else</span>
+     else:
+        param.requires_grad = False</code></pre>
+  <p><code>requires_grad</code> is PyTorch's switch for "compute a gradient for this tensor". Set to <code>False</code>, the optimizer never updates it. This is the setup the book calls "as we did in Chapter 2" (it was Chapter 4's embedding + classifier idea): only the feedforward head learns.</p>
+  <figure class="bookfig"><img src="figs/fig-11-5.png" alt="All 12 encoder blocks and the token vectors marked Nontrainable Frozen with an iceberg; only the feedforward neural network marked Trainable with a flame" loading="lazy"><figcaption>Figure 11-5 (book, pdf p352): We fully freeze all encoder blocks and embedding layers such that the BERT model does not learn new representations during fine-tuning.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same drawing as Figure 11-4, now with a solid bracket on the right labelled "Nontrainable, Frozen" (iceberg) covering all encoders 0–11 and their outputs, and a short dashed bracket with a flame, "Trainable", only next to the feedforward neural network. The token vectors coming out of BERT will be the same before and after training.</p>
+  <pre class="code"><code>trainer = Trainer(model=model, args=training_args,
+   train_dataset=tokenized_train, eval_dataset=tokenized_test,
+   tokenizer=tokenizer, data_collator=data_collator,
+   compute_metrics=compute_metrics)
+trainer.train()
+trainer.evaluate()
+
+{'eval_loss': 0.6821751594543457,
+ 'eval_f1': 0.6331058020477816,
+ 'eval_runtime': 4.0175,
+ 'eval_samples_per_second': 265.337,
+ 'eval_steps_per_second': 16.677,
+ 'epoch': 1.0}</code></pre>
+  <p>Training becomes <b>much faster</b>, because only the head is trained. But the F1 drops to <b>0.63</b>, far below the 0.85 of full fine-tuning. (Note the eval loss too: 0.68 is close to ln 2 ≈ 0.69, the loss of a coin-flip guesser, so after one epoch the head alone has barely learned.)</p>
+  <h3>Experiment B · freeze the first 10 encoder blocks</h3>
+  <p>Instead of freezing nearly everything, they freeze everything <b>up until encoder block 10</b>. A major benefit is that this <b>reduces computation but still allows updates to flow through part of the pretrained model</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-11-6.png" alt="Encoders 0 to 9 shown pale and marked Frozen; encoders 10 and 11 and the feedforward network marked Trainable" loading="lazy"><figcaption>Figure 11-6 (book, pdf p353): We freeze the first 10 encoder blocks of our BERT model. Everything else is trainable and will be fine-tuned.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Encoders 0 to 9 are drawn pale and sit under the "Nontrainable, Frozen" bracket. Encoders 10 and 11 are drawn in full colour and, together with the token vectors and the feedforward head, sit under the dashed "Trainable" bracket with the flame. That is "frozen layers followed by trainable layers" in a picture.</p>
+  <pre class="code"><code><span class="cm"># Load model</span>
+model_id = "bert-base-cased"
+model = AutoModelForSequenceClassification.from_pretrained(
+    model_id, num_labels=2
+)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+
+<span class="cm"># Encoder block 11 starts at index 165 and</span>
+<span class="cm"># we freeze everything before that block</span>
+for index, (name, param) in enumerate(model.named_parameters()):
+    if index &lt; 165:
+        param.requires_grad = False
+
+<span class="cm"># Trainer which executes the training process</span>
+trainer = Trainer(...same arguments...)
+trainer.train()
+trainer.evaluate()
+
+{'eval_loss': 0.40812647342681885,
+ 'eval_f1': 0.8,
+ 'eval_runtime': 3.7125,
+ 'eval_samples_per_second': 287.137,
+ 'eval_steps_per_second': 18.047,
+ 'epoch': 1.0}</code></pre>
+  <div class="errata"><b>Reading note · "block 11" at index 165</b><p>Count it: 5 embedding tensors, then 16 tensors per encoder block, so block <i>i</i> starts at index 5 + 16·<i>i</i>. Index 165 is <code>bert.encoder.layer.10...</code>, the <b>11th</b> block counting from one. So <code>index &lt; 165</code> freezes the embeddings and blocks 0–9 (ten blocks), and leaves blocks 10 and 11, the pooler and the classifier trainable. That matches Figure 11-6 and the text ("the first 10 encoder blocks"); the code comment just counts blocks from one. Check it with the index slider above.</p></div>
+  <p>Result: <b>F1 = 0.80</b>, much better than 0.63 with everything frozen. Lesson: <b>you generally want to train as many layers as possible, but you can get away with training fewer if you don't have the compute.</b></p>
+  <h3>Experiment C · freeze more and more blocks</h3>
+  <p>To show the effect more fully, they repeated this for different numbers of trainable encoder blocks. As Figure 11-7 shows, training only the first five encoder blocks (the red vertical line) is enough to <b>almost reach the performance of training all of them</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-11-7.png" alt="Line chart of F1 score against trainable encoder blocks from None to all: rises steeply from about 0.70 to about 0.84 at blocks 0-4 (red dotted line, performance stabilizing), then creeps up to about 0.85" loading="lazy"><figcaption>Figure 11-7 (book, pdf p354): The effect of freezing certain encoder blocks on the performance of the model. Training more blocks leads to improved performance but stabilizes early on.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> X-axis: which encoder blocks were trainable, from "None" through "0-1", "0-2" … "0-10" to "all". Y-axis: F1 score (note the broken axis: it starts at 0.70, not 0). The curve climbs steeply at first (≈0.70 → ≈0.79 → ≈0.82), reaches ≈0.84 at "0-4", where a red dotted line and a green arrow say "Performance stabilizing", and then only creeps up to ≈0.85 for "all". Most of the gain comes from the first few trainable blocks; the rest is diminishing returns.</p>
+  <div class="errata"><b>Reading note · two small mismatches</b><p>(1) The "None" point of Figure 11-7 sits near 0.70, while Experiment A printed 0.63; the figure is presumably a separate set of runs, and the book doesn't explain the gap. (2) The axis labels say blocks "0-4" are trainable and the text says "the first five encoder blocks", while the code in Experiment B trains the <i>last</i> blocks. The book doesn't say which end the sweep unfroze; read the chart as "how many blocks are trainable".</p></div>
+  <div class="box work"><b>Try it · the freezing dial</b>
+    <p>Choose how many encoder blocks are trainable. The stack follows the book's code style (bottom frozen, top trainable). F1 is read off Figure 11-7 by eye; the trainable-parameter count is computed from <code>bert-base-cased</code>'s layer sizes (beyond the book).</p>
+    <div class="controls"><label>trainable encoder blocks <input id="fz_k" type="range" min="0" max="11" value="2"><output id="fz_ko"></output></label><label><input type="checkbox" id="fz_headonly"> head only (pooler frozen too, like Experiment A)</label></div>
+    <div class="two">
+      <div class="stack" id="fz_stack"></div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <div class="readout" id="fz_r"></div>
+        <div><div class="small">share of the 108.3M weights being trained</div><div class="bar"><div id="fz_bar"></div></div></div>
+        <div class="chartbox"><svg id="fz_chart" viewBox="0 0 480 200" role="img" aria-label="F1 by trainable blocks, read off Figure 11-7"></svg></div>
+      </div>
+    </div>
+  </div>
+  <div class="box"><b>Book's tip</b><p>When you train for <b>multiple epochs</b>, the gap in training time and resources between freezing and not freezing usually gets <b>larger</b>. So experiment to find the balance that works for you.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A big kirana shop's ledger system: the bottom layers are the shop's basic bookkeeping rules (how to write dates, add columns), the top layers are "which customers buy on credit". For a new branch you don't rewrite basic bookkeeping; you retrain the top layer of habits. Freezing everything (Experiment A) is forcing the new branch to use the old customer habits and only change the final yes/no stamp. <i>Where it breaks:</i> in a shop you can see which rule lives where; in BERT, "low layers = general, high layers = task-ish" is a tendency, not a clean division.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Freezing saves work in two ways: frozen weights need no optimizer state (Adam keeps two extra numbers per trainable weight), and if all frozen layers are at the bottom, the backward pass can stop where the frozen region begins, so you skip computing gradients through those blocks. That is why "frozen followed by trainable" is the efficient arrangement: freezing a block in the <i>middle</i> still forces gradients to pass through it to reach the trainable blocks below. The F1 curve flattens because the lower blocks mostly hold general language features that are already useful for sentiment.</p></div>
+  <div class="box work"><b>Worked example · what you actually train</b>
+    <div class="tablewrap"><table>
+      <tr><th>Setup</th><th>Trainable tensors</th><th>Trainable weights (computed)</th><th>F1 (book)</th></tr>
+      <tr><td>All trainable (plate 3)</td><td class="num">201</td><td class="num">≈108.3 M</td><td class="num">0.85</td></tr>
+      <tr><td>Blocks 10–11 + pooler + head (B)</td><td class="num">36</td><td class="num">≈14.8 M (13.6%)</td><td class="num">0.80</td></tr>
+      <tr><td>Head only (A)</td><td class="num">2</td><td class="num">1,538</td><td class="num">0.63</td></tr>
+    </table></div>
+    <p class="note">Weight counts are beyond the book: 768-wide hidden size, 3,072-wide feedforward, 28,996-token vocabulary, 512 positions. One encoder block ≈ 7.09 M weights; embeddings ≈ 22.7 M; pooler 0.59 M; head 768×2 + 2.</p>
+  </div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You have a small GPU budget. How do you fine-tune a 110M encoder?"</i> Freeze the embeddings and the lower encoder blocks and train the top few plus the head; that cuts gradient computation and optimizer memory, and in the book's experiment training a handful of blocks gets close to full fine-tuning (0.80–0.84 vs 0.85) while head-only collapses to 0.63. Keep frozen layers at the bottom so the backward pass can stop early. (Beyond the book: the modern alternative is a parameter-efficient method like LoRA, covered in <a href="ch12_fine_tuning_generation_models.html">Ch.12</a>.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: parameter-efficient fine-tuning (adapters, LoRA), the general version of "train only a small part".</li><li><a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7</a>: memory math for fine-tuning (weights, gradients, optimizer states).</li><li>Plate 2: why the backward pass reaches BERT at all.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · FEW-SHOT CLASSIFICATION</div><h2>Few-shot: learn the labels from only a handful of examples</h2></div><span class="chip">pdf p355 · Fig 11-8</span></div>
+  <p><b>Few-shot classification</b> is a technique <i>within</i> supervised classification where the classifier learns the target labels from <b>only a few labeled examples</b>. It is great when you have a classification task but <b>not many labeled data points</b> readily available. Put differently: you label a <b>few high-quality data points per class</b> and train on those.</p>
+  <figure class="bookfig"><img src="figs/fig-11-8.png" alt="Four labeled reviews, two negative and two positive, used as few labeled data points to predict the label of a new review 'Never want to see this movie again!'" loading="lazy"><figcaption>Figure 11-8 (book, pdf p355): In few-shot classification, we only use a few labeled data points to learn from.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Four labeled examples at the top: "What a horrible movie…" (0, negative), "Very disappointed" (0, negative), "Some flaws but still a great experience" (1, positive), "Best movie ever!" (1, positive). Arrows merge into "Few labeled data points", which are used to predict the yellow "?" for a new review, "Never want to see this movie again!". The whole training set is those four rows.</p>
+  <div class="box picture"><b>Picture it</b><p>A new cashier at a sweet shop learns to sort orders from a few examples the owner shows on day one: "this is a bulk wedding order, this is a walk-in". She doesn't need 8,000 past orders because she already understands language and context. <i>Where it breaks:</i> the cashier can ask questions when unsure; a few-shot model just guesses, so the few examples must be clean and representative.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Few-shot works because the model is pretrained: it already places similar sentences near each other. The few labels only need to tell it <i>which</i> direction in that space matters for your classes. With full fine-tuning (plate 3) on only 32 examples, a 108M-parameter model would overfit badly; SetFit (next plate) avoids that by turning 32 labels into many training pairs.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"You need an intent classifier for a new product but have almost no labels. Options?"</i> Zero-shot with an LLM prompt or embedding similarity to label names; few-shot prompting; or few-shot fine-tuning like SetFit, which needs ~8–16 labeled examples per class and gives a small, fast encoder you can serve cheaply. I'd label a few high-quality examples per intent first, because few-shot quality depends on them heavily.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: few-shot <i>prompting</i> (examples in the prompt, no training): same word, different technique.</li><li><a href="ch04_text_classification.html">Ch.4</a>: zero-shot classification with embeddings of label descriptions.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SETFIT: EFFICIENT FINE-TUNING WITH FEW TRAINING EXAMPLES</div><h2>SetFit: turn a few labels into many sentence pairs, then train</h2></div><span class="chip">pdf p355–359 · Fig 11-9, 11-10, 11-11, 11-12, 11-13</span></div>
+  <p>For few-shot text classification the book uses an efficient framework called <b>SetFit</b> (footnote 2: Tunstall et al., "Efficient few-shot learning without prompts", 2022). It is built on top of the <b>sentence-transformers</b> architecture, which produces high-quality text representations (sentence embeddings), and these representations are <b>updated during training</b>. With only a few labeled examples, SetFit can be <b>competitive with fine-tuning a BERT-like model on a large labeled dataset</b>, like the previous example.</p>
+  <p>The algorithm has <b>three steps</b>:</p>
+  <ol class="plain">
+    <li><b>Sampling training data.</b> From in-class and out-class selection of the labeled data, generate <b>positive</b> (similar) and <b>negative</b> (dissimilar) <b>pairs of sentences</b>.</li>
+    <li><b>Fine-tuning embeddings.</b> Fine-tune a pretrained embedding model on those generated pairs.</li>
+    <li><b>Training a classifier.</b> Put a classification head on top of the embedding model and train it on the training data.</li>
+  </ol>
+  <h3>Step 1 · sampling training data</h3>
+  <p>Fine-tuning an embedding model needs data in the form of positive and negative <b>sentence pairs</b>. But a classification dataset isn't labeled that way: each sentence just has a class. Take this example dataset with two categories, text about programming languages and text about pets:</p>
+  <figure class="bookfig"><img src="figs/fig-11-9.png" alt="Table with four sentences: 'I write my code in Python' and 'I should practice SQL' labeled Programming languages; 'My dog is a labrador' and 'I have a Siamese cat' labeled Pets" loading="lazy"><figcaption>Figure 11-9 (book, pdf p356): Data in two classes: text about programming languages and text about pets.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A plain classification table: two blue rows (Python, SQL) belong to "Programming languages", two purple rows (labrador, Siamese cat) to "Pets". This is the kind of data you normally have: one label per sentence, no pairs.</p>
+  <p>SetFit creates the pairs by <b>in-class and out-class selection</b>: any two sentences from the <b>same class</b> become a <b>positive pair</b>; any two from <b>different classes</b> become a <b>negative pair</b>. For example, with <b>16 sentences about sports</b> you can create <b>16 × (16 − 1) / 2 = 120</b> positive pairs. Negative pairs are collected the same way, but across classes.</p>
+  <figure class="bookfig"><img src="figs/fig-11-10.png" alt="Table with columns Text 1, Text 2, Pair type: I write my code in Python + I should practice SQL = Positive; My dog is a labrador + I have a Siamese cat = Positive; I write my code in Python + My dog is a labrador = Negative; I have a Siamese cat + I should practice SQL = Negative" loading="lazy"><figcaption>Figure 11-10 (book, pdf p356): Step 1: sampling training data. We assume sentences within a class are similar and create positive pairs while sentences in different classes become negative pairs.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three columns: Text 1, Text 2, Pair type. Blue cells are programming sentences ("I write my code in Python", "I should practice SQL"); purple cells are pet sentences ("My dog is a labrador", "I have a Siamese cat"). Blue + blue (Python, SQL) → Positive. Purple + purple (labrador, Siamese cat) → Positive. Blue + purple (Python, labrador) and purple + blue (Siamese cat, SQL) → Negative. The colour of the two cells tells you the pair type; no human labelled any pair.</p>
+  <div class="box work"><b>Try it · how many pairs can you make?</b>
+    <div class="controls"><label>classes <input id="pr_c" type="range" min="2" max="6" value="2"><output id="pr_co"></output></label><label>labeled examples per class <input id="pr_n" type="range" min="2" max="32" value="16"><output id="pr_no"></output></label></div>
+    <div class="readout" id="pr_r"></div>
+    <div id="pr_grid" class="pairgrid" style="overflow-x:auto"></div>
+    <p class="note">Grid = every sentence against every other (only shown for up to 40 sentences). Green = same class (positive), red = different class (negative). Counting all possible pairs is exact maths; how many SetFit actually samples is set by <code>num_iterations</code> (plate 7).</p>
+  </div>
+  <h3>Step 2 · fine-tuning embeddings with contrastive learning</h3>
+  <p>The generated pairs are used to fine-tune the embedding model with <b>contrastive learning</b>: as reviewed in <a href="ch10_creating_text_embedding_models.html">Chapter 10</a>, it learns accurate sentence embeddings from pairs of similar (positive) and dissimilar (negative) sentences. Since step 1 made those pairs, they can fine-tune a <b>SentenceTransformers</b> model. Figure 11-11 is a refresher.</p>
+  <figure class="bookfig"><img src="figs/fig-11-11.png" alt="Negative pair 'I write code in Python' and 'My dog is a Labrador' both passed through BERT, token embeddings pooled into sentence embeddings u and v, combined as (u, v, |u-v|) into a softmax" loading="lazy"><figcaption>Figure 11-11 (book, pdf p357): Step 2: Fine-tuning a SentenceTransformers model. Using contrastive learning, embeddings are learned from positive and negative sentence pairs.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> One pair goes in at the top, here a <b>negative</b> example: "I write code in Python" and "My dog is a Labrador". Each sentence passes through the <b>same</b> BERT (one shared model), producing token embeddings (blue for the first sentence, purple for the second). <b>Pooling</b> (for example averaging) turns the token embeddings into one <b>sentence embedding</b> each, called <b>u</b> and <b>v</b>. The three pieces u, v and |u − v| (the element-wise difference) are concatenated and fed to a <b>softmax</b> classifier that predicts whether the pair is similar. Training pushes u and v apart for negative pairs and together for positive pairs.</p>
+  <p>The goal: an embedding model whose embeddings are <b>tuned to the classification task</b>. The relevance of the classes and their relative meaning are <b>distilled into the embeddings</b> by this fine-tuning.</p>
+  <h3>Step 3 · training a classifier</h3>
+  <p>Now generate embeddings for all sentences with the fine-tuned SentenceTransformers model and use them as <b>features</b> for a classifier. The classifier learns from the fine-tuned embeddings to predict unseen sentences accurately.</p>
+  <figure class="bookfig"><img src="figs/fig-11-12.png" alt="Three sentences pass through the fine-tuned SentenceTransformers model into embeddings, then a classifier outputs Code 79% Pets 21%, Code 93% Pets 7%, Code 15% Pets 85%" loading="lazy"><figcaption>Figure 11-12 (book, pdf p358): Step 3: Training a classifier. The classifier can be any scikit-learn model or a classification head.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three sentences (Python, SQL, Labrador) pass through the <b>fine-tuned</b> SentenceTransformers model, each becoming one embedding. A <b>classifier</b> box ("for example using scikit-learn or PyTorch"; side note: any classification model can be used) turns each embedding into class probabilities: Python → 79% Code / 21% Pets; SQL → 93% Code / 7% Pets; Labrador → 15% Code / 85% Pets.</p>
+  <p>Put together, this is an <b>efficient and elegant pipeline</b> for classification when you only have a few labels per class. It cleverly uses the fact that we <i>do</i> have labeled data, just not in the form we'd like (pairs).</p>
+  <figure class="bookfig"><img src="figs/fig-11-13.png" alt="Three panels: 1 generate positive and negative sentence pairs, 2 fine-tune pretrained SentenceTransformer with two BERT copies and softmax, 3 embed sentences with the fine-tuned model and train classifier" loading="lazy"><figcaption>Figure 11-13 (book, pdf p359): The three main steps of SetFit.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Panel 1: a green box (positive pair: Python + SQL) and a red box (negative pair: Python + Labrador). Panel 2: the pair goes through BERT twice (same weights), the two embeddings go up into a SoftMax: this is contrastive fine-tuning. Panel 3: a single sentence ("I write my code in Python") goes through the <i>fine-tuned</i> SentenceTransformer into one embedding, then into the Classifier, which outputs the class bar. In the book's words: first, pairs from in-class and out-class selection; second, those pairs fine-tune a pretrained SentenceTransformer; third, sentences are embedded with the fine-tuned model and a classifier is trained on them.</p>
+  <div class="box work"><b>Step through · SetFit on the four-sentence toy dataset</b>
+    <div class="stepbar"><button id="w6_prev" type="button">◀ Back</button><button id="w6_next" type="button">Next ▶</button><span id="w6_n"></span></div>
+    <div class="chartbox"><svg id="w6_svg" viewBox="0 0 480 230" role="img" aria-label="2D embedding space of four sentences moving during SetFit"></svg></div>
+    <div class="caption" id="w6_cap"></div>
+    <p class="note">The 2-D positions are modelled for illustration; real embeddings have 768 dimensions.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A railway ticket checker learning to tell first-class from sleeper passengers with only 16 examples of each. Instead of memorising 32 faces, she studies <i>pairs</i>: "these two travel the same class, these two don't". After 1,280 such comparisons she has a sharp sense of what separates the classes, and then a simple rule ("which side of the line?") does the labelling. <i>Where it breaks:</i> the pairs are made by assuming every member of a class is similar to every other; if a class is really two sub-groups, SetFit will still squeeze them together.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Pairing multiplies data: n labeled examples give about n²/2 pairs, so 32 sentences yield 496 possible pairs (more than 15× the examples). Contrastive learning on pairs is a much easier problem for a 110M-parameter model than direct classification from 32 rows, so it overfits far less. Once the embedding space has the classes in separate regions, even logistic regression (a straight line) separates them. Step 2 changes the "map"; step 3 just draws the border.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Explain SetFit in 30 seconds."</i> SetFit does few-shot classification in three steps: build positive pairs from same-class examples and negative pairs from different classes; contrastively fine-tune a sentence-transformer on those pairs so the embedding space separates the classes; then train a light classifier (logistic regression by default) on the new embeddings. No prompts, a small model, and with 16 examples per class it matched full fine-tuning-level F1 in the book.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: contrastive learning, SBERT's (u, v, |u−v|) softmax objective, and sentence-transformers fine-tuning in depth.</li><li><a href="ch04_text_classification.html">Ch.4</a>: step 3 is the same "embeddings + logistic regression" classifier, now on better embeddings.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: the same embedding space ideas behind semantic search.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · FINE-TUNING FOR FEW-SHOT CLASSIFICATION</div><h2>SetFit in code: 32 reviews, 1,280 pairs, F1 ≈ 0.84</h2></div><span class="chip">pdf p359–361</span></div>
+  <p>The earlier example trained on <b>roughly 8,500</b> movie reviews. For a few-shot setting they <b>sample only 16 examples per class</b>: with 2 classes, just <b>32 documents</b>.</p>
+  <pre class="code"><code>from setfit import sample_dataset
+
+<span class="cm"># We simulate a few-shot setting by sampling 16 examples per class</span>
+sampled_train_data = sample_dataset(tomatoes["train"], num_samples=16)</code></pre>
+  <p>Next, a pretrained SentenceTransformer model to fine-tune. The sentence-transformers documentation lists pretrained models; they choose <b><code>sentence-transformers/all-mpnet-base-v2</code></b>, one of the best-performing models on the <b>MTEB leaderboard</b> (Massive Text Embedding Benchmark), which ranks embedding models across many tasks.</p>
+  <pre class="code"><code>from setfit import SetFitModel
+
+<span class="cm"># Load a pretrained SentenceTransformer model</span>
+model = SetFitModel.from_pretrained("sentence-transformers/all-mpnet-base-v2")</code></pre>
+  <p>Then the <b>SetFitTrainer</b>. By default, a <b>logistic regression</b> model is the classifier that gets trained. As with Hugging Face Transformers, the trainer holds the parameters you play with. Here <code>num_epochs=3</code> means contrastive learning runs for three epochs:</p>
+  <pre class="code"><code>from setfit import TrainingArguments as SetFitTrainingArguments
+from setfit import Trainer as SetFitTrainer
+
+<span class="cm"># Define training arguments</span>
+args = SetFitTrainingArguments(
+    num_epochs=3, <span class="cm"># The number of epochs to use for contrastive learning</span>
+    num_iterations=20  <span class="cm"># The number of text pairs to generate</span>
+)
+args.eval_strategy = args.evaluation_strategy
+
+<span class="cm"># Create trainer</span>
+trainer = SetFitTrainer(
+    model=model,
+    args=args,
+    train_dataset=sampled_train_data,
+    eval_dataset=test_data,
+    metric="f1"
+)</code></pre>
+  <div class="anno">
+    <div><code>as SetFitTrainingArguments</code> / <code>as SetFitTrainer</code>: renamed on import so they don't clash with the Transformers classes of the same name used earlier.</div>
+    <div><code>num_iterations=20</code>: how many sentence pairs to generate <i>per labeled example</i> (see the maths below).</div>
+    <div><code>args.eval_strategy = args.evaluation_strategy</code>: a one-line compatibility shim for the library version the book used; it copies one argument name to the other.</div>
+    <div><code>metric="f1"</code>: evaluate with F1, like the earlier examples.</div>
+  </div>
+  <pre class="code"><code><span class="cm"># Training loop</span>
+trainer.train()
+
+***** Running training *****
+  Num unique pairs = 1280
+  Batch size = 16
+  Num epochs = 3
+  Total optimization steps = 240</code></pre>
+  <p>The output says <b>1,280 sentence pairs</b> were generated to fine-tune the SentenceTransformer. By default <b>20 sentence-pair combinations are generated for each sample</b>, and this is multiplied by 2 because both a positive and a negative pair are generated. Generating 1,280 pairs from only 32 labeled sentences is quite impressive.</p>
+  <div class="errata"><b>Reading note · the arithmetic</b><p>The book prints "20 * 32 = 680 samples" and then "680 * 2 = 1,280". The correct product is 20 × 32 = <b>640</b>, and 640 × 2 = 1,280, which matches the training log. The step count also checks out: 1,280 pairs / batch 16 = 80 steps per epoch × 3 epochs = <b>240</b> optimisation steps.</p></div>
+  <div class="box work"><b>Try it · SetFit pair and step calculator</b>
+    <div class="controls"><label>examples per class <input id="sf_n" type="range" min="2" max="64" value="16"><output id="sf_no"></output></label><label>classes <input id="sf_c" type="range" min="2" max="8" value="2"><output id="sf_co"></output></label><label>num_iterations <input id="sf_it" type="range" min="5" max="60" step="5" value="20"><output id="sf_ito"></output></label><label>num_epochs <input id="sf_ep" type="range" min="1" max="5" value="3"><output id="sf_epo"></output></label></div>
+    <div class="readout" id="sf_r"></div>
+    <p class="note">Uses the book's rule: pairs = examples × num_iterations × 2; batch size 16. The defaults reproduce the book's log (1,280 pairs, 240 steps).</p>
+  </div>
+  <div class="box"><b>Book's tip · choosing your own head</b><p>If you don't specify a classification head, logistic regression is used. To use a differentiable (neural network) head instead, load the model like this, where <code>num_classes</code> is the number of classes to predict:</p>
+  <pre class="code"><code><span class="cm"># Load a SetFit model from Hub</span>
+model = SetFitModel.from_pretrained(
+    "sentence-transformers/all-mpnet-base-v2",
+    use_differentiable_head=True,
+    head_params={"out_features": num_classes},
+)
+
+<span class="cm"># Create trainer</span>
+trainer = SetFitTrainer(
+    model=model,
+    ...
+)</code></pre></div>
+  <pre class="code"><code><span class="cm"># Evaluate the model on our test data</span>
+trainer.evaluate()
+
+{'f1': 0.8363988383349468}</code></pre>
+  <p>With <b>only 32 labeled documents</b>, the F1 is about 0.84 (the text rounds it to "0.85"). Given that the model saw a tiny subset of the original data, this is very impressive. The book adds that in "Chapter 2" the same performance came from a logistic regression trained on embeddings of the <b>full</b> data. So this pipeline shows the value of taking the time to <b>label just a few instances</b> well.</p>
+  <div class="errata"><b>Reading note</b><p>The printed score is 0.836, which rounds to 0.84, not 0.85. And the "embeddings + logistic regression on the full data" experiment the text refers to is the one in <a href="ch04_text_classification.html">Chapter 4</a> (Figure 11-1's lower path); the book's "Chapter 2" looks like a cross-reference slip.</p></div>
+  <div class="box"><b>Book's tip · zero-shot with SetFit</b><p>SetFit can also do <b>zero-shot classification</b>, when you have <b>no labels at all</b>. It generates <b>synthetic examples from the label names</b> that resemble the task, then trains a SetFit model on them. For labels "happy" and "sad", the synthetic data could be "The example is happy" and "This example is sad."</p></div>
+  <div class="tablewrap"><table>
+    <tr><th>Approach</th><th>Labeled training docs</th><th>F1 on Rotten Tomatoes test</th></tr>
+    <tr><td>Ch.4 task-specific model (frozen)</td><td class="num">0</td><td class="num">0.80</td></tr>
+    <tr><td>Full BERT fine-tune (plate 3)</td><td class="num">≈8,500</td><td class="num">0.85</td></tr>
+    <tr><td>BERT, head only (plate 4)</td><td class="num">≈8,500</td><td class="num">0.63</td></tr>
+    <tr><td>BERT, last 2 blocks + head (plate 4)</td><td class="num">≈8,500</td><td class="num">0.80</td></tr>
+    <tr><td>SetFit, all-mpnet-base-v2 (this plate)</td><td class="num">32</td><td class="num">0.836</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>Making 1,280 practice matches from 32 players: in a gully-cricket tournament with 32 players in two teams, you can stage many one-on-one "same team?" quizzes without recruiting anyone new. Each player shows up in about 80 quizzes (20 iterations × 2 pairs × 2 slots per pair). <i>Where it breaks:</i> the quizzes reuse the same 32 people, so if one example is mislabeled, that mistake is repeated across dozens of pairs.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Training cost scales with the number of <i>pairs</i>, not with the size of the original dataset: 240 steps of batch 16 here, versus about 534 steps for one epoch of full BERT fine-tuning on 8.5k reviews. Inference is cheap too: one encoder pass plus a logistic regression. That is why SetFit is attractive for many small, separate classifiers (beyond the book).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your SetFit model is at 0.84 F1 with 16 examples per class. How would you improve it?"</i> Label more high-quality examples (the cheapest win), try a stronger or domain-matched sentence-transformer from MTEB, tune <code>num_iterations</code>/<code>num_epochs</code>, try the differentiable head, and check for mislabeled seed examples since each one is replicated across many pairs. Once you have thousands of labels, compare against full fine-tuning.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 6: where 1,280 comes from conceptually.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: MTEB and sentence-transformers training.</li><li><a href="../ai_engineering/ch08_dataset_engineering.html">AI Engineering Ch.8</a>: data quality vs quantity, synthetic data.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · CONTINUED PRETRAINING WITH MASKED LANGUAGE MODELING</div><h2>Squeeze a step in the middle: keep pretraining on your own domain</h2></div><span class="chip">pdf p362–364 · Fig 11-14, 11-15, 11-16</span></div>
+  <p>So far every example took a pretrained model and fine-tuned it for classification. That is a <b>two-step process</b>: first <b>pretrain</b> a model (already done for us), then <b>fine-tune</b> it for a particular task.</p>
+  <figure class="bookfig"><img src="figs/fig-11-14.png" alt="Step 1 pretraining BERT from scratch with masked language modeling filling '[MASK]' in 'What a horrible movie [MASK]!' with dream, idea, day; arrow to step 2 fine-tuning BERT on classification giving Positive 5% Negative 95%" loading="lazy"><figcaption>Figure 11-14 (book, pdf p362): To fine-tune the model on a target task—for example, classification—we either start with pretraining a BERT model or use a pretrained one.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Step ① "Pretraining from scratch", for example with <b>masked language modeling</b>: the input "[CLS] What a horrible movie [MASK]!" has one word hidden, and the model learns to guess candidates ("What a horrible <i>dream</i>!", "<i>idea</i>", "<i>day</i>" …). Step ② "Fine-tuning on target task", e.g. classification: "What a horrible movie!" → Positive 5%, Negative 95%. The arrow means step 2 starts from the weights step 1 produced.</p>
+  <p>This two-step approach is used in many applications, but it has a <b>limitation with domain-specific data</b>. The pretrained model is usually trained on very <b>general</b> data, like Wikipedia pages, and may not be tuned to your <b>domain-specific words</b>.</p>
+  <p>Instead, squeeze <b>another step between them</b>: <b>continue pretraining</b> the already-pretrained BERT model. In other words, keep training BERT with <b>masked language modeling (MLM)</b>, the same "guess the hidden word" task, but on <b>data from your domain</b>. The book's example: going from a general BERT model, to a <b>BioBERT</b> model specialised for the medical domain, to a fine-tuned BioBERT model that <b>classifies medication</b>.</p>
+  <p>This updates the <b>subword representations</b> to be more tuned toward words the model wouldn't have seen (much) before. Continuing pretraining on a pretrained BERT model <b>has been shown to improve performance on classification tasks</b> (footnote 3: Sun et al., "How to fine-tune BERT for text classification?", 2019) and is a worthwhile addition to the fine-tuning pipeline.</p>
+  <figure class="bookfig"><img src="figs/fig-11-15.png" alt="Three steps: 1 pretraining from scratch with MLM filling dream idea day; 2 continued pretraining on domain-specific data filling movie ending premise; 3 fine-tuning on classification" loading="lazy"><figcaption>Figure 11-15 (book, pdf p363): Instead of a two-step approach, we can add another step that continues to pretrain the pretrained model before fine-tuning it on the target task. Notice how the masks were filled with abstract concepts in 1 while they were filled with movie-specific concepts in 2.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same as Figure 11-14 with a new middle column, ② "Continued pretraining from pretrained" <b>on domain-specific data</b>. The same masked sentence is now filled with yellow, movie-flavoured answers: "What a horrible <i>movie</i>/<i>ending</i>/<i>premise</i>!", where step ① gave general, abstract words (dream, idea, day). The task is identical (MLM); only the training text changed, and that is enough to shift what the model expects.</p>
+  <p>You don't need to pretrain an entire model from scratch: you simply <b>continue</b> pretraining before fine-tuning. This also helps the model adapt to a certain domain or even <b>the lingo of a specific organization</b>. Figure 11-16 shows the "genealogy" of models a company might adopt.</p>
+  <figure class="bookfig"><img src="figs/fig-11-16.png" alt="1 pretrained representation model such as BERT, 2 ACME representation model continued-pretrained on ACME corp data, 3 three final ACME models fine-tuned for customer service topic classification, semantic search, and NER" loading="lazy"><figcaption>Figure 11-16 (book, pdf p364): The three-step approach illustrated for specific use cases.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> ① a general <b>pretrained representation model</b> (e.g., BERT). ② an <b>ACME representation model</b>: the same model continued-pretrained on ACME corp's own data. ③ <b>several final fine-tuned models</b>, all branching from the one ACME model: one fine-tuned for <b>customer service topic classification</b>, one for <b>semantic search</b>, one for <b>NER</b>. The expensive domain adaptation happens once (step 2) and is reused by every task (step 3).</p>
+  <div class="box work"><b>Step through · the model family tree</b>
+    <div class="stepbar"><button id="w8_prev" type="button">◀ Back</button><button id="w8_next" type="button">Next ▶</button><span id="w8_n"></span></div>
+    <div class="chartbox"><svg id="w8_svg" viewBox="0 0 520 200" role="img" aria-label="Genealogy from general BERT to domain model to task models"></svg></div>
+    <div class="caption" id="w8_cap"></div>
+    <p class="note">The voice-agent example in the last step is ours, not the book's.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A general physician who joins a cardiology hospital. Medical school is pretraining. Before you ask them to triage ECG reports (fine-tuning), they spend a month just <i>reading</i> the hospital's cardiology case files (continued pretraining): no grades, just absorbing the vocabulary. <i>Where it breaks:</i> the doctor remembers medical school perfectly; a model continued-pretrained too long on narrow text can lose some general ability.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>MLM needs no labels: the text itself is the answer key (hide a token, predict it). So you can continue pretraining on any amount of raw in-domain text, which is usually far more plentiful than labeled data. Each prediction error updates the token embeddings and attention layers, so domain words (drug names, product codes, company jargon) get more useful vectors, and every later fine-tune starts from a model that already "speaks the language". The tokenizer itself is not changed (plate 9), so new words are still split into the same sub-word pieces; it's their combined meaning that improves.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Our classifier struggles with internal jargon. Labels are scarce but we have tons of tickets. What would you do?"</i> Do domain-adaptive continued pretraining: run masked-language-model training of the base encoder on the raw tickets (no labels needed), then fine-tune that adapted model on the labeled set. Build it once as a company base model and branch task models off it (topic classification, semantic search, NER), as in the book's ACME example.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a> and <a href="ch03_looking_inside_llms.html">Ch.3</a>: pretraining vs fine-tuning, MLM as BERT's original objective.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: domain adaptation for embedding models.</li><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: the generative-model version (pretraining → instruction tuning → preference tuning).</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · CONTINUED PRETRAINING IN CODE</div><h2>Token masking vs whole-word masking, then "What a horrible [MASK]!"</h2></div><span class="chip">pdf p364–367 · Fig 11-17</span></div>
+  <p>The demo applies <b>step 2</b> (continued pretraining) to <code>bert-base-cased</code>, using the same Rotten Tomatoes reviews as the "domain" data. The model is loaded with a <b>masked-language-modeling head</b> instead of a classification head:</p>
+  <pre class="code"><code>from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+<span class="cm"># Load model for masked language modeling (MLM)</span>
+model = AutoModelForMaskedLM.from_pretrained("bert-base-cased")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")</code></pre>
+  <p>Tokenize the raw sentences and <b>remove the labels</b>, since this is <b>not a supervised task</b>:</p>
+  <pre class="code"><code>def preprocess_function(examples):
+   return tokenizer(examples["text"], truncation=True)
+
+<span class="cm"># Tokenize data</span>
+tokenized_train = train_data.map(preprocess_function, batched=True)
+tokenized_train = tokenized_train.remove_columns("label")
+tokenized_test = test_data.map(preprocess_function, batched=True)
+tokenized_test = tokenized_test.remove_columns("label")</code></pre>
+  <h3>Masking: token vs whole-word</h3>
+  <p>Earlier the collator was <code>DataCollatorWithPadding</code>, which only pads. Now the collator must also <b>perform the masking</b>. Two methods are common:</p>
+  <ul class="plain">
+    <li><b>Token masking</b>: randomly mask <b>15% of the tokens</b> in a sentence. It can happen that only <i>part</i> of a word gets masked.</li>
+    <li><b>Whole-word masking</b>: if any piece of a word is chosen, mask <b>the entire word</b> (all its sub-word tokens).</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-11-17.png" alt="Input 'Her vocalization was remarkably melodic' tokenized into CLS Her vocal ##ization was remarkably melodic SEP; token masking masks only ##ization; whole-word masking masks both vocal and ##ization" loading="lazy"><figcaption>Figure 11-17 (book, pdf p365): Different methods for randomly masking tokens.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Input: "Her vocalization was remarkably melodic". <b>Tokenization</b> (blue) splits "vocalization" into <code>vocal</code> + <code>##ization</code> (<code>##</code> means "continues the previous token"). <b>Token masking</b> (green) replaces just <code>##ization</code> with <code>[MASK]</code>, so the model sees "vocal[MASK]" and can guess the ending from the visible half. <b>Whole-word masking</b> (purple) masks both <code>vocal</code> and <code>##ization</code>, so the whole word must be inferred from context.</p>
+  <p>Predicting whole words is generally <b>harder</b> than predicting tokens, which makes the model <b>perform better</b> because it must learn more accurate and precise representations. But it tends to <b>take a bit more time to converge</b>. This example uses token masking (<code>DataCollatorForLanguageModeling</code>) for faster convergence. To switch to whole-word masking, replace it with <code>DataCollatorForWholeWordMask</code>. The masking probability is set with <code>mlm_probability</code>:</p>
+  <pre class="code"><code>from transformers import DataCollatorForLanguageModeling
+
+<span class="cm"># Masking Tokens</span>
+data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=True,
+    mlm_probability=0.15
+)</code></pre>
+  <div class="box work"><b>Try it · mask a review yourself</b>
+    <div class="controls"><label>sentence <select id="mk_s"><option value="0">Her vocalization was remarkably melodic</option><option value="1">The cinematography was breathtaking but the screenplay dragged</option><option value="2">An unpretentious, heartwarming documentary</option></select></label><label>method <select id="mk_m"><option value="tok">token masking</option><option value="ww">whole-word masking</option></select></label><label>mlm_probability <input id="mk_p" type="range" min="5" max="50" step="5" value="15"><output id="mk_po"></output></label><button type="button" id="mk_go">Mask again</button></div>
+    <div class="toks" id="mk_box"></div>
+    <div class="readout" id="mk_r"></div>
+    <p class="note">The sub-word splits for sentences 2 and 3 are modelled (WordPiece-style), not the real <code>bert-base-cased</code> output. Special tokens are never masked. In the real collator, a chosen token is replaced by <code>[MASK]</code> 80% of the time, a random token 10%, and left unchanged 10% (beyond the book); this toy always shows <code>[MASK]</code>.</p>
+  </div>
+  <h3>Trainer and training</h3>
+  <pre class="code"><code><span class="cm"># Training arguments for parameter tuning</span>
+training_args = TrainingArguments(
+   "model",
+   learning_rate=2e-5,
+   per_device_train_batch_size=16,
+   per_device_eval_batch_size=16,
+   num_train_epochs=10,
+   weight_decay=0.01,
+   save_strategy="epoch",
+   report_to="none"
+)
+
+<span class="cm"># Initialize Trainer</span>
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_train,
+    eval_dataset=tokenized_test,
+    tokenizer=tokenizer,
+    data_collator=data_collator
+)</code></pre>
+  <p>Note: no <code>compute_metrics</code> here; the loss on masked tokens is what is tracked. The book says "we train for 20 epochs and keep the task short", and suggests experimenting with the <b>learning rate</b> and <b>weight decay</b> to see whether they help.</p>
+  <div class="errata"><b>Reading note</b><p>The code sets <code>num_train_epochs=10</code> while the text says 20 epochs. Trust the code: 10 epochs over ≈8,530 short reviews.</p></div>
+  <p>Before training, they <b>save the pretrained tokenizer</b>. The tokenizer is <b>not updated</b> during training, so there's no need to save it afterwards. The <b>model</b>, however, is saved after continued pretraining:</p>
+  <pre class="code"><code><span class="cm"># Save pre-trained tokenizer</span>
+tokenizer.save_pretrained("mlm")
+
+<span class="cm"># Train model</span>
+trainer.train()
+
+<span class="cm"># Save updated model</span>
+model.save_pretrained("mlm")</code></pre>
+  <h3>Did it learn the domain? A before/after fill-mask test</h3>
+  <p>The new model is in the <code>mlm</code> folder. Normally you'd evaluate it by fine-tuning on a variety of tasks. Here, a quick check: run masking tasks and see if it learned from continued training. First, the <b>original</b> pretrained model on "What a horrible [MASK]!":</p>
+  <pre class="code"><code>from transformers import pipeline
+
+<span class="cm"># Load and create predictions</span>
+mask_filler = pipeline("fill-mask", model="bert-base-cased")
+preds = mask_filler("What a horrible [MASK]!")
+
+<span class="cm"># Print results</span>
+for pred in preds:
+    print(f"&gt;&gt;&gt; {pred["sequence"]}")</code></pre>
+  <div class="box work"><b>Compare · before and after continued pretraining (book's outputs)</b>
+    <div class="controls"><span class="seg"><button type="button" id="fm_a" class="on">bert-base-cased</button><button type="button" id="fm_b">mlm (after)</button></span></div>
+    <div class="toks" id="fm_box"></div>
+    <div class="caption" id="fm_cap"></div>
+  </div>
+  <p>The original model suggests general concepts like "idea", "dream" and "day", which make sense. The updated model suggests "movie", "film", "mess", "comedy", "story": it is clearly <b>more biased toward the data we fed it</b>.</p>
+  <p class="note">A small detail: <code>f"&gt;&gt;&gt; {pred["sequence"]}"</code> reuses double quotes inside a double-quoted f-string, which only parses on Python 3.12+ (beyond the book). On older Python, write <code>pred['sequence']</code>.</p>
+  <p>The next step would be to fine-tune this model on the classification task from the start of the chapter. Just load it from the <code>mlm</code> folder:</p>
+  <pre class="code"><code>from transformers import AutoModelForSequenceClassification
+
+<span class="cm"># Fine-tune for classification</span>
+model = AutoModelForSequenceClassification.from_pretrained("mlm", num_labels=2)
+tokenizer = AutoTokenizer.from_pretrained("mlm")</code></pre>
+  <p class="note">Loading an MLM checkpoint into <code>AutoModelForSequenceClassification</code> keeps the BERT body, drops the MLM head and adds a fresh classification head, so you then train exactly as in plate 3. The book stops here and doesn't report the F1 of this combined pipeline.</p>
+  <div class="box picture"><b>Picture it</b><p>Token masking is a fill-in-the-blank test where the blank is "melo___": you can guess "dic" from the first half. Whole-word masking blanks out "_______" entirely, so you must understand the sentence. A harder test makes a better student but takes longer to pass. <i>Where it breaks:</i> students get bored of hard tests; for a model the only cost is more training steps to converge.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The MLM loss is cross-entropy over the vocabulary, computed <b>only at the masked positions</b> (the collator sets the label of every unmasked token to −100, the same "ignore" value you will meet in NER, plate 11: beyond the book's wording). Because the masks are chosen randomly every time a batch is built, 10 epochs see 10 different maskings of each review, so the model can't just memorise the answers.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Which data collator do you use for which task?"</i> <code>DataCollatorWithPadding</code> for sequence classification (just dynamic padding); <code>DataCollatorForLanguageModeling(mlm=True, mlm_probability=0.15)</code> or <code>DataCollatorForWholeWordMask</code> for continued pretraining; <code>DataCollatorForTokenClassification</code> for NER, because it also pads the label sequences. Whole-word masking is the harder objective that usually gives better representations but converges slower.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: WordPiece tokenization and the <code>##</code> prefix.</li><li>Plate 11: the same sub-word splitting causes the NER label alignment problem.</li><li><a href="../llm_engineers_handbook/ch05_supervised_fine_tuning.html">LLM Engineer's Handbook Ch.5</a>: continued pretraining vs supervised fine-tuning for generative LLMs.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · NAMED-ENTITY RECOGNITION</div><h2>NER: classify every token, not the whole document</h2></div><span class="chip">pdf p367–368 · Fig 11-18, 11-19</span></div>
+  <p>The last section fine-tunes a pretrained BERT model for <b>NER (named-entity recognition)</b>. Instead of classifying entire documents, NER classifies <b>individual tokens and/or words</b>, for example as <b>people</b> and <b>locations</b>. This is especially useful for <b>de-identification and anonymization</b> when the data is sensitive (find the names, then hide them).</p>
+  <p>NER is similar to the document classification at the start of the chapter. The key difference is in <b>preprocessing and classification</b>: since we classify individual words instead of documents, the data must be prepared at that finer, word-level granularity.</p>
+  <figure class="bookfig"><img src="figs/fig-11-18.png" alt="'I am Maarten and I live in the Netherlands.' passed through BERT fine-tuned for NER; Maarten highlighted as Person, 'the Netherlands' highlighted as Location" loading="lazy"><figcaption>Figure 11-18 (book, pdf p368): Fine-tuning a BERT model for NER allows for the detection of named entities, such as people or locations.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> One sentence, "I am Maarten and I live in the Netherlands.", goes through a BERT fine-tuned for NER. Out comes one box per word. Most stay pale (no entity). "Maarten" is green and bracketed as <b>Person</b>; "the" and "Netherlands" are green and bracketed together as <b>Location</b>: an entity can span more than one word.</p>
+  <p>The architecture looks like the document classifier, but with a <b>fundamental shift</b>: rather than <b>aggregating or pooling</b> token embeddings into one vector for the document, the model makes a <b>prediction for each individual token</b> in the sequence. And importantly, the "word-level" task actually classifies <b>tokens</b>, the pieces that make up words, not whole words.</p>
+  <figure class="bookfig"><img src="figs/fig-11-19.png" alt="'My name is Maarten' tokenized into CLS My name is Maar ##ten SEP, passed through BERT; each token embedding goes through the feedforward network giving No entity, No entity, No entity, Person, Person" loading="lazy"><figcaption>Figure 11-19 (book, pdf p368): During the fine-tuning process of a BERT model, individual tokens are classified instead of words or entire documents.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Compare with Figure 11-3. Input "My name is Maarten" becomes tokens <code>[CLS] My name is Maar ##ten [SEP]</code>. BERT gives one purple vector per token, and the feedforward head now has <b>one output per token</b> (five arrows for the five real tokens): My → No entity, name → No entity, is → No entity, Maar → Person, ##ten → Person. Both pieces of "Maarten" are labelled Person. No pooling step: the head is applied to each token's vector separately.</p>
+  <div class="errata"><b>Reading note</b><p>This figure splits "Maarten" as <code>Maar ##ten</code> for illustration. The real <code>bert-base-cased</code> tokenizer, as printed later in the chapter (and Figure 11-21), gives <code>Ma ##arte ##n</code>.</p></div>
+  <div class="two">
+    <div class="box"><b>Document classification</b><p>N token vectors → <b>pool</b> into 1 vector → head → <b>1 label</b>. Output shape: [batch, num_labels].</p></div>
+    <div class="box"><b>Token classification (NER)</b><p>N token vectors → head on <b>each</b> → <b>N labels</b>. Output shape: [batch, seq_len, num_labels].</p></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Sentiment classification is a teacher writing one grade on top of an essay. NER is a teacher with a highlighter going through every word: names in green, places in blue, companies in purple. <i>Where it breaks:</i> the teacher highlights words; the model highlights sub-word tokens, so "Maarten" may get three highlights that have to be stitched back into one name.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each token's final vector already contains context from the whole sentence (BERT's self-attention is bidirectional), so "Washington" can be classified as a person or a location depending on its neighbours even though the head looks at one vector at a time. The head is shared across positions: the same small linear layer (768 → 9 labels here) runs on every token.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you redact PII from call transcripts before storing them for RAG memory?"</i> Run a token-classification (NER) model over each transcript, merge B-/I- tagged tokens back into entity spans using character offsets, and replace PERSON/LOC/ORG (and custom types like phone numbers) with placeholders before embedding. A fine-tuned BERT-sized NER model is fast enough for streaming text. The book flags exactly this: NER for de-identification and anonymization of sensitive data.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 2: document classification, the pooled version.</li><li>Plate 11: the data preparation NER needs.</li><li><a href="../llm_engineers_handbook/ch03_data_engineering.html">LLM Engineer's Handbook Ch.3</a>: cleaning and anonymizing data before it enters a pipeline.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · PREPARING DATA FOR NAMED-ENTITY RECOGNITION</div><h2>CoNLL-2003, B-/I- tags, and lining word labels up with sub-word tokens</h2></div><span class="chip">pdf p369–374 · Fig 11-20, 11-21</span></div>
+  <p>The dataset is the English version of <b>CoNLL-2003</b> (footnote 4: Sang &amp; De Meulder, 2003). It contains several entity types (<b>person, organization, location, miscellaneous, and no entity</b>) and has roughly <b>14,000 training samples</b>.</p>
+  <pre class="code"><code><span class="cm"># The CoNLL-2003 dataset for NER</span>
+dataset = load_dataset("conll2003", trust_remote_code=True)</code></pre>
+  <div class="box"><b>Book's tip · other NER datasets worth a look</b><ul>
+    <li><b><code>wnut_17</code></b>: focuses on <b>emerging and rare entities</b>, which are harder to spot.</li>
+    <li><b><code>tner/mit_movie_trivia</code></b>: detects entities like <b>actor, plot and soundtrack</b>.</li>
+    <li><b><code>tner/mit_restaurant</code></b>: detects entities like <b>amenity, dish and cuisine</b> (footnote 5: Liu et al., "Asgard", 2013).</li>
+  </ul><p>The authors call the last two "quite fun to use".</p></div>
+  <p>One example from the training set:</p>
+  <pre class="code"><code>example = dataset["train"][848]
+example
+
+{'id': '848',
+ 'tokens': ['Dean', 'Palmer', 'hit', 'his', '30th', 'homer', 'for', 'the', 'Rangers', '.'],
+ 'pos_tags': [22, 22, 38, 29, 16, 21, 15, 12, 23, 7],
+ 'chunk_tags': [11, 12, 21, 11, 12, 12, 13, 11, 12, 0],
+ 'ner_tags': [1, 2, 0, 0, 0, 0, 0, 0, 3, 0]}</code></pre>
+  <p>The data gives a label <b>for each word</b>. <code>pos_tags</code> (part-of-speech) and <code>chunk_tags</code> (phrase chunks) are other annotations in the dataset; NER uses only <b><code>ner_tags</code></b>, whose numbers map to these entities:</p>
+  <pre class="code"><code>label2id = {
+    "O": 0, "B-PER": 1, "I-PER": 2, "B-ORG": 3, "I-ORG": 4,
+    "B-LOC": 5, "I-LOC": 6, "B-MISC": 7, "I-MISC": 8
+}
+id2label = {index: label for label, index in label2id.items()}</code></pre>
+  <p>The categories: <b>PER</b> (person), <b>ORG</b> (organization), <b>LOC</b> (location), <b>MISC</b> (miscellaneous), and <b>O</b> (no entity). Each entity has a prefix <b>B</b> (beginning) or <b>I</b> (inside). If consecutive tokens are part of the <b>same phrase</b>, the start of the phrase is marked B and the following ones I, showing they <b>belong together</b> and are not separate entities. (This scheme is called <b>BIO tagging</b>; beyond the book's wording.)</p>
+  <figure class="bookfig"><img src="figs/fig-11-20.png" alt="Dean tagged B-PER as start of phrase, Palmer tagged I-PER as part of previous phrase, merging into 'Dean Palmer' Person; Rangers tagged B-LOC as start of phrase, becoming Rangers Location" loading="lazy"><figcaption>Figure 11-20 (book, pdf p370): By indicating the start and end of the phrase with the same entity, we can recognize entities of entire phrases.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The sentence from example 848, "Dean Palmer hit his 30th homer for the Rangers.", as word boxes. "Dean" carries <code>B-PER</code> ("Start of phrase"), "Palmer" carries <code>I-PER</code> ("Part of previous phrase"); their brackets merge into the full phrase <b>Dean Palmer → Person</b>, one person, not two. "Rangers" carries <code>B-LOC</code> ("Start of phrase") and becomes a one-word full phrase, <b>Rangers → Location</b>. Every other word has no tag (O).</p>
+  <div class="errata"><b>Reading note</b><p>The figure tags "Rangers" as <code>B-LOC</code> / Location, but the data above gives it <code>ner_tags</code> 3, which is <code>B-ORG</code> (the Texas Rangers baseball team: an organization). The data is right; the figure's label is a slip. The B/I idea it illustrates is unaffected.</p></div>
+  <h3>The sub-word problem</h3>
+  <p>The data is split into <b>words</b>, not yet into <b>tokens</b>. Tokenize it further with the same tokenizer used all chapter, <code>bert-base-cased</code>, and load a <b>token classification</b> model with the label maps:</p>
+  <pre class="code"><code>from transformers import AutoModelForTokenClassification
+
+<span class="cm"># Load tokenizer</span>
+tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
+
+<span class="cm"># Load model</span>
+model = AutoModelForTokenClassification.from_pretrained(
+    "bert-base-cased",
+    num_labels=len(id2label),
+    id2label=id2label,
+    label2id=label2id
+)</code></pre>
+  <p><code>num_labels=len(id2label)</code> = 9 outputs per token. Passing <code>id2label</code>/<code>label2id</code> stores the names in the model config, so later the pipeline prints "B-PER" instead of "LABEL_1".</p>
+  <pre class="code"><code><span class="cm"># Split individual tokens into sub-tokens</span>
+token_ids = tokenizer(example["tokens"], is_split_into_words=True)["input_ids"]
+sub_tokens = tokenizer.convert_ids_to_tokens(token_ids)
+sub_tokens
+
+['[CLS]', 'Dean', 'Palmer', 'hit', 'his', '30th', 'home', '##r', 'for', 'the', 'Rangers', '.', '[SEP]']</code></pre>
+  <p><code>is_split_into_words=True</code> tells the tokenizer the input is already a list of words. The tokenizer added <code>[CLS]</code> and <code>[SEP]</code> (Chapters 2 and 3), and split <b>"homer"</b> into <b><code>home</code> + <code>##r</code></b>. Now there are 13 tokens but only 10 word labels: the labels are at the <b>word level</b>, the model works at the <b>token level</b>. The fix is to <b>align</b> labels with their sub-tokens during tokenization.</p>
+  <p>Take the word <b>"Maarten"</b>, labelled <code>B-PER</code>. The tokenizer splits it into <code>Ma</code>, <code>##arte</code> and <code>##n</code>. Giving all three <code>B-PER</code> would say they are <b>three independent people</b>. Rule: <b>whenever an entity is split into tokens, the first token gets B (beginning) and the following ones get I (inner)</b>. So <code>Ma</code> → <code>B-PER</code>, <code>##arte</code> and <code>##n</code> → <code>I-PER</code>.</p>
+  <figure class="bookfig"><img src="figs/fig-11-21.png" alt="Input row My name is Maarten with Maarten tagged B-PER; tokenized row My name is Ma ##arte ##n; aligned row Ma B-PER, ##arte I-PER, ##n I-PER" loading="lazy"><figcaption>Figure 11-21 (book, pdf p372): The alignment process of labeling tokenized input.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three rows. <b>Input</b>: words "My name is Maarten", with Maarten tagged <code>B-PER</code> (start of phrase). <b>Tokenized</b>: "Maarten" becomes three tokens, Ma, ##arte, ##n. <b>Aligned</b>: Ma keeps <code>B-PER</code> (start of phrase); ##arte and ##n get <code>I-PER</code> (part of previous phrase). One person, three tokens, correctly tagged.</p>
+  <h3>The <code>align_labels</code> function</h3>
+  <pre class="code"><code>def align_labels(examples):
+    token_ids = tokenizer(
+        examples["tokens"],
+        truncation=True,
+        is_split_into_words=True
+    )
+    labels = examples["ner_tags"]
+
+    updated_labels = []
+    for index, label in enumerate(labels):
+
+        <span class="cm"># Map tokens to their respective word</span>
+        word_ids = token_ids.word_ids(batch_index=index)
+        previous_word_idx = None
+        label_ids = []
+        for word_idx in word_ids:
+
+            <span class="cm"># The start of a new word</span>
+            if word_idx != previous_word_idx:
+
+                previous_word_idx = word_idx
+                updated_label = -100 if word_idx is None else label[word_idx]
+                label_ids.append(updated_label)
+
+            <span class="cm"># Special token is -100</span>
+            elif word_idx is None:
+                label_ids.append(-100)
+
+            <span class="cm"># If the label is B-XXX we change it to I-XXX</span>
+            else:
+                updated_label = label[word_idx]
+                if updated_label % 2 == 1:
+                    updated_label += 1
+                label_ids.append(updated_label)
+
+        updated_labels.append(label_ids)
+
+    token_ids["labels"] = updated_labels
+    return token_ids
+
+tokenized = dataset.map(align_labels, batched=True)</code></pre>
+  <div class="anno">
+    <div><code>word_ids(batch_index=index)</code>: for each token, the index of the word it came from, or <code>None</code> for special tokens. For example 848: <code>[None, 0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, None]</code> (home and ##r both come from word 5).</div>
+    <div><b>New word</b> (<code>word_idx != previous_word_idx</code>): copy that word's label; a special token at the start gets <b>−100</b>.</div>
+    <div><b><code>word_idx is None</code></b> (special token, not first): <b>−100</b>. PyTorch's cross-entropy loss ignores label −100 by default, so <code>[CLS]</code>, <code>[SEP]</code> and padding never count in the loss.</div>
+    <div><b>Same word again</b> (a continuation sub-token): take the word's label; if it is odd (1, 3, 5, 7 = a B- tag in <code>label2id</code>) add 1 to turn it into the matching I- tag (2, 4, 6, 8). O (0) stays 0.</div>
+  </div>
+  <pre class="code"><code><span class="cm"># Difference between original and updated labels</span>
+print(f"Original: {example["ner_tags"]}")
+print(f"Updated: {tokenized["train"][848]["labels"]}")
+
+Original: [1, 2, 0, 0, 0, 0, 0, 0, 3, 0]
+Updated: [-100, 1, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, -100]</code></pre>
+  <p>Extra <b>−100</b> labels were added for <code>[CLS]</code> and <code>[SEP]</code>, and "homer" now has two labels (0, 0) for <code>home</code> and <code>##r</code>, so the list has 13 entries, one per token.</p>
+  <div class="box work"><b>Step through · <code>align_labels</code> token by token</b>
+    <div class="controls"><label>example <select id="al_ex"><option value="0">Dean Palmer hit his 30th homer for the Rangers .</option><option value="1">My name is Maarten (B-PER word split in 3)</option></select></label></div>
+    <div class="stepbar"><button id="al_prev" type="button">◀ Back</button><button id="al_next" type="button">Next ▶</button><span id="al_n"></span></div>
+    <div class="toks" id="al_box"></div>
+    <div class="formula" id="al_out"></div>
+    <div class="caption" id="al_cap"></div>
+    <p class="note">The Maarten tokens are the book's (Figure 11-21); "My name is" as tokens of their own is how the book draws it.</p>
+  </div>
+  <h3>Evaluation at the token level</h3>
+  <p>The metric also changes: instead of one prediction per document, there are <b>many predictions per document</b>, one per token. They use Hugging Face's <b><code>evaluate</code></b> package and its <b><code>seqeval</code></b> metric, which evaluates sequence labelling:</p>
+  <pre class="code"><code>import evaluate
+
+<span class="cm"># Load sequential evaluation</span>
+seqeval = evaluate.load("seqeval")
+
+def compute_metrics(eval_pred):
+    <span class="cm"># Create predictions</span>
+    logits, labels = eval_pred
+    predictions = np.argmax(logits, axis=2)
+
+    true_predictions = []
+    true_labels = []
+
+    <span class="cm"># Document-level iteration</span>
+    for prediction, label in zip(predictions, labels):
+
+      <span class="cm"># Token-level iteration</span>
+      for token_prediction, token_label in zip(prediction, label):
+
+        <span class="cm"># We ignore special tokens</span>
+        if token_label != -100:
+          true_predictions.append([id2label[token_prediction]])
+          true_labels.append([id2label[token_label]])
+
+    results = seqeval.compute(
+    predictions=true_predictions, references=true_labels
+    )
+    return {"f1": results["overall_f1"]}</code></pre>
+  <div class="anno">
+    <div><code>np.argmax(logits, axis=2)</code>: logits are now [documents, tokens, 9 labels], so the argmax is over axis 2 (the label axis), giving one predicted label per token.</div>
+    <div>Two loops: over documents, then over tokens. Tokens labelled −100 (special tokens) are skipped.</div>
+    <div>IDs are turned back into tag strings with <code>id2label</code> because seqeval works on "B-PER"-style strings; <code>overall_f1</code> is the F1 across all entity types.</div>
+  </div>
+  <div class="box beyond"><b>Beyond the book</b><p>The listing wraps <i>each token</i> in its own list (<code>[id2label[...]]</code>), so seqeval sees every token as a one-token sequence. That makes the score closer to a per-token F1 than the usual entity-span F1, where you'd append one list per document. Either is fine for comparing runs; just know which one you report.</p></div>
+  <div class="box picture"><b>Picture it</b><p>Railway reservation for a family: the booking (word) "Sharma family" has one PNR, but the chart (tokens) lists three seats. The first seat gets "head of booking" (B), the others "same booking" (I). Seats for the TTE's own use ([CLS], [SEP]) are marked −100: don't count them in the passenger tally. <i>Where it breaks:</i> a PNR is assigned by a system that knows the family; the tokenizer splits words by vocabulary statistics, so where the "seats" break is arbitrary.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two choices exist for continuation sub-tokens: label them (as here, with I-) or mask them with −100 so only the first sub-token is trained and scored. The book labels them, which gives more training signal. Because a word's label ID scheme puts B at odd numbers and I at B+1, the B→I switch is a one-line <code>+1</code>; that only works because of how <code>label2id</code> is ordered.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How do you handle word-level labels when the tokenizer splits words into sub-words?"</i> Use the fast tokenizer's <code>word_ids()</code> to map each token back to its word. Give the first sub-token the word's label, give continuation sub-tokens the I- version (or −100 to ignore them), and give special tokens −100 so cross-entropy skips them. At inference, merge tokens back into spans using the offsets.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 9: the same sub-word splitting (<code>vocal ##ization</code>) that whole-word masking deals with.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: why tokenizers split rare words.</li><li>Plate 12: training and inference with these labels.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · FINE-TUNING FOR NAMED-ENTITY RECOGNITION</div><h2>Train the token classifier and find "Maarten"</h2></div><span class="chip">pdf p374–375</span></div>
+  <p>Instead of <code>DataCollatorWithPadding</code>, NER needs a collator that works at the token level: <b><code>DataCollatorForTokenClassification</code></b>.</p>
+  <pre class="code"><code>from transformers import DataCollatorForTokenClassification
+
+<span class="cm"># Token-classification DataCollator</span>
+data_collator = DataCollatorForTokenClassification(tokenizer=tokenizer)</code></pre>
+  <p class="note">Why a special collator (beyond the book's wording): it pads the <code>labels</code> list too, with −100, so the label sequences stay the same length as the padded token sequences. <code>DataCollatorWithPadding</code> only pads the inputs.</p>
+  <p>The rest is like the earlier training runs: the same arguments, then the Trainer.</p>
+  <pre class="code"><code><span class="cm"># Training arguments for parameter tuning</span>
+training_args = TrainingArguments(
+   "model",
+   learning_rate=2e-5,
+   per_device_train_batch_size=16,
+   per_device_eval_batch_size=16,
+   num_train_epochs=1,
+   weight_decay=0.01,
+   save_strategy="epoch",
+   report_to="none"
+)
+
+<span class="cm"># Initialize Trainer</span>
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized["train"],
+    eval_dataset=tokenized["test"],
+    tokenizer=tokenizer,
+    data_collator=data_collator,
+    compute_metrics=compute_metrics,
+)
+trainer.train()
+
+<span class="cm"># Evaluate the model on our test data</span>
+trainer.evaluate()</code></pre>
+  <p class="note">The book doesn't print the NER evaluation numbers.</p>
+  <p>Finally, save the model and use it in a <b>pipeline</b> for inference, so you can inspect what happens on specific inputs and decide whether you're satisfied:</p>
+  <pre class="code"><code>from transformers import pipeline
+
+<span class="cm"># Save our fine-tuned model</span>
+trainer.save_model("ner_model")
+
+<span class="cm"># Run inference on the fine-tuned model</span>
+token_classifier = pipeline(
+    "token-classification",
+    model="ner_model",
+)
+token_classifier("My name is Maarten.")
+
+[{'entity': 'B-PER', 'score': 0.99534035, 'index': 4, 'word': 'Ma',     'start': 11, 'end': 13},
+ {'entity': 'I-PER', 'score': 0.9928328,  'index': 5, 'word': '##arte', 'start': 13, 'end': 17},
+ {'entity': 'I-PER', 'score': 0.9954301,  'index': 6, 'word': '##n',    'start': 17, 'end': 18}]</code></pre>
+  <p>In "My name is Maarten", the word "Maarten" and its sub-tokens are <b>correctly identified as a person</b>.</p>
+  <div class="box work"><b>Try it · read the pipeline output</b>
+    <p>Hover or tap a token to see its entry. Tokens with label O are not returned by the pipeline, which is why only three dicts come back.</p>
+    <div class="toks" id="po_box"></div>
+    <div class="formula" id="po_out">tap a token</div>
+    <div class="readout" id="po_r"></div>
+  </div>
+  <div class="box work"><b>Worked example · from tokens back to an entity</b>
+    <p>The string is "My name is Maarten." Characters 11–13 = "Ma", 13–17 = "arte", 17–18 = "n". Since the three tokens are B-PER, I-PER, I-PER and their offsets touch, you merge them into one span: characters <b>11–18 = "Maarten"</b>, type PER, with average score (0.9953 + 0.9928 + 0.9954) / 3 ≈ <b>0.995</b>. The <code>index</code> values (4, 5, 6) count tokens including <code>[CLS]</code> at 0: [CLS]=0, My=1, name=2, is=3, Ma=4.</p>
+    <p class="note">Beyond the book: <code>pipeline("token-classification", aggregation_strategy="simple")</code> does this merge for you and returns one "PER: Maarten" entry.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A UPI app's "mask sensitive info" feature in a chat: it scans each piece of the message, flags the pieces that form a name, and returns where they are (start/end) so the app can blur exactly those characters. <i>Where it breaks:</i> the model gives confidence scores, not certainty; a production redactor needs a threshold and usually a regex layer for structured items like phone numbers.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The pipeline tokenizes the text, runs the model, takes a softmax over the 9 labels at each token, keeps the argmax, drops O tokens and special tokens, and maps each token back to character offsets using the fast tokenizer's offset mapping. The <code>score</code> is the softmax probability of the chosen label.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you deploy this NER model in a low-latency service?"</i> It is a single forward pass of a ~108M encoder, so batch requests, use the fast tokenizer for offsets, aggregate sub-tokens into spans server-side, and return spans with character offsets and scores. For transcripts from a voice agent, run it on finalised utterances so partial ASR (automatic speech recognition) text doesn't create flickering redactions.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11: where the B-/I- labels and −100 come from.</li><li>Plate 3: same <code>TrainingArguments</code>, different model class and collator.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: entity extraction is a common preprocessing step before indexing documents.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>The chapter in plain words</h2></div><span class="chip">pdf p375–376</span></div>
+  <p>The chapter explored several ways to fine-tune pretrained <b>representation models</b> for specific classification tasks:</p>
+  <ul class="plain">
+    <li><b>Fine-tuning a pretrained BERT model</b> for document classification, then <b>freezing</b> some of its layers to see the trade-off (full: 0.85 F1; last two blocks + head: 0.80; head only: 0.63).</li>
+    <li><b>SetFit</b>, a few-shot technique that fine-tunes a pretrained embedding model together with a classification head using very little labeled data. With only a few labeled points it matched the performance of models from earlier chapters.</li>
+    <li><b>Continued pretraining</b>: start from a pretrained BERT and keep training it on different (domain) data. The underlying process, <b>masked language modeling</b>, is not only how representation models are created; it can also continue pretraining them.</li>
+    <li><b>Named-entity recognition</b>: identifying specific entities such as people and places in unstructured text. Unlike the earlier examples, the classification is done at the <b>word level</b> (really, token level) instead of the document level.</li>
+  </ul>
+  <p>Next, <a href="ch12_fine_tuning_generation_models.html">Chapter 12</a> moves on to fine-tuning <b>generative</b> models, in two steps: fine-tune a model to follow instructions, then fine-tune it for human preference.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning in this chapter</th></tr>
+    <tr><td>Fine-tuning</td><td>Continuing to train a pretrained model on labeled data for a specific task.</td></tr>
+    <tr><td>Frozen / nontrainable</td><td>Parameters with <code>requires_grad=False</code>: they get no updates during training.</td></tr>
+    <tr><td>Classification head</td><td>A small network (here a feedforward layer, or logistic regression in SetFit) on top of the representation model that outputs class scores.</td></tr>
+    <tr><td>Backward pass</td><td>Computing gradients from the loss back through the network; it starts at the head and goes through BERT if BERT is trainable.</td></tr>
+    <tr><td>Task-specific model</td><td>A representation model plus head trained end-to-end for one task (e.g., sentiment).</td></tr>
+    <tr><td>DataCollator</td><td>A class that builds batches and can apply augmentation (padding, masking, label padding).</td></tr>
+    <tr><td>Dynamic padding</td><td>Padding each batch only to its own longest sequence (<code>DataCollatorWithPadding</code>).</td></tr>
+    <tr><td>F1 score</td><td>Harmonic mean of precision and recall; the chapter's metric throughout.</td></tr>
+    <tr><td>Epoch</td><td>One full pass ("round") over the training data.</td></tr>
+    <tr><td>Encoder block</td><td>One of BERT-base's 12 layers (0–11): attention, dense network, layer normalization.</td></tr>
+    <tr><td>Few-shot classification</td><td>Learning target labels from only a few labeled examples per class.</td></tr>
+    <tr><td>SetFit</td><td>Few-shot framework: generate sentence pairs → contrastively fine-tune a sentence-transformer → train a classifier on its embeddings.</td></tr>
+    <tr><td>Positive / negative pair</td><td>Two sentences from the same class / from different classes.</td></tr>
+    <tr><td>Contrastive learning</td><td>Learning embeddings by pulling similar pairs together and pushing dissimilar pairs apart.</td></tr>
+    <tr><td>MTEB</td><td>Massive Text Embedding Benchmark: leaderboard of embedding models across tasks.</td></tr>
+    <tr><td>Zero-shot (SetFit)</td><td>No labels: SetFit builds synthetic examples from label names ("This example is happy").</td></tr>
+    <tr><td>Continued pretraining</td><td>Extra MLM training of a pretrained model on domain data, before task fine-tuning.</td></tr>
+    <tr><td>MLM (masked language modeling)</td><td>Hide some tokens and train the model to predict them.</td></tr>
+    <tr><td>Token masking / whole-word masking</td><td>Mask random tokens (15% here) / mask all sub-tokens of a chosen word.</td></tr>
+    <tr><td>NER</td><td>Named-entity recognition: label each token as person, organization, location, misc, or none.</td></tr>
+    <tr><td>B- / I- / O</td><td>Beginning of an entity / inside (continuation) of the same entity / no entity.</td></tr>
+    <tr><td>Label alignment</td><td>Mapping word-level labels onto sub-word tokens (first sub-token B, rest I).</td></tr>
+    <tr><td>−100</td><td>Label value ignored by the loss; used for special tokens.</td></tr>
+    <tr><td>seqeval</td><td>A sequence-labelling evaluation metric (via Hugging Face <code>evaluate</code>), reporting <code>overall_f1</code>.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">tools and models named in the chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Name</th><th>What the chapter does with it</th></tr>
+    <tr><td>Hugging Face Transformers</td><td><code>AutoModelForSequenceClassification</code>, <code>AutoModelForMaskedLM</code>, <code>AutoModelForTokenClassification</code>, <code>AutoTokenizer</code>, <code>TrainingArguments</code>, <code>Trainer</code>, the three data collators, and <code>pipeline("fill-mask")</code> / <code>pipeline("token-classification")</code>.</td></tr>
+    <tr><td>Hugging Face Datasets</td><td><code>load_dataset</code> for <code>rotten_tomatoes</code> and <code>conll2003</code>; <code>.map(..., batched=True)</code> for tokenizing; <code>remove_columns</code>; <code>load_metric("f1")</code>.</td></tr>
+    <tr><td>Hugging Face Evaluate</td><td><code>evaluate.load("seqeval")</code> for token-level NER scoring.</td></tr>
+    <tr><td>bert-base-cased</td><td>The base model for supervised classification, freezing, continued pretraining and NER. Pretrained on English Wikipedia + unpublished books.</td></tr>
+    <tr><td>SetFit (library)</td><td><code>sample_dataset</code>, <code>SetFitModel</code>, SetFit <code>TrainingArguments</code>/<code>Trainer</code>; logistic regression head by default, optional differentiable head; zero-shot via synthetic examples.</td></tr>
+    <tr><td>sentence-transformers / all-mpnet-base-v2</td><td>The pretrained sentence-embedding model SetFit fine-tunes; a top model on the MTEB leaderboard at the time.</td></tr>
+    <tr><td>MTEB leaderboard</td><td>Used to pick a strong embedding model.</td></tr>
+    <tr><td>BioBERT</td><td>Example of a domain-adapted (medical) BERT obtained by continued pretraining.</td></tr>
+    <tr><td>Rotten Tomatoes dataset</td><td>5,331 positive + 5,331 negative movie reviews; used for classification, SetFit and as "domain" data for MLM.</td></tr>
+    <tr><td>CoNLL-2003</td><td>English NER dataset, ~14,000 training samples, PER/ORG/LOC/MISC/O.</td></tr>
+    <tr><td>wnut_17, tner/mit_movie_trivia, tner/mit_restaurant</td><td>Other NER datasets: rare/emerging entities; actor/plot/soundtrack; amenity/dish/cuisine.</td></tr>
+    <tr><td>scikit-learn / PyTorch</td><td>Any classifier from these can serve as SetFit's step-3 classifier (Figure 11-12).</td></tr>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book</b><p>spaCy and Flair are common production NER libraries; Microsoft Presidio combines NER models with pattern rules for PII redaction. ModernBERT and DeBERTa-v3 are newer encoder bases often used in place of <code>bert-base-cased</code> for the same fine-tuning recipes.</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (tap to reveal)</h2></div><span class="chip">14 questions</span></div>
+  <details class="ans"><summary>1. What is the difference between the Chapter 4 setups and the first fine-tuning example of this chapter?</summary><p>In Chapter 4 the pretrained models were frozen; only a separate classifier (after the embedding model) learned. Here BERT and a classification head are trained jointly as one architecture, so the backward pass goes from the head through BERT and updates both. F1 went from 0.80 to 0.85.</p></details>
+  <details class="ans"><summary>2. Why must you pass <code>num_labels</code> when loading <code>AutoModelForSequenceClassification</code>?</summary><p>It sizes the feedforward classification head built on top of the pretrained model: one output per label.</p></details>
+  <details class="ans"><summary>3. What does <code>DataCollatorWithPadding</code> do, and why not pad everything to 512?</summary><p>It builds batches and pads each batch only to its longest sequence. Padding everything to the max wastes computation on [PAD] tokens for short reviews.</p></details>
+  <details class="ans"><summary>4. What happened when only the classification head was trainable, and why is training faster?</summary><p>F1 fell to 0.63 (from 0.85). Only the head's ~1.5k weights get gradients and optimizer updates, so each step is much cheaper, but BERT can't adapt its representations to the task.</p></details>
+  <details class="ans"><summary>5. The code freezes <code>index &lt; 165</code>. Which blocks are trainable, and what F1 did it get?</summary><p>Index 165 is where <code>encoder.layer.10</code> begins (5 embedding tensors + 16 per block). So embeddings and blocks 0–9 are frozen; blocks 10–11, the pooler and the head train. F1 = 0.80.</p></details>
+  <details class="ans"><summary>6. Why should frozen layers generally be followed by trainable layers?</summary><p>Gradients flow from the head down. If the frozen part is at the bottom, the backward pass can stop there and you save the most compute; a frozen layer sandwiched in the middle still has gradients passing through it.</p></details>
+  <details class="ans"><summary>7. With 16 labeled sentences in one class, how many positive pairs can SetFit form? And how did the book get 1,280 pairs from 32 sentences?</summary><p>16 × 15 / 2 = 120. With <code>num_iterations=20</code>: 20 × 32 = 640, × 2 (a positive and a negative pair each) = 1,280. (The book misprints 640 as 680.)</p></details>
+  <details class="ans"><summary>8. Describe SetFit's three steps.</summary><p>(1) Sample positive (same-class) and negative (different-class) sentence pairs. (2) Contrastively fine-tune a pretrained SentenceTransformer on them. (3) Embed all sentences with the fine-tuned model and train a classifier (logistic regression by default) on the embeddings.</p></details>
+  <details class="ans"><summary>9. How can SetFit work with zero labels?</summary><p>It generates synthetic examples from the label names (e.g., "The example is happy", "This example is sad") and trains a SetFit model on them.</p></details>
+  <details class="ans"><summary>10. What would happen if you fine-tuned a general BERT directly on medical-report classification with few labels, versus doing continued pretraining first?</summary><p>The general model hasn't learned the medical vocabulary well, so its sub-word representations for domain terms are weak. Continued MLM pretraining on raw medical text (no labels needed) adapts those representations first (general BERT → BioBERT → fine-tuned BioBERT), which has been shown to improve classification.</p></details>
+  <details class="ans"><summary>11. Token masking vs whole-word masking: which is harder, and what's the trade-off?</summary><p>Whole-word masking is harder (no visible half-word to guess from), so it tends to learn more precise representations, but it takes longer to converge. The book uses token masking at 15% for faster convergence.</p></details>
+  <details class="ans"><summary>12. Why is the tokenizer saved before training in the MLM example, but the model after?</summary><p>Continued pretraining doesn't change the tokenizer (vocabulary and splitting rules), only the model weights.</p></details>
+  <details class="ans"><summary>13. "Maarten" (B-PER) becomes Ma, ##arte, ##n. What labels do they get and why? What label do [CLS] and [SEP] get?</summary><p>Ma → B-PER, ##arte → I-PER, ##n → I-PER, so the three tokens are one person, not three. [CLS]/[SEP] get −100, which the loss ignores. In the code, B tags are odd IDs, so continuation tokens get label + 1.</p></details>
+  <details class="ans"><summary>14. Interview: how is the model's output different for NER compared with sentiment classification, and which collator changes?</summary><p>Sentiment pools tokens into one vector → one label per document; NER applies the head to every token → one label per token, and the argmax is over axis 2. The collator becomes <code>DataCollatorForTokenClassification</code>, which also pads the label sequences, and evaluation uses seqeval instead of plain F1.</p></details>
+</section>
+
+<!-- references -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's references</h2></div><span class="chip">footnotes 1–5</span></div>
+  <details><summary>Footnotes cited in Chapter 11</summary>
+    <ol class="refs">
+      <li>Jacob Devlin et al.: "BERT: Pre-training of deep bidirectional transformers for language understanding," arXiv:1810.04805, 2018. (pdf p348)</li>
+      <li>Lewis Tunstall et al.: "Efficient few-shot learning without prompts," arXiv:2209.11055, 2022. (SetFit, pdf p355)</li>
+      <li>Chi Sun et al.: "How to fine-tune BERT for text classification?" CCL 2019, Springer, 2019. (printed as "GERT" in the book, pdf p363)</li>
+      <li>Erik F. Sang and Fien De Meulder: "Introduction to the CoNLL-2003 shared task: Language-independent named entity recognition," arXiv cs/0306050, 2003. (pdf p369)</li>
+      <li>Jingjing Liu et al.: "Asgard: A portable architecture for multilingual dialogue systems," IEEE ICASSP, 2013. (MIT restaurant/movie datasets, pdf p369)</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Jay Alammar &amp; Maarten Grootendorst, O'Reilly 2024), Chapter 11. Figures are the book's, cropped from the PDF for personal study. Numbers marked "modelled" or "beyond the book" are not from the book.</footer>
+</div>
+<script>
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+function rnd(n) { return Math.floor(Math.random() * n); }
+function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+function stepper(prefix, count, render) {
+  var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+  function draw() { if (i > count() - 1) i = count() - 1; if (lab) lab.textContent = "step " + (i + 1) + " / " + count(); prev.disabled = i === 0; next.disabled = i >= count() - 1; render(i); }
+  prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+  next.addEventListener("click", function () { if (i < count() - 1) { i++; draw(); } });
+  draw();
+  return { reset: function () { i = 0; draw(); }, redraw: draw };
+}
+function seg(ids, onPick) {
+  ids.forEach(function (id, k) {
+    $(id).addEventListener("click", function () {
+      ids.forEach(function (j) { $(j).classList.remove("on"); });
+      $(id).classList.add("on"); onPick(k);
+    });
+  });
+}
+
+/* ---------- s2: one training step, frozen vs trainable ---------- */
+run("s2", function () {
+  var mode = 0; /* 0 frozen, 1 trainable */
+  var rows = ["Classification head (feedforward)", "Encoder 11", "Encoder 10", "…", "Encoder 1", "Encoder 0", "Embeddings"];
+  var steps = [
+    { t: "<b>Forward pass.</b> \"What a horrible movie!\" is tokenized and flows bottom → top: embeddings, encoders 0…11, then the head.", hl: [6, 5, 4, 3, 2, 1, 0], g: [] },
+    { t: "<b>Prediction.</b> The head outputs Positive 25%, Negative 75% (Figure 11-3's numbers). The true label is Negative.", hl: [0], g: [] },
+    { t: "<b>Loss.</b> Cross-entropy = −ln(0.75) ≈ 0.29. Lower is better; a perfect 100% would give 0.", hl: [0], g: [] },
+    { t: "<b>Backward pass starts at the head.</b> Gradients are computed for the head's weights.", hl: [], g: [0] },
+    { t: null, hl: [], g: [0, 1, 2, 3, 4, 5, 6] },
+    { t: null, hl: [], g: [] }
+  ];
+  function render(i) {
+    var s = steps[i], txt = s.t, g = s.g.slice();
+    if (i === 4) {
+      if (mode === 0) { g = [0]; txt = "<b>Gradient stops.</b> BERT is frozen (requires_grad=False), so no gradients are computed for it: the backward pass ends at the head. Cheap, but BERT's vectors never change."; }
+      else { txt = "<b>Gradient flows through BERT.</b> From the head into encoder 11, 10, … down to the embeddings (Figure 11-2: \"a backward pass will start at the classification head and go through BERT\")."; }
+    }
+    if (i === 5) {
+      g = mode === 0 ? [0] : [0, 1, 2, 3, 4, 5, 6];
+      txt = mode === 0 ? "<b>Update.</b> Only the head's ~1.5k weights move. Repeat for every batch." : "<b>Update.</b> All ~108M weights move a little (learning rate 2e-5). BERT and head learn from one another.";
+    }
+    var h = "";
+    rows.forEach(function (r, k) {
+      var frozen = mode === 0 && k > 0;
+      var cls = "lyr " + (frozen ? "frozen" : "");
+      var tag = frozen ? "❄ frozen" : "🔥 trainable";
+      var mark = "";
+      if (s.hl.indexOf(k) >= 0) mark = " ← active";
+      if (g.indexOf(k) >= 0) { cls += " train"; mark = " ← gradient"; }
+      h += '<div class="' + cls + '"><span>' + esc(r) + esc(mark) + '</span><span>' + tag + '</span></div>';
+    });
+    $("w2_box").innerHTML = h;
+    $("w2_cap").innerHTML = txt;
+  }
+  var st = stepper("w2", function () { return steps.length; }, render);
+  seg(["s2_fr", "s2_tr"], function (k) { mode = k; st.redraw(); });
+});
+
+/* ---------- s3: dynamic padding ---------- */
+run("pad", function () {
+  var lens = [];
+  function newBatch() { lens = []; for (var i = 0; i < 4; i++) lens.push(6 + rnd(38)); }
+  function draw() {
+    var mode = $("pad_mode").value, L = mode === "dyn" ? Math.max.apply(null, lens) : 64;
+    var h = "", real = 0, pad = 0;
+    lens.forEach(function (n, r) {
+      var row = '<div style="display:flex;gap:1px;align-items:center;font-family:var(--mono);font-size:11px"><span style="min-width:62px">review ' + (r + 1) + '</span>';
+      for (var j = 0; j < L; j++) {
+        var isReal = j < n;
+        row += '<span style="width:6px;height:14px;border-radius:1px;display:inline-block;flex:none;background:' + (isReal ? "var(--c2)" : "var(--grid)") + '"></span>';
+      }
+      h += row + '</div>';
+      real += n; pad += L - n;
+    });
+    $("pad_box").innerHTML = h;
+    $("pad_r").innerHTML = "batch length <b>" + L + "</b> · real tokens <b>" + real + "</b> · [PAD] tokens <b>" + pad + "</b> · wasted <b class=\"" + (pad / (real + pad) > 0.4 ? "bad" : "good") + "\">" + Math.round(100 * pad / (real + pad)) + "%</b>";
+  }
+  newBatch(); draw();
+  $("pad_mode").addEventListener("change", draw);
+  $("pad_new").addEventListener("click", function () { newBatch(); draw(); });
+});
+
+/* ---------- s3: F1 calculator ---------- */
+run("f1", function () {
+  function draw() {
+    var tp = +$("f1_tp").value, fp = +$("f1_fp").value, fn = 533 - tp, tn = 533 - fp;
+    $("f1_tpo").textContent = tp; $("f1_fpo").textContent = fp;
+    var p = tp + fp ? tp / (tp + fp) : 0, r = tp / 533, f1 = p + r ? 2 * p * r / (p + r) : 0, acc = (tp + tn) / 1066;
+    $("f1_r").innerHTML = "TP <b>" + tp + "</b> · FN <b>" + fn + "</b> · FP <b>" + fp + "</b> · TN <b>" + tn + "</b> · precision <b>" + p.toFixed(3) + "</b> · recall <b>" + r.toFixed(3) + "</b> · F1 <b class=\"" + (f1 >= 0.85 ? "good" : "") + "\">" + f1.toFixed(3) + "</b> · accuracy <b>" + acc.toFixed(3) + "</b>";
+  }
+  $("f1_tp").addEventListener("input", draw); $("f1_fp").addEventListener("input", draw); draw();
+});
+
+/* ---------- s4: named_parameters index ---------- */
+var BERT = { V: 28996, H: 768, F: 3072, P: 512 };
+var PARAMS = (function () {
+  var H = BERT.H, F = BERT.F, list = [];
+  list.push(["bert.embeddings.word_embeddings.weight", [BERT.V, H]]);
+  list.push(["bert.embeddings.position_embeddings.weight", [BERT.P, H]]);
+  list.push(["bert.embeddings.token_type_embeddings.weight", [2, H]]);
+  list.push(["bert.embeddings.LayerNorm.weight", [H]]);
+  list.push(["bert.embeddings.LayerNorm.bias", [H]]);
+  for (var l = 0; l < 12; l++) {
+    var p = "bert.encoder.layer." + l + ".";
+    ["query", "key", "value"].forEach(function (q) { list.push([p + "attention.self." + q + ".weight", [H, H]]); list.push([p + "attention.self." + q + ".bias", [H]]); });
+    list.push([p + "attention.output.dense.weight", [H, H]]); list.push([p + "attention.output.dense.bias", [H]]);
+    list.push([p + "attention.output.LayerNorm.weight", [H]]); list.push([p + "attention.output.LayerNorm.bias", [H]]);
+    list.push([p + "intermediate.dense.weight", [F, H]]); list.push([p + "intermediate.dense.bias", [F]]);
+    list.push([p + "output.dense.weight", [H, F]]); list.push([p + "output.dense.bias", [H]]);
+    list.push([p + "output.LayerNorm.weight", [H]]); list.push([p + "output.LayerNorm.bias", [H]]);
+  }
+  list.push(["bert.pooler.dense.weight", [H, H]]); list.push(["bert.pooler.dense.bias", [H]]);
+  list.push(["classifier.weight", [2, H]]); list.push(["classifier.bias", [2]]);
+  return list;
+})();
+function numel(shape) { return shape.reduce(function (a, b) { return a * b; }, 1); }
+var TOTAL = PARAMS.reduce(function (a, p) { return a + numel(p[1]); }, 0);
+run("np", function () {
+  function draw() {
+    var i = +$("np_i").value, p = PARAMS[i];
+    $("np_io").textContent = i;
+    $("np_name").textContent = i + ": " + p[0] + "   shape " + JSON.stringify(p[1]);
+    var frozenUpTo = PARAMS.slice(0, 165).reduce(function (a, q) { return a + numel(q[1]); }, 0);
+    $("np_r").innerHTML = "with <code>index &lt; 165</code> this tensor is <b class=\"" + (i < 165 ? "bad" : "good") + "\">" + (i < 165 ? "frozen" : "trainable") + "</b> · tensors in total <b>" + PARAMS.length + "</b> · weights frozen by the rule <b>" + fmt(frozenUpTo) + "</b> of <b>" + fmt(TOTAL) + "</b>";
+  }
+  $("np_i").addEventListener("input", draw); draw();
+});
+
+/* ---------- s4: freezing dial ---------- */
+run("fz", function () {
+  var labels = ["None", "0-1", "0-2", "0-3", "0-4", "0-5", "0-6", "0-7", "0-8", "0-9", "0-10", "all"];
+  var nTrain = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  var f1 = [0.705, 0.79, 0.816, 0.827, 0.843, 0.836, 0.838, 0.840, 0.850, 0.850, 0.852, 0.853];
+  var BLOCK = 0, EMB = 0, POOL = 0, HEAD = 0;
+  PARAMS.forEach(function (p) {
+    var n = numel(p[1]);
+    if (p[0].indexOf("bert.embeddings") === 0) EMB += n;
+    else if (p[0].indexOf("bert.encoder.layer.0.") === 0) BLOCK += n;
+    else if (p[0].indexOf("bert.pooler") === 0) POOL += n;
+    else if (p[0].indexOf("classifier") === 0) HEAD += n;
+  });
+  function draw() {
+    var k = +$("fz_k").value, headOnly = $("fz_headonly").checked;
+    if (headOnly && k !== 0) { $("fz_k").value = 0; k = 0; }
+    var nb = nTrain[k];
+    $("fz_ko").textContent = labels[k] + " (" + nb + " blocks)";
+    var tr = nb * BLOCK + HEAD + (headOnly ? 0 : POOL) + (nb === 12 ? EMB : 0);
+    var h = '<div class="lyr train"><span>classifier (head)</span><span>🔥 ' + fmt(HEAD) + '</span></div>';
+    h += '<div class="lyr ' + (headOnly ? "frozen" : "train") + '"><span>pooler</span><span>' + (headOnly ? "❄" : "🔥") + ' ' + fmt(POOL) + '</span></div>';
+    for (var l = 11; l >= 0; l--) {
+      var on = l >= 12 - nb;
+      h += '<div class="lyr ' + (on ? "train" : "frozen") + '"><span>encoder ' + l + '</span><span>' + (on ? "🔥" : "❄") + ' ' + fmt(BLOCK) + '</span></div>';
+    }
+    h += '<div class="lyr ' + (nb === 12 ? "train" : "frozen") + '"><span>embeddings</span><span>' + (nb === 12 ? "🔥" : "❄") + ' ' + fmt(EMB) + '</span></div>';
+    $("fz_stack").innerHTML = h;
+    var shownF1 = headOnly ? "0.63 (book, Experiment A)" : "≈" + f1[k].toFixed(2) + " (read off Fig 11-7)";
+    if (nb === 2 && !headOnly) shownF1 += " · book's Experiment B printed 0.80";
+    $("fz_r").innerHTML = "trainable weights <b>" + fmt(tr) + "</b> (" + (100 * tr / TOTAL).toFixed(tr / TOTAL < 0.01 ? 4 : 1) + "%) · F1 <b>" + shownF1 + "</b>";
+    $("fz_bar").style.width = Math.max(0.5, 100 * tr / TOTAL) + "%";
+    /* chart */
+    var W = 480, Hh = 200, x0 = 44, x1 = 466, y0 = 170, y1 = 14, lo = 0.68, hi = 0.86;
+    function X(i) { return x0 + i * (x1 - x0) / 11; } function Y(v) { return y0 - (v - lo) / (hi - lo) * (y0 - y1); }
+    var s = "";
+    [0.70, 0.74, 0.78, 0.82, 0.86].forEach(function (v) { s += '<line class="gridl" x1="' + x0 + '" x2="' + x1 + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text x="4" y="' + (Y(v) + 4) + '">' + v.toFixed(2) + '</text>'; });
+    s += '<line class="axis" x1="' + x0 + '" x2="' + x1 + '" y1="' + y0 + '" y2="' + y0 + '"/>';
+    var pts = f1.map(function (v, i) { return X(i) + "," + Y(v); }).join(" ");
+    s += '<polyline class="ln" points="' + pts + '"/>';
+    f1.forEach(function (v, i) { s += '<circle class="pt' + (i === k && !headOnly ? " on" : "") + '" cx="' + X(i) + '" cy="' + Y(v) + '" r="' + (i === k && !headOnly ? 6 : 3.5) + '"/>'; if (i % 2 === 0 || i === 11) s += '<text x="' + X(i) + '" y="188" text-anchor="middle" style="font-size:10px">' + labels[i] + '</text>'; });
+    if (headOnly) s += '<circle class="pt on" cx="' + X(0) + '" cy="' + Y(0.68) + '" r="6"/><text x="' + (X(0) + 10) + '" y="' + (Y(0.68) - 6) + '" style="font-size:10px">0.63 (below axis)</text>';
+    s += '<line x1="' + X(4) + '" x2="' + X(4) + '" y1="' + y1 + '" y2="' + y0 + '" style="stroke:var(--sell);stroke-dasharray:3 3"/>';
+    s += '<text x="' + (X(4) + 4) + '" y="' + (y1 + 10) + '" style="font-size:10px">stabilizing</text>';
+    $("fz_chart").innerHTML = s;
+  }
+  $("fz_k").addEventListener("input", function () { if (+$("fz_k").value !== 0) $("fz_headonly").checked = false; draw(); });
+  $("fz_headonly").addEventListener("change", draw); draw();
+});
+
+/* ---------- s6: pair counter ---------- */
+run("pairs", function () {
+  function draw() {
+    var c = +$("pr_c").value, n = +$("pr_n").value, N = c * n;
+    $("pr_co").textContent = c; $("pr_no").textContent = n;
+    var pos = c * n * (n - 1) / 2, all = N * (N - 1) / 2, neg = all - pos;
+    $("pr_r").innerHTML = "sentences <b>" + N + "</b> · positive pairs <b class=\"good\">" + fmt(pos) + "</b> (" + c + " × " + n + "·" + (n - 1) + "/2) · negative pairs <b class=\"bad\">" + fmt(neg) + "</b> · all pairs <b>" + fmt(all) + "</b> (" + (all / N).toFixed(1) + "× the number of sentences)";
+    var g = "";
+    if (N <= 40) {
+      for (var i = 0; i < N; i++) {
+        g += "<div>";
+        for (var j = 0; j < N; j++) {
+          var cls = i === j ? "self" : (Math.floor(i / n) === Math.floor(j / n) ? "pos" : "neg");
+          g += '<span class="' + cls + '" style="width:' + (N > 24 ? 8 : 14) + 'px;height:' + (N > 24 ? 8 : 14) + 'px"></span>';
+        }
+        g += "</div>";
+      }
+    } else g = '<p class="note">(grid hidden above 40 sentences)</p>';
+    $("pr_grid").innerHTML = g;
+  }
+  $("pr_c").addEventListener("input", draw); $("pr_n").addEventListener("input", draw); draw();
+});
+
+/* ---------- s6: SetFit step-through in a toy 2-D space ---------- */
+run("w6", function () {
+  var S = [
+    { t: "Python", c: 0, a: [150, 70], b: [80, 70] },
+    { t: "SQL", c: 0, a: [250, 150], b: [110, 120] },
+    { t: "labrador", c: 1, a: [210, 60], b: [380, 80] },
+    { t: "Siamese cat", c: 1, a: [120, 170], b: [400, 140] }
+  ];
+  var caps = [
+    "<b>Before training.</b> The pretrained model places the four sentences (modelled positions). Classes are mixed: \"I write my code in Python\" sits closer to the labrador sentence than to SQL.",
+    "<b>Step 1 · pairs.</b> Same class → positive pair (green): Python–SQL, labrador–cat. Different class → negative pair (red, dashed). That's 2 positive and 4 negative pairs from 4 sentences.",
+    "<b>Step 2 · contrastive fine-tuning.</b> Training pulls positive pairs together and pushes negative pairs apart. The embedding space now separates code from pets.",
+    "<b>Step 3 · classifier.</b> Logistic regression learns a line (the default head) in the fine-tuned space.",
+    "<b>Predict.</b> A new sentence, \"My parrot sings\", is embedded with the fine-tuned model and lands on the pets side, so the classifier says Pets (modelled)."
+  ];
+  function render(i) {
+    var s = "", key = i >= 2 ? "b" : "a";
+    if (i === 1 || i === 2) {
+      for (var a = 0; a < 4; a++) for (var b = a + 1; b < 4; b++) {
+        var same = S[a].c === S[b].c;
+        s += '<line x1="' + S[a][key][0] + '" y1="' + S[a][key][1] + '" x2="' + S[b][key][0] + '" y2="' + S[b][key][1] + '" style="stroke:' + (same ? "var(--buy)" : "var(--sell)") + ';stroke-width:' + (same ? 2.4 : 1.2) + (same ? "" : ";stroke-dasharray:4 3") + ';opacity:.8"/>';
+      }
+    }
+    if (i >= 3) s += '<line x1="250" y1="10" x2="240" y2="220" style="stroke:var(--c1);stroke-width:2.4"/><text x="150" y="215">Code</text><text x="300" y="215">Pets</text>';
+    S.forEach(function (p) {
+      var col = p.c === 0 ? "var(--c2)" : "var(--c3)";
+      s += '<circle cx="' + p[key][0] + '" cy="' + p[key][1] + '" r="8" style="fill:' + col + '"/><text x="' + (p[key][0] + 11) + '" y="' + (p[key][1] + 4) + '">' + esc(p.t) + '</text>';
+    });
+    if (i === 4) s += '<circle cx="360" cy="185" r="8" style="fill:var(--c1)"/><text x="300" y="175">"My parrot sings" → Pets</text>';
+    $("w6_svg").innerHTML = s;
+    $("w6_cap").innerHTML = caps[i];
+  }
+  stepper("w6", function () { return caps.length; }, render);
+});
+
+/* ---------- s7: SetFit calculator ---------- */
+run("sf", function () {
+  var ids = ["sf_n", "sf_c", "sf_it", "sf_ep"];
+  function draw() {
+    var n = +$("sf_n").value, c = +$("sf_c").value, it = +$("sf_it").value, ep = +$("sf_ep").value;
+    $("sf_no").textContent = n; $("sf_co").textContent = c; $("sf_ito").textContent = it; $("sf_epo").textContent = ep;
+    var docs = n * c, pairs = docs * it * 2, per = Math.ceil(pairs / 16);
+    $("sf_r").innerHTML = "labeled docs <b>" + docs + "</b> · pairs = " + docs + " × " + it + " × 2 = <b>" + fmt(pairs) + "</b> · steps/epoch <b>" + per + "</b> · total optimisation steps <b>" + fmt(per * ep) + "</b>" + (docs === 32 && it === 20 && ep === 3 ? ' · <span class="good">matches the book\'s log</span>' : "");
+  }
+  ids.forEach(function (id) { $(id).addEventListener("input", draw); }); draw();
+});
+
+/* ---------- s8: genealogy ---------- */
+run("w8", function () {
+  var caps = [
+    "<b>Step 1 · pretrained model.</b> A general representation model like BERT, trained on Wikipedia and books. Knows English, not your company.",
+    "<b>Step 2 · continued pretraining.</b> Keep training it with MLM on ACME corp's own text (no labels). Result: the ACME representation model, which knows the company's lingo.",
+    "<b>Step 3 · task fine-tunes.</b> Branch several task models off the ACME model: customer-service topic classification, semantic search, NER (Figure 11-16).",
+    "<b>Your version (our example).</b> For a voice-agent company: continued-pretrain on call transcripts, then fine-tune intent classification, PII-redaction NER and a retriever for memory search."
+  ];
+  function render(i) {
+    var s = "";
+    function box(x, y, w, t1, t2, hi) { s += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="40" rx="5" style="fill:' + (hi ? "var(--tint)" : "var(--plate)") + ';stroke:' + (hi ? "var(--c1)" : "var(--ink)") + ';stroke-width:' + (hi ? 2.2 : 1.2) + '"/><text x="' + (x + w / 2) + '" y="' + (y + 17) + '" text-anchor="middle" style="font-weight:600">' + esc(t1) + '</text><text x="' + (x + w / 2) + '" y="' + (y + 32) + '" text-anchor="middle" style="font-size:10px">' + esc(t2) + '</text>'; }
+    function line(x1, y1, x2, y2) { s += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" style="stroke:var(--muted);stroke-width:1.4"/>'; }
+    var mine = i === 3;
+    box(10, 80, 130, "BERT", "general pretrained", i === 0);
+    if (i >= 1) { line(140, 100, 190, 100); box(190, 80, 140, mine ? "Voice-co BERT" : "ACME BERT", mine ? "MLM on call transcripts" : "MLM on ACME data", i === 1); }
+    if (i >= 2) {
+      var t = mine ? [["intent classifier", "topic of the call"], ["PII NER", "redact names"], ["retriever", "memory search"]] : [["topic classifier", "customer service"], ["semantic search", "fine-tuned"], ["NER", "fine-tuned"]];
+      [20, 80, 140].forEach(function (y, k) { line(330, 100, 370, y + 20); box(370, y, 140, t[k][0], t[k][1], i >= 2); });
+    }
+    $("w8_svg").innerHTML = s;
+    $("w8_cap").innerHTML = caps[i];
+  }
+  stepper("w8", function () { return caps.length; }, render);
+});
+
+/* ---------- s9: masking toy ---------- */
+run("mask", function () {
+  var SENT = [
+    [["Her"], ["vocal", "##ization"], ["was"], ["remarkably"], ["melodic"]],
+    [["The"], ["cinema", "##tography"], ["was"], ["breath", "##taking"], ["but"], ["the"], ["screen", "##play"], ["dragged"]],
+    [["An"], ["un", "##pre", "##ten", "##tious"], [","], ["heart", "##warming"], ["documentary"]]
+  ];
+  function draw() {
+    var words = SENT[+$("mk_s").value], m = $("mk_m").value, p = +$("mk_p").value / 100;
+    $("mk_po").textContent = Math.round(p * 100) + "%";
+    var toks = [];
+    words.forEach(function (w, wi) { w.forEach(function (t) { toks.push({ t: t, w: wi, m: false }); }); });
+    if (m === "tok") { toks.forEach(function (o) { o.m = Math.random() < p; }); if (!toks.some(function (o) { return o.m; })) toks[rnd(toks.length)].m = true; }
+    else {
+      var chosen = words.map(function () { return Math.random() < p; });
+      if (chosen.indexOf(true) < 0) {
+        var multi = words.map(function (w, i) { return w.length > 1 ? i : -1; }).filter(function (i) { return i >= 0; });
+        chosen[multi.length ? multi[rnd(multi.length)] : rnd(words.length)] = true;
+      }
+      toks.forEach(function (o) { o.m = chosen[o.w]; });
+    }
+    var h = '<span class="tok sp">[CLS]</span>', nm = 0, partial = 0;
+    toks.forEach(function (o) { if (o.m) nm++; h += '<span class="tok' + (o.m ? " mask" : "") + '">' + (o.m ? "[MASK]" : esc(o.t)) + '<small>' + (o.m ? esc(o.t) : "&nbsp;") + '</small></span>'; });
+    words.forEach(function (w, wi) { var ms = toks.filter(function (o) { return o.w === wi && o.m; }).length; if (ms > 0 && ms < w.length) partial++; });
+    h += '<span class="tok sp">[SEP]</span>';
+    $("mk_box").innerHTML = h;
+    $("mk_r").innerHTML = "masked <b>" + nm + "</b> of <b>" + toks.length + "</b> tokens (" + Math.round(100 * nm / toks.length) + "%) · words only partly masked <b class=\"" + (partial ? "bad" : "good") + "\">" + partial + "</b>" + (partial ? " ← the model can peek at the rest of the word" : "");
+  }
+  ["mk_s", "mk_m", "mk_p"].forEach(function (id) { $(id).addEventListener("input", draw); $(id).addEventListener("change", draw); });
+  $("mk_go").addEventListener("click", draw); draw();
+});
+
+/* ---------- s9: fill-mask before/after ---------- */
+run("fm", function () {
+  var A = ["idea", "dream", "thing", "day", "thought"], B = ["movie", "film", "mess", "comedy", "story"];
+  function show(k) {
+    var L = k === 0 ? A : B, h = "";
+    L.forEach(function (w, i) { h += '<span class="tok' + (k === 1 ? " misc" : "") + '">What a horrible <b>' + esc(w) + '</b>!<small>rank ' + (i + 1) + '</small></span>'; });
+    $("fm_box").innerHTML = h;
+    $("fm_cap").innerHTML = k === 0 ? "<b>bert-base-cased</b>: general, abstract concepts (the book: \"idea,\" \"dream,\" and \"day\" definitely make sense)." : "<b>mlm</b> (after continued pretraining on Rotten Tomatoes): every guess is about films. The model is now biased toward the data it was fed.";
+  }
+  seg(["fm_a", "fm_b"], show); show(0);
+});
+
+/* ---------- s11: align_labels step-through ---------- */
+run("align", function () {
+  var ID2 = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"];
+  var EX = [
+    { toks: ["[CLS]", "Dean", "Palmer", "hit", "his", "30th", "home", "##r", "for", "the", "Rangers", ".", "[SEP]"], wid: [null, 0, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, null], lab: [1, 2, 0, 0, 0, 0, 0, 0, 3, 0] },
+    { toks: ["[CLS]", "My", "name", "is", "Ma", "##arte", "##n", "[SEP]"], wid: [null, 0, 1, 2, 3, 3, 3, null], lab: [0, 0, 0, 1] }
+  ];
+  var ex = EX[0], st;
+  function trace() {
+    var prev = null, out = [], why = [];
+    ex.wid.forEach(function (w) {
+      if (w !== prev) {
+        prev = w;
+        var u = w === null ? -100 : ex.lab[w];
+        out.push(u);
+        why.push(w === null ? "word_idx is None but differs from previous_word_idx, so it enters the \"start of a new word\" branch: label −100 (special token at the end)." : "Start of a new word (word " + w + "): copy its label " + u + " (" + ID2[u] + ").");
+      } else if (w === null) { out.push(-100); why.push("word_idx is None and equals previous_word_idx (both None at the very start): special-token branch, label −100."); }
+      else {
+        var u2 = ex.lab[w], orig = u2;
+        if (u2 % 2 === 1) u2 += 1;
+        out.push(u2);
+        why.push("Same word " + w + " again (continuation sub-token). Word label " + orig + " (" + ID2[orig] + ")" + (orig % 2 === 1 ? " is odd = a B- tag, so +1 → " + u2 + " (" + ID2[u2] + ")." : " is not a B- tag, keep " + u2 + " (" + ID2[u2] + ")."));
+      }
+    });
+    return { out: out, why: why };
+  }
+  function cls(l) { if (l === -100) return " ign"; var n = ID2[l]; if (n.indexOf("PER") > 0) return " per"; if (n.indexOf("ORG") > 0) return " org"; if (n.indexOf("LOC") > 0) return " loc"; if (n.indexOf("MISC") > 0) return " misc"; return ""; }
+  function render(i) {
+    var tr = trace(), h = "";
+    ex.toks.forEach(function (t, k) {
+      var shown = k <= i, l = tr.out[k];
+      h += '<span class="tok' + (shown ? cls(l) : "") + (k === i ? " cur" : "") + (t.charAt(0) === "[" ? " sp" : "") + '">' + esc(t) + '<small>w=' + (ex.wid[k] === null ? "None" : ex.wid[k]) + ' · ' + (shown ? (l === -100 ? "−100" : l + " " + ID2[l]) : "?") + '</small></span>';
+    });
+    $("al_box").innerHTML = h;
+    $("al_out").textContent = "word labels: " + JSON.stringify(ex.lab) + "\nlabel_ids:   [" + tr.out.slice(0, i + 1).join(", ") + (i < tr.out.length - 1 ? ", …" : "") + "]";
+    $("al_cap").innerHTML = "<b>Token " + i + " '" + esc(ex.toks[i]) + "'.</b> " + esc(tr.why[i]) + (i === tr.out.length - 1 && ex === EX[0] ? " Final list matches the book: [-100, 1, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, -100]." : "");
+  }
+  st = stepper("al", function () { return ex.toks.length; }, render);
+  $("al_ex").addEventListener("change", function () { ex = EX[+$("al_ex").value]; st.reset(); });
+});
+
+/* ---------- s12: pipeline output ---------- */
+run("po", function () {
+  var T = [
+    { w: "[CLS]", i: 0 }, { w: "My", i: 1 }, { w: "name", i: 2 }, { w: "is", i: 3 },
+    { w: "Ma", i: 4, e: { entity: "B-PER", score: 0.99534035, index: 4, word: "Ma", start: 11, end: 13 } },
+    { w: "##arte", i: 5, e: { entity: "I-PER", score: 0.9928328, index: 5, word: "##arte", start: 13, end: 17 } },
+    { w: "##n", i: 6, e: { entity: "I-PER", score: 0.9954301, index: 6, word: "##n", start: 17, end: 18 } },
+    { w: ".", i: 7 }, { w: "[SEP]", i: 8 }
+  ];
+  var h = "";
+  T.forEach(function (t, k) { h += '<button type="button" class="tok' + (t.e ? " per" : "") + (t.w.charAt(0) === "[" ? " sp" : "") + '" data-k="' + k + '">' + esc(t.w) + '<small>index ' + t.i + '</small></button>'; });
+  $("po_box").innerHTML = h;
+  function show(k) {
+    var t = T[k];
+    $("po_out").textContent = t.e ? JSON.stringify(t.e, null, 1).replace(/\n\s*/g, " ") : (t.w.charAt(0) === "[" ? "special token: never returned (label −100 in training)" : "predicted O (no entity): the pipeline leaves it out of the result");
+  }
+  Array.prototype.forEach.call($("po_box").querySelectorAll("button"), function (b) {
+    var k = +b.getAttribute("data-k");
+    b.addEventListener("click", function () { show(k); });
+    b.addEventListener("mouseenter", function () { show(k); });
+  });
+  var sc = (0.99534035 + 0.9928328 + 0.9954301) / 3;
+  $("po_r").innerHTML = 'merged span: <b>"My name is Maarten.".slice(11, 18) = "Maarten"</b> · type <b>PER</b> · mean score <b>' + sc.toFixed(4) + '</b>';
+});
+
+})();
+</script>
+</body>
+</html>

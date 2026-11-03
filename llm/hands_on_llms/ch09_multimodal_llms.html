@@ -1,0 +1,1573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hands-On LLMs Ch.9 Multimodal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.9 Multimodal) ---- */
+.patchgrid { display: grid; gap: 2px; width: 100%; max-width: 300px; aspect-ratio: 1 / 1; }
+.patchgrid div { background: var(--tint2); border: 1px solid var(--c2); font-family: var(--mono); font-size: 9px; display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--muted); }
+.tokrow { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 12.5px; }
+.tokrow span { border: 1px solid var(--rule); background: var(--paper); border-radius: 3px; padding: 2px 6px; max-width: 100%; overflow-wrap: anywhere; }
+.tokrow span.sp { border-color: var(--c1); background: var(--tint); }
+.tokrow span.cls { border-color: var(--c3); color: var(--c3); font-weight: 600; }
+.tokrow span.img { border-color: var(--c2); background: var(--tint2); }
+.mat { border-collapse: separate; border-spacing: 3px; width: auto; }
+.mat td, .mat th { border: none; padding: 6px 8px; text-align: center; font-family: var(--mono); font-size: 13px; }
+.mat td.v { border-radius: 4px; cursor: pointer; min-width: 52px; border: 2px solid transparent; }
+.mat td.v.best { border-color: var(--buy); font-weight: 700; }
+.mat td.v.sel { outline: 2px solid var(--c1); }
+.mat th.rowh { text-align: right; font-family: var(--body); font-weight: 400; font-size: 14px; max-width: 220px; }
+.chat { display: grid; gap: 6px; font-family: var(--body); font-size: 15px; }
+.chat .u { justify-self: start; background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 6px 10px; max-width: 85%; }
+.chat .b { justify-self: end; background: var(--tint2); border: 1px solid var(--c2); border-radius: 10px; padding: 6px 10px; max-width: 85%; }
+.frz { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.frz .blk { border: 2px solid var(--rule); border-radius: 6px; padding: 8px 10px; min-width: 120px; flex: 1 1 120px; background: var(--paper); font-family: var(--mono); font-size: 12.5px; display: grid; gap: 4px; cursor: pointer; }
+.frz .blk b { font-family: var(--display); font-size: 14px; }
+.frz .blk.train { border-color: var(--c1); background: var(--tint); }
+.frz .blk.frozen { border-color: var(--c2); border-style: dashed; }
+.bar { height: 10px; border-radius: 99px; background: var(--rule); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--c1); }
+textarea.prompt { width: 100%; font-family: var(--mono); font-size: 12.5px; background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 8px; min-height: 90px; resize: vertical; }
+input.wide { font-family: var(--mono); font-size: 13px; width: 100%; max-width: 420px; padding: 5px 7px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.emb2d { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.emb2d svg { display: block; width: 100%; min-width: 320px; height: auto; }
+.emb2d circle.pt { cursor: pointer; stroke-width: 2; }
+.emb2d circle.pt.txt { fill: var(--tint2); stroke: var(--c2); }
+.emb2d circle.pt.img { fill: var(--tint3); stroke: var(--c3); }
+.emb2d circle.pt.on { stroke: var(--c1); stroke-width: 4; }
+.emb2d line.nn { stroke: var(--c1); stroke-width: 2; stroke-dasharray: 4 3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch08_semantic_search_and_rag.html">← Ch.8 Semantic Search and RAG</a><a href="ch10_creating_text_embedding_models.html">Ch.10 Creating Text Embedding Models →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 9 · PDF p281–308</div>
+  <h1>Multimodal LLMs: teaching a <em>text</em> model to look at pictures</h1>
+  <p class="lede">So far every model in the book read and wrote only text. This chapter adds a second kind of data, images. First it shows how a <b>Vision Transformer (ViT)</b> turns a picture into "tokens": it cuts the image into small square patches and embeds each patch, so the normal Transformer encoder can read it. Then it uses that trick to build <b>CLIP</b>, an embedding model that puts images and captions into the <b>same vector space</b>, so "a puppy playing in the snow" lands right next to a photo of one; you try it with OpenCLIP and sentence-transformers. Finally it shows <b>BLIP-2</b>, which gives an existing LLM eyes without retraining it: a small trainable bridge (the <b>Q-Former</b>) turns image features into "soft visual prompts" the frozen LLM can read. You end by captioning a supercar and an inkblot, and chatting with the model about a picture.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is one chain: <b>LLMs only read text</b> → find a way to turn images into token-like vectors → use that to <b>compare</b> images and text (embeddings) → then use it to let an LLM <b>talk about</b> images (generation). Each orange box is the idea the next row builds on.</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 9">
+    <div class="row"><span class="tag">Problem</span><span class="node">LLMs see only text</span><span class="arr">→</span><span class="node">but real communication uses images, sound, gestures</span><span class="arr">→</span><span class="node key">multimodal models</span></div>
+    <div class="row"><span class="tag">Idea 1</span><span class="node">images have no words</span><span class="arr">→</span><span class="node key">ViT: cut image into patches</span><span class="arr">→</span><span class="node">linear projection = patch embeddings</span><span class="arr">→</span><span class="node">same Transformer encoder as text</span></div>
+    <div class="row"><span class="tag">Idea 2</span><span class="node key">one vector space for text + images</span><span class="arr">→</span><span class="node">CLIP: text encoder + image encoder (ViT)</span><span class="arr">→</span><span class="node">contrastive training on image–caption pairs</span></div>
+    <div class="row"><span class="tag">Hands-on</span><span class="node">OpenCLIP: tokenize, resize to 224×224, 512-d vectors</span><span class="arr">→</span><span class="node">cosine score 0.33</span><span class="arr">→</span><span class="node">3×3 similarity matrix</span><span class="arr">→</span><span class="node">sentence-transformers shortcut</span></div>
+    <div class="row"><span class="tag">Trade-off</span><span class="node">a multimodal LLM from scratch needs billions of pairs + huge compute</span><span class="arr">→</span><span class="node key">reuse frozen ViT + frozen LLM</span></div>
+    <div class="row"><span class="tag">Idea 3</span><span class="node key">BLIP-2 Q-Former bridge</span><span class="arr">→</span><span class="node">step 1: learn vision+language reps (3 tasks)</span><span class="arr">→</span><span class="node">step 2: project to soft visual prompt for LLM</span><span class="arr">→</span><span class="node">(LLaVA, Idefics 2 do similar)</span></div>
+    <div class="row"><span class="tag">Hands-on</span><span class="node">processor: images → 224×224, text → GPT-2 tokens</span><span class="arr">→</span><span class="node">use case 1: captioning</span><span class="arr">→</span><span class="node">use case 2: visual question answering + chat</span></div>
+  </div>
+  <svg viewBox="0 0 640 190" class="dg" role="img" aria-label="Three model shapes in this chapter: ViT, CLIP, BLIP-2" style="width:100%;height:auto;max-width:640px">
+    <text x="10" y="16" class="b">ViT (plates 2–4)</text>
+    <text x="225" y="16" class="b">CLIP (plates 5–9)</text>
+    <text x="440" y="16" class="b">BLIP-2 (plates 10–18)</text>
+    <rect x="10" y="30" width="80" height="26" rx="4" class="s"/><text x="50" y="47" text-anchor="middle">image</text>
+    <line x1="50" y1="56" x2="50" y2="74"/>
+    <rect x="10" y="74" width="180" height="26" rx="4" class="f"/><text x="100" y="91" text-anchor="middle">patches → embeddings</text>
+    <line x1="100" y1="100" x2="100" y2="118"/>
+    <rect x="10" y="118" width="180" height="26" rx="4" class="hi"/><text x="100" y="135" text-anchor="middle">Transformer encoder</text>
+    <line x1="100" y1="144" x2="100" y2="160"/>
+    <text x="100" y="176" text-anchor="middle" class="m">"cat 98%"</text>
+    <rect x="225" y="30" width="80" height="26" rx="4" class="s"/><text x="265" y="47" text-anchor="middle">caption</text>
+    <rect x="325" y="30" width="80" height="26" rx="4" class="s"/><text x="365" y="47" text-anchor="middle">image</text>
+    <line x1="265" y1="56" x2="265" y2="74"/><line x1="365" y1="56" x2="365" y2="74"/>
+    <rect x="225" y="74" width="80" height="26" rx="4" class="f"/><text x="265" y="91" text-anchor="middle">text enc.</text>
+    <rect x="325" y="74" width="80" height="26" rx="4" class="f"/><text x="365" y="91" text-anchor="middle">ViT</text>
+    <line x1="265" y1="100" x2="300" y2="128"/><line x1="365" y1="100" x2="330" y2="128"/>
+    <rect x="250" y="128" width="130" height="26" rx="4" class="hi"/><text x="315" y="145" text-anchor="middle">cosine similarity</text>
+    <text x="315" y="176" text-anchor="middle" class="m">same 512-d space</text>
+    <rect x="440" y="30" width="90" height="26" rx="4" class="f"/><text x="485" y="47" text-anchor="middle">ViT ❄</text>
+    <line x1="485" y1="56" x2="485" y2="74"/>
+    <rect x="440" y="74" width="90" height="26" rx="4" class="hi"/><text x="485" y="91" text-anchor="middle">Q-Former 🔥</text>
+    <line x1="485" y1="100" x2="485" y2="118"/>
+    <rect x="440" y="118" width="90" height="26" rx="4" class="f"/><text x="485" y="135" text-anchor="middle">linear proj.</text>
+    <line x1="530" y1="131" x2="550" y2="131"/>
+    <rect x="550" y="100" width="84" height="60" rx="4" class="f"/><text x="592" y="126" text-anchor="middle">LLM ❄</text><text x="592" y="142" text-anchor="middle" class="m">+ question</text>
+    <text x="537" y="180" text-anchor="middle" class="m">"a sports car…"</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening: what is multimodal?</a>
+    <a href="#s2"><span>02</span>Transformers for vision: ViT</a>
+    <a href="#s3"><span>03</span>Tokenizing an image into patches</a>
+    <a href="#s4"><span>04</span>Patch embeddings into the encoder</a>
+    <a href="#s5"><span>05</span>Multimodal embedding models</a>
+    <a href="#s6"><span>06</span>CLIP: connecting text and images</a>
+    <a href="#s7"><span>07</span>How CLIP is trained</a>
+    <a href="#s8"><span>08</span>OpenCLIP hands-on</a>
+    <a href="#s9"><span>09</span>CLIP via sentence-transformers</a>
+    <a href="#s10"><span>10</span>Making text generators multimodal</a>
+    <a href="#s11"><span>11</span>BLIP-2: the Q-Former bridge</a>
+    <a href="#s12"><span>12</span>BLIP-2 step 1: vision + language</a>
+    <a href="#s13"><span>13</span>BLIP-2 step 2: soft visual prompts</a>
+    <a href="#s14"><span>14</span>Preprocessing multimodal inputs</a>
+    <a href="#s15"><span>15</span>Preprocessing images</a>
+    <a href="#s16"><span>16</span>Preprocessing text (the Ġ)</a>
+    <a href="#s17"><span>17</span>Use case 1: image captioning</a>
+    <a href="#s18"><span>18</span>Use case 2: multimodal chat</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>What "multimodal" means, and why a language model should care</h2></div><span class="chip">pdf p281–282 · Fig 9-1</span></div>
+  <p>When you think of large language models (LLMs), "multimodal" is not the first word that comes to mind. They are <i>language</i> models, after all. But a model becomes much more useful if it can handle kinds of data other than text. For example, it is very handy if a language model can glance at a picture and answer questions about it.</p>
+  <p>Each type of data (text, images, audio, video, sensor readings) is called a <b>modality</b>. A model that can handle more than one modality, such as text <i>and</i> images, is called <b>multimodal</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-9-1.png" alt="A multimodal model box receiving text, code (JSON), an image of a cat and audio, and outputting text and JSON" loading="lazy"><figcaption>Figure 9-1 (book, pdf p281): Models that are able to deal with different types (or modalities) of data, such as images, audio, video, or sensors, are said to be multimodal. It's possible for a model to accept a modality as input yet not be able to generate in that modality.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> On the left are four <b>input modalities</b>: the text "This is a cat", a piece of code (a JSON object <code>{"type": "cat", "Description": "cute"}</code>), a pixel-art image of a cat, and an audio waveform. All four wires go into one pink box, the multimodal model. On the right are the <b>output modalities</b>: a text reply ("It's pixelated!") and a JSON reply (<code>{"status": "accepted"}</code>). Notice what is <i>missing</i> on the right: no image and no audio come out. That is the caption's key point: a model can <b>accept</b> a modality as input without being able to <b>generate</b> it. Every model in this chapter is like that: images go in, only text (or vectors) come out.</p>
+  <p>Why bother? The book points out that LLMs have already shown all kinds of <b>emerging behaviours</b> (abilities nobody trained for directly): generalization, reasoning, arithmetic, linguistics. As models grow larger and smarter, their skill sets grow too (footnote 1: Jason Wei et al., "Emergent abilities of large language models", 2022). The ability to receive and reason about multimodal input might increase this further and unlock abilities that were previously locked away.</p>
+  <p>In practice, language does not live in a vacuum. When you speak, your <b>body language, facial expressions and intonation</b> all add meaning to the words. The same holds for LLMs: if they can reason about multimodal information, their abilities might grow, and we can use them for new kinds of problems.</p>
+  <p><b>Roadmap of the chapter</b> (as the book states it): first, how images become numbers, using an adaptation of the original Transformer. Then, how LLMs can be extended to vision tasks using that Transformer.</p>
+  <div class="box work"><b>Worked example · which way can data flow?</b>
+    <p>Pick a model from this chapter and see which modalities go in and come out. (The rows are taken from what the chapter shows each model doing.)</p>
+    <div class="controls"><label for="m1sel">Model <select id="m1sel"><option value="vit">ViT classifier</option><option value="clip">CLIP</option><option value="blip">BLIP-2</option><option value="llm">Plain text LLM (Llama 2, ChatGPT as described)</option></select></label></div>
+    <div class="tablewrap"><table id="m1tab"></table></div>
+    <div class="caption" id="m1cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A phone call versus a video call with your mother. On the phone she hears your words and tone. On video she also sees your face and knows at once you have not slept. Same words, more information, better answer. A text-only LLM is on the phone; a multimodal LLM is on video. <i>Where it breaks:</i> your mother can also send you a photo back; most models in this chapter can look but cannot draw (they only output text).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An LLM only ever works on vectors (embeddings). Text becomes vectors through a tokenizer plus an embedding table. To add a modality, you need a <i>second road</i> that turns that modality into vectors the same model can use. The whole chapter is about building that road for images: first for an encoder (ViT), then into a shared embedding space (CLIP), then into a generative LLM's input (BLIP-2).</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"What does multimodal mean, and is GPT-style image input the same as image generation?"</i> Say: "A modality is a data type like text, image or audio. A multimodal model handles more than one. Input and output are separate: many vision-language models take images in but only produce text. Image generation, like stable diffusion, is a different model family that is often <i>driven</i> by a multimodal embedding such as CLIP's." For voice agents this is the same idea with audio as the extra modality.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: the encoder/decoder Transformer reused here.</li><li><a href="ch03_looking_inside_llms.html">Ch.3</a>: how an LLM consumes a sequence of embeddings, which is exactly where image vectors get injected later (plate 13).</li><li><a href="../ai_engineering/ch01_building_ai_applications.html">AI Engineering Ch.1</a>: foundation models as multimodal models.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · TRANSFORMERS FOR VISION</div><h2>The Vision Transformer (ViT): a Transformer that reads pictures</h2></div><span class="chip">pdf p282–283 · Fig 9-2, 9-3</span></div>
+  <p>Throughout the book, Transformer-based models have done well on many language tasks: classification, clustering, search and generation. So it is not surprising that researchers tried to carry that success over to <b>computer vision</b> (getting computers to understand images).</p>
+  <p>Their method is the <b>Vision Transformer (ViT)</b>. It has been shown to do tremendously well on <b>image recognition</b> compared with the previous default, <b>convolutional neural networks (CNNs)</b> (footnote 2: Alexey Dosovitskiy et al., "An image is worth 16x16 words: Transformers for image recognition at scale", 2020). Like the original Transformer, ViT turns <b>unstructured data</b> (here an image) into <b>representations</b> (numbers) that can be used for tasks such as classification.</p>
+  <figure class="bookfig"><img src="figs/fig-9-2.png" alt="Top: spam email text goes into a Transformer and gets 78% spam, 32% not spam. Bottom: a cat image goes into a Vision Transformer and gets 98% cat, 2% dog" loading="lazy"><figcaption>Figure 9-2 (book, pdf p283): Both the original Transformer as well as the Vision Transformer take unstructured data, convert it to numerical representations, and finally use that for tasks like classification.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two parallel rows, read left to right: <b>Input features → model → output prediction</b>. Top row: a text "You have been selected to receive 1.4 million dollars!" goes through a normal Transformer and comes out as a spam score (78% spam, 32% not spam). Bottom row: a cat picture goes through a <b>Vision Transformer (ViT)</b> and comes out as 98% cat, 2% dog. The point is symmetry: same kind of box, same kind of output, only the input type differs. (The book's spam numbers add up to 110%; they are just illustrative, not real probabilities.)</p>
+  <p>ViT relies on one important part of the Transformer: the <b>encoder</b>. As Chapter 1 showed, the encoder turns textual input into numerical representations before they go to the decoder. But before the encoder can do anything, the text has to be <b>tokenized</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-9-3.png" alt="The sentence 'What a horrible movie!' split into tokens [CLS] what a horrible movie ! [SEP], each fed into an encoder" loading="lazy"><figcaption>Figure 9-3 (book, pdf p283): Text is passed to one or multiple encoders by first tokenizing it using a tokenizer.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The textual input "What a horrible movie!" is split into tokens: <code>[CLS]</code>, <code>what</code>, <code>a</code>, <code>horrible</code>, <code>movie</code>, <code>!</code>, <code>[SEP]</code>. The blue ones are <b>special tokens</b>: <code>[CLS]</code> (classification token, its output is often used to represent the whole input) and <code>[SEP]</code> (separator, marks the end). Each token goes down into the encoder, and one vector comes out per token (the arrows at the bottom). Keep this picture in mind: ViT will copy it exactly, but with image pieces instead of words.</p>
+  <div class="box work"><b>Worked example · text path vs image path (step-through)</b>
+    <div class="stepbar"><button id="w2_prev" type="button">◀ Back</button><button id="w2_next" type="button">Next ▶</button><span id="w2_n"></span></div>
+    <div id="w2_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w2_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A sorting clerk at a post office who only knows how to read <i>envelopes</i> (text). ViT is the trick of putting every parcel (image) into an envelope with a label, so the same clerk can sort parcels too, without retraining the clerk's whole method. <i>Where it breaks:</i> the "label" for an image piece is not a word from a dictionary; it is computed fresh for every patch (plate 4).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>CNNs bake in assumptions about images (nearby pixels matter most, slide the same filter everywhere). The Transformer's encoder has none of those built in: it uses <b>attention</b> so every piece can look at every other piece. All it needs is a <b>sequence of vectors</b>. If you can turn an image into a sequence of vectors, the same machinery works. That is the whole ViT idea, and the next two plates show how.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How does a Transformer process images?"</i> Say: "The Vision Transformer cuts the image into fixed-size patches, flattens each patch and linearly projects it into an embedding, adds a class token, and feeds the sequence to a standard Transformer encoder. After that point it is treated exactly like a sequence of text tokens. It beat CNNs on image recognition, which is why it became the default image encoder in CLIP and in vision-language models."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: encoder-only models (BERT) and the [CLS] token.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: tokenizers and special tokens.</li><li><a href="ch04_text_classification.html">Ch.4</a>: classification with representation models (the spam example is the same task).</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · TOKENIZING AN IMAGE</div><h2>Images have no words, so cut them into patches</h2></div><span class="chip">pdf p283–284 · Fig 9-4</span></div>
+  <p>An image is not made of words, so the text tokenization process cannot be used on it. Instead, the ViT authors invented a way to <b>"tokenize" images into "words"</b>, which let them reuse the original encoder unchanged.</p>
+  <p>Imagine a picture of a cat. It is made of pixels, say <b>512 × 512 pixels</b>. One single pixel tells you almost nothing. But when you group <b>patches</b> of pixels together, you slowly start to see more: an ear, an eye, a paw.</p>
+  <p>ViT uses exactly that idea. Instead of splitting text into tokens, it <b>splits the image into patches</b> (smaller sub-images): it cuts the picture into pieces horizontally and vertically.</p>
+  <figure class="bookfig"><img src="figs/fig-9-4.png" alt="Original cat image, then the same image cut into a 3 by 3 grid of patches, then those 9 patches laid in one row as the flattened input" loading="lazy"><figcaption>Figure 9-4 (book, pdf p284): The "tokenization" process for image input. It converts an image into patches of subimages.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three stages, left to right. <b>Original image</b>: the whole cat. <b>Patched image</b>: the same cat cut into a 3 × 3 grid, nine squares. <b>Flattened input</b>: the nine squares laid out in one row, read like a book (top-left, top-middle, top-right, then the next row…). That row is the image's "sentence", and each square is one "word". Note the first square is empty background: background patches still become tokens.</p>
+  <p>Just as text becomes tokens of text, an image becomes <b>patches of image</b>. The <b>flattened</b> row of patches can be thought of as the tokens of a piece of text.</p>
+  <p>Important size detail: the book's pictures use <b>3 × 3 patches</b> only for illustration. The <b>original ViT used 16 × 16 patches</b> (16 × 16 pixels each). That is where the paper's name comes from: "An Image is Worth 16x16 Words."</p>
+  <div class="box work"><b>Worked example · how many "words" is an image worth?</b>
+    <p>Choose an image size and a patch size. The grid shows the patches; the readout counts the tokens the encoder will see. 512 × 512 is the book's cat; 224 × 224 is the size CLIP and BLIP-2 resize to later (plates 8 and 15).</p>
+    <div class="controls">
+      <label for="p3img">Image side (px) <select id="p3img"><option>224</option><option selected>512</option><option>48</option><option>384</option></select></label>
+      <label for="p3patch">Patch side (px) <select id="p3patch"><option>16</option><option>32</option><option>14</option><option value="170.67">512/3 (book's 3×3 drawing)</option></select></label>
+    </div>
+    <div class="two"><div id="p3grid" class="patchgrid" aria-label="patch grid"></div><div class="readout" id="p3out" style="display:grid;gap:4px;align-content:start"></div></div>
+    <p class="note">Arithmetic from the book's own numbers. The "+1" is the [CLASS] token drawn in Figure 9-5. Pixel values per patch = side × side × 3 colour channels (RGB). The model name in plate 8, <code>clip-vit-base-patch32</code>, means 32 × 32 patches.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A jigsaw puzzle of a Taj Mahal poster. One tiny jigsaw piece is meaningless alone, but lay all 9 (or 196) pieces in order and the picture is there. ViT reads the pieces in a fixed order, like reading a train's coaches from engine to guard van. <i>Where it breaks:</i> jigsaw pieces have unique shapes that tell you where they go; ViT patches are all square, so their position must be <i>told</i> to the model (Beyond the book: ViT adds a learned position embedding to each patch).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Patches trade detail for length. Attention cost grows with the square of the sequence length. Making each pixel a token would give 512 × 512 = 262,144 tokens, far too many. 16 × 16 patches on a 224 × 224 image give only 196 tokens, a normal sentence length. Bigger patches mean fewer tokens (cheaper) but coarser detail.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"Why patches and not pixels?"</i> Say: "Self-attention is quadratic in sequence length. A pixel-level sequence would be hundreds of thousands of tokens. Patching a 224 × 224 image into 16 × 16 patches gives 196 tokens, which is cheap, and each patch carries local structure that a single pixel can't." Image tokens also count toward context and cost in vision LLM APIs, the same way text tokens do.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: how text tokenizers pick a vocabulary.</li><li>Plate 4: what happens to each patch next.</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a>: why sequence length drives inference cost.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · PATCH EMBEDDINGS</div><h2>No vocabulary for patches: embed them with a linear projection</h2></div><span class="chip">pdf p284–285 · Fig 9-5</span></div>
+  <p>Here is a key difference from text. A text tokenizer gives each token an <b>ID</b> from a fixed vocabulary (in CLIP's tokenizer, plate 8, "puppy" is always 6829). You cannot do that for patches: a given patch of pixels will <b>rarely appear in any other image</b>, so there is no reusable "vocabulary" of patches.</p>
+  <p>Instead, the patches are <b>linearly embedded</b>: each patch's pixel values are multiplied by a learned weight matrix (a <b>linear projection</b>) to produce a vector, a <b>patch embedding</b>. These embeddings are the input of the Transformer. That way, image patches are treated the same way as tokens.</p>
+  <figure class="bookfig"><img src="figs/fig-9-5.png" alt="Cat image patched into 3 by 3, flattened into 9 patches, passed through a linear projection into patch embeddings plus a [CLASS] embedding, then into an encoder" loading="lazy"><figcaption>Figure 9-5 (book, pdf p285): The main algorithm behind ViT. After patching the images and linearly projecting them, the patch embeddings are passed to the encoder and treated as if they were textual tokens.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Top: original image → patched image (3 × 3). The arrow on the right brings the patches down into the <b>flattened input</b> row (9 squares). Each square goes through the pink <b>Linear projection</b> bar and comes out as a green square, its <b>patch embedding</b>. At the far left of the embedding row there is an extra one labelled <b>[CLASS]</b>, a special learnable token with no patch behind it, just like <code>[CLS]</code> in Figure 9-3. Then all 10 vectors enter the <b>ENCODER</b>, and one vector comes out per position. Compare it with Figure 9-3: the bottom half is identical. Only the top (how you get the vectors) changed.</p>
+  <p>What makes this so interesting: the moment the embeddings enter the encoder, they are <b>treated as if they were textual tokens</b>. From that point on, there is <b>no difference</b> in how text or images are trained.</p>
+  <p>Because of this similarity, ViT is often used to <b>make all kinds of language models multimodal</b>. One of the most straightforward ways is during the training of <b>embedding models</b>, which is the next section.</p>
+  <div class="box work"><b>Worked example · one patch through the projection (modelled)</b>
+    <p>A tiny 2 × 2 grey-scale "patch" (4 pixel values) is multiplied by a 4 × 3 weight matrix to get a 3-number embedding. Drag the pixel brightness and watch the embedding change. Real ViT does the same with 16 × 16 × 3 = 768 numbers in and (for ViT-Base, Beyond the book) 768 numbers out.</p>
+    <div class="controls" id="p4ctl"></div>
+    <div class="formula" id="p4out"></div>
+    <p class="note">Weights are invented (modelled). In a real model they are learned during training, and the same matrix is used for every patch.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A UPI QR code at a kirana shop. Every shop's QR is different, so there is no "dictionary" of QR codes, but your phone runs the same scanning rule on any QR and turns it into a usable payment ID. The linear projection is that one scanning rule applied to every patch. <i>Where it breaks:</i> a QR decodes to an exact, discrete ID; a patch becomes a continuous vector, where similar-looking patches get similar vectors.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Text embedding = <b>look up</b> a row in a table by token ID. Patch embedding = <b>compute</b> a vector from the pixels with one matrix multiply. Both produce a sequence of same-sized vectors, which is all the encoder ever sees. That shared interface is why "after the encoder there is no difference".</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"Why can't images use a vocabulary like text?"</i> Say: "Text has a finite set of recurring tokens, so you can store one learned vector per ID. Image patches are continuous and almost never repeat exactly, so ViT computes the embedding with a learned linear projection of the raw pixels instead of a lookup table."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: token embeddings as a lookup table.</li><li>Plate 7: the ViT becomes CLIP's image encoder.</li><li>Plate 11: a frozen ViT is BLIP-2's eyes.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · MULTIMODAL EMBEDDING MODELS</div><h2>One vector space for both words and pictures</h2></div><span class="chip">pdf p285–286 · Fig 9-6, 9-7</span></div>
+  <p>In earlier chapters, <b>embedding models</b> captured the meaning (semantic content) of text such as papers and documents. Those embeddings let us find similar documents, classify text, and even do topic modeling.</p>
+  <p>Embeddings are often an important driver behind LLM applications. They are an efficient way to capture large-scale information and to search for the <b>"needle in the haystack"</b>.</p>
+  <p>Until now we only used <b>text-only</b> embedding models. Embedding models that embed <b>only images</b> also exist. But this chapter looks at models that capture <b>both</b> textual and visual representations.</p>
+  <figure class="bookfig"><img src="figs/fig-9-6.png" alt="A sentence 'This is a cat' and a cat image both go into one multimodal embedding model, which outputs a sentence embedding and an image embedding of the same size" loading="lazy"><figcaption>Figure 9-6 (book, pdf p286): Multimodal embedding models can create embeddings for multiple modalities in the same vector space.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two inputs enter one box: the sentence "This is a cat" (blue label) and a cat image (purple label). Out come two embeddings drawn as the <b>same three-cell strip</b>: a sentence embedding and an image embedding. The equal size is the point: both vectors have the same length and live in the same space, so you can compare them directly. The "•••" before each input means "many more sentences / images".</p>
+  <p>The advantage: because the embeddings lie in the <b>same vector space</b>, you can compare representations across modalities. For example, you can <b>find images from input text</b>: which images are closest to "pictures of a puppy"? The reverse also works: which documents best relate to this image (the book phrases it as a question)?</p>
+  <figure class="bookfig"><img src="figs/fig-9-7.png" alt="A 2D grid showing a car photo near the words Car and Road, a puppy photo near Snowing and A puppy, a cat image near My cat is cute and I don't like cats" loading="lazy"><figcaption>Figure 9-7 (book, pdf p286): Despite having coming from different modalities, embeddings with similar meaning will be close to each other in vector space.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The grid is a 2-D cartoon of the vector space. Big circles are <b>image</b> embeddings (a supercar at sunset, a puppy in snow, a pixel cat); small circles are <b>text</b> embeddings. Each image sits in a neighbourhood of related words: the car near "Car" and "Road"; the puppy near "Snowing" and "A puppy"; the cat near "My cat is cute" and "I don't like cats". Notice "I don't like cats" is still near the cat: embeddings capture <i>topic</i>, not opinion. Distance on the grid = difference in meaning.</p>
+  <p>There are several multimodal embedding models, but the best known and (at the time of writing) most used is <b>CLIP: Contrastive Language-Image Pre-training</b>.</p>
+  <div class="box work"><b>Worked example · search across modalities (modelled)</b>
+    <p>Click any point. The page finds its nearest neighbour of the <b>other</b> modality (text → image or image → text), like a text-to-image search. (On this flat toy map "nearest" is plain distance; real systems use cosine similarity on hundreds of dimensions.) Positions are invented 2-D stand-ins laid out like Figure 9-7.</p>
+    <div class="emb2d"><svg id="e5svg" viewBox="0 0 640 300" role="img" aria-label="2-D toy embedding space"></svg></div>
+    <div class="readout" id="e5out"></div>
+    <div class="legend"><span style="--sw:var(--c3)">image embedding</span><span style="--sw:var(--c2)">text embedding</span><span style="--sw:var(--c1)">nearest match</span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding photo album where every photo has the guest's name tag stuck next to it. Whether you start from the name ("Sharma aunty") or from the face, you land on the same page. A shared vector space is one album for words and photos. <i>Where it breaks:</i> the album has exact pages; vector neighbourhoods are fuzzy, so "a dog" and "a puppy" share a page, which is what you want for search but not for exact lookup.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two different encoders (one for text, one for images) are trained so that their outputs land in one coordinate system. Nothing forces this by itself: an untrained text encoder and image encoder would produce vectors in unrelated spaces. The training method on the next plates is what lines them up.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How would you build text-to-image search?"</i> Say: "Use a multimodal embedding model such as CLIP. Embed every image once offline with the image encoder and store vectors in a vector database. At query time, embed the text with the text encoder and do nearest-neighbour search with cosine similarity. Because both encoders share one space, no captions are needed for the images." It is the same pipeline as text RAG, with a different encoder on the document side.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a> and <a href="ch08_semantic_search_and_rag.html">Ch.8</a>: what text embeddings were used for.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: building your own embedding model.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: retrieval, including multimodal retrieval.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · CLIP: CONNECTING TEXT AND IMAGES</div><h2>CLIP: what it is and the four things you can do with it</h2></div><span class="chip">pdf p287</span></div>
+  <p><b>CLIP</b> is an embedding model that computes embeddings for <b>both images and texts</b>. The embeddings lie in the same vector space, so image embeddings can be compared with text embeddings (footnote 3: Alec Radford et al., "Learning transferable visual models from natural language supervision", ICML 2021). That comparison ability makes CLIP and similar models useful for:</p>
+  <div class="grid2">
+    <div class="card"><b>1 · Zero-shot classification</b><span>Compare the image's embedding with the embeddings of descriptions of its possible classes; the most similar class wins. No training on those classes ("zero-shot").</span></div>
+    <div class="card"><b>2 · Clustering</b><span>Cluster images together with a collection of keywords, to find which keywords belong to which groups of images.</span></div>
+    <div class="card"><b>3 · Search</b><span>Across billions of texts or images, quickly find what relates to an input text or image.</span></div>
+    <div class="card"><b>4 · Generation</b><span>Use multimodal embeddings to drive the generation of images, e.g. <b>stable diffusion</b> (footnote 4: Robin Rombach et al., "High-resolution image synthesis with latent diffusion models", CVPR 2022).</span></div>
+  </div>
+  <div class="box work"><b>Worked example · zero-shot classification in three lines of thought</b>
+    <ol class="plain">
+      <li>Write one short description per class: "a photo of a cat", "a photo of a dog", "a photo of a car".</li>
+      <li>Embed the three descriptions with the text encoder and the image with the image encoder.</li>
+      <li>Compute cosine similarity of the image to each description and pick the highest. Using the book's own numbers from Figure 9-14 (plate 8): the puppy image scores 0.33 with "a puppy playing in the snow", 0.15 with "a pixelated image of a cute cat", 0.08 with "a supercar…", so it is classified as the puppy caption.</li>
+    </ol>
+    <p>Want a new class tomorrow ("a photo of an autorickshaw")? Just add a sentence. No retraining.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A railway enquiry clerk who has never seen your parcel's category list, but can read any label you write. You hand over a parcel and three labels; she says which label fits best. That is zero-shot: the labels are made up at query time. <i>Where it breaks:</i> the clerk knows only what she learned from public signboards; CLIP knows only concepts common in its internet training pairs, so niche labels (a specific factory part) score poorly.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>All four uses are the same operation, <b>vector similarity</b>, used differently: classification = similarity to a few label vectors; clustering = groups of nearby vectors; search = nearest neighbours among many vectors; generation = a text vector steering an image generator.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"What is zero-shot classification with CLIP?"</i> Say: "Turn each class into a text prompt, embed the prompts and the image into CLIP's shared space, and pick the class with the highest cosine similarity. New classes only need a new prompt, no labelled data or fine-tuning. Accuracy depends on how well the prompt wording matches what CLIP saw in training."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>: zero-shot classification with text embeddings (same trick, one modality).</li><li><a href="ch05_text_clustering_and_topic_modeling.html">Ch.5</a>: clustering pipeline.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: dense retrieval.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · HOW CAN CLIP GENERATE MULTIMODAL EMBEDDINGS?</div><h2>Training CLIP: pull matching pairs together, push the rest apart</h2></div><span class="chip">pdf p287–290 · Fig 9-8 to 9-11</span></div>
+  <p>The CLIP procedure is quite straightforward. Imagine a dataset with <b>millions of images, each with a caption</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-9-8.png" alt="Three images with captions: a pixelated cute cat, a puppy playing in the snow, a supercar on the road with the sunset in the background" loading="lazy"><figcaption>Figure 9-8 (book, pdf p287): The type of data that is needed to train a multimodal embedding model.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Each column is one training example: an <b>image</b> (purple bracket) and its <b>caption</b> (blue bracket): "A pixelated image of a cute cat", "A puppy playing in the snow", "A supercar on the road with the sunset in the background". Nobody labels classes; the caption <i>is</i> the label. These same three images return in the hands-on part (plate 8).</p>
+  <p>From this dataset CLIP makes two representations for each pair: one for the image and one for its caption. It uses a <b>text encoder</b> for text and an <b>image encoder</b> for images.</p>
+  <figure class="bookfig"><img src="figs/fig-9-9.png" alt="Step 1: the sentence 'This is a cat' goes into a text encoder giving a sentence embedding; the cat image goes into an image encoder (ViT) giving an image embedding" loading="lazy"><figcaption>Figure 9-9 (book, pdf p288): In the first step of training CLIP, both images and text are embedded using an image and text encoder, respectively.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Step ① "Embed input". Top lane: sentence → <b>Text encoder</b> → sentence embedding. Bottom lane: image → <b>Image encoder (ViT)</b> → image embedding. Two separate networks, one per modality. The image encoder is a ViT, which is why plates 2–4 came first.</p>
+  <p>The pair of embeddings is compared with <b>cosine similarity</b>. As Chapter 4 showed, cosine similarity is the cosine of the angle between two vectors: the <b>dot product</b> of the embeddings <b>divided by the product of their lengths</b>.</p>
+  <div class="formula">cos(a, b) = (a · b) / (|a| × |b|)
+  = 1  → same direction (very similar)
+  = 0  → at right angles (unrelated)
+  = −1 → opposite directions</div>
+  <p>When training starts, the similarity between an image embedding and its caption's embedding is <b>low</b>, because the two encoders are not yet optimized to share a vector space. During training we optimize the similarity: <b>maximize</b> it for similar image/caption pairs and <b>minimize</b> it for dissimilar pairs.</p>
+  <figure class="bookfig"><img src="figs/fig-9-10.png" alt="Step 2: the two embeddings are compared; the prediction says 0 dissimilar while the label says 1 similar" loading="lazy"><figcaption>Figure 9-10 (book, pdf p289): In the second step of training CLIP, the similarity between the sentence and image embedding is calculated using cosine similarity.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Step ② "Compare embeddings" is added. On the right are two columns. <b>Prediction</b>: the model currently says "0 Dissimilar" (highlighted green). <b>Label</b>: the truth is "1 Similar" (highlighted green), because this caption really describes this image. The mismatch between the two columns is the error that training will fix.</p>
+  <p>After computing the similarity, the model is <b>updated</b>, and the process starts again with new batches of data and updated representations. This method is called <b>contrastive learning</b>; Chapter 10 goes deep into how it works, when you build your own embedding model.</p>
+  <figure class="bookfig"><img src="figs/fig-9-11.png" alt="Step 3: dashed arrows from the label back to both the text encoder and image encoder, labelled update model" loading="lazy"><figcaption>Figure 9-11 (book, pdf p289): In the third step of training CLIP, the text and image encoders are updated to match what the intended similarity should be. This updates the embeddings such that they are closer in vector space if the inputs are similar.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Step ③ "Update model": dashed arrows run from the label back into <b>both</b> encoders. Both the text encoder and the image encoder change their weights, so next time this pair's embeddings come out closer. Steps ①→②→③ repeat over millions of pairs.</p>
+  <p>Eventually we expect the embedding of a cat image to be similar to the embedding of the phrase "a picture of a cat." To make the representations as accurate as possible, <b>negative examples</b> (images and captions that are <i>not</i> related) must also be included in training (more in Chapter 10). Modeling similarity is not only knowing what makes things similar, but also <b>what makes them different</b>.</p>
+  <div class="box work"><b>Worked example · contrastive training on a batch of 3 (step-through, modelled)</b>
+    <p>A batch holds the three pairs from Figure 9-8. Rows are captions, columns are images. The diagonal cells are the true pairs (positives); off-diagonal cells are negatives. Step through training and watch the diagonal rise and the rest fall.</p>
+    <div class="stepbar"><button id="w7_prev" type="button">◀ Back</button><button id="w7_next" type="button">Next ▶</button><span id="w7_n"></span></div>
+    <div class="tablewrap"><table class="mat" id="w7_mat"></table></div>
+    <div class="caption" id="w7_cap"></div>
+    <p class="note">Scores are modelled. A batch of N pairs gives N positives and N² − N negatives for free, which is why CLIP-style training needs no extra negative labelling (Beyond the book: CLIP's paper trained with very large batches).</p>
+  </div>
+  <div class="box work"><b>Worked example · cosine similarity by hand</b>
+    <p>Two 2-D vectors. Drag the angles; the readout does the book's formula: dot product divided by product of lengths.</p>
+    <div class="controls"><label for="c7a">text angle <input id="c7a" type="range" min="0" max="180" value="20"><output id="c7ao">20°</output></label><label for="c7b">image angle <input id="c7b" type="range" min="0" max="180" value="60"><output id="c7bo">60°</output></label><label for="c7l">image length <input id="c7l" type="range" min="1" max="3" step="0.1" value="2"><output id="c7lo">2</output></label></div>
+    <svg id="c7svg" viewBox="0 0 320 180" class="dg" style="width:100%;max-width:420px;height:auto" role="img" aria-label="two vectors and the angle between them"></svg>
+    <div class="formula" id="c7out"></div>
+    <p class="note">Change only the length: cosine stays the same. That is why cosine compares direction (meaning), not size.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A school sports day "find your partner" game. Each child holds a photo or a caption card. The teacher (training) keeps nudging the right pairs to stand together and wrong pairs to step apart. After many rounds, every photo-holder stands next to its caption-holder. <i>Where it breaks:</i> children move in a playground; embeddings move in a space with hundreds of dimensions (512 for the CLIP model in plate 8), and it is the encoders, not the points, that are changed.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Without negatives, the easiest way to make every pair "similar" is to map everything to the same point (collapse). Negatives force the model to keep different things apart, so the space keeps meaning. Within one batch, every non-matching caption is a free negative for each image, so the model learns both "this goes with that" and "this does not go with those".</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"Explain contrastive learning in CLIP."</i> Say: "Take a batch of image–caption pairs. Encode images with a ViT and captions with a text encoder, compute all pairwise cosine similarities, and train both encoders so the true pairs score high and all mismatched pairs score low. The negatives come free from the other items in the batch. The result is a shared space where text and image of the same thing are close."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>: cosine similarity introduced.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: contrastive learning and negatives in depth.</li><li>Plate 12: BLIP-2 reuses image-text contrastive learning as one of its three tasks.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · OPENCLIP</div><h2>Hands-on: embed a puppy photo and its caption, then compare</h2></div><span class="chip">pdf p290–294 · Fig 9-12, 9-13, 9-14</span></div>
+  <p>The examples use models from <b>OpenCLIP</b>, the open source variant of CLIP. Using OpenCLIP, or any CLIP model, boils down to two things: <b>processing the text and image inputs</b> before passing them to the main model.</p>
+  <h3>The input: a puppy and a caption</h3>
+  <p>The example image is one seen before (Figure 9-7, 9-8): an <b>AI-generated image</b> (made with stable diffusion) of a puppy playing in the snow.</p>
+  <pre class="code"><code>from urllib.request import urlopen
+from PIL import Image
+
+# Load an AI-generated image of a puppy playing in the snow
+puppy_path = "https://raw.githubusercontent.com/HandsOnLLM/Hands-On-Large-Language-Models/main/chapter09/images/puppy.png"
+image = Image.open(urlopen(puppy_path)).convert("RGB")
+
+caption = "a puppy playing in the snow"</code></pre>
+  <p class="note"><code>urlopen</code> downloads the file; <code>PIL.Image.open</code> reads it; <code>.convert("RGB")</code> makes sure it has exactly three colour channels (a PNG can have a fourth, transparency channel, which the model does not expect).</p>
+  <figure class="bookfig"><img src="figs/fig-9-12.png" alt="AI-generated photo of a black and tan puppy with snow on its head sitting in snow, trees and a bench behind" loading="lazy"><figcaption>Figure 9-12 (book, pdf p290): An AI-generated image of a puppy playing in the snow.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Just the raw input: a square, colourful, 512 × 512 image (the book gives its size on the next page). Keep its look in mind; Figure 9-13 shows what the model actually receives after preprocessing.</p>
+  <h3>Three components to load</h3>
+  <p>Since we have a caption for this image, OpenCLIP can embed both. We load three things:</p>
+  <ul class="plain">
+    <li>A <b>tokenizer</b> to tokenize the text input.</li>
+    <li>A <b>preprocessor</b> (processor) to preprocess and resize the image.</li>
+    <li>The <b>main model</b> that turns those outputs into embeddings.</li>
+  </ul>
+  <pre class="code"><code>from transformers import CLIPTokenizerFast, CLIPProcessor, CLIPModel
+
+model_id = "openai/clip-vit-base-patch32"
+
+# Load a tokenizer to preprocess the text
+clip_tokenizer = CLIPTokenizerFast.from_pretrained(model_id)
+
+# Load a processor to preprocess the images
+clip_processor = CLIPProcessor.from_pretrained(model_id)
+
+# Main model for generating text and image embeddings
+model = CLIPModel.from_pretrained(model_id)</code></pre>
+  <p class="note">The model id reads as: OpenAI's CLIP, image encoder = ViT, "base" size, 32 × 32-pixel patches. All three objects come from the Hugging Face <code>transformers</code> library and are downloaded by the same id so they match each other.</p>
+  <h3>Text side: tokens</h3>
+  <pre class="code"><code># Tokenize our input
+inputs = clip_tokenizer(caption, return_tensors="pt")
+inputs
+# {'input_ids': tensor([[49406, 320, 6829, 1629, 530, 518, 2583, 49407]]),
+#  'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1]])}
+
+# Convert our input back to tokens
+clip_tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+# ['&lt;|startoftext|&gt;', 'a&lt;/w&gt;', 'puppy&lt;/w&gt;', 'playing&lt;/w&gt;',
+#  'in&lt;/w&gt;', 'the&lt;/w&gt;', 'snow&lt;/w&gt;', '&lt;|endoftext|&gt;']</code></pre>
+  <div class="tokrow" aria-label="CLIP tokens"><span class="cls">&lt;|startoftext|&gt; 49406</span><span>a&lt;/w&gt; 320</span><span>puppy&lt;/w&gt; 6829</span><span>playing&lt;/w&gt; 1629</span><span>in&lt;/w&gt; 530</span><span>the&lt;/w&gt; 518</span><span>snow&lt;/w&gt; 2583</span><span class="cls">&lt;|endoftext|&gt; 49407</span></div>
+  <p><code>return_tensors="pt"</code> asks for PyTorch tensors. The output is a dictionary with <b>input_ids</b> (the token IDs) and an <b>attention_mask</b> (all 1s: every token is real, none is padding). <code>convert_ids_to_tokens</code> turns the IDs back into readable tokens.</p>
+  <p>What to notice:</p>
+  <ul class="plain">
+    <li>As usual, the text is split into tokens (here, one per word; <code>&lt;/w&gt;</code> marks "end of word").</li>
+    <li>The <b>start and end</b> of the text are marked (<code>&lt;|startoftext|&gt;</code>, <code>&lt;|endoftext|&gt;</code>) to separate it from a potential image embedding.</li>
+    <li>The <code>[CLS]</code> token is <b>missing</b>. In CLIP, the [CLS] token is actually used to represent the <b>image embedding</b>.</li>
+  </ul>
+  <pre class="code"><code># Create a text embedding
+text_embedding = model.get_text_features(**inputs)
+text_embedding.shape      # torch.Size([1, 512])</code></pre>
+  <p><code>**inputs</code> unpacks the dictionary into keyword arguments (<code>input_ids=…, attention_mask=…</code>). The result is <b>one embedding of 512 values</b> for this single string (shape [1, 512]: batch of 1, 512 numbers).</p>
+  <h3>Image side: preprocessing to 224 × 224</h3>
+  <p>Like the text, the image must be preprocessed first, because the model expects certain characteristics such as <b>size and shape</b>. We use the processor created earlier:</p>
+  <pre class="code"><code># Preprocess image
+processed_image = clip_processor(
+    text=None, images=image, return_tensors="pt"
+)["pixel_values"]
+processed_image.shape     # torch.Size([1, 3, 224, 224])</code></pre>
+  <p class="note"><code>text=None</code>: the CLIP processor can handle text and images together; here we pass only the image. <code>["pixel_values"]</code> picks the image tensor out of the returned dictionary.</p>
+  <p>The original image was <b>512 × 512</b> pixels. Preprocessing reduced it to <b>224 × 224</b>, the size the model expects. The shape reads: 1 image, 3 colour channels (red, green, blue), 224 rows, 224 columns. The book then visualizes the result:</p>
+  <pre class="code"><code>import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Prepare image for visualization
+img = processed_image.squeeze(0)
+img = img.permute(*torch.arange(img.ndim - 1, -1, -1))
+img = np.einsum("ijk-&gt;jik", img)
+
+# Visualize preprocessed image
+plt.imshow(img)
+plt.axis("off")</code></pre>
+  <p class="note"><code>squeeze(0)</code> drops the batch dimension → [3, 224, 224]. <code>permute(2, 1, 0)</code> reverses the axes → [224 (width), 224 (height), 3]. <code>einsum("ijk-&gt;jik")</code> swaps the first two axes back → [height, width, 3], the layout matplotlib's <code>imshow</code> wants (channels last).</p>
+  <figure class="bookfig"><img src="figs/fig-9-13.png" alt="The puppy image after CLIP preprocessing: strong contrast, washed-out whites and very dark shadows" loading="lazy"><figcaption>Figure 9-13 (book, pdf p293): The preprocessed input image by CLIP.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Same puppy, but now 224 × 224 and with strange colours: the snow is blown-out white and the shadows are very dark. This is what the model "sees". The book only says it is the preprocessed image. <i>Beyond the book:</i> the odd colours come from <b>normalization</b>: CLIP's processor subtracts a per-channel mean and divides by a standard deviation, so pixel values are no longer in the 0–1 range that <code>imshow</code> expects; matplotlib clips them, which looks like extreme contrast. The content (puppy, snow, bench) is all still there.</p>
+  <pre class="code"><code># Create the image embedding
+image_embedding = model.get_image_features(processed_image)
+image_embedding.shape     # torch.Size([1, 512])</code></pre>
+  <p>The image embedding has the <b>same shape</b> as the text embedding: 512 values. This matters: it is what allows comparing them.</p>
+  <h3>Comparing: normalize, then dot product</h3>
+  <pre class="code"><code># Normalize the embeddings
+text_embedding /= text_embedding.norm(dim=-1, keepdim=True)
+image_embedding /= image_embedding.norm(dim=-1, keepdim=True)
+
+# Calculate their similarity
+text_embedding = text_embedding.detach().cpu().numpy()
+image_embedding = image_embedding.detach().cpu().numpy()
+score = np.dot(text_embedding, image_embedding.T)
+score     # array([[0.33149648]], dtype=float32)</code></pre>
+  <ul class="plain">
+    <li><code>.norm(dim=-1, keepdim=True)</code> is each vector's length; dividing by it makes the vector length 1 (<b>normalizing</b>).</li>
+    <li>For length-1 vectors, the <b>dot product equals the cosine similarity</b> (the "divide by lengths" step is already done).</li>
+    <li><code>.detach().cpu().numpy()</code>: stop tracking gradients, move to CPU memory, convert to a NumPy array so <code>np.dot</code> can use it. <code>.T</code> transposes [1, 512] to [512, 1] so the result is a 1 × 1 matrix.</li>
+  </ul>
+  <p>The score is <b>0.33</b>. On its own that is hard to interpret: we don't know what the model considers low or high. So the book extends the example to <b>three images and three captions</b>:</p>
+  <figure class="bookfig"><img src="figs/fig-9-14.png" alt="3 by 3 similarity matrix: rows are captions, columns are puppy, cat, car images; diagonal values 0.33, 0.35, 0.31 are highest" loading="lazy"><figcaption>Figure 9-14 (book, pdf p294): The similarity matrix between three images and three captions.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Columns are images (puppy, pixel cat, supercar). Rows are captions. Each cell is the cosine similarity of that caption with that image. The yellow diagonal (0.33, 0.35, 0.31) holds the correct pairs, and in every row and every column the diagonal is the biggest number. The off-diagonal cells range from 0.08 to 0.19. So 0.33 <b>is</b> high: CLIP's similarity scores live in a narrow band, and you should read them <b>relatively</b> (compare against alternatives), not as absolute percentages.</p>
+  <div class="box work"><b>Worked example · use Figure 9-14 as a zero-shot classifier (book's numbers)</b>
+    <p>Click a cell, or choose a direction. Green borders mark the best match. "Image → caption" is image captioning by retrieval; "caption → image" is text-to-image search.</p>
+    <div class="controls"><span class="seg"><button id="m8dir1" type="button" class="on">image → best caption</button><button id="m8dir2" type="button">caption → best image</button></span></div>
+    <div class="tablewrap"><table class="mat" id="m8mat"></table></div>
+    <div class="caption" id="m8cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Exam marks out of a strict examiner who never gives above 40. A 33 looks like a fail, until you see everyone else scored 10–19. Then 33 is topping the class. CLIP's 0.33 is like that. <i>Where it breaks:</i> an examiner's scale may shift paper to paper; CLIP's scale is fixed for a given model, so you <i>can</i> tune a threshold once, but only per model.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Training only taught CLIP to rank the true pair above the others; it never asked for the true pair to reach any particular absolute value. So absolute scores cluster in a narrow range and only the <b>ranking</b> is reliable. That's why retrieval (top-k) and classification (argmax) work well, while fixed thresholds need calibration on your own data.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"A CLIP similarity of 0.33: is that good?"</i> Say: "You can't tell in isolation. Contrastive training only enforces ranking, so cosine scores live in a narrow band. Compare against alternatives (other captions or images) or calibrate a threshold on labelled data. In the book's 3 × 3 example the true pairs score 0.31–0.35 and the wrong ones 0.08–0.19." Same lesson as setting a relevance cutoff in a RAG retriever.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: tokenizers compared (CLIP's <code>&lt;/w&gt;</code> style vs GPT-2's Ġ style in plate 16).</li><li>Plate 15: BLIP-2's processor also resizes to 224 × 224.</li><li><a href="../llm_engineers_handbook/ch04_rag_feature_pipeline.html">LLM Engineer's Handbook Ch.4</a>: embedding documents for a RAG feature pipeline.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · USING SENTENCE-TRANSFORMERS TO LOAD CLIP</div><h2>The shortcut: CLIP in a few lines</h2></div><span class="chip">pdf p294</span></div>
+  <p>The <b>sentence-transformers</b> library implements a few CLIP-based models that make creating embeddings much easier. It takes only a few lines:</p>
+  <pre class="code"><code>from sentence_transformers import SentenceTransformer, util
+
+# Load SBERT-compatible CLIP model
+model = SentenceTransformer("clip-ViT-B-32")
+
+# Encode the images
+image_embeddings = model.encode(images)
+
+# Encode the captions
+text_embeddings = model.encode(captions)
+
+#Compute cosine similarities
+sim_matrix = util.cos_sim(
+    image_embeddings, text_embeddings
+)</code></pre>
+  <ul class="plain">
+    <li><code>"clip-ViT-B-32"</code>: the same family as before (ViT-Base, 32-pixel patches), packaged to be <b>SBERT-compatible</b> (SBERT = Sentence-BERT, the sentence-transformers model format).</li>
+    <li><code>model.encode(...)</code> does all the work of plate 8 in one call: the same <code>encode</code> method takes a list of PIL images <i>or</i> a list of strings, and handles tokenizing, resizing and the forward pass. Here <code>images</code> and <code>captions</code> are the lists of three images and three captions behind Figure 9-14 (the book does not print their definition).</li>
+    <li><code>util.cos_sim(a, b)</code> returns the full matrix of cosine similarities, every image against every caption, so no manual normalizing is needed. The result is the kind of matrix shown in Figure 9-14.</li>
+  </ul>
+  <div class="box work"><b>Worked example · the two paths side by side</b>
+    <div class="tablewrap"><table>
+      <tr><th>Step</th><th>transformers (plate 8)</th><th>sentence-transformers</th></tr>
+      <tr><td>Load</td><td>tokenizer + processor + model (3 objects)</td><td><code>SentenceTransformer("clip-ViT-B-32")</code> (1 object)</td></tr>
+      <tr><td>Text → vector</td><td><code>clip_tokenizer</code> then <code>get_text_features</code></td><td><code>model.encode(captions)</code></td></tr>
+      <tr><td>Image → vector</td><td><code>clip_processor</code> then <code>get_image_features</code></td><td><code>model.encode(images)</code></td></tr>
+      <tr><td>Compare</td><td>normalize by <code>.norm</code>, then <code>np.dot</code></td><td><code>util.cos_sim</code></td></tr>
+      <tr><td>Good for</td><td>seeing every step, custom control</td><td>production code, batching many inputs</td></tr>
+    </table></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Making chai from scratch (boil water, add leaves, ginger, milk, sugar, strain) versus a chai premix sachet. Same cup, fewer steps. <i>Where it breaks:</i> with the premix you can't easily change one step (a different resize or tokenizer setting); for that you go back to the from-scratch path.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The wrapper detects whether each input is an image or a string and routes it to the right encoder of the same CLIP model. Both outputs land in the same space, so one call to <code>cos_sim</code> compares across modalities.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How would you quickly prototype image search over a product catalogue?"</i> Say: "Load a CLIP model through sentence-transformers, call <code>encode</code> on all product images in batches, store the vectors in a vector database, and at query time <code>encode</code> the user's text and run cosine top-k. Swap to the lower-level transformers API only if you need custom preprocessing."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_text_classification.html">Ch.4</a>, <a href="ch08_semantic_search_and_rag.html">Ch.8</a>: sentence-transformers for text embeddings.</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a>: training models in this same library.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · MAKING TEXT GENERATION MODELS MULTIMODAL</div><h2>Giving a chat model eyes</h2></div><span class="chip">pdf p295 · Fig 9-15</span></div>
+  <p>Traditionally, text generation models interpret <b>textual</b> representations. Models like <b>Llama 2</b> and <b>ChatGPT</b> are excellent at reasoning about text and answering in natural language. But they are limited to the modality they were trained on: text. As with multimodal embedding models, adding <b>vision</b> can extend what a model can do.</p>
+  <p>For a text generation model, we want it to <b>reason about input images</b>. For example: give it a picture of a <b>pizza</b> and ask what ingredients it has. Show it the <b>Eiffel Tower</b> and ask when it was built or where it is. This conversational ability is shown below.</p>
+  <figure class="bookfig"><img src="figs/fig-9-15.png" alt="Chat: image of a supercar; user asks to write down what you see; bot says a sports car driving on the road at sunset; user asks what it would take to drive such a car; bot says a lot of money and time" loading="lazy"><figcaption>Figure 9-15 (book, pdf p295): An example of a multimodal text generation model (BLIP-2) that can reason about input images.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A chat. At the top is the image (an orange supercar at sunset). User: "Write down what you see in this picture." BLIP-2 (robot): "A sports car driving on the road at sunset". User: "What would it take to drive such a car?" BLIP-2: "A lot of money and time". The second question is <b>not</b> answerable from pixels alone: the model combines what it sees with world knowledge from the LLM. <i>Note:</i> the figure's follow-up question and answer differ from the code run in plate 18 (there the question is "What would it cost me to drive that car?" and the answer is "$1,000,000"). The figure is an illustration; the code output is the actual run.</p>
+  <p>To bridge the two domains, people have tried to add a form of multimodality to <b>existing</b> models. One such method is <b>BLIP-2: Bootstrapping Language-Image Pre-training for Unified Vision-Language Understanding and Generation 2</b>. BLIP-2 is an easy-to-use, <b>modular</b> technique for adding vision to existing language models.</p>
+  <div class="box work"><b>Worked example · what each kind of model can answer</b>
+    <div class="tablewrap"><table>
+      <tr><th>Question about a pizza photo</th><th>Text LLM</th><th>CLIP</th><th>BLIP-2</th></tr>
+      <tr><td>"Which of these 5 labels fits best?"</td><td>✗ can't see</td><td>✓ similarity ranking</td><td>✓ (by generating)</td></tr>
+      <tr><td>"Describe this picture."</td><td>✗</td><td>✗ (only scores, no text out)</td><td>✓ caption</td></tr>
+      <tr><td>"What ingredients are on it?"</td><td>✗</td><td>✗</td><td>✓ visual question answering</td></tr>
+      <tr><td>"How much would this cost in Mumbai?"</td><td>✗</td><td>✗</td><td>~ guesses using LLM knowledge (like the "$1,000,000" answer)</td></tr>
+    </table></div>
+    <p class="note">Rows follow the uses the chapter shows; the pizza/Mumbai wording is our own example.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A brilliant blind professor (the LLM) and a sharp-eyed assistant (the image encoder) who speak different languages. BLIP-2 hires an interpreter who turns what the assistant sees into sentences the professor understands. <i>Where it breaks:</i> the interpreter does not use words; it passes the professor special vectors (soft prompts) that no human could read.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>CLIP aligns images and text for <b>comparison</b>; it has no decoder, so it can't write. A generative LLM can write, but only reads token embeddings. Making a text generator multimodal means getting image information <b>into the LLM's input embeddings</b>. BLIP-2's answer is to do that without changing the LLM at all.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"What's the difference between CLIP and a vision-language model like BLIP-2 or LLaVA?"</i> Say: "CLIP is an embedding model: two encoders, one shared space, output is vectors for retrieval or zero-shot classification. A vision-language model feeds image features into a generative LLM so it can caption images and answer questions in free text. VLMs usually reuse a CLIP-like image encoder as their eyes."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>, <a href="ch07_advanced_text_generation.html">Ch.7</a>: the text generation models being extended.</li><li>Plates 11–13: how BLIP-2 is built.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · BLIP-2: BRIDGING THE MODALITY GAP</div><h2>Don't train from scratch: freeze two experts, train a small bridge</h2></div><span class="chip">pdf p295–296 · Fig 9-16</span></div>
+  <p>Building a multimodal language model <b>from scratch</b> needs huge compute and data: <b>billions</b> of images, texts and image-text pairs. That is not easily feasible.</p>
+  <p>Instead, BLIP-2 bridges the vision-language gap by building a bridge called the <b>Querying Transformer (Q-Former)</b>, which connects a <b>pretrained image encoder</b> and a <b>pretrained LLM</b> (footnote 5: Junnan Li et al., "BLIP-2: Bootstrapping language-image pretraining with frozen image encoders and large language models", ICML 2023).</p>
+  <p>Because it reuses pretrained models, BLIP-2 only needs to <b>train the bridge</b>. The image encoder and the LLM are not trained from scratch (they stay <b>frozen</b>: their weights don't change). It makes good use of technology and models that already exist.</p>
+  <figure class="bookfig"><img src="figs/fig-9-16.png" alt="Pretrained Vision Transformer (snowflake, frozen) connects to trainable Q-Former (flame) which connects to pretrained Large language model (snowflake)" loading="lazy"><figcaption>Figure 9-16 (book, pdf p296): The Querying Transformer is the bridge between vision (ViT) and text (LLM) that is the only trainable component of the pipeline.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three boxes in a line. The <b>snowflake</b> ❄ icon means frozen / pretrained (on the Vision Transformer and the LLM); the icebergs under them hint at how big they are. The <b>flame</b> 🔥 icon means trainable: only the Q-Former in the middle. Data flows left to right: image → ViT → Q-Former → LLM.</p>
+  <p>To connect the two pretrained models, the Q-Former <b>mimics their architectures</b>. It has two modules that <b>share their attention layers</b>:</p>
+  <ul class="plain">
+    <li>An <b>Image Transformer</b> that interacts with the frozen Vision Transformer for <b>feature extraction</b>.</li>
+    <li>A <b>Text Transformer</b> that can interact with the LLM.</li>
+  </ul>
+  <p>The Q-Former is trained in <b>two stages</b>, one for each modality (next two plates).</p>
+  <div class="box work"><b>Worked example · freeze or train? (parameter counter)</b>
+    <p>Click a block to toggle it between frozen ❄ and trainable 🔥. The bar shows what share of all weights you must train. BLIP-2's choice is "only the Q-Former".</p>
+    <div class="frz" id="f11"></div>
+    <div class="bar" aria-hidden="true"><i id="f11bar"></i></div>
+    <div class="readout" id="f11out"></div>
+    <p class="note">Beyond the book, approximate sizes: the BLIP-2 paper reports a Q-Former of about 188M parameters; the model used in plate 14 pairs it with OPT-2.7B (≈2.7B) and a ViT-g image encoder (≈1B). Treat these as rough, for the proportion only.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Connecting a new metro line to an old railway station. You don't rebuild the station or the metro; you build one foot-over-bridge between them. Cheap, quick, and both systems keep running as before. <i>Where it breaks:</i> a foot bridge just carries people as they are; the Q-Former must also <i>translate</i> what crosses it into a form the other side understands.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Freezing means no gradients for the big models: much less GPU memory (no optimizer state for billions of weights), much less data needed, and no risk of damaging what the LLM already knows (forgetting its language skills). The price: the frozen parts can't adapt, so the small bridge must do all the aligning.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How would you add vision to an existing LLM on a budget?"</i> Say: "Keep a pretrained image encoder and the LLM frozen, and train only a small adapter that maps image features into the LLM's input embedding space, as BLIP-2 does with its Q-Former (or LLaVA with a projection). You train a tiny fraction of the weights, need far less paired data, and the LLM keeps its language ability."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: freezing and parameter-efficient fine-tuning.</li><li><a href="../ai_engineering/ch07_finetuning.html">AI Engineering Ch.7</a>: why training fewer parameters saves memory.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · BLIP-2 STEP 1</div><h2>Step 1: teach the Q-Former to represent images and text together</h2></div><span class="chip">pdf p296–298 · Fig 9-17, 9-18</span></div>
+  <figure class="bookfig"><img src="figs/fig-9-17.png" alt="Left dotted box Vision-and-language representation learning: pretrained ViT and trainable Q-Former with inner Vision Transformer and Text Transformer. Right dotted box Vision-to-language generative learning: pretrained LLM" loading="lazy"><figcaption>Figure 9-17 (book, pdf p297): In step 1, representation learning is applied to learn representations for vision and language simultaneously. In step 2, these representations are converted to soft visual prompts to feed the LLM.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Two dotted boxes = two training stages. Left: <b>Vision-and-language, representation learning</b> (step 1). It holds the frozen ViT and the trainable Q-Former, which now shows its two inner modules: a <b>Vision Transformer</b> and a <b>Text Transformer</b> (the "Image Transformer" and "Text Transformer" of plate 11). Right: <b>Vision-to-language, generative learning</b> (step 2), which brings in the frozen LLM. The arrow shows step 1's output feeding step 2.</p>
+  <p>In <b>step 1</b>, <b>image-document pairs</b> are used to train the Q-Former to represent both images and text. These pairs are usually <b>image captions</b>, like the ones used to train CLIP.</p>
+  <p>The images go into the <b>frozen ViT</b> to extract <b>vision embeddings</b>. Those embeddings are the input of the Q-Former's ViT (its image module). The captions are the input of the Q-Former's Text Transformer.</p>
+  <p>With these inputs, the Q-Former is trained on <b>three tasks</b>:</p>
+  <div class="grid2">
+    <div class="card"><b>Image-text contrastive learning</b><span>Align pairs of image and text embeddings so they <b>maximize their mutual information</b> (they tell as much as possible about each other). Same spirit as CLIP: matching pairs close, others apart.</span></div>
+    <div class="card"><b>Image-text matching</b><span>A <b>classification</b> task: predict whether an image and text pair is <b>positive</b> (matched) or <b>negative</b> (unmatched).</span></div>
+    <div class="card"><b>Image-grounded text generation</b><span>Train the model to <b>generate text</b> based on information extracted from the input image.</span></div>
+  </div>
+  <p>The three objectives are <b>jointly optimized</b> to improve the visual representations extracted from the frozen ViT. In a way, we are <b>injecting textual information into the embeddings of the frozen ViT</b> so we can use them in the LLM.</p>
+  <figure class="bookfig"><img src="figs/fig-9-18.png" alt="Input image patches go into a pretrained ViT, then into the Q-Former's Vision Transformer with learnable embeddings; the Text Transformer gets the caption 'A pixelated image of a cute cat'; both feed three tasks: image-text matching, contrastive learning, image-grounded text generation" loading="lazy"><figcaption>Figure 9-18 (book, pdf p298): In step 1, the output of the frozen ViT is used together with its caption and trained on three contrastive-like tasks to learn visual-text representations.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Left to right: the input image (as patches) → the frozen, pretrained ViT (❄) → into the Q-Former (dotted box). Inside, the Q-Former's <b>Vision Transformer</b> (🔥) takes the ViT output plus a row of green <b>learnable embeddings</b> (a small set of trainable vectors, the "queries" that give the Querying Transformer its name). The Q-Former's <b>Text Transformer</b> (🔥) takes the caption "A pixelated image of a cute cat". A shared line connects both modules up to the three task boxes on top: <b>image-text matching</b>, <b>image-text contrastive learning</b> and <b>image-grounded text generation</b>. The green learnable embeddings are what step 2 will hand to the LLM.</p>
+  <div class="box work"><b>Worked example · the three tasks on one batch (step-through)</b>
+    <p>One image (the pixel cat) and three candidate captions. Step through to see what each task asks the Q-Former to do.</p>
+    <div class="stepbar"><button id="w12_prev" type="button">◀ Back</button><button id="w12_next" type="button">Next ▶</button><span id="w12_n"></span></div>
+    <div id="w12_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w12_cap"></div>
+    <p class="note">Scores are modelled to show what each task rewards.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Training a new tour guide at Hampi. Task 1 (contrastive): match each photo to the right description card from a pile. Task 2 (matching): for one photo and one card, say "yes this fits" or "no". Task 3 (generation): look at a photo and describe it in your own words. A guide who passes all three really understands what they see in words. <i>Where it breaks:</i> the guide learns by practice over weeks; the Q-Former learns all three at once from the same batches (joint optimization).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each task pushes in a different direction. Contrastive learning gives a coarse "these belong together" alignment. Matching forces fine-grained checking of one pair. Generation forces the image features to carry enough detail to <i>produce</i> words. Together they shape the learnable embeddings into a summary of the image that is already "text-flavoured", which makes step 2 much easier.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"What does the Q-Former learn in stage 1?"</i> Say: "With the image encoder frozen, a set of learnable query embeddings attends to the image features, and the Q-Former is trained jointly on image-text contrastive learning, image-text matching (a binary classifier) and image-grounded text generation. That pulls out the visual information that is most relevant to language, before any LLM is involved."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 7: contrastive learning in CLIP.</li><li><a href="ch04_text_classification.html">Ch.4</a>: matching as binary classification.</li><li><a href="ch03_looking_inside_llms.html">Ch.3</a>: attention, which the Q-Former's two modules share.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · BLIP-2 STEP 2 + THE FULL PICTURE</div><h2>Step 2: project the learned embeddings into the LLM as a soft visual prompt</h2></div><span class="chip">pdf p298–299 · Fig 9-19, 9-20</span></div>
+  <p>In <b>step 2</b>, the learnable embeddings from step 1 now contain <b>visual information in the same dimensional space</b> as the matching textual information. These learnable embeddings are passed to the LLM. In a way, they act as <b>soft visual prompts</b>: they <b>condition</b> the LLM on the visual representations extracted by the Q-Former.</p>
+  <p>Between the Q-Former and the LLM sits a <b>fully connected linear layer</b> (a <b>projection layer</b>). It makes sure the learnable embeddings have the <b>shape the LLM expects</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-9-19.png" alt="Trainable Q-Former outputs green learnable embeddings, fully connected lines map them to red projected embeddings, which go into the pretrained LLM" loading="lazy"><figcaption>Figure 9-19 (book, pdf p298): In step 2, the learned embeddings from the Q-Former are passed to the LLM through a projection layer. The projected embeddings serve as a soft visual prompt.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> The Q-Former (🔥) outputs the green <b>learnable embeddings</b> (5 cells drawn). The crossing lines are the fully connected <b>linear layer</b>: every output cell is a weighted mix of every input cell. Out come the red <b>projected embeddings</b> (3 cells drawn, i.e. a different size to show the shape change). Those go straight into the frozen LLM (❄), in place of where token embeddings would go.</p>
+  <p>Put together, the Q-Former learns visual and textual representations in the same dimensional space, which can then be used as a <b>soft prompt</b> to the LLM. The LLM receives information about the image in a <b>similar way to the context you give it when prompting</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-9-20.png" alt="Full BLIP-2: patches into pretrained ViT, into trainable Q-Former with Vision and Text Transformers (representation learning), then learnable embeddings projected and fed into the pretrained LLM (generative learning)" loading="lazy"><figcaption>Figure 9-20 (book, pdf p299): The full BLIP-2 procedure.</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> This is Figure 9-17 with Figure 9-19 attached. Top dotted box (representation learning): image patches → frozen ViT → Q-Former with its Vision and Text Transformers. The arrow down hands the Q-Former's learnable embeddings to the bottom dotted box (generative learning): linear projection → projected embeddings → frozen LLM. Two snowflakes, one flame, plus the projection layer: everything that learns sits between the two frozen giants.</p>
+  <div class="box work"><b>Worked example · one question through BLIP-2 (step-through)</b>
+    <div class="stepbar"><button id="w13_prev" type="button">◀ Back</button><button id="w13_next" type="button">Next ▶</button><span id="w13_n"></span></div>
+    <div id="w13_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w13_cap"></div>
+    <p class="note">The 224 × 224 input and the question/answer are from the book. Vector counts and sizes are illustrative (Beyond the book: the BLIP-2 paper uses 32 query embeddings; OPT-2.7B's embedding width is 2,560).</p>
+  </div>
+  <h3>Since BLIP-2: LLaVA and Idefics 2</h3>
+  <p>Many other <b>visual LLMs</b> with similar processes have appeared since BLIP-2:</p>
+  <ul class="plain">
+    <li><b>LLaVA</b>: a framework for making textual LLMs multimodal (footnote 6: Haotian Liu et al., "Visual instruction tuning", NeurIPS 36, 2024).</li>
+    <li><b>Idefics 2</b>: an efficient visual LLM based on the <b>Mistral 7B</b> LLM (footnote 7: Hugo Laurençon et al., "What matters when building vision-language models?", 2024).</li>
+  </ul>
+  <p>Both have different architectures, but both <b>connect pretrained CLIP-like visual encoders with textual LLMs</b>. The goal of these architectures is to <b>project visual features from the input images to language embeddings</b> so they can be used as input to an LLM. Like the Q-Former, they try to bridge the gap between images and text.</p>
+  <div class="box picture"><b>Picture it</b><p>Sending a photo to a friend on WhatsApp with no caption versus with a voice note describing it. The soft visual prompt is like a voice note in a "language" only the LLM understands, placed right before your question in the chat. <i>Where it breaks:</i> a voice note is a human description; soft prompt vectors are not words at all and need not match any token in the vocabulary.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An LLM's first layer takes a sequence of vectors. Normally each vector comes from looking up a token ID. Nothing stops you from putting <b>other vectors of the same width</b> in that sequence. "Soft" means they are continuous and learned, not picked from the vocabulary (a "hard" prompt is real tokens). The projection layer exists purely to make the Q-Former's width match the LLM's width.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How does an image actually get into an LLM?"</i> Say: "An image encoder produces feature vectors; an adapter (BLIP-2's Q-Former plus a linear projection, or a projection in LLaVA) maps them to the LLM's embedding width; those vectors are prepended to the text token embeddings as a soft visual prompt. The LLM then attends to them like any other context." Practical consequence: image tokens consume context window and cost, like text.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch03_looking_inside_llms.html">Ch.3</a>: the input embedding sequence of an LLM.</li><li><a href="ch06_prompt_engineering.html">Ch.6</a>: prompts as context (here the "prompt" includes vectors).</li><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: adapters and parameter-efficient tuning.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · PREPROCESSING MULTIMODAL INPUTS</div><h2>Loading BLIP-2: a processor and a model</h2></div><span class="chip">pdf p300</span></div>
+  <p>Now that we know how BLIP-2 is built, there are many interesting uses for it, including (but not limited to) <b>captioning images</b>, <b>answering visual questions</b>, and even <b>prompting</b>. First, load the model and see how to use it:</p>
+  <pre class="code"><code>from transformers import AutoProcessor, Blip2ForConditionalGeneration
+import torch
+
+# Load processor and main model
+blip_processor = AutoProcessor.from_pretrained("Salesforce/blip2-opt-2.7b")
+model = Blip2ForConditionalGeneration.from_pretrained(
+    "Salesforce/blip2-opt-2.7b",
+    torch_dtype=torch.float16
+)
+
+# Send the model to GPU to speed up inference
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)</code></pre>
+  <ul class="plain">
+    <li><code>"Salesforce/blip2-opt-2.7b"</code>: BLIP-2 released by Salesforce, with <b>OPT-2.7B</b> (a 2.7-billion-parameter language model) as its LLM.</li>
+    <li><code>AutoProcessor</code> picks the right processor class for this model id automatically.</li>
+    <li><code>Blip2ForConditionalGeneration</code>: the BLIP-2 model with a text-generating head ("conditional" = generation conditioned on the image).</li>
+    <li><code>torch_dtype=torch.float16</code>: load weights in 16-bit floats, half the memory of 32-bit. Inputs must later be cast to <code>torch.float16</code> too, which is why every later call ends in <code>.to(device, torch.float16)</code>.</li>
+    <li><code>device</code>: use the GPU ("cuda") if one is available, else the CPU. The GPU speeds up inference.</li>
+  </ul>
+  <p class="note"><b>Tip from the book:</b> <code>model.vision_model</code> and <code>model.language_model</code> show you which ViT and which generative model are inside the BLIP-2 model you loaded.</p>
+  <p>We loaded the two parts of the pipeline: a <b>processor</b> and a <b>model</b>. The processor is comparable to the <b>tokenizer</b> of a language model: it converts unstructured input, such as images and text, into the representations the model expects.</p>
+  <div class="box work"><b>Worked example · memory for the weights</b>
+    <p>Rough weight memory = parameters × bytes per parameter. Choose a precision.</p>
+    <div class="controls"><label for="q14p">Parameters (billions) <input id="q14p" type="range" min="0.5" max="14" step="0.1" value="3.9"><output id="q14po">3.9</output></label><label for="q14d">dtype <select id="q14d"><option value="4">float32 (4 bytes)</option><option value="2" selected>float16 (2 bytes)</option><option value="1">int8 (1 byte)</option></select></label></div>
+    <div class="readout" id="q14out"></div>
+    <p class="note">Modelled. 3.9B ≈ OPT-2.7B + ViT-g + Q-Former (Beyond the book, approximate). Real usage is higher: activations and the CUDA context come on top.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A restaurant kitchen. The processor is the prep counter: it washes, peels and cuts everything to the standard size the cooks expect. The model is the cook. Even a perfect cook can't use a whole unpeeled pumpkin. <i>Where it breaks:</i> a kitchen helper can adapt to odd ingredients; the processor applies fixed rules (like "always 224 × 224") even when they damage the input (next plate).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A processor bundles two preprocessors: an image processor (resize, normalize, make tensors) and a tokenizer (text to IDs). Loading both by the same model id guarantees they match what the model was trained with; mixing a different tokenizer or image size would silently give garbage.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"Why load in float16?"</i> Say: "It halves the weight memory versus float32 with little quality loss for inference, so a ~4B-parameter model fits in about 8 GB of weights instead of 16. You must cast the inputs to the same dtype and device, which is why the code moves inputs with <code>.to(device, torch.float16)</code>."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: tokenizers.</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a> and <a href="../llm_engineers_handbook/ch08_inference_optimization.html">LLM Engineer's Handbook Ch.8</a>: precision and quantization.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · PREPROCESSING IMAGES</div><h2>Everything becomes a 224 × 224 square</h2></div><span class="chip">pdf p300–301</span></div>
+  <p>What does the processor do to images? The book loads a deliberately <b>wide</b> image for illustration, a supercar:</p>
+  <pre class="code"><code># Load image of a supercar
+car_path = "https://raw.githubusercontent.com/HandsOnLLM/Hands-On-Large-Language-Models/main/chapter09/images/car.png"
+image = Image.open(urlopen(car_path)).convert("RGB")
+image</code></pre>
+  <p>The image is <b>520 × 492 pixels</b>, an unusual format. Now process it:</p>
+  <pre class="code"><code># Preprocess the image
+inputs = blip_processor(image, return_tensors="pt").to(device, torch.float16)
+inputs["pixel_values"].shape      # torch.Size([1, 3, 224, 224])</code></pre>
+  <p>The result is a <b>224 × 224</b> image, quite a bit smaller than the original. It also means every image, whatever its shape, is <b>processed into a square</b>. So be careful with <b>very wide or very tall images</b>: they may get <b>distorted</b>.</p>
+  <div class="box work"><b>Worked example · how much does your image get squashed?</b>
+    <p>Enter an image size. The page shows how the processor (as the book describes it: every shape becomes 224 × 224) scales each side, and draws the before/after shapes.</p>
+    <div class="controls"><label for="r15w">width <input id="r15w" type="number" min="16" max="8000" value="520"></label><label for="r15h">height <input id="r15h" type="number" min="16" max="8000" value="492"></label><span class="seg"><button type="button" id="r15a">car 520×492</button><button type="button" id="r15b">phone photo 3024×4032</button><button type="button" id="r15c">banner 1500×300</button><button type="button" id="r15d">puppy 512×512</button></span></div>
+    <svg id="r15svg" viewBox="0 0 640 220" class="dg" style="width:100%;height:auto" role="img" aria-label="original shape and squashed 224 square"></svg>
+    <div class="readout" id="r15out"></div>
+    <p class="note">Assumes a direct resize to 224 × 224, as the book's shape output implies. Beyond the book: some image processors resize the short side then center-crop instead, which cuts off edges rather than distorting.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Fitting a long wedding-hall group photo into a square Instagram frame by squeezing it: everybody suddenly looks tall and thin. Fine for "how many people are there", bad for "is uncle's turban straight". <i>Where it breaks:</i> people notice distortion; the model just silently sees a different image.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The frozen ViT was trained on one input size, so its patch grid (and position information) is fixed. Every image must be forced to that size. Shrinking also throws away detail: a 3024 × 4032 phone photo goes down to about 0.4% of its pixels, so tiny text or small objects can vanish.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"Your vision model misreads small text in screenshots. Why?"</i> Say: "Preprocessing resizes every image to a fixed low resolution, 224 × 224 for this BLIP-2, so fine detail is lost and wide or tall images get distorted. Fixes: crop or tile the region of interest before sending, pad to square instead of stretching, or use a model with higher input resolution."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 8: CLIP also resizes 512 × 512 → 224 × 224.</li><li>Plate 3: why the input size fixes the patch count.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · PREPROCESSING TEXT</div><h2>BLIP-2's tokenizer, and the mystery of Ġ</h2></div><span class="chip">pdf p301–302</span></div>
+  <p>Next, the processor's text side. First, look at the tokenizer it uses:</p>
+  <pre class="code"><code>blip_processor.tokenizer
+# GPT2TokenizerFast(name_or_path='Salesforce/blip2-opt-2.7b', vocab_size=50265,
+#   model_max_length=1000000000000000019884624838656, is_fast=True,
+#   padding_side='right', truncation_side='right',
+#   special_tokens={'bos_token': '&lt;/s&gt;', 'eos_token': '&lt;/s&gt;', 'unk_token': '&lt;/s&gt;', 'pad_token': '&lt;pad&gt;'},
+#   clean_up_tokenization_spaces=True), added_tokens_decoder={
+#   1: AddedToken("&lt;pad&gt;", ...special=True),
+#   2: AddedToken("&lt;/s&gt;", ...special=True),
+# }</code></pre>
+  <p>What this output tells you, piece by piece:</p>
+  <ul class="plain">
+    <li><b>GPT2TokenizerFast</b>: BLIP-2 here uses a <b>GPT-2 tokenizer</b>. As Chapter 2 showed, tokenizers can differ greatly in how they treat text.</li>
+    <li><b>vocab_size=50265</b>: about 50 thousand tokens in its vocabulary.</li>
+    <li><b>model_max_length</b> = a huge number: in effect "no limit set" on the tokenizer side.</li>
+    <li><b>padding_side / truncation_side = 'right'</b>: padding and cutting happen at the end of the text.</li>
+    <li><b>Special tokens</b>: <code>&lt;/s&gt;</code> serves as beginning-of-sequence (bos), end-of-sequence (eos) and unknown (unk) token; <code>&lt;pad&gt;</code> is for padding. They are added tokens with IDs 1 (<code>&lt;pad&gt;</code>) and 2 (<code>&lt;/s&gt;</code>).</li>
+  </ul>
+  <p>Try it on a small sentence: convert to token IDs, then back to tokens.</p>
+  <pre class="code"><code># Preprocess the text
+text = "Her vocalization was remarkably melodic"
+token_ids = blip_processor(image, text=text, return_tensors="pt")
+token_ids = token_ids.to(device, torch.float16)["input_ids"][0]
+
+# Convert input ids back to tokens
+tokens = blip_processor.tokenizer.convert_ids_to_tokens(token_ids)
+tokens
+# ['&lt;/s&gt;', 'Her', 'Ġvocal', 'ization', 'Ġwas', 'Ġremarkably', 'Ġmel', 'odic']</code></pre>
+  <div class="tokrow"><span class="cls">&lt;/s&gt;</span><span>Her</span><span class="sp">Ġvocal</span><span>ization</span><span class="sp">Ġwas</span><span class="sp">Ġremarkably</span><span class="sp">Ġmel</span><span>odic</span></div>
+  <p>Note the processor is called with both the image and the text; we keep only <code>input_ids</code>. The sequence starts with <code>&lt;/s&gt;</code> (the bos token). Words split into pieces: "vocalization" → <code>Ġvocal</code> + <code>ization</code>, "melodic" → <code>Ġmel</code> + <code>odic</code>.</p>
+  <p>The strange <b>Ġ</b> symbol at the start of some tokens is actually a <b>space</b>. An internal function takes characters in certain code points and <b>moves them up by 256</b> to make them printable. So the space (<b>code point 32</b>) becomes Ġ (<b>code point 288</b>).</p>
+  <p>For readability, replace it with an underscore:</p>
+  <pre class="code"><code># Replace the space token with an underscore
+tokens = [token.replace("Ġ", "_") for token in tokens]
+tokens
+# ['&lt;/s&gt;', 'Her', '_vocal', 'ization', '_was', '_remarkably', '_mel', 'odic']</code></pre>
+  <p>Now it's clear: the underscore marks the <b>beginning of a word</b>. That way, words made of several tokens can be recognized (a token without the mark continues the previous word).</p>
+  <div class="box work"><b>Worked example · the +256 shift, character by character</b>
+    <p>Type anything. Each character is shown with its code point; characters in the shifted range (like space, code point 32) are shown as the printable character 256 places higher, as the book describes. This only shows the character mapping; it does <b>not</b> do the real GPT-2 splitting into sub-words.</p>
+    <input id="g16in" class="wide" type="text" value="Her vocalization was remarkably melodic" aria-label="text to map">
+    <div class="tokrow" id="g16out" style="margin-top:8px"></div>
+    <div class="readout" id="g16sum"></div>
+    <p class="note">Beyond the book: GPT-2's byte-level mapping shifts the non-printable and whitespace bytes (0–32, 127–160, 173) up to code points from 256 upwards; the common space case lands exactly at 32 + 256 = 288 = Ġ. Newline (10) becomes Ċ (266). This demo applies the "+256" rule to code points 0–32 only, matching the book's explanation.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Railway reservation charts that print a "▲" before a passenger's name to mean "new booking starts here", because a blank space would get lost when the chart is folded. Ġ is that visible marker for an invisible space. <i>Where it breaks:</i> the chart marker is a design choice for humans; Ġ is a technical side-effect of making every byte printable for the tokenizer's vocabulary file.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>GPT-2-style tokenizers work on <b>bytes</b>, and store their vocabulary as readable strings. Bytes like space or newline would be invisible or break the file, so they are remapped to visible characters. Keeping the space <i>attached to the start</i> of the next word means "was" at a word start and "was" inside a word are different tokens, and decoding can rebuild the exact original spacing.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"What's the Ġ in GPT-2 tokens?"</i> Say: "It's the space character. GPT-2's byte-level BPE remaps non-printable bytes to printable code points by adding 256, so space (32) shows as Ġ (288). Tokens starting with Ġ begin a new word; tokens without it continue the previous one. CLIP's tokenizer marks word <i>ends</i> with &lt;/w&gt; instead."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: comparing tokenizers (GPT-2, BERT, others).</li><li>Plate 8: CLIP's <code>&lt;/w&gt;</code> end-of-word marker.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · USE CASE 1: IMAGE CAPTIONING</div><h2>Let the model write a caption: a supercar and an inkblot</h2></div><span class="chip">pdf p302–305 · Fig 9-21</span></div>
+  <p>The most straightforward use of a model like BLIP-2 is to <b>create captions</b> for images you have. You might be a <b>store</b> that wants descriptions of its clothing, or a <b>photographer</b> with no time to label the <b>1,000+ pictures of a wedding</b> by hand.</p>
+  <p>Captioning closely follows the preprocessing: the image becomes <b>pixel values</b> the model can read; these go into BLIP-2, which turns them into <b>soft visual prompts</b>; the LLM uses those to decide on a fitting caption.</p>
+  <pre class="code"><code># Load an AI-generated image of a supercar
+image = Image.open(urlopen(car_path)).convert("RGB")
+
+# Convert an image into inputs and preprocess it
+inputs = blip_processor(image, return_tensors="pt").to(device, torch.float16)
+image
+
+# Generate image ids to be passed to the decoder (LLM)
+generated_ids = model.generate(**inputs, max_new_tokens=20)
+
+# Generate text from the image ids
+generated_text = blip_processor.batch_decode(
+    generated_ids, skip_special_tokens=True
+)
+generated_text = generated_text[0].strip()
+generated_text
+# an orange supercar driving on the road at sunset</code></pre>
+  <ul class="plain">
+    <li><code>model.generate(**inputs, max_new_tokens=20)</code>: only an image is given (no text), so BLIP-2 writes a caption, stopping after at most 20 new tokens. It returns <b>token IDs</b>.</li>
+    <li><code>batch_decode(..., skip_special_tokens=True)</code>: turn the IDs back into text and drop special tokens like <code>&lt;/s&gt;</code>. It returns a list (one string per image); <code>[0]</code> takes the first and <code>.strip()</code> removes stray spaces.</li>
+  </ul>
+  <p>Result: <b>"an orange supercar driving on the road at sunset"</b>. A perfect description of the image.</p>
+  <p>Captioning is a great way to learn the model before moving to harder uses. Try it on several images to see where it works well and where it does poorly. <b>Domain-specific images</b>, such as particular cartoon characters or imaginary creations, may <b>fail</b>, because the model was trained on <b>largely public data</b>.</p>
+  <h3>A fun one: the Rorschach test</h3>
+  <p>The book ends this use case with an image from the <b>Rorschach test</b>, an old psychological experiment that tests how a person perceives inkblots (footnote 8: Roy Schafer, <i>Psychoanalytic Interpretation in Rorschach Testing: Theory and Application</i>, 1954). What someone sees in an inkblot supposedly tells you something about their personality. It is quite a subjective test, which makes it more fun.</p>
+  <figure class="bookfig"><img src="figs/fig-9-21.png" alt="A symmetric grey Rorschach inkblot on cream paper, with wing-like shapes on both sides" loading="lazy"><figcaption>Figure 9-21 (book, pdf p304): An image from the Rorschach test. What do you see in it?</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> A mirror-symmetric grey ink shape. The two upper-side shapes look like spread wings, and the central body suggests a creature, but there is no "right answer": that is the point of the test. It makes a good probe of what the model "projects" onto an ambiguous image.</p>
+  <pre class="code"><code># Load Rorschach image
+url = "https://upload.wikimedia.org/wikipedia/commons/7/70/Rorschach_blot_01.jpg"
+image = Image.open(urlopen(url)).convert("RGB")
+
+# Generate caption
+inputs = blip_processor(image, return_tensors="pt").to(device, torch.float16)
+generated_ids = model.generate(**inputs, max_new_tokens=20)
+generated_text = blip_processor.batch_decode(
+    generated_ids, skip_special_tokens=True
+)
+generated_text = generated_text[0].strip()
+generated_text
+# a black and white ink drawing of a bat</code></pre>
+  <p>The caption: <b>"a black and white ink drawing of a bat"</b>. The authors can see why the model would say that, and ask (playfully) what it says about the model, since this is a Rorschach test.</p>
+  <div class="box work"><b>Worked example · the captioning pipeline (step-through)</b>
+    <div class="stepbar"><button id="w17_prev" type="button">◀ Back</button><button id="w17_next" type="button">Next ▶</button><span id="w17_n"></span></div>
+    <div id="w17_box" style="display:grid;gap:8px;min-width:0"></div>
+    <div class="caption" id="w17_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A wedding photographer's new intern who has seen thousands of public wedding photos. Hand over 1,000 shots and you get "bride and groom on a stage" for each, fast. Ask for "Ravi's cousin from Pune" and the intern has no idea. <i>Where it breaks:</i> the intern can ask; BLIP-2 will confidently write <i>something</i> even about images it doesn't understand (the inkblot became "a bat").</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>With no text prompt, the LLM's only context is the soft visual prompt, so the most likely continuation is a description. The 20-token cap keeps captions short. Generation is still next-token prediction: the model picks words the training data made likely for images like this, which is why public-data concepts work and private ones fail.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"You need alt-text for 1 million product images. How?"</i> Say: "Batch-run an image-captioning model like BLIP-2 on GPU, cap the output length, and store captions next to the image IDs. Spot-check a sample, since domain-specific items (our own brand names, niche parts) may be captioned wrongly; for those, fine-tune or add metadata into a prompt." The captions also make images searchable by a normal text RAG index.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_advanced_text_generation.html">Ch.7</a>: generation parameters like <code>max_new_tokens</code>.</li><li>Plate 18: adding a question changes captioning into visual question answering.</li></ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · USE CASE 2: MULTIMODAL CHAT-BASED PROMPTING</div><h2>Ask questions about an image, then keep chatting</h2></div><span class="chip">pdf p305–308</span></div>
+  <p>Captioning is important, but we can go further. Captioning went in a straight line from one modality (vision: the image) to another (text: the caption).</p>
+  <p>Instead, we can give the model <b>both modalities at once</b>. This is called <b>visual question answering (VQA)</b>: we give the model an image <b>and</b> a question about that image, and it answers. The model must process the image and the question together.</p>
+  <p>Start with the car image and ask BLIP-2 to describe it. To do VQA, the model needs more than the image: it needs a <b>prompt</b>. Without one, it would just write a caption as before.</p>
+  <pre class="code"><code># Load an AI-generated image of a supercar
+image = Image.open(urlopen(car_path)).convert("RGB")
+
+# Visual question answering
+prompt = "Question: Write down what you see in this picture. Answer:"
+
+# Process both the image and the prompt
+inputs = blip_processor(image, text=prompt, return_tensors="pt").to(device, torch.float16)
+
+# Generate text
+generated_ids = model.generate(**inputs, max_new_tokens=30)
+generated_text = blip_processor.batch_decode(
+    generated_ids, skip_special_tokens=True
+)
+generated_text = generated_text[0].strip()
+generated_text
+# A sports car driving on the road at sunset</code></pre>
+  <p>The prompt uses a fixed <b>"Question: … Answer:"</b> template, ending with "Answer:" so the most natural next words are the answer. Output: <b>"A sports car driving on the road at sunset"</b>. Correct, but simple: the question is basically "write a caption".</p>
+  <p>Now the interesting part: <b>follow-up questions in a chat-like way</b>. Give the model the previous conversation, including its own answer, then ask a new question:</p>
+  <pre class="code"><code># Chat-like prompting
+prompt = "Question: Write down what you see in this picture. Answer: A sports car driving on the road at sunset. Question: What would it cost me to drive that car? Answer:"
+
+# Generate output
+inputs = blip_processor(image, text=prompt, return_tensors="pt").to(device, torch.float16)
+generated_ids = model.generate(**inputs, max_new_tokens=30)
+generated_text = blip_processor.batch_decode(
+    generated_ids, skip_special_tokens=True
+)
+generated_text = generated_text[0].strip()
+generated_text
+# $1,000,000</code></pre>
+  <p>Answer: <b>$1,000,000</b>. Highly specific! It shows more chat-like behaviour from BLIP-2, which allows interesting conversations. (Notice the "memory" is just the old Q&amp;A pasted into the new prompt.)</p>
+  <h3>An interactive chatbot in Jupyter</h3>
+  <p>Finally, the book makes this smoother with an interactive chatbot built using <b>ipywidgets</b>, an extension for Jupyter notebooks for interactive buttons, text inputs and so on:</p>
+  <pre class="code"><code>from IPython.display import HTML, display
+import ipywidgets as widgets
+
+def text_eventhandler(*args):
+    question = args[0]["new"]
+    if question:
+        args[0]["owner"].value = ""
+
+        # Create prompt
+        if not memory:
+            prompt = " Question: " + question + " Answer:"
+        else:
+            template = "Question: {} Answer: {}."
+            prompt = " ".join(
+                [
+                    template.format(memory[i][0], memory[i][1])
+                    for i in range(len(memory))
+                ]
+            ) + " Question: " + question + " Answer:"
+
+        # Generate text
+        inputs = blip_processor(image, text=prompt, return_tensors="pt")
+        inputs = inputs.to(device, torch.float16)
+        generated_ids = model.generate(**inputs, max_new_tokens=100)
+        generated_text = blip_processor.batch_decode(
+            generated_ids,
+            skip_special_tokens=True
+        )
+        generated_text = generated_text[0].strip().split("Question")[0]
+
+        # Update memory
+        memory.append((question, generated_text))
+
+        # Assign to output
+        output.append_display_data(HTML("&lt;b&gt;USER:&lt;/b&gt; " + question))
+        output.append_display_data(HTML("&lt;b&gt;BLIP-2:&lt;/b&gt; " + generated_text))
+        output.append_display_data(HTML("&lt;br&gt;"))
+
+# Prepare widgets
+in_text = widgets.Text()
+in_text.continuous_update = False
+in_text.observe(text_eventhandler, "value")
+output = widgets.Output()
+memory = []
+
+# Display chat box
+display(
+    widgets.VBox(
+        children=[output, in_text],
+        layout=widgets.Layout(display="inline-flex", flex_flow="column-reverse"),
+    )
+)</code></pre>
+  <p>What each part does:</p>
+  <ul class="plain">
+    <li><b>The event handler</b> runs whenever the text box's value changes. <code>args[0]["new"]</code> is the typed question; setting <code>args[0]["owner"].value = ""</code> clears the box (which fires the handler again with an empty value, so the <code>if question:</code> check skips it).</li>
+    <li><b>Building the prompt</b>: on the first turn (empty <code>memory</code>), the prompt is just <code>" Question: … Answer:"</code>. Later, every past (question, answer) pair is formatted with <code>"Question: {} Answer: {}."</code>, joined with spaces, and the new question is appended. This is the chat history pasted into one prompt.</li>
+    <li><b>Generating</b>: same as before, but <code>max_new_tokens=100</code> for longer answers.</li>
+    <li><b><code>.split("Question")[0]</code></b>: the LLM may keep going and invent the user's next "Question: …" itself; this keeps only the text before that.</li>
+    <li><b>Memory</b>: the new pair is appended to <code>memory</code>, so the next turn includes it.</li>
+    <li><b>Display</b>: each turn is shown as bold "USER:" and "BLIP-2:" lines. <code>continuous_update = False</code> means the handler fires on Enter, not on every keystroke. The <code>VBox</code> stacks output and input; <code>flex_flow="column-reverse"</code> puts the input box at the top visually above the output.</li>
+  </ul>
+  <p>The result: you can keep asking questions. With this chat approach, we have essentially built a <b>chatbot that can reason about images</b>.</p>
+  <div class="box work"><b>Worked example · the chatbot's prompt builder, reproduced</b>
+    <p>This box runs the <b>exact string logic</b> of the book's handler. Type questions; for the answers the page uses canned replies (the first two are the book's real outputs; after that, a placeholder, since no model runs here). Watch the prompt that BLIP-2 would receive grow each turn.</p>
+    <div class="controls"><input id="c18q" class="wide" type="text" value="Write down what you see in this picture." aria-label="question"><button id="c18ask" type="button">Ask ▶</button><button id="c18reset" type="button">Reset memory</button></div>
+    <div class="chat" id="c18chat"></div>
+    <b class="small">Prompt sent to BLIP-2 this turn (with the image):</b>
+    <textarea class="prompt" id="c18prompt" readonly aria-label="built prompt"></textarea>
+    <div class="readout" id="c18info"></div>
+    <p class="note">Second suggested question: "What would it cost me to drive that car?" Answers after turn 2 are placeholders, not model output.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Talking to a helpful shopkeeper who has terrible short-term memory: every time you speak, you must first read out the whole conversation so far from a notebook, then add your new question. That notebook is <code>memory</code>. <i>Where it breaks:</i> the notebook grows each turn; the shopkeeper (the model) can only read so much at once, and each re-reading costs time, so long chats get slow and eventually overflow the context.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The LLM itself is <b>stateless</b>: it has no memory between calls. "Chat" is created entirely by the application, by re-sending the history inside the prompt every turn. The image is re-processed with every call too. The "Question/Answer" template gives the base LLM (OPT-2.7B is not an instruction-tuned chat model) a pattern to continue.</p></div>
+  <div class="box" style="background:var(--tint2)"><b>Interview angle</b><p><i>"How do you add memory to a stateless LLM chat?"</i> Say: "Store the turns on the server and rebuild the prompt each request: system text, past question/answer pairs, then the new question, as the book's BLIP-2 chatbot does with a template. Cap it with a sliding window or summaries once it nears the context limit, and strip any text the model generates past its own turn." This is exactly the conversation-buffer pattern in voice and text agents.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_advanced_text_generation.html">Ch.7</a>: conversation memory (buffer, windowed, summary) in LangChain.</li><li><a href="ch06_prompt_engineering.html">Ch.6</a>: prompt templates.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: memory in agents.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>The chapter in plain words</h2></div><span class="chip">pdf p308</span></div>
+  <p>The chapter explored ways to make LLMs <b>multimodal</b> by bridging the gap between textual and visual representations.</p>
+  <ul class="plain">
+    <li><b>Transformers for vision</b>: models that turn images into numbers, using <b>image encoders</b> and <b>patch embeddings</b>, which let the model process images at various scales. (ViT cuts an image into patches, linearly projects each into an embedding, and feeds them to a normal Transformer encoder, treating them like text tokens.)</li>
+    <li><b>Multimodal embedding models</b> with <b>CLIP</b>: convert both images and text into numbers in one shared space. CLIP uses <b>contrastive learning</b> to align image and text embeddings, which enables <b>zero-shot classification, clustering and search</b>. <b>OpenCLIP</b> is an open source variant that is easy to use.</li>
+    <li><b>Multimodal text generation</b> with <b>BLIP-2</b>: the core idea is to <b>project visual features from input images into text embeddings</b> an LLM can use. Used for <b>image captioning</b> and <b>multimodal chat-based prompting</b>, where both modalities combine to produce answers.</li>
+  </ul>
+  <p>Overall: multimodality is powerful in LLMs, with uses in image captioning, search and chat-based prompting. Next, Part III covers training and fine-tuning; Chapter 10 builds and fine-tunes a <b>text embedding model</b>, a core technology behind many language applications, and serves as an introduction to training and fine-tuning.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning in this chapter</th></tr>
+    <tr><td>Modality</td><td>A type of data: text, image, audio, video, sensor data.</td></tr>
+    <tr><td>Multimodal model</td><td>Handles more than one modality; may accept a modality as input without generating it.</td></tr>
+    <tr><td>ViT (Vision Transformer)</td><td>Transformer encoder applied to images by splitting them into patches; beat CNNs on image recognition.</td></tr>
+    <tr><td>CNN (convolutional neural network)</td><td>The previous default architecture for image recognition.</td></tr>
+    <tr><td>Patch</td><td>A small square sub-image; ViT's equivalent of a token (16 × 16 pixels in the original ViT).</td></tr>
+    <tr><td>Linear projection / patch embedding</td><td>A learned matrix multiply that turns a patch's pixels into a vector (patches have no vocabulary IDs).</td></tr>
+    <tr><td>[CLS] / [CLASS] token</td><td>Special token whose output represents the whole input; in CLIP it represents the image embedding.</td></tr>
+    <tr><td>Multimodal embedding model</td><td>Embeds several modalities into the same vector space so they can be compared.</td></tr>
+    <tr><td>CLIP</td><td>Contrastive Language-Image Pre-training: text encoder + image encoder trained on image–caption pairs.</td></tr>
+    <tr><td>OpenCLIP</td><td>Open source variant of CLIP.</td></tr>
+    <tr><td>Cosine similarity</td><td>Dot product divided by the product of vector lengths; equals plain dot product after normalizing.</td></tr>
+    <tr><td>Contrastive learning</td><td>Training that pulls similar pairs together and pushes dissimilar (negative) pairs apart.</td></tr>
+    <tr><td>Zero-shot classification</td><td>Classify by comparing an input's embedding with embeddings of class descriptions, without training on those classes.</td></tr>
+    <tr><td>BLIP-2</td><td>Bootstrapping Language-Image Pre-training 2: adds vision to a frozen LLM via a trainable Q-Former.</td></tr>
+    <tr><td>Q-Former (Querying Transformer)</td><td>The trainable bridge between a frozen ViT and a frozen LLM; an image and a text module sharing attention layers.</td></tr>
+    <tr><td>Frozen</td><td>Pretrained weights kept fixed during training.</td></tr>
+    <tr><td>Learnable embeddings</td><td>Trainable vectors in the Q-Former that collect visual information; passed on to the LLM.</td></tr>
+    <tr><td>Image-text matching</td><td>Binary classification: does this image–text pair match?</td></tr>
+    <tr><td>Image-grounded text generation</td><td>Generate text from information extracted from the image.</td></tr>
+    <tr><td>Soft visual prompt</td><td>Projected embeddings fed to the LLM to condition it on the image, like context in a prompt.</td></tr>
+    <tr><td>Projection layer</td><td>Fully connected linear layer reshaping Q-Former output to the LLM's expected size.</td></tr>
+    <tr><td>Processor</td><td>Like a tokenizer for multimodal models: converts images and text into model-ready inputs.</td></tr>
+    <tr><td>Ġ</td><td>GPT-2 tokenizer's printable stand-in for a space (code point 32 + 256 = 288); marks a word start.</td></tr>
+    <tr><td>Visual question answering (VQA)</td><td>Give the model an image plus a question; it answers using both.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · REAL SYSTEMS</div><h2>Where you meet this in real systems</h2></div><span class="chip">named in the chapter</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Name</th><th>What the chapter does with it</th></tr>
+    <tr><td>Vision Transformer (ViT), Google (Dosovitskiy et al.)</td><td>The image encoder idea behind CLIP and BLIP-2; "An Image is Worth 16x16 Words".</td></tr>
+    <tr><td>CLIP (OpenAI), <code>openai/clip-vit-base-patch32</code></td><td>Multimodal embedding model; loaded with <code>CLIPTokenizerFast</code>, <code>CLIPProcessor</code>, <code>CLIPModel</code>; 512-d embeddings; 224 × 224 inputs.</td></tr>
+    <tr><td>OpenCLIP</td><td>The open source variant of CLIP the examples are framed around.</td></tr>
+    <tr><td>Hugging Face <code>transformers</code></td><td>Loads CLIP and BLIP-2 (<code>AutoProcessor</code>, <code>Blip2ForConditionalGeneration</code>), tokenizers, <code>generate</code>, <code>batch_decode</code>.</td></tr>
+    <tr><td>sentence-transformers (<code>clip-ViT-B-32</code>)</td><td>One-line CLIP embeddings for images and text; <code>util.cos_sim</code> for the similarity matrix.</td></tr>
+    <tr><td>Stable diffusion (Rombach et al.)</td><td>Image generation driven by multimodal embeddings; also made the puppy and supercar images.</td></tr>
+    <tr><td>BLIP-2 (Salesforce), <code>Salesforce/blip2-opt-2.7b</code></td><td>Frozen ViT + trainable Q-Former + frozen OPT-2.7B; captioning, VQA, chat.</td></tr>
+    <tr><td>GPT2TokenizerFast</td><td>The tokenizer inside this BLIP-2 (vocab 50,265; Ġ for spaces).</td></tr>
+    <tr><td>LLaVA</td><td>Visual instruction tuning: connects a CLIP-like encoder to a text LLM.</td></tr>
+    <tr><td>Idefics 2 (on Mistral 7B)</td><td>Efficient visual LLM with the same "project visual features into the LLM" goal.</td></tr>
+    <tr><td>Llama 2, ChatGPT</td><td>Named as strong text-only generators (as described in the book).</td></tr>
+    <tr><td>PyTorch, PIL, NumPy, matplotlib</td><td>Tensors and dtypes, image loading, dot products, visualizing the preprocessed image.</td></tr>
+    <tr><td>ipywidgets / Jupyter</td><td>The interactive BLIP-2 chat box.</td></tr>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Since this book, most frontier chat models (GPT-4o family, Claude, Gemini) accept images natively, and open models such as Qwen-VL, LLaVA successors and Llama vision variants follow the same "vision encoder → projector → LLM" pattern described here. Multimodal embeddings like CLIP/SigLIP are common in vector databases for image search. Check current docs before relying on any of these specifics.</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (tap to reveal)</h2></div><span class="chip">14 questions</span></div>
+  <details class="ans"><summary>1. Can a model accept a modality it cannot generate? Give an example from the chapter.</summary><p>Yes. BLIP-2 takes images in but only produces text; CLIP takes images and text in but outputs only vectors.</p></details>
+  <details class="ans"><summary>2. Why can't ViT assign vocabulary IDs to patches like a text tokenizer does?</summary><p>A patch of pixels rarely appears in another image, so there is no reusable vocabulary. Instead each patch is linearly projected into an embedding.</p></details>
+  <details class="ans"><summary>3. A 224 × 224 image with 16 × 16 patches: how many patch tokens? And with 32 × 32 patches?</summary><p>14 × 14 = 196 patches (plus a [CLASS] token = 197). With 32 × 32: 7 × 7 = 49 (+1 = 50).</p></details>
+  <details class="ans"><summary>4. After the embeddings enter the ViT encoder, what is different from text?</summary><p>Nothing: the book says from that point there is no difference in how text or images are processed and trained.</p></details>
+  <details class="ans"><summary>5. Name CLIP's four uses listed in the chapter.</summary><p>Zero-shot classification, clustering, search, and generation (driving image generation such as stable diffusion).</p></details>
+  <details class="ans"><summary>6. What would happen if CLIP were trained only on positive (matching) pairs?</summary><p>The model could make everything similar (collapse all embeddings together). Negatives are needed so it also learns what makes things different.</p></details>
+  <details class="ans"><summary>7. Why does the CLIP code normalize the embeddings before <code>np.dot</code>?</summary><p>For unit-length vectors the dot product equals the cosine similarity, so normalizing first makes the dot product a cosine score.</p></details>
+  <details class="ans"><summary>8. The puppy and its caption score 0.33. Is that high? How do you know?</summary><p>Yes, relative to the alternatives: in Figure 9-14 wrong pairs score 0.08–0.19 and right pairs 0.31–0.35. CLIP scores must be read relatively.</p></details>
+  <details class="ans"><summary>9. Where is the [CLS] token in CLIP's tokenized caption, and why?</summary><p>It's missing from the text tokens; in CLIP the [CLS] token is used to represent the image embedding. The text gets start/end-of-text tokens instead.</p></details>
+  <details class="ans"><summary>10. Which parts of BLIP-2 are trained, and why not the rest?</summary><p>Only the Q-Former (and the projection layer to the LLM). The ViT and LLM are frozen pretrained models, because training a multimodal model from scratch would need billions of pairs and huge compute.</p></details>
+  <details class="ans"><summary>11. List the three step-1 training tasks of the Q-Former.</summary><p>Image-text contrastive learning, image-text matching (binary classification), image-grounded text generation, jointly optimized.</p></details>
+  <details class="ans"><summary>12. What is a "soft visual prompt", and what does the linear layer do?</summary><p>The Q-Former's learned embeddings, projected to the LLM's expected shape and fed in like prompt context to condition the LLM on the image. The fully connected linear layer does the reshaping.</p></details>
+  <details class="ans"><summary>13. You send a 1500 × 300 banner to this BLIP-2. What happens and what's the risk?</summary><p>It's resized to 224 × 224: width shrinks ~6.7×, height ~1.3×, so the image is heavily squashed and may be misread. Crop or pad it first.</p></details>
+  <details class="ans"><summary>14. In the chatbot code, why <code>.split("Question")[0]</code>, and where does "memory" live?</summary><p>The LLM may continue by inventing the next "Question: …", so the code keeps only the text before it. Memory is a Python list of (question, answer) pairs that the app pastes into every new prompt; the model itself is stateless.</p></details>
+</section>
+
+<!-- references -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's footnotes</h2></div><span class="chip">pdf p282–304</span></div>
+  <details><summary>Footnotes 1–8</summary>
+    <ol class="refs">
+      <li>Jason Wei et al.: "Emergent abilities of large language models," arXiv:2206.07682, 2022.</li>
+      <li>Alexey Dosovitskiy et al.: "An image is worth 16x16 words: Transformers for image recognition at scale," arXiv:2010.11929, 2020.</li>
+      <li>Alec Radford et al.: "Learning transferable visual models from natural language supervision," ICML (PMLR), 2021.</li>
+      <li>Robin Rombach et al.: "High-resolution image synthesis with latent diffusion models," CVPR, 2022.</li>
+      <li>Junnan Li et al.: "BLIP-2: Bootstrapping language-image pretraining with frozen image encoders and large language models," ICML (PMLR), 2023.</li>
+      <li>Haotian Liu et al.: "Visual instruction tuning," NeurIPS 36, 2024.</li>
+      <li>Hugo Laurençon et al.: "What matters when building vision-language models?" arXiv:2405.02246, 2024.</li>
+      <li>Roy Schafer: <i>Psychoanalytic Interpretation in Rorschach Testing: Theory and Application</i>, 1954.</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> by Jay Alammar and Maarten Grootendorst (O'Reilly, 2024). Book figures are cropped from the PDF for personal study. Widgets marked "modelled" use invented numbers to show the shape of an idea; they are not measurements and not from the book. Notes marked "Beyond the book" add outside context.</footer>
+</div>
+<script>
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+function stepper(prefix, count, render) {
+  var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(prefix + "_n");
+  function draw() { if (lab) lab.textContent = "step " + (i + 1) + " / " + count(); prev.disabled = i === 0; next.disabled = i >= count() - 1; render(i); }
+  prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+  next.addEventListener("click", function () { if (i < count() - 1) { i++; draw(); } });
+  draw();
+  return { redraw: draw };
+}
+function toks(list) { return '<div class="tokrow">' + list.map(function (t) { return '<span class="' + (t[1] || "") + '">' + esc(t[0]) + '</span>'; }).join("") + '</div>'; }
+function heat(v, lo, hi) { var t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); return "color-mix(in srgb, var(--c1) " + Math.round(10 + t * 60) + "%, var(--plate))"; }
+
+/* ---------- s1: modality table ---------- */
+run("m1", function () {
+  var D = {
+    vit: { inn: ["image"], out: ["class scores (e.g. 98% cat)"], cap: "ViT reads an image and outputs numbers used for classification (Figure 9-2). No text in, no text out." },
+    clip: { inn: ["text", "image"], out: ["512-number embedding (for either input)"], cap: "CLIP reads text or images and outputs vectors in one shared space. It never writes text: it can only score similarity." },
+    blip: { inn: ["image", "text prompt (optional)"], out: ["text (caption or answer)"], cap: "BLIP-2 reads an image plus an optional question and writes text. It cannot output an image: accept ≠ generate (Figure 9-1)." },
+    llm: { inn: ["text"], out: ["text"], cap: "A text-only LLM: limited to the modality it was trained in (pdf p295)." }
+  };
+  var sel = $("m1sel");
+  function draw() {
+    var d = D[sel.value], all = ["text", "image", "audio"];
+    var h = "<tr><th>Modality</th><th>Can go in?</th><th>Can come out?</th></tr>";
+    all.forEach(function (m) {
+      var i = d.inn.some(function (x) { return x.indexOf(m) === 0; }), o = d.out.some(function (x) { return x.indexOf(m) === 0; });
+      h += "<tr><td>" + m + "</td><td>" + (i ? '<span class="pill good">yes</span>' : '<span class="pill bad">no</span>') + "</td><td>" + (o ? '<span class="pill good">yes</span>' : '<span class="pill bad">no</span>') + "</td></tr>";
+    });
+    h += "<tr><td>vector</td><td>–</td><td>" + (sel.value === "clip" ? '<span class="pill good">yes</span>' : (sel.value === "vit" ? '<span class="pill warn">scores</span>' : '<span class="pill bad">no</span>')) + "</td></tr>";
+    $("m1tab").innerHTML = h;
+    $("m1cap").innerHTML = "<b>In:</b> " + esc(d.inn.join(", ")) + " · <b>Out:</b> " + esc(d.out.join(", ")) + "<br>" + esc(d.cap);
+  }
+  sel.addEventListener("change", draw); draw();
+});
+
+/* ---------- s2: text path vs image path ---------- */
+run("w2", function () {
+  var S = [
+    { h: toks([["What a horrible movie!", ""]]) + toks([["🐱 cat image 512×512", "img"]]), c: "<b>Start.</b> Text path: a sentence. Image path: a picture. The encoder needs a sequence of vectors from both." },
+    { h: toks([["[CLS]", "cls"], ["what"], ["a"], ["horrible"], ["movie"], ["!"], ["[SEP]", "cls"]]) + toks([["patch 1", "img"], ["patch 2", "img"], ["patch 3", "img"], ["…", "img"], ["patch 9", "img"]]), c: "<b>Split.</b> Text is tokenized (Figure 9-3). The image is cut into patches (Figure 9-4: 3 × 3 = 9 in the drawing)." },
+    { h: toks([["ID lookup → 7 vectors", ""]]) + toks([["[CLASS]", "cls"], ["linear projection → 9 vectors", "img"]]), c: "<b>Embed.</b> Tokens look up their vector by ID. Patches have no IDs, so a linear projection computes each vector; a [CLASS] vector is added in front (Figure 9-5)." },
+    { h: toks([["7 vectors → ENCODER → 7 outputs", ""]]) + toks([["10 vectors → ENCODER → 10 outputs", "img"]]), c: "<b>Encode.</b> Same encoder design for both. From here on there is no difference between text and image." },
+    { h: toks([["[CLS] output → spam 78%", "cls"]]) + toks([["[CLASS] output → cat 98%", "cls"]]), c: "<b>Use.</b> A classifier on the class token's output gives the prediction (Figure 9-2's numbers)." }
+  ];
+  stepper("w2", function () { return S.length; }, function (i) { $("w2_box").innerHTML = S[i].h; $("w2_cap").innerHTML = S[i].c; });
+});
+
+/* ---------- s3: patch calculator ---------- */
+run("p3", function () {
+  var a = $("p3img"), b = $("p3patch");
+  function draw() {
+    var side = +a.value, p = +b.value, n = Math.floor(side / p + 1e-6), left = side - n * p;
+    var g = $("p3grid"), show = Math.min(n, 16);
+    g.style.gridTemplateColumns = "repeat(" + show + ", 1fr)";
+    var h = ""; for (var k = 0; k < show * show; k++) h += "<div>" + (show <= 8 ? (k + 1) : "") + "</div>";
+    g.innerHTML = h;
+    var per = Math.round(p * p * 3);
+    $("p3out").innerHTML = "<span>grid: <b>" + n + " × " + n + "</b>" + (n > 16 ? " (drawing shows 16 × 16)" : "") + "</span>" +
+      "<span>patch tokens: <b>" + (n * n) + "</b></span>" +
+      "<span>with [CLASS]: <b>" + (n * n + 1) + "</b></span>" +
+      "<span>values per patch: <b>" + (p === Math.round(p) ? p + "×" + p + "×3 = " + per : "≈" + per) + "</b></span>" +
+      "<span>vs one token per pixel: <b>" + (side * side).toLocaleString() + "</b></span>" +
+      (left > 0.5 ? '<span class="bad">' + Math.round(left) + " px left over at the edge (real processors resize to fit first)</span>" : "");
+  }
+  a.addEventListener("change", draw); b.addEventListener("change", draw); draw();
+});
+
+/* ---------- s4: linear projection ---------- */
+run("p4", function () {
+  var W = [[0.5, -0.2, 0.1], [0.3, 0.4, -0.3], [-0.1, 0.6, 0.2], [0.2, -0.1, 0.7]];
+  var v = [0.9, 0.8, 0.2, 0.1], ctl = $("p4ctl");
+  var names = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  names.forEach(function (n, i) {
+    var lab = document.createElement("label");
+    lab.innerHTML = n + ' <input type="range" min="0" max="1" step="0.05" value="' + v[i] + '" aria-label="' + n + ' pixel"><output>' + v[i] + '</output>';
+    ctl.appendChild(lab);
+    var inp = lab.querySelector("input"), out = lab.querySelector("output");
+    inp.addEventListener("input", function () { v[i] = +inp.value; out.textContent = inp.value; draw(); });
+  });
+  function draw() {
+    var e = [0, 0, 0];
+    for (var j = 0; j < 3; j++) for (var i = 0; i < 4; i++) e[j] += v[i] * W[i][j];
+    var s = "pixels p = [" + v.map(function (x) { return x.toFixed(2); }).join(", ") + "]\n";
+    s += "W (4×3, learned) = [" + W.map(function (r) { return "[" + r.join(", ") + "]"; }).join(", ") + "]\n";
+    s += "embedding = p · W = [" + e.map(function (x) { return x.toFixed(3); }).join(", ") + "]";
+    $("p4out").textContent = s;
+  }
+  draw();
+});
+
+/* ---------- s5: 2-D embedding space ---------- */
+run("e5", function () {
+  var P = [
+    { n: "car photo", t: "img", x: 140, y: 80 }, { n: "Car", t: "txt", x: 205, y: 62 }, { n: "Road", t: "txt", x: 95, y: 135 },
+    { n: "puppy photo", t: "img", x: 500, y: 70 }, { n: "Snowing", t: "txt", x: 440, y: 72 }, { n: "A puppy", t: "txt", x: 515, y: 125 },
+    { n: "cat image", t: "img", x: 330, y: 220 }, { n: "My cat is cute", t: "txt", x: 270, y: 250 }, { n: "I don't like cats", t: "txt", x: 395, y: 245 }
+  ];
+  var sel = 0;
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function draw() {
+    var me = P[sel], best = null, bs = -1e9;
+    P.forEach(function (q) { if (q.t !== me.t) { var s = -dist(me, q); if (s > bs) { bs = s; best = q; } } });
+    var s = "";
+    for (var gx = 0; gx <= 640; gx += 40) s += '<line x1="' + gx + '" y1="0" x2="' + gx + '" y2="300" style="stroke:var(--grid)"/>';
+    for (var gy = 0; gy <= 300; gy += 40) s += '<line x1="0" y1="' + gy + '" x2="640" y2="' + gy + '" style="stroke:var(--grid)"/>';
+    s += '<line class="nn" x1="' + me.x + '" y1="' + me.y + '" x2="' + best.x + '" y2="' + best.y + '"/>';
+    P.forEach(function (q, i) {
+      s += '<circle class="pt ' + q.t + (i === sel ? " on" : "") + '" data-i="' + i + '" cx="' + q.x + '" cy="' + q.y + '" r="' + (q.t === "img" ? 16 : 9) + '" tabindex="0" role="button" aria-label="' + esc(q.n) + '"/>';
+      s += '<text x="' + (q.x + (q.t === "img" ? 20 : 12)) + '" y="' + (q.y + 4) + '">' + esc(q.n) + '</text>';
+    });
+    $("e5svg").innerHTML = s;
+    $("e5out").innerHTML = "<span>selected: <b>" + esc(me.n) + "</b> (" + (me.t === "img" ? "image" : "text") + ")</span><span>nearest " + (me.t === "img" ? "text" : "image") + ": <b>" + esc(best.n) + "</b></span><span>distance: <b>" + Math.round(dist(me, best)) + "</b> (modelled units)</span>";
+    Array.prototype.forEach.call($("e5svg").querySelectorAll("circle.pt"), function (c) {
+      function pick() { sel = +c.getAttribute("data-i"); draw(); }
+      c.addEventListener("click", pick);
+      c.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+    });
+  }
+  draw();
+});
+
+/* ---------- s7: contrastive batch ---------- */
+run("w7", function () {
+  var caps = ["A pixelated image of a cute cat", "A puppy playing in the snow", "A supercar on the road…"], imgs = ["cat", "puppy", "car"];
+  var start = [[0.04, 0.06, 0.02], [0.05, 0.03, 0.07], [0.06, 0.02, 0.05]], end = [[0.35, 0.12, 0.07], [0.10, 0.33, 0.08], [0.06, 0.09, 0.31]];
+  var steps = [0, 0.25, 0.6, 1];
+  var txt = [
+    "<b>Before training.</b> Encoders are random, so all scores are small and the true pairs (diagonal) are no higher than the rest. Prediction ≠ label (Figure 9-10).",
+    "<b>Update 1.</b> The loss rewards high diagonal and low off-diagonal scores; both encoders are updated (Figure 9-11). Diagonal starts to rise.",
+    "<b>Many batches later.</b> True pairs clearly lead in every row and column.",
+    "<b>Trained.</b> Each caption's best image is its own pair. Values are modelled, but shaped like the book's Figure 9-14 (diagonal ≈ 0.31–0.35)."
+  ];
+  stepper("w7", function () { return steps.length; }, function (k) {
+    var t = steps[k], h = "<tr><th></th>" + imgs.map(function (x) { return "<th>" + x + "</th>"; }).join("") + "</tr>";
+    for (var r = 0; r < 3; r++) {
+      h += '<tr><th class="rowh">' + esc(caps[r]) + "</th>";
+      var row = [];
+      for (var c = 0; c < 3; c++) row.push(start[r][c] + (end[r][c] - start[r][c]) * t);
+      var mx = Math.max.apply(null, row);
+      for (c = 0; c < 3; c++) h += '<td class="v' + (row[c] === mx && t > 0 ? " best" : "") + '" style="background:' + heat(row[c], 0, 0.36) + '">' + row[c].toFixed(2) + (r === c ? " ✓" : "") + "</td>";
+      h += "</tr>";
+    }
+    $("w7_mat").innerHTML = h; $("w7_cap").innerHTML = txt[k];
+  });
+});
+
+/* ---------- s7: cosine ---------- */
+run("c7", function () {
+  var a = $("c7a"), b = $("c7b"), l = $("c7l");
+  function draw() {
+    var ta = +a.value * Math.PI / 180, tb = +b.value * Math.PI / 180, L = +l.value;
+    $("c7ao").textContent = a.value + "°"; $("c7bo").textContent = b.value + "°"; $("c7lo").textContent = L;
+    var A = [Math.cos(ta), Math.sin(ta)], B = [L * Math.cos(tb), L * Math.sin(tb)];
+    var dot = A[0] * B[0] + A[1] * B[1], la = 1, lb = L, cs = dot / (la * lb);
+    var ox = 160, oy = 160, sc = 45;
+    var s = '<line x1="10" y1="' + oy + '" x2="310" y2="' + oy + '"/>';
+    s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + A[0] * sc) + '" y2="' + (oy - A[1] * sc) + '" style="stroke:var(--c2);stroke-width:3"/>';
+    s += '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + B[0] * sc) + '" y2="' + (oy - B[1] * sc) + '" style="stroke:var(--c3);stroke-width:3"/>';
+    s += '<text x="' + (ox + A[0] * sc + 4) + '" y="' + (oy - A[1] * sc) + '">text</text><text x="' + (ox + B[0] * sc + 4) + '" y="' + (oy - B[1] * sc) + '">image</text>';
+    $("c7svg").innerHTML = s;
+    $("c7out").textContent = "text = [" + A.map(function (x) { return x.toFixed(2); }) + "]   image = [" + B.map(function (x) { return x.toFixed(2); }) + "]\n" +
+      "dot = " + dot.toFixed(3) + "   |text| = 1.00   |image| = " + L.toFixed(2) + "\n" +
+      "cosine = " + dot.toFixed(3) + " / (1.00 × " + L.toFixed(2) + ") = " + cs.toFixed(3) + "   (angle " + Math.abs(+a.value - +b.value) + "°)";
+  }
+  [a, b, l].forEach(function (x) { x.addEventListener("input", draw); }); draw();
+});
+
+/* ---------- s8: Figure 9-14 matrix ---------- */
+run("m8", function () {
+  var caps = ["A puppy playing in the snow", "A pixelated image of a cute cat", "A supercar on the road with the sunset in the background"], imgs = ["puppy", "cat", "car"];
+  var M = [[0.33, 0.19, 0.11], [0.15, 0.35, 0.09], [0.08, 0.13, 0.31]];
+  var dir = "img", selR = 0, selC = 0;
+  function draw() {
+    var h = "<tr><th></th>" + imgs.map(function (x) { return "<th>" + x + " image</th>"; }).join("") + "</tr>";
+    for (var r = 0; r < 3; r++) {
+      h += '<tr><th class="rowh">' + esc(caps[r]) + "</th>";
+      for (var c = 0; c < 3; c++) {
+        var best;
+        if (dir === "img") { best = M[r][c] === Math.max(M[0][c], M[1][c], M[2][c]); }
+        else { best = M[r][c] === Math.max.apply(null, M[r]); }
+        h += '<td class="v' + (best ? " best" : "") + (r === selR && c === selC ? " sel" : "") + '" data-r="' + r + '" data-c="' + c + '" tabindex="0" style="background:' + heat(M[r][c], 0.05, 0.36) + '">' + M[r][c].toFixed(2) + "</td>";
+      }
+      h += "</tr>";
+    }
+    $("m8mat").innerHTML = h;
+    var v = M[selR][selC], rank;
+    if (dir === "img") {
+      var col = [M[0][selC], M[1][selC], M[2][selC]], bi = col.indexOf(Math.max.apply(null, col));
+      rank = col.filter(function (x) { return x > v; }).length + 1;
+      $("m8cap").innerHTML = "Image <b>" + imgs[selC] + "</b>: best caption = <b>“" + esc(caps[bi]) + "”</b> (" + col[bi].toFixed(2) + "). Selected caption scores " + v.toFixed(2) + ", rank " + rank + " of 3." + (bi === selC ? " ✓ correct" : "");
+    } else {
+      var row = M[selR], bj = row.indexOf(Math.max.apply(null, row));
+      rank = row.filter(function (x) { return x > v; }).length + 1;
+      $("m8cap").innerHTML = "Query <b>“" + esc(caps[selR]) + "”</b>: best image = <b>" + imgs[bj] + "</b> (" + row[bj].toFixed(2) + "). Selected image scores " + v.toFixed(2) + ", rank " + rank + " of 3." + (bj === selR ? " ✓ correct" : "");
+    }
+    Array.prototype.forEach.call($("m8mat").querySelectorAll("td.v"), function (td) {
+      function pick() { selR = +td.getAttribute("data-r"); selC = +td.getAttribute("data-c"); draw(); }
+      td.addEventListener("click", pick);
+      td.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+    });
+  }
+  $("m8dir1").addEventListener("click", function () { dir = "img"; this.classList.add("on"); $("m8dir2").classList.remove("on"); draw(); });
+  $("m8dir2").addEventListener("click", function () { dir = "cap"; this.classList.add("on"); $("m8dir1").classList.remove("on"); draw(); });
+  draw();
+});
+
+/* ---------- s11: freeze toggles ---------- */
+run("f11", function () {
+  var B = [{ n: "Vision Transformer", p: 1.0, train: false }, { n: "Q-Former", p: 0.188, train: true }, { n: "LLM (OPT-2.7B)", p: 2.7, train: false }];
+  function draw() {
+    var tot = 0, tr = 0, h = "";
+    B.forEach(function (b, i) {
+      tot += b.p; if (b.train) tr += b.p;
+      h += '<button type="button" class="blk ' + (b.train ? "train" : "frozen") + '" data-i="' + i + '"><b>' + (b.train ? "🔥 " : "❄ ") + esc(b.n) + "</b><span>≈" + (b.p >= 1 ? b.p.toFixed(1) + "B" : Math.round(b.p * 1000) + "M") + " params</span><span>" + (b.train ? "trainable" : "frozen") + "</span></button>";
+    });
+    $("f11").innerHTML = h;
+    var pct = tr / tot * 100;
+    $("f11bar").style.width = pct.toFixed(1) + "%";
+    var isBlip = !B[0].train && B[1].train && !B[2].train;
+    $("f11out").innerHTML = "<span>trainable: <b>" + (tr >= 1 ? tr.toFixed(2) + "B" : Math.round(tr * 1000) + "M") + "</b> of ≈" + tot.toFixed(2) + "B</span><span>share: <b>" + pct.toFixed(1) + "%</b></span>" + (isBlip ? '<span class="good">BLIP-2\'s setup</span>' : '<span class="bad">not BLIP-2\'s setup</span>');
+    Array.prototype.forEach.call($("f11").querySelectorAll(".blk"), function (el) {
+      el.addEventListener("click", function () { var i = +el.getAttribute("data-i"); B[i].train = !B[i].train; draw(); });
+    });
+  }
+  draw();
+});
+
+/* ---------- s12: three tasks ---------- */
+run("w12", function () {
+  var capsT = [["“A pixelated image of a cute cat”", "sp"], ["“A puppy playing in the snow”", ""], ["“A supercar on the road”", ""]];
+  var S = [
+    { h: toks([["🐱 pixel cat → frozen ViT → vision embeddings", "img"]]) + toks([["learnable embeddings (queries)", "cls"]]) + toks(capsT), c: "<b>Inputs.</b> The frozen ViT turns the image into vision embeddings; the Q-Former's image module reads them through its learnable embeddings. Captions go into its Text Transformer." },
+    { h: toks([["cat ↔ cat caption: 0.40 ↑", "sp"], ["cat ↔ puppy caption: 0.10 ↓", ""], ["cat ↔ car caption: 0.05 ↓", ""]]), c: "<b>Task 1 · Image-text contrastive learning.</b> Make the true pair's embeddings agree (maximize mutual information) and the others disagree, like CLIP." },
+    { h: toks([["(cat, “cute cat”) → matched ✓", "sp"], ["(cat, “puppy in snow”) → unmatched ✗", ""]]), c: "<b>Task 2 · Image-text matching.</b> A yes/no classifier on one pair at a time: positive (matched) or negative (unmatched)." },
+    { h: toks([["image →", "img"], ["A", ""], ["pixelated", ""], ["image", ""], ["of", ""], ["a", ""], ["cute", ""], ["cat", ""]]), c: "<b>Task 3 · Image-grounded text generation.</b> Generate the caption word by word from information extracted from the image." },
+    { h: toks([["loss = contrastive + matching + generation", "cls"]]) + toks([["update Q-Former only 🔥 (ViT stays ❄)", "img"]]), c: "<b>Joint optimization.</b> All three objectives are optimized together, injecting textual information into the visual representations so the LLM can use them in step 2." }
+  ];
+  stepper("w12", function () { return S.length; }, function (i) { $("w12_box").innerHTML = S[i].h; $("w12_cap").innerHTML = S[i].c; });
+});
+
+/* ---------- s13: BLIP-2 inference ---------- */
+run("w13", function () {
+  var S = [
+    { h: toks([["🚗 supercar 520×492", "img"]]) + toks([["“Question: Write down what you see in this picture. Answer:”", ""]]), c: "<b>Input.</b> An image and (optionally) a text prompt." },
+    { h: toks([["processor → pixel_values [1, 3, 224, 224]", "img"]]) + toks([["tokenizer → input_ids", ""]]), c: "<b>Preprocess.</b> Image resized to 224 × 224 (plate 15); text tokenized with the GPT-2 tokenizer (plate 16)." },
+    { h: toks([["frozen ViT ❄ → patch features", "img"]]), c: "<b>See.</b> The frozen image encoder turns the patches into vision embeddings." },
+    { h: toks([["Q-Former 🔥 → learnable embeddings (e.g. 32 vectors)", "cls"]]), c: "<b>Summarize.</b> The Q-Former's learnable embeddings pull the language-relevant visual information out of the ViT features." },
+    { h: toks([["linear projection → LLM-width vectors", "sp"]]), c: "<b>Reshape.</b> A fully connected linear layer gives the vectors the shape the LLM expects. These are the soft visual prompt." },
+    { h: toks([["[soft visual prompt]", "sp"], ["Question:", ""], ["Write", ""], ["down", ""], ["…", ""], ["Answer:", ""]]), c: "<b>Prompt.</b> The soft visual prompt sits in front of the question's token embeddings, like context in a normal prompt." },
+    { h: toks([["frozen LLM ❄ → “A sports car driving on the road at sunset”", ""]]), c: "<b>Generate.</b> The LLM generates the answer token by token, conditioned on the image vectors and the question (the book's real output)." }
+  ];
+  stepper("w13", function () { return S.length; }, function (i) { $("w13_box").innerHTML = S[i].h; $("w13_cap").innerHTML = S[i].c; });
+});
+
+/* ---------- s14: memory calc ---------- */
+run("q14", function () {
+  var p = $("q14p"), d = $("q14d");
+  function draw() {
+    $("q14po").textContent = (+p.value).toFixed(1);
+    var gb = +p.value * 1e9 * +d.value / 1e9;
+    $("q14out").innerHTML = "<span>weights ≈ <b>" + gb.toFixed(1) + " GB</b></span><span>" + (gb <= 16 ? '<span class="good">fits a 16 GB GPU (weights only)</span>' : '<span class="bad">needs more than a 16 GB GPU</span>') + "</span>";
+  }
+  p.addEventListener("input", draw); d.addEventListener("change", draw); draw();
+});
+
+/* ---------- s15: squash ---------- */
+run("r15", function () {
+  var w = $("r15w"), h = $("r15h");
+  function set(a, b) { w.value = a; h.value = b; draw(); }
+  $("r15a").addEventListener("click", function () { set(520, 492); });
+  $("r15b").addEventListener("click", function () { set(3024, 4032); });
+  $("r15c").addEventListener("click", function () { set(1500, 300); });
+  $("r15d").addEventListener("click", function () { set(512, 512); });
+  function draw() {
+    var W = Math.max(16, +w.value || 16), H = Math.max(16, +h.value || 16);
+    var sx = 224 / W, sy = 224 / H, ratio = Math.max(sx, sy) / Math.min(sx, sy);
+    var mx = Math.max(W, H), bw = W / mx * 180, bh = H / mx * 180;
+    var s = '<text x="10" y="16" class="b">original ' + W + '×' + H + '</text>';
+    s += '<rect x="10" y="' + (28 + (180 - bh) / 2) + '" width="' + bw + '" height="' + bh + '" class="s"/>';
+    s += '<circle cx="' + (10 + bw / 2) + '" cy="' + (28 + 90) + '" r="' + Math.min(bw, bh) / 4 + '" style="fill:var(--c2);fill-opacity:.4"/>';
+    s += '<text x="260" y="118">→ resize →</text>';
+    s += '<text x="380" y="16" class="b">model input 224×224</text>';
+    s += '<rect x="380" y="28" width="180" height="180" class="hi"/>';
+    s += '<ellipse cx="470" cy="118" rx="' + (Math.min(bw, bh) / 4) * (180 / bw) + '" ry="' + (Math.min(bw, bh) / 4) * (180 / bh) + '" style="fill:var(--c2);fill-opacity:.4"/>';
+    $("r15svg").innerHTML = s;
+    var kept = (224 * 224) / (W * H) * 100;
+    $("r15out").innerHTML = "<span>width × <b>" + sx.toFixed(3) + "</b></span><span>height × <b>" + sy.toFixed(3) + "</b></span><span>distortion: <b class='" + (ratio > 1.3 ? "bad" : "good") + "'>" + ratio.toFixed(2) + "×</b> " + (ratio > 1.3 ? "(shapes visibly stretched)" : "(little stretch)") + "</span><span>pixels kept: <b>" + (kept >= 100 ? "upscaled" : kept.toFixed(1) + "%") + "</b></span>";
+  }
+  w.addEventListener("input", draw); h.addEventListener("input", draw); draw();
+});
+
+/* ---------- s16: +256 shift ---------- */
+run("g16", function () {
+  var inp = $("g16in");
+  function draw() {
+    var s = inp.value, h = "", shifted = 0;
+    for (var i = 0; i < s.length && i < 200; i++) {
+      var cp = s.charCodeAt(i);
+      if (cp <= 32) { shifted++; h += '<span class="sp" title="code point ' + cp + ' → ' + (cp + 256) + '">' + esc(String.fromCharCode(cp + 256)) + " <small>" + cp + "→" + (cp + 256) + "</small></span>"; }
+      else h += '<span title="code point ' + cp + '">' + esc(s[i]) + "</span>";
+    }
+    $("g16out").innerHTML = h;
+    $("g16sum").innerHTML = "<span>characters: <b>" + s.length + "</b></span><span>shifted (code point ≤ 32): <b>" + shifted + "</b></span><span>space → <b>Ġ</b> (32 + 256 = 288)</span>";
+  }
+  inp.addEventListener("input", draw); draw();
+});
+
+/* ---------- s17: captioning pipeline ---------- */
+run("w17", function () {
+  var S = [
+    { h: toks([["Image.open(urlopen(car_path)).convert(\"RGB\")", "img"]]), c: "<b>Load.</b> Download the supercar image and force 3 colour channels." },
+    { h: toks([["blip_processor(image) → pixel_values [1, 3, 224, 224], float16, on GPU", "img"]]), c: "<b>Preprocess.</b> Only an image, no text, so the model will caption." },
+    { h: toks([["ViT ❄ → Q-Former 🔥 → projection → soft visual prompt", "sp"]]), c: "<b>Soft prompt.</b> BLIP-2 converts the pixels into vectors the LLM can use." },
+    { h: toks([["an", ""], ["orange", ""], ["super", ""], ["car", ""], ["…", ""], ["(≤ 20 new tokens)", "cls"]]), c: "<b>Generate.</b> <code>model.generate(**inputs, max_new_tokens=20)</code> returns token IDs. (The sub-word split shown is illustrative.)" },
+    { h: toks([["batch_decode(skip_special_tokens=True)[0].strip()", ""]]) + toks([["an orange supercar driving on the road at sunset", "sp"]]), c: "<b>Decode.</b> IDs become text; special tokens dropped; first item of the list; spaces trimmed. The book's real output." }
+  ];
+  stepper("w17", function () { return S.length; }, function (i) { $("w17_box").innerHTML = S[i].h; $("w17_cap").innerHTML = S[i].c; });
+});
+
+/* ---------- s18: chatbot prompt builder ---------- */
+run("c18", function () {
+  var memory = [], q = $("c18q");
+  var canned = { "write down what you see in this picture.": "A sports car driving on the road at sunset", "what would it cost me to drive that car?": "$1,000,000" };
+  function build(question) {
+    if (!memory.length) return " Question: " + question + " Answer:";
+    var template = function (a, b) { return "Question: " + a + " Answer: " + b + "."; };
+    return memory.map(function (m) { return template(m[0], m[1]); }).join(" ") + " Question: " + question + " Answer:";
+  }
+  function render(prompt) {
+    var h = "";
+    memory.forEach(function (m) { h += '<div class="u"><b>USER:</b> ' + esc(m[0]) + '</div><div class="b"><b>BLIP-2:</b> ' + esc(m[1]) + "</div>"; });
+    $("c18chat").innerHTML = h || '<span class="note">No turns yet. Press Ask.</span>';
+    $("c18prompt").value = prompt || "";
+    $("c18info").innerHTML = "<span>turns in memory: <b>" + memory.length + "</b></span><span>prompt length: <b>" + (prompt || "").length + "</b> chars</span><span>max_new_tokens: <b>100</b></span>";
+  }
+  $("c18ask").addEventListener("click", function () {
+    var question = q.value.trim();
+    if (!question) return;
+    var prompt = build(question);
+    var ans = canned[question.toLowerCase()] || "(placeholder answer: no model runs on this page)";
+    ans = ans.split("Question")[0];
+    memory.push([question, ans]);
+    render(prompt);
+    q.value = memory.length === 1 ? "What would it cost me to drive that car?" : "";
+  });
+  q.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("c18ask").click(); } });
+  $("c18reset").addEventListener("click", function () { memory = []; q.value = "Write down what you see in this picture."; render(""); });
+  render("");
+});
+
+})();
+</script>
+</body>
+</html>

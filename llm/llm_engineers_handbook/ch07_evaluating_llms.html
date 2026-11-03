@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LLM Handbook Ch.7 Evaluation</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (LLM Engineer's Handbook ch.7 Evaluating LLMs) ---- */
+.box.interview { background: var(--paper); border-left: 3px solid var(--c1); }
+.box.interview > b { color: var(--c1); }
+pre { margin: 0; }
+pre code { display: block; font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; line-height: 1.45; white-space: pre; overflow-wrap: normal; }
+.codeexp { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 15.5px; max-width: 68ch; }
+.meter { height: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 99px; overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--c2); width: 0; transition: width .2s; }
+.meter.amber > i { background: var(--c1); }
+.meter.plum > i { background: var(--c3); }
+.mrow { display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 4.5em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.mrow span:last-child { text-align: right; font-weight: 600; }
+.claims { display: grid; gap: 6px; }
+.claims label { display: flex; gap: 8px; align-items: flex-start; font-size: 15.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+.claims input { margin-top: 5px; accent-color: var(--buy); }
+.chunks { display: flex; flex-wrap: wrap; gap: 6px; }
+.chunks button { min-width: 64px; }
+.chunks button.rel { background: var(--buy); color: var(--plate); border-color: var(--buy); }
+.qa { display: grid; gap: 8px; }
+.qa .opt { display: grid; grid-template-columns: 2em minmax(0, 1fr) 4em; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.qa .opt.right b { color: var(--buy); }
+.tok { display: inline-block; border: 1px solid var(--rule); background: var(--paper); border-radius: 3px; padding: 1px 5px; margin: 2px; font-family: var(--mono); font-size: 12.5px; }
+.tok.hit { background: var(--buy); color: var(--plate); border-color: var(--buy); }
+.tok.hit2 { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.controls textarea { font-family: var(--mono); font-size: 13px; width: 100%; min-height: 3.2em; padding: 6px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; resize: vertical; }
+.controls .full { display: grid; gap: 4px; width: 100%; }
+.answer { font-size: 15.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; }
+.bench { display: flex; flex-wrap: wrap; gap: 6px; }
+.dg rect.g { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.p { fill: var(--c3); fill-opacity: .18; stroke: var(--c3); }
+.dg rect.bar1 { fill: var(--c2); }
+.dg rect.bar2 { fill: var(--c1); }
+.dg rect.bar3 { fill: var(--c3); }
+.dg line.ax { stroke: var(--rule); }
+.dg text.big { font-size: 14px; font-weight: 600; }
+.sqbox svg.narrow { min-width: 480px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch06_preference_alignment.html">← Ch.6 Preference Alignment</a><a href="ch08_inference_optimization.html">Ch.8 Inference Optimization →</a></nav>
+
+<header class="hero">
+  <div class="kicker">PAUL IUSZTIN &amp; MAXIME LABONNE · LLM ENGINEER'S HANDBOOK · CHAPTER 7 · PDF p290–317</div>
+  <h1>Evaluating LLMs: how do you <em>know</em> your model (and your RAG system) is any good?</h1>
+  <p class="lede">There is no single, agreed way to measure an LLM (large language model), only a set of patterns you adapt to your use case. The chapter moves in three steps. First, <b>model evaluation</b>: how it differs from classic ML (machine learning) evaluation, then three families of tests: <b>general-purpose</b> benchmarks (training loss and perplexity during pre-training, MMLU, HellaSwag and friends for base models, IFEval, Chatbot Arena, AlpacaEval, MT-Bench and GAIA for chat models), <b>domain-specific</b> leaderboards (medical, code, hallucinations, enterprise, Korean, Portuguese, Arabic) and <b>task-specific</b> evaluations you build yourself (ROUGE, accuracy/precision/recall/F1, multiple-choice quizzes, LLM-as-a-judge). Second, <b>RAG (retrieval-augmented generation) evaluation</b>, where the whole system is judged: retrieval, integration and factuality, using two frameworks, <b>Ragas</b> (LLM-assisted metrics: faithfulness, answer relevancy, context precision, context recall) and <b>ARES</b> (synthetic data + trained classifiers). Third, a hands-on evaluation of the book's own <b>TwinLlama-3.1-8B</b> (SFT) and <b>TwinLlama-3.1-8B-DPO</b> against Llama-3.1-8B-Instruct: answers are generated with vLLM and scored by GPT-4o-mini on <b>accuracy</b> and <b>style</b>. The DPO model writes in the most natural style; the official Instruct model stays the most accurate.</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Read the rows top to bottom. Each highlighted box is the idea the next row reacts to. The chapter's one-line argument: <i>the narrower your model or system, the more you must build your own evaluation; and once a model sits inside a RAG system, you must evaluate the whole pipeline, not just the model.</i></p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 7">
+    <div class="row"><span class="tag">Problem</span><span class="node">LLM output is open text, often subjective</span><span class="arr">→</span><span class="node key">no single number like accuracy or MSE</span></div>
+    <div class="row"><span class="tag">ML vs LLM</span><span class="node">numerical metrics</span><span class="node">feature engineering</span><span class="node">interpretability</span><span class="arr">→</span><span class="node key">all three work differently for LLMs</span></div>
+    <div class="row"><span class="tag">General</span><span class="node">during pre-training: loss, perplexity, grad norm</span><span class="arr">→</span><span class="node">base model: MMLU, HellaSwag, ARC-C…</span><span class="arr">→</span><span class="node">chat model: IFEval, Arena, MT-Bench, GAIA</span></div>
+    <div class="row"><span class="tag">Caveat</span><span class="node">benchmarks can be gamed, humans like long answers</span><span class="arr">→</span><span class="node key">treat benchmarks as signals, not truth</span></div>
+    <div class="row"><span class="tag">Domain</span><span class="node">medical · code · hallucination · enterprise · language leaderboards</span><span class="arr">→</span><span class="node">good suites are complex, diverse, practical</span></div>
+    <div class="row"><span class="tag">Task</span><span class="node">ROUGE, accuracy/P/R/F1</span><span class="arr">→</span><span class="node">custom multiple-choice quiz</span><span class="arr">→</span><span class="node key">LLM-as-a-judge for open-ended tasks</span></div>
+    <div class="row"><span class="tag">System</span><span class="node">model inside a RAG pipeline</span><span class="arr">→</span><span class="node key">judge retrieval + integration + factuality</span><span class="arr">→</span><span class="node">Ragas (LLM metrics)</span><span class="node">ARES (trained classifiers)</span></div>
+    <div class="row"><span class="tag">Practice</span><span class="node">334 test instructions</span><span class="arr">→</span><span class="node">vLLM answers from 3 models</span><span class="arr">→</span><span class="node key">GPT-4o-mini judge: accuracy + style (1–3)</span><span class="arr">→</span><span class="node">DPO best style, Instruct best accuracy</span></div>
+  </div>
+  <svg viewBox="0 0 640 150" class="dg" role="img" aria-label="Three layers of evaluation: model, system, own task" style="width:100%;height:auto;max-width:640px">
+    <rect x="8" y="20" width="190" height="80" rx="6" class="f"/><text x="103" y="44" text-anchor="middle" class="b">Model evaluation</text><text x="103" y="64" text-anchor="middle" class="m">one LLM, no RAG,</text><text x="103" y="80" text-anchor="middle" class="m">no prompt tricks</text>
+    <rect x="225" y="20" width="190" height="80" rx="6" class="f"/><text x="320" y="44" text-anchor="middle" class="b">RAG evaluation</text><text x="320" y="64" text-anchor="middle" class="m">retriever + LLM</text><text x="320" y="80" text-anchor="middle" class="m">as one system</text>
+    <rect x="442" y="20" width="190" height="80" rx="6" class="hi"/><text x="537" y="44" text-anchor="middle" class="b">TwinLlama eval</text><text x="537" y="64" text-anchor="middle" class="m">own task, own judge,</text><text x="537" y="80" text-anchor="middle" class="m">own criteria</text>
+    <line x1="198" y1="60" x2="225" y2="60" class="on"/><line x1="415" y1="60" x2="442" y2="60" class="on"/>
+    <text x="320" y="132" text-anchor="middle" class="m">wider scope (whole system) → narrower target (one task you care about)</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Chapter opening</a>
+    <a href="#s2"><span>02</span>Model evaluation</a>
+    <a href="#s3"><span>03</span>Comparing ML and LLM evaluation</a>
+    <a href="#s4"><span>04</span>General-purpose: during pre-training</a>
+    <a href="#s5"><span>05</span>General-purpose: base &amp; fine-tuned benchmarks</a>
+    <a href="#s6"><span>06</span>Using benchmarks + their flaws</a>
+    <a href="#s7"><span>07</span>Domain-specific leaderboards</a>
+    <a href="#s8"><span>08</span>Language leaderboards + design principles</a>
+    <a href="#s9"><span>09</span>Task-specific: ROUGE &amp; classic metrics</a>
+    <a href="#s10"><span>10</span>Custom multiple-choice benchmarks</a>
+    <a href="#s11"><span>11</span>LLM-as-a-judge</a>
+    <a href="#s12"><span>12</span>RAG evaluation</a>
+    <a href="#s13"><span>13</span>Ragas</a>
+    <a href="#s14"><span>14</span>ARES (+ Ragas vs ARES)</a>
+    <a href="#s15"><span>15</span>Evaluating TwinLlama-3.1-8B: the plan</a>
+    <a href="#s16"><span>16</span>Generating answers with vLLM</a>
+    <a href="#s17"><span>17</span>Evaluating answers with GPT-4o-mini</a>
+    <a href="#s18"><span>18</span>Analyzing results</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Why evaluation is hard, and what this chapter covers</h2></div><span class="chip">pdf p290</span></div>
+  <p><b>LLM evaluation</b> is the process of checking how well an LLM performs and what it can do. The book stresses that it comes in many shapes:</p>
+  <ul class="plain">
+    <li><b>Multiple-choice question answering</b>: the model picks A, B, C or D, and you count how often it is right.</li>
+    <li><b>Open-ended instructions</b>: the model writes free text ("explain X", "write a post about Y") and something has to judge the text.</li>
+    <li><b>Feedback from real users</b>: people vote, rate or pick the better of two answers.</li>
+  </ul>
+  <p>Today there is <b>no unified approach</b> to measuring a model. What exists is a set of <b>patterns and recipes</b> you adapt to your own use case.</p>
+  <p>The best-known evaluations are <b>general-purpose</b> ones, like <b>MMLU</b> (Massive Multi-Task Language Understanding, a big multiple-choice exam) and <b>LMSYS Chatbot Arena</b> (people vote between two anonymous chatbots). But models built for one <b>domain</b> or one <b>task</b> are better served by narrower tests. This is even more true when you evaluate a whole <b>LLM system</b> rather than a bare model. Such systems are often built around a <b>RAG</b> (retrieval-augmented generation) pipeline, which adds new parts, such as <b>retrievers</b> (find relevant documents) and <b>post-processors</b> (clean or rerank what was found). Those parts must be evaluated too.</p>
+  <p>The chapter has three topics:</p>
+  <ol class="plain">
+    <li><a href="#s2">Model evaluation</a> (plates 2–11)</li>
+    <li><a href="#s12">RAG evaluation</a> (plates 12–14)</li>
+    <li><a href="#s15">Evaluating TwinLlama-3.1-8B</a>, the book's own fine-tuned model (plates 15–18)</li>
+  </ol>
+  <p>Goal: by the end you know the most popular LLM evaluations and how to evaluate both models and RAG systems with different techniques.</p>
+  <div class="box picture"><b>Picture it</b><p>Hiring a cook for a dhaba. A general exam (can he chop, boil, fry?) tells you he is a decent cook. A domain test (can he make Punjabi dishes?) is narrower. A task test (does <i>his</i> dal makhani taste the way <i>your</i> customers like?) is narrowest, and only you can design it. And once he joins, you also judge the whole kitchen: did the helper bring the right ingredients (retriever), and did the cook actually use them (integration)? <i>Where it breaks:</i> a cook's dish can be tasted directly; an LLM's "taste" is often judged by another LLM, which has its own biases (plate 11).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you evaluate an LLM feature?"</i> → "I separate model evaluation from system evaluation. For the model, I look at public benchmarks only as a first filter, then build a task-specific set: exact metrics where the output is structured, a multiple-choice quiz or an LLM judge with a clear rubric where it is open-ended. For a RAG system, I add retrieval metrics and grounding metrics like faithfulness, because a great model with bad retrieval still gives bad answers."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a> and <a href="ch06_preference_alignment.html">Ch.6</a>: the two models (SFT and DPO) evaluated in plates 15–18.</li><li><a href="ch04_rag_feature_pipeline.html">Ch.4</a> and <a href="ch09_rag_inference_pipeline.html">Ch.9</a>: the RAG system that plates 12–14 teach you to evaluate.</li><li>Other books: <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3 Evaluation Methodology</a> · <a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4 Evaluate AI Systems</a>.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · MODEL EVALUATION</div><h2>Model evaluation: test the bare model, nothing around it</h2></div><span class="chip">pdf p290–291</span></div>
+  <p><b>Model evaluation</b> means measuring what <b>one model on its own</b> can do: no prompt engineering, no RAG pipeline, no extra tools. You are testing the engine, not the whole car.</p>
+  <p>Why bother? The book gives two reasons (and says there are more):</p>
+  <ul class="plain">
+    <li><b>Picking the right LLM</b> for your project from many candidates.</li>
+    <li><b>Checking that fine-tuning really helped</b>, that the trained model is better than the one you started from (and not worse at something else).</li>
+  </ul>
+  <p>The section is laid out as: first a comparison of ML and LLM evaluation (plate 3), then benchmarks for three kinds of models: <b>general-purpose</b> (plates 4–6), <b>domain-specific</b> (plates 7–8) and <b>task-specific</b> (plates 9–11).</p>
+  <svg viewBox="0 0 640 160" class="dg" role="img" aria-label="Scope of evaluations from broad to narrow" style="width:100%;height:auto;max-width:640px">
+    <rect x="10" y="20" width="620" height="120" rx="8" class="s"/><text x="24" y="42" class="b">General-purpose</text><text x="24" y="60" class="m">MMLU, HellaSwag, IFEval, Chatbot Arena…</text>
+    <rect x="230" y="50" width="390" height="82" rx="8" class="f"/><text x="244" y="72" class="b">Domain-specific</text><text x="244" y="90" class="m">medical, code, Korean, enterprise…</text>
+    <rect x="440" y="76" width="172" height="50" rx="8" class="hi"/><text x="526" y="98" text-anchor="middle" class="b">Task-specific</text><text x="526" y="116" text-anchor="middle" class="m">built by you</text>
+  </svg>
+  <p class="note">Own diagram: the narrower the circle, the more likely you have to build the test yourself.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Isolating the model removes noise. If you test "model + prompt + retriever" together and the score drops, you can't tell which part broke. By testing the model alone first, you get a baseline; later system tests (plate 12) can then blame the right component.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s15">Plate 15</a>: the book applies exactly this idea, comparing a fine-tuned model to its starting point.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · COMPARING ML AND LLM EVALUATION</div><h2>Classic ML scores are crisp; LLM scores are fuzzy</h2></div><span class="chip">pdf p291–292</span></div>
+  <p><b>ML evaluation</b> checks models built for <b>prediction, classification and regression</b>. Its main question is: how <i>accurately and efficiently</i> does the model turn (usually <b>structured</b>) data into a specific outcome? <b>LLM evaluation</b> instead asks how well a model <i>understands and produces language</i>.</p>
+  <p>The difference comes from the tasks. A classic ML model solves one narrow problem, like predicting stock prices or spotting outliers, usually on <b>numerical or categorical</b> data, so scoring it is simple. An LLM interprets and writes language, and judging language is partly <b>subjective</b>. So LLM evaluation can't rely only on numbers; it often adds <b>qualitative</b> checks: is the reply coherent, relevant, and accurate in context?</p>
+  <p>The book lists <b>three key differences</b>:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Aspect</th><th>Classic ML</th><th>LLMs</th></tr></thead>
+    <tbody>
+      <tr><td><b>Numerical metrics</b></td><td>Objective metrics fit the task: accuracy, precision, recall, MSE (mean squared error).</td><td>One model does many tasks, so it needs many evaluations, and the same numeric metrics rarely apply.</td></tr>
+      <tr><td><b>Feature engineering</b></td><td>Humans pick and transform input features before training; judging whether that worked is part of model evaluation.</td><td>LLMs read raw text directly, so there is much less manual feature engineering to evaluate.</td></tr>
+      <tr><td><b>Interpretability</b></td><td>Easier to see <i>why</i> a prediction was made (e.g. feature importance); often part of evaluation.</td><td>Not directly possible. But you can ask the model to <b>explain itself while generating</b>, which gives some insight into its decisions.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Looking ahead: evaluating <b>general-purpose</b> LLMs is far from ML evaluation, but <b>task-specific</b> LLMs come back close to it (plate 9), because their outputs are narrower and more structured.</p>
+  <div class="box work"><b>Try it · which kind of evaluation fits?</b>
+    <p>Pick an output and see whether a crisp ML-style metric is enough.</p>
+    <div class="controls" id="mlv_btns"></div>
+    <div class="verdict" id="mlv_out">Pick an example above.</div>
+    <p class="note">Examples are modelled, not from the book.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A board-exam maths paper vs an essay paper. Maths: the answer is 42 or it isn't, so any teacher gives the same mark. Essay: two teachers may give 14/20 and 17/20, and you need a marking scheme (rubric) to keep them close. Classic ML is the maths paper; LLMs mostly write essays. <i>Where it breaks:</i> some LLM tasks (classification, extraction) are really maths papers in disguise, and there you should use the crisp metrics.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A classifier's output space is tiny (a few labels), so "correct" is a lookup. An LLM's output space is every possible string; many different strings are equally good answers. Any metric must therefore either compare <i>meaning</i> (hard, often needs another model) or force the output into a small space (multiple choice, JSON fields).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Why can't you just use accuracy for an LLM?"</i> → "Because there is usually no single right string. A classifier picks from a few labels, so accuracy works. An LLM writes free text, so I either constrain the output (multiple choice, structured JSON) to make it measurable, or I score meaning with a rubric and a judge model. And one LLM does many tasks, so I need a suite, not one number."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s9">Plate 9</a>: where task-specific LLMs reuse accuracy, precision, recall and F1.</li><li><a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs Ch.12</a>: its evaluation section covers word-level metrics, benchmarks and human eval.</li></ul></div>
+</section>
+<script>
+(function(){
+  var ex = [
+    ["Spam / not spam label", "good", "Crisp. Output is one of two labels: use accuracy, precision, recall, F1 exactly as in classic ML."],
+    ["Extracted invoice total", "good", "Mostly crisp. Compare the extracted number to the true one (exact match); classic metrics work."],
+    ["Summary of a 3-page report", "warn", "Partly crisp. ROUGE can measure word overlap with a reference summary, but two good summaries can use different words. Often add a judge."],
+    ["Friendly reply to an angry customer", "bad", "Fuzzy. Tone, helpfulness and correctness are all needed. No single number; use a rubric + LLM judge or human ratings."],
+    ["LinkedIn post in Dhanesh's style", "bad", "Fuzzy. This is exactly the TwinLlama case: style is subjective, so the book uses an LLM judge with a style scale (plate 17)."]
+  ];
+  var box = document.getElementById("mlv_btns"), out = document.getElementById("mlv_out");
+  ex.forEach(function(e, i){
+    var b = document.createElement("button"); b.type = "button"; b.textContent = e[0];
+    b.addEventListener("click", function(){
+      Array.prototype.forEach.call(box.children, function(c){ c.classList.remove("on"); });
+      b.classList.add("on"); out.className = "verdict " + e[1]; out.textContent = e[2];
+    });
+    box.appendChild(b);
+  });
+})();
+</script>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · GENERAL-PURPOSE LLM EVALUATIONS (1/3)</div><h2>Three phases, and what to watch while the model is still pre-training</h2></div><span class="chip">pdf p292</span></div>
+  <p><b>General-purpose evaluations</b> are metrics for <b>base models</b> (only pre-trained) and <b>general-purpose fine-tuned models</b> (chat assistants). They test a broad mix of abilities tied to <b>knowledge</b> and <b>usefulness</b>, without targeting one task or domain. Developers use them to:</p>
+  <ul class="plain">
+    <li>get an overview of the model's capabilities,</li>
+    <li>compare themselves with competitors,</li>
+    <li>find strengths and weaknesses,</li>
+    <li>and, based on the results, tweak the <b>dataset</b>, the <b>hyperparameters</b>, or even the <b>architecture</b>.</li>
+  </ul>
+  <p>They fall into <b>three phases</b>: <b>during pre-training</b>, <b>after pre-training</b> (plate 5), and <b>after fine-tuning</b> (plate 5).</p>
+  <svg viewBox="0 0 640 110" class="dg" role="img" aria-label="Three phases of general-purpose evaluation" style="width:100%;height:auto;max-width:640px">
+    <rect x="8" y="16" width="196" height="64" rx="6" class="hi"/><text x="106" y="40" text-anchor="middle" class="b">During pre-training</text><text x="106" y="60" text-anchor="middle" class="m">loss · perplexity · grad norm</text>
+    <rect x="222" y="16" width="196" height="64" rx="6" class="f"/><text x="320" y="40" text-anchor="middle" class="b">After pre-training</text><text x="320" y="60" text-anchor="middle" class="m">MMLU · HellaSwag · ARC-C…</text>
+    <rect x="436" y="16" width="196" height="64" rx="6" class="f"/><text x="534" y="40" text-anchor="middle" class="b">After fine-tuning</text><text x="534" y="60" text-anchor="middle" class="m">IFEval · Arena · MT-Bench…</text>
+    <line x1="204" y1="48" x2="222" y2="48" class="on"/><line x1="418" y1="48" x2="436" y2="48" class="on"/>
+    <text x="320" y="102" text-anchor="middle" class="m">this plate = the highlighted box</text>
+  </svg>
+  <p><b>During pre-training</b> you watch how the model learns (the book points back to the end of <a href="ch05_supervised_fine_tuning.html">Chapter 5</a>, where the same curves were read during SFT). The simplest metrics are <b>low-level</b> and match how models are trained:</p>
+  <ul class="plain">
+    <li><b>Training loss</b>: based on <b>cross-entropy loss</b>. It measures the gap between the probability distribution the model predicts for the next token and the true next token.</li>
+    <li><b>Validation loss</b>: the same loss, computed on a <b>held-out validation set</b> the model never trains on, to check that it <b>generalizes</b> (not just memorizes).</li>
+    <li><b>Perplexity</b>: the <b>exponential of the cross-entropy loss</b>. It says how "surprised" the model is by the data. <b>Lower is better.</b></li>
+    <li><b>Gradient norm</b>: the size of the gradients during training. Watching it catches <b>instabilities</b> and <b>vanishing or exploding gradients</b>.</li>
+  </ul>
+  <p>You can also run benchmarks such as <b>HellaSwag</b> (common-sense reasoning) during pre-training, but the book warns of a risk: you may start <b>overfitting to these evaluations</b>, steering training toward the test instead of toward real ability.</p>
+  <div class="box work"><b>Try it · loss → perplexity</b>
+    <p>Move the loss. Perplexity = e<sup>loss</sup>. A handy reading: "the model is as unsure as if it were choosing uniformly among this many tokens."</p>
+    <div class="controls"><label>cross-entropy loss <input type="range" id="pp_l" min="0" max="5" step="0.05" value="2"><output id="pp_lo">2.00</output></label></div>
+    <div class="readout"><span>perplexity <b id="pp_p">7.39</b></span><span id="pp_t"></span></div>
+    <div class="meter amber"><i id="pp_m"></i></div>
+    <p class="note">Formula from the book's definition; the "choose among N tokens" reading is a standard intuition, not a quote. Bar scale is log, modelled.</p>
+  </div>
+  <div class="box work"><b>Worked example · reading two curves</b>
+    <p>Step 1,000: train loss 2.10, validation loss 2.15 → perplexities ≈ 8.2 and 8.6. Healthy: both close.<br>Step 5,000: train loss 1.40, validation loss 2.30 → perplexities ≈ 4.1 and 10.0. Training keeps improving but validation got worse: the model is memorizing, not generalizing. Gradient norm suddenly jumping from ~1 to 40 at the same time would add a warning of instability.</p>
+    <p class="note">Numbers are modelled for illustration.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Perplexity is like a cricket commentator guessing the next ball. A new commentator is "surprised" by everything: it could be any of 50 kinds of delivery. A veteran who knows the bowler narrows it to 3. Lower surprise = better model of the game. <i>Where it breaks:</i> a commentator can be unsurprised and still talk boringly; low perplexity says the model predicts text well, not that it is a helpful assistant. That's why later phases add real benchmarks.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Cross-entropy for one token is −log(probability the model gave to the correct token). Averaged over many tokens, then exponentiated, you get perplexity. If the model always gives the correct token probability 1/8, the loss is log 8 ≈ 2.08 and perplexity is exactly 8. Gradient norm is the length of the gradient vector: if it explodes, weight updates become huge and training diverges; if it vanishes, learning stalls.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What is perplexity?"</i> → "It's e to the power of the average cross-entropy loss: how surprised the model is by real text. Lower is better. A perplexity of 8 means the model is about as uncertain as picking uniformly among 8 tokens. It's a training-time health metric; it doesn't tell you if the model is a good assistant."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: train loss, eval loss and grad norm curves for TwinLlama.</li><li><a href="../hands_on_llms/ch12_fine_tuning_generation_models.html">Hands-On LLMs Ch.12</a> and <a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a> (perplexity, cross-entropy and bits-per-byte in depth).</li></ul></div>
+</section>
+<script>
+(function(){
+  var l = document.getElementById("pp_l"), lo = document.getElementById("pp_lo"), p = document.getElementById("pp_p"), t = document.getElementById("pp_t"), m = document.getElementById("pp_m");
+  function upd(){
+    var v = parseFloat(l.value), ppl = Math.exp(v);
+    lo.textContent = v.toFixed(2); p.textContent = ppl < 100 ? ppl.toFixed(2) : Math.round(ppl);
+    t.textContent = "≈ guessing among " + Math.max(1, Math.round(ppl)) + " equally likely tokens";
+    m.style.width = Math.min(100, Math.log(ppl + 1) / Math.log(150) * 100) + "%";
+  }
+  l.addEventListener("input", upd); upd();
+})();
+</script>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · GENERAL-PURPOSE LLM EVALUATIONS (2/3)</div><h2>Benchmarks for base models, and for fine-tuned chat models</h2></div><span class="chip">pdf p292–293</span></div>
+  <p><b>After pre-training</b>, teams run a <b>suite</b> of evaluations on the base model. It mixes <b>internal</b> (private) and <b>public</b> benchmarks. The book's non-exhaustive list of common public ones:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Benchmark</th><th>Tests</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td><b>MMLU</b></td><td>knowledge</td><td>Multiple-choice questions over <b>57 subjects</b>, from elementary school to professional level.</td></tr>
+      <tr><td><b>HellaSwag</b></td><td>reasoning</td><td>Given a situation, pick the most plausible ending from several choices.</td></tr>
+      <tr><td><b>ARC-C</b></td><td>reasoning</td><td>Grade-school multiple-choice science questions that need causal reasoning (the "Challenge" set).</td></tr>
+      <tr><td><b>Winogrande</b></td><td>reasoning</td><td>Common sense through <b>pronoun resolution</b> in carefully built sentences (who does "it" refer to?).</td></tr>
+      <tr><td><b>PIQA</b></td><td>reasoning</td><td>Physical common sense: questions about everyday physical interactions.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Same benchmarks, used to judge fine-tuning</h3>
+  <p>Many of these datasets are also run on <b>general-purpose fine-tuned</b> models. Here the interesting number is the <b>difference</b> between the base model's score and the fine-tuned model's score:</p>
+  <ul class="plain">
+    <li><b>Bad fine-tuning</b> can <b>damage knowledge</b>: the MMLU score drops.</li>
+    <li><b>Good fine-tuning</b> may add knowledge: MMLU goes up.</li>
+    <li>A jump that is <b>too big</b> is a red flag for <b>contamination</b>: the fine-tuning data was too close to a test set. The book's example: gaining <b>10 MMLU points</b> during fine-tuning is unlikely, and suggests the instruction data is contaminated.</li>
+  </ul>
+  <div class="box work"><b>Try it · base vs fine-tuned MMLU delta</b>
+    <div class="controls"><label>base MMLU <input type="range" id="dm_b" min="30" max="85" value="66"><output id="dm_bo">66</output></label><label>fine-tuned MMLU <input type="range" id="dm_f" min="25" max="95" value="65"><output id="dm_fo">65</output></label></div>
+    <div class="verdict" id="dm_v"></div>
+    <p class="note">The thresholds (−2, +3, +10) are modelled to make the book's idea concrete; only the "+10 is suspicious" example comes from the book.</p>
+  </div>
+  <h3>Benchmarks made for fine-tuned models</h3>
+  <p>Here <b>"fine-tuned model"</b> means a model trained with <b>SFT</b> (supervised fine-tuning, <a href="ch05_supervised_fine_tuning.html">Ch.5</a>) <b>and preference alignment</b> (<a href="ch06_preference_alignment.html">Ch.6</a>). Their benchmarks test what such models are for: understanding and answering. Specifically <b>instruction-following</b>, <b>multi-turn conversation</b> and <b>agentic skills</b>:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Benchmark</th><th>Tests</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td><b>IFEval</b></td><td>instruction following</td><td>Instructions with checkable constraints, e.g. "don't use any commas in your answer".</td></tr>
+      <tr><td><b>Chatbot Arena</b></td><td>conversation</td><td><b>Humans vote</b> for the better answer when two models face each other head-to-head on the same instruction.</td></tr>
+      <tr><td><b>AlpacaEval</b></td><td>instruction following</td><td><b>Automatic</b> evaluation for fine-tuned models, highly correlated with Chatbot Arena.</td></tr>
+      <tr><td><b>MT-Bench</b></td><td>conversation</td><td><b>Multi-turn</b> conversations: does the model keep context and stay coherent?</td></tr>
+      <tr><td><b>GAIA</b></td><td>agentic</td><td>Many abilities like <b>tool use</b> and <b>web browsing</b>, in multi-step tasks.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box work"><b>Try it · IFEval-style checker</b>
+    <p>IFEval works because its constraints can be checked by code, with no judge. Type an "answer" to the instruction <i>"Describe chai in one sentence, no commas, under 15 words."</i></p>
+    <div class="controls"><div class="full"><textarea id="if_t">Chai is sweet milky tea boiled with ginger and cardamom.</textarea></div></div>
+    <div class="readout" id="if_r"></div>
+    <p class="note">Toy checker (modelled), in the spirit of IFEval's verifiable constraints.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>MMLU is the JEE/NEET-style exam: many subjects, multiple choice, a clean score. Chatbot Arena is a <i>Swayamvar</i>-style contest: two suitors answer the same question and the audience picks one; ratings build up from many such duels. IFEval is a form with strict rules ("write in BLOCK LETTERS, no overwriting"): a clerk can check it mechanically. <i>Where it breaks:</i> exam toppers can still be bad at real jobs, and audiences can be swayed by style; see plate 6.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Base-model benchmarks probe what pre-training stored: facts (MMLU) and common-sense patterns (HellaSwag, PIQA, Winogrande, ARC-C). Chat-model benchmarks probe behaviour that SFT and preference alignment add: obeying constraints, holding a conversation, using tools. That's why you compare base vs fine-tuned on the first group (did we lose knowledge?) and compare chat models with each other on the second group.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you detect benchmark contamination after fine-tuning?"</i> → "Compare base and fine-tuned scores on a knowledge benchmark like MMLU. Fine-tuning mostly teaches format and style, so it shouldn't add many knowledge points; a jump like +10 MMLU is a strong hint the instruction data overlaps the test set. Then I'd check for n-gram overlap between the training data and the benchmark questions."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: data decontamination (removing test-like samples before training).</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: public benchmarks, leaderboards and contamination in more depth.</li></ul></div>
+</section>
+<script>
+(function(){
+  var b = document.getElementById("dm_b"), f = document.getElementById("dm_f"), v = document.getElementById("dm_v");
+  function upd(){
+    var bb = +b.value, ff = +f.value, d = ff - bb;
+    document.getElementById("dm_bo").textContent = bb; document.getElementById("dm_fo").textContent = ff;
+    var s = (d > 0 ? "+" : "") + d + " points. ";
+    if (d >= 10) { v.className = "verdict bad"; v.textContent = s + "Suspicious: a gain this large during fine-tuning is unlikely. Check the instruction data for contamination (test questions leaking in)."; }
+    else if (d >= 3) { v.className = "verdict good"; v.textContent = s + "Good fine-tuning may add some knowledge. Plausible, but still worth a contamination check."; }
+    else if (d >= -2) { v.className = "verdict good"; v.textContent = s + "Knowledge kept roughly intact. Typical: fine-tuning mainly changes format and behaviour."; }
+    else { v.className = "verdict warn"; v.textContent = s + "Knowledge degraded. The fine-tuning may be too aggressive (learning rate, epochs) or the data too narrow (catastrophic forgetting)."; }
+  }
+  b.addEventListener("input", upd); f.addEventListener("input", upd); upd();
+  var t = document.getElementById("if_t"), r = document.getElementById("if_r");
+  function chk(){
+    var s = t.value.trim(), w = s ? s.split(/\s+/).length : 0, sent = (s.match(/[.!?](\s|$)/g) || []).length;
+    var c1 = s.indexOf(",") < 0, c2 = w > 0 && w < 15, c3 = sent <= 1 && w > 0;
+    function pill(ok, txt){ return '<span class="pill ' + (ok ? "good" : "bad") + '">' + (ok ? "✓ " : "✗ ") + txt + "</span>"; }
+    r.innerHTML = pill(c1, "no commas") + pill(c2, w + " words (&lt;15)") + pill(c3, "one sentence") + "<span>score <b>" + ((c1?1:0)+(c2?1:0)+(c3?1:0)) + "/3</b></span>";
+  }
+  t.addEventListener("input", chk); chk();
+})();
+</script>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · GENERAL-PURPOSE LLM EVALUATIONS (3/3)</div><h2>Using benchmarks to choose a model, and why never to trust one alone</h2></div><span class="chip">pdf p293–294</span></div>
+  <p>Knowing how these evaluations are built helps you <b>pick the best LLM</b> for your application:</p>
+  <ul class="plain">
+    <li><b>If you plan to fine-tune</b>, you want the best <b>base model</b> for its size in <b>knowledge and reasoning</b> (MMLU, ARC-C and friends). That gives the strongest foundation to build on.</li>
+    <li><b>If you won't fine-tune</b>, benchmarks like <b>Chatbot Arena</b> or <b>IFEval</b> help compare ready-made <b>instruct</b> models. Match the benchmark to the goal:
+      <ul><li>a <b>chatbot</b> needs great <b>conversational</b> ability (Arena, MT-Bench);</li>
+      <li><b>information extraction</b> from unstructured documents doesn't need chat skill; it needs excellent <b>instruction-following</b> (IFEval) to understand and carry out the task.</li></ul></li>
+  </ul>
+  <h3>The flaws</h3>
+  <ul class="plain">
+    <li><b>Public benchmarks can be gamed</b>: models trained on the test data, or on samples very similar to it, score high without being better.</li>
+    <li><b>Human evaluation is biased</b> too: people tend to prefer <b>long, confident</b> answers, especially when nicely <b>formatted</b> (e.g. Markdown headings and bullets).</li>
+    <li><b>Private test sets</b> avoid gaming, but have been checked by far fewer people, so they may carry their own errors and biases.</li>
+  </ul>
+  <p>The conclusion: benchmarks are <b>not a single source of truth</b>; use them as <b>signals</b>. When several independent evaluations point the same way, your confidence in the model's real ability can go up.</p>
+  <div class="box work"><b>Try it · pick the benchmark, then count agreeing signals</b>
+    <div class="controls"><label>my goal <select id="bs_g">
+      <option value="ft">fine-tune my own model</option>
+      <option value="chat">customer-facing chatbot</option>
+      <option value="ext">extract fields from PDFs</option>
+      <option value="agent">tool-calling agent</option>
+    </select></label></div>
+    <div class="verdict" id="bs_v"></div>
+    <p>Model X claims to be best. Tick the evaluations that agree:</p>
+    <div class="claims" id="bs_c">
+      <label><input type="checkbox"> Public leaderboard (e.g. MMLU / Open LLM leaderboard)</label>
+      <label><input type="checkbox"> Chatbot Arena human votes</label>
+      <label><input type="checkbox"> Our private test set</label>
+      <label><input type="checkbox"> A quick manual review of 20 answers</label>
+    </div>
+    <div class="mrow"><span>confidence</span><div class="meter"><i id="bs_m"></i></div><span id="bs_n">low</span></div>
+    <p class="note">Confidence meter is a modelled illustration of "more agreeing signals → more confidence".</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Choosing a restaurant on Zomato. A 4.6 rating is a signal, but ratings can be bought, and reviewers love big portions and pretty plating (long, formatted answers). Your friend's private recommendation is unbiased by marketing but based on few visits. If the rating, your friend, and a food blogger all agree, you go. <i>Where it breaks:</i> you can taste the food yourself in one visit; for an LLM, "tasting" means building your own task-specific test (plates 9–11).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each benchmark has its own error: contamination for public sets, verbosity and format bias for human votes, untested labels for private sets. These errors are mostly independent, so when the benchmarks agree, the shared signal is likely real ability rather than any one benchmark's flaw.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How did you choose which LLM to use?"</i> → "Leaderboards only made the shortlist. I matched benchmarks to the job: for structured extraction or tool-calling I weigh instruction-following (IFEval-style) over chat preference scores. Then I ran our own small eval set on the shortlist, because public scores can be gamed and human-vote boards reward long, nicely formatted answers. I trusted a model once several signals agreed." For a realtime voice agent, add latency and cost as hard constraints next to quality.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s11">Plate 11</a>: LLM judges share the human bias toward long, confident answers.</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: model selection workflow.</li></ul></div>
+</section>
+<script>
+(function(){
+  var g = document.getElementById("bs_g"), v = document.getElementById("bs_v");
+  var msg = {
+    ft: "Look at base-model knowledge and reasoning for the size you can afford: MMLU, ARC-C, HellaSwag, Winogrande, PIQA. Best foundation → best fine-tune.",
+    chat: "Look at conversation benchmarks: Chatbot Arena (human votes), MT-Bench (multi-turn), AlpacaEval (automatic, Arena-correlated).",
+    ext: "Look at instruction-following: IFEval. Chat charm doesn't matter; obeying the format and the task does.",
+    agent: "Look at agentic benchmarks such as GAIA (tool use, browsing, multi-step), plus IFEval for strict formats."
+  };
+  function upd(){ v.className = "verdict good"; v.textContent = msg[g.value]; }
+  g.addEventListener("change", upd); upd();
+  var boxes = document.querySelectorAll("#bs_c input"), m = document.getElementById("bs_m"), n = document.getElementById("bs_n");
+  function cnt(){
+    var k = 0; Array.prototype.forEach.call(boxes, function(b){ if (b.checked) k++; });
+    m.style.width = (k * 25) + "%"; n.textContent = ["none", "low", "medium", "good", "high"][k];
+  }
+  Array.prototype.forEach.call(boxes, function(b){ b.addEventListener("change", cnt); }); cnt();
+})();
+</script>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · DOMAIN-SPECIFIC LLM EVALUATIONS (1/2)</div><h2>Narrower scope, deeper tests: four domain leaderboards</h2></div><span class="chip">pdf p294–295</span></div>
+  <p><b>Domain-specific LLMs</b> cover less ground than general-purpose ones. That is useful: you can test <b>finer-grained</b> abilities in <b>more depth</b> than the broad benchmarks do.</p>
+  <p>Which benchmarks to use depends <b>entirely on the domain</b>. For common cases, like a <b>language-specific</b> model or a <b>code</b> model, the book recommends searching for existing evaluations and even <b>benchmark suites</b>. A suite bundles several benchmarks, is designed to be <b>reproducible</b>, and, by covering different aspects of the domain, usually captures domain performance more accurately than any single test.</p>
+  <p>Four examples with leaderboards on the <b>Hugging Face Hub</b>:</p>
+  <div class="box work"><b>Explore · click a leaderboard</b>
+    <div class="controls" id="lb_btns"></div>
+    <div class="answer" id="lb_out"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Leaderboard</th><th>Domain</th><th>Contents at a glance</th></tr></thead>
+    <tbody>
+      <tr><td><b>Open Medical-LLM</b></td><td>medical QA</td><td>9 metrics · MedQA (1,273 US licence-exam Qs) · PubMedQA (500) · MedMCQA (4,183, Indian medical entrance exams) · 1,089 Qs from 6 MMLU medical sub-categories</td></tr>
+      <tr><td><b>BigCodeBench</b></td><td>code</td><td>Complete (from docstrings) + Instruct (from natural language) · ranked by Pass@1, greedy decoding · Elo for Complete</td></tr>
+      <tr><td><b>Hallucinations</b></td><td>false / unsupported info</td><td>16 tasks, 5 categories: QA (NQ Open, TruthfulQA, SQuADv2) · reading (TriviaQA, RACE) · summarization (HaluEval Summ, XSum, CNN/DM) · dialogue (HaluEval Dial, FaithDial) · fact checking (MemoTrap, SelfCheckGPT, FEVER, TrueFalse) · plus IFEval</td></tr>
+      <tr><td><b>Enterprise Scenarios</b></td><td>business use</td><td>6 cases: FinanceBench (100) · Legal Confidentiality (100, LegalBench) · Writing Prompts · Customer Support Dialogue · Toxic Prompts · Enterprise PII · some test sets closed-source</td></tr>
+    </tbody>
+  </table></div>
+  <p>Leaderboards take different approaches depending on the domain. <b>BigCodeBench</b> is unusual: just <b>two metrics</b> are enough to capture the whole domain. The <b>Hallucinations Leaderboard</b> groups <b>16 metrics</b>, many of them general-purpose evaluations. Lesson: besides custom benchmarks, <b>reusing general-purpose ones</b> can complete your own suite.</p>
+  <h3>Pass@1, greedy decoding and Elo (terms used above)</h3>
+  <ul class="plain">
+    <li><b>Pass@1</b>: the share of coding problems where the model's <b>first</b> generated solution passes the unit tests.</li>
+    <li><b>Greedy decoding</b>: always pick the most likely next token (no sampling), so the result is repeatable.</li>
+    <li><b>Elo rating</b>: a chess-style score updated from pairwise wins and losses (the same idea behind Chatbot Arena). <i>Beyond the book:</i> the book only names Elo for the Complete variant; this one-line definition is standard background.</li>
+  </ul>
+  <div class="box work"><b>Worked example · Pass@1</b>
+    <p>A code model is given 200 problems, one greedy attempt each. 118 of the solutions pass all unit tests → <b>Pass@1 = 118 / 200 = 59%</b>. No partial credit: a solution that fails one test counts as wrong.</p>
+    <p class="note">Numbers modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A general MBBS exam vs a cardiology fellowship exam. The cardiology exam asks fewer topics but much deeper ones, and it borrows a few general medicine questions too. Similarly the Open Medical-LLM board reuses six MMLU medical sub-categories next to MedQA, PubMedQA and MedMCQA (from Indian medical entrance exams). <i>Where it breaks:</i> the domain board still uses multiple-choice; real clinical work is open-ended, so a high score is necessary, not sufficient.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Domain performance has several sides (for medicine: licensing knowledge, reading research, entrance-exam recall; for hallucination: QA, reading, summarization, dialogue, fact-checking). A suite samples each side, so a model can't top the board by being good at one narrow format. Closed test sets (Enterprise Scenarios) further stop models from training on the test.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you evaluate a model for a specialised domain, say legal or finance?"</i> → "Start from an existing domain suite if one exists, e.g. FinanceBench or LegalBench tasks, because they are reproducible and cover several sides of the domain. Add relevant general benchmarks (instruction-following, hallucination) and a few safety checks like PII and toxicity, as the Enterprise Scenarios board does. Then a private, closed set from our own data so nobody can overfit to it."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s8">Plate 8</a>: language leaderboards and the three design principles.</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: building your own evaluation pipeline.</li></ul></div>
+</section>
+<script>
+(function(){
+  var lb = [
+    ["Open Medical-LLM", "Medical question answering. <b>9 metrics</b> built from: <b>1,273</b> US medical licence exam questions (<b>MedQA</b>), <b>500</b> questions from PubMed articles (<b>PubMedQA</b>), <b>4,183</b> questions from <b>Indian medical entrance exams</b> (<b>MedMCQA</b>), and <b>1,089</b> questions from <b>6 MMLU sub-categories</b>: clinical knowledge, medical genetics, anatomy, professional medicine, college biology, college medicine."],
+    ["BigCodeBench", "Code LLMs. Two categories: <b>BigCodeBench-Complete</b> (complete code from structured docstrings) and <b>BigCodeBench-Instruct</b> (write code from natural-language instructions). Ranked by <b>Pass@1</b> with <b>greedy decoding</b>; the Complete variant also gets an <b>Elo rating</b>. Covers many programming scenarios that test compositional reasoning and instruction-following."],
+    ["Hallucinations", "Tendency to produce false or unsupported information: <b>16 tasks</b> in <b>5 categories</b>. <b>Question answering</b>: NQ Open, TruthfulQA, SQuADv2. <b>Reading comprehension</b>: TriviaQA, RACE. <b>Summarization</b>: HaluEval Summ, XSum, CNN/DM. <b>Dialogue</b>: HaluEval Dial, FaithDial. <b>Fact checking</b>: MemoTrap, SelfCheckGPT, FEVER, TrueFalse. Also checks instruction-following with <b>IFEval</b>."],
+    ["Enterprise Scenarios", "<b>Six</b> real-world business use cases: <b>FinanceBench</b> (100 financial questions with retrieved context), <b>Legal Confidentiality</b> (100 prompts from LegalBench, legal reasoning), <b>Writing Prompts</b> (creative writing), <b>Customer Support Dialogue</b> (relevance in support chats), <b>Toxic Prompts</b> (safety against harmful generation), <b>Enterprise PII</b> (protecting sensitive personal information). <b>Some test sets are closed-source</b> to prevent gaming. Focus: answer accuracy, legal reasoning, creative writing, contextual relevance and safety."]
+  ];
+  var box = document.getElementById("lb_btns"), out = document.getElementById("lb_out");
+  lb.forEach(function(e, i){
+    var b = document.createElement("button"); b.type = "button"; b.textContent = e[0];
+    b.addEventListener("click", function(){ Array.prototype.forEach.call(box.children, function(c){ c.classList.remove("on"); }); b.classList.add("on"); out.innerHTML = e[1]; });
+    box.appendChild(b); if (i === 0) b.click();
+  });
+})();
+</script>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · DOMAIN-SPECIFIC LLM EVALUATIONS (2/2)</div><h2>Language-specific leaderboards, three design principles, two libraries</h2></div><span class="chip">pdf p295–296</span></div>
+  <p><b>Language-specific LLMs</b> (a model for Korean, Portuguese, Hindi…) often reuse <b>translated</b> versions of general-purpose benchmarks, and complete them with <b>original evaluations written in the native language</b>. Some translations are done by machine; the book says <b>human-translated</b> evaluations are better, for quality. Three leaderboards to show how such suites are built (the book calls them "task-specific" here, but they are the language-specific examples of this section):</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Leaderboard</th><th>Size</th><th>What's inside</th></tr></thead>
+    <tbody>
+      <tr><td><b>OpenKo-LLM</b> (Korean)</td><td>9 metrics</td><td>Translated general benchmarks: <b>GPQA, Winogrande, GSM8K, EQ-Bench, IFEval</b>. Custom ones: <b>Knowledge, Social Value, Harmlessness, Helpfulness</b>.</td></tr>
+      <tr><td><b>Open Portuguese LLM</b></td><td>9 benchmarks</td><td>Education: <b>ENEM</b> (1,430 questions) and <b>BLUEX</b> (724 university-entrance questions). Professional: <b>OAB Exams</b> (2,000+ questions). Language understanding: <b>ASSIN2 RTE</b> and <b>STS</b>, <b>FAQUAD NLI</b>. Social media: <b>HateBR</b> (7,000 Instagram comments), <b>PT Hate Speech</b> (5,668 tweets), <b>tweetSentBR</b>.</td></tr>
+      <tr><td><b>Open Arabic LLM</b></td><td>2 native + 12 translated</td><td>Native Arabic: <b>AlGhafa</b>, <b>Arabic-Culture-Value-Alignment</b>. Translated: 12 benchmarks such as <b>MMLU, ARC-Challenge, HellaSwag, PIQA</b>.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Three principles for any good evaluation (general or domain)</h3>
+  <ol class="plain">
+    <li><b>Complex</b>: hard enough to separate good outputs from bad ones. If every model scores 95%, the test tells you nothing.</li>
+    <li><b>Diverse</b>: cover as many topics and scenarios as possible. If one benchmark isn't enough, add more to build a stronger suite.</li>
+    <li><b>Practical</b>: easy to run. This depends a lot on the evaluation <b>library</b>.</li>
+  </ol>
+  <p>The book recommends two libraries for running benchmarks: <b>lm-evaluation-harness</b> from <b>EleutherAI</b> (github.com/EleutherAI/lm-evaluation-harness) and <b>lighteval</b> from <b>Hugging Face</b> (github.com/huggingface/lighteval).</p>
+  <div class="box work"><b>Try it · design a Hindi suite and score it on the three principles</b>
+    <p>Tick the parts you'd include for a Hindi assistant model.</p>
+    <div class="claims" id="hs_c">
+      <label><input type="checkbox" data-c="1" data-d="1" data-p="1"> MMLU, machine-translated to Hindi</label>
+      <label><input type="checkbox" data-c="1" data-d="1" data-p="0"> MMLU, human-translated to Hindi (better quality, more effort)</label>
+      <label><input type="checkbox" data-c="1" data-d="1" data-p="1"> IFEval translated (instruction following)</label>
+      <label><input type="checkbox" data-c="2" data-d="2" data-p="0"> Native questions from Indian exams written in Hindi</label>
+      <label><input type="checkbox" data-c="1" data-d="2" data-p="1"> Hindi social-media sentiment / hate-speech sets</label>
+      <label><input type="checkbox" data-c="0" data-d="1" data-p="2"> Run everything through lm-evaluation-harness / lighteval</label>
+    </div>
+    <div class="mrow"><span>complex</span><div class="meter amber"><i id="hs_1"></i></div><span id="hs_1n">0</span></div>
+    <div class="mrow"><span>diverse</span><div class="meter"><i id="hs_2"></i></div><span id="hs_2n">0</span></div>
+    <div class="mrow"><span>practical</span><div class="meter plum"><i id="hs_3"></i></div><span id="hs_3n">0</span></div>
+    <p class="note">The Hindi suite and the point values are modelled; the pattern (translated + native + a runnable library) is the book's.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Translating MMLU into Hindi by machine is like dubbing a Hollywood film with Google Translate: the plot survives but jokes and idioms break, and some questions become nonsense. A human dub is better, and an original Hindi film (native evaluation) tests things a dub never can, like cultural context. <i>Where it breaks:</i> a film only needs to entertain; a benchmark must also be unambiguous, so even human translators must re-check every answer key.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Translation preserves the <i>skill</i> being tested (reasoning, knowledge) but can't test language-specific knowledge (culture, local exams, local social media). Native benchmarks add that. Libraries matter because benchmark scores depend on small details (prompt format, few-shot examples, how answers are parsed); running everyone through the same harness keeps numbers comparable.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you evaluate a model for an Indian-language voice assistant?"</i> → "A mix: general benchmarks translated by humans, not machines, so I can compare to English baselines; native-language sets for culture and local knowledge; and task tests for my use case. I'd keep it complex, diverse and practical, and run it with a standard harness like lm-evaluation-harness or lighteval so results are reproducible."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s10">Plate 10</a>: how lm-evaluation-harness scores multiple-choice questions.</li></ul></div>
+</section>
+<script>
+(function(){
+  var boxes = document.querySelectorAll("#hs_c input");
+  function upd(){
+    var s = [0, 0, 0];
+    Array.prototype.forEach.call(boxes, function(b){ if (b.checked){ s[0] += +b.dataset.c; s[1] += +b.dataset.d; s[2] += +b.dataset.p; } });
+    [1,2,3].forEach(function(i){
+      var v = Math.min(5, s[i-1]);
+      document.getElementById("hs_" + i).style.width = (v * 20) + "%";
+      document.getElementById("hs_" + i + "n").textContent = v + "/5";
+    });
+  }
+  Array.prototype.forEach.call(boxes, function(b){ b.addEventListener("change", upd); }); upd();
+})();
+</script>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · TASK-SPECIFIC LLM EVALUATIONS (1/3)</div><h2>Your own task: back to classic metrics (ROUGE, accuracy, precision, recall, F1)</h2></div><span class="chip">pdf p296–297</span></div>
+  <p>General and domain benchmarks tell you that a base or instruct model is <i>strong</i>. They can't tell you how well it does <b>your</b> task. For that you need benchmarks built for the task, measuring <b>downstream performance</b> (performance on the real job).</p>
+  <p>Because task-specific models are so narrow, there is rarely a ready-made dataset. The upside: their outputs tend to be <b>more structured</b>, so <b>traditional ML metrics</b> often work.</p>
+  <h3>Summarization: ROUGE</h3>
+  <p><b>ROUGE</b> (Recall-Oriented Understudy for Gisting Evaluation) measures the <b>overlap</b> between the generated text and a <b>reference</b> text using <b>n-grams</b> (runs of n consecutive words).</p>
+  <div class="box work"><b>Try it · ROUGE-1 / ROUGE-2 calculator</b>
+    <div class="controls">
+      <div class="full"><span>reference summary</span><textarea id="rg_r">the train to pune is delayed by two hours due to heavy rain</textarea></div>
+      <div class="full"><span>model summary</span><textarea id="rg_g">heavy rain delayed the pune train by two hours</textarea></div>
+    </div>
+    <div class="readout" id="rg_out"></div>
+    <div id="rg_toks"></div>
+    <p class="note">Simplified ROUGE (lower-case, split on spaces, clipped counts). Recall = overlap / reference n-grams; precision = overlap / generated n-grams; F1 combines them. Example sentences modelled.</p>
+  </div>
+  <h3>Classification-like tasks: four classic metrics</h3>
+  <ul class="plain">
+    <li><b>Accuracy</b>: correct predictions ÷ all predictions. Best when outputs are categories with a clear right/wrong, such as <b>NER</b> (named entity recognition: tagging names, places, dates in text).</li>
+    <li><b>Precision</b>: true positives ÷ everything the model <i>predicted</i> as positive. "When it says yes, how often is it right?"</li>
+    <li><b>Recall</b>: true positives ÷ everything that is <i>actually</i> positive. "Of all the real yeses, how many did it find?"</li>
+    <li><b>F1 score</b>: the <b>harmonic mean</b> of precision and recall, balancing the two. Especially useful for classification and <b>entity extraction</b>.</li>
+  </ul>
+  <div class="box work"><b>Try it · confusion matrix → metrics</b>
+    <p>An LLM tags 100 support tickets as "refund request" or not.</p>
+    <div class="controls">
+      <label>true positives <input type="range" id="cm_tp" min="0" max="50" value="30"><output id="cm_tpo">30</output></label>
+      <label>false positives <input type="range" id="cm_fp" min="0" max="50" value="10"><output id="cm_fpo">10</output></label>
+      <label>false negatives <input type="range" id="cm_fn" min="0" max="50" value="5"><output id="cm_fno">5</output></label>
+    </div>
+    <div class="readout" id="cm_out"></div>
+    <div class="mrow"><span>accuracy</span><div class="meter"><i id="cm_a"></i></div><span id="cm_an"></span></div>
+    <div class="mrow"><span>precision</span><div class="meter amber"><i id="cm_p"></i></div><span id="cm_pn"></span></div>
+    <div class="mrow"><span>recall</span><div class="meter plum"><i id="cm_r"></i></div><span id="cm_rn"></span></div>
+    <div class="mrow"><span>F1</span><div class="meter"><i id="cm_f"></i></div><span id="cm_fn2"></span></div>
+    <p class="note">True negatives = 100 − TP − FP − FN. Numbers modelled.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A railway TTE checking for ticketless passengers. <b>Precision</b>: of the people he fined, how many really had no ticket? (Fining honest people = false positives.) <b>Recall</b>: of all the ticketless people on the train, how many did he catch? (Missed ones = false negatives.) A TTE who fines everyone has perfect recall and terrible precision; F1 punishes that. <i>Where it breaks:</i> ROUGE is a different animal: it is like checking a summary by counting shared words, so "rain delayed the train" and "the train was late because of weather" score low despite meaning the same.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The harmonic mean is pulled toward the smaller number: P = 0.9, R = 0.1 gives F1 = 0.18, not 0.5. So a model can't hide a weak side. ROUGE is "recall-oriented" because its classic form asks how much of the <i>reference</i> got covered; it rewards overlap of surface words, so it misses paraphrases. That is the reason open-ended tasks move to judges (plate 11).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your LLM extracts entities from documents. How do you measure it?"</i> → "That's a classic ML problem in disguise, so I use precision, recall and F1 per entity type against a labelled set. Precision tells me about false alarms, recall about misses, F1 balances them. For summaries I could use ROUGE against references, but since it only counts word overlap I'd pair it with an LLM judge for meaning."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s3">Plate 3</a>: why task-specific LLMs come back close to ML evaluation.</li><li><a href="#s12">Plate 12</a>: retrieval precision and recall in RAG.</li><li><a href="../hands_on_llms/ch04_text_classification.html">Hands-On LLMs Ch.4</a>: classification reports with precision, recall, F1.</li></ul></div>
+</section>
+<script>
+(function(){
+  function grams(s, n){ var w = s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean), g = []; for (var i = 0; i + n <= w.length; i++) g.push(w.slice(i, i + n).join(" ")); return g; }
+  function overlap(a, b){ var c = {}, o = 0; b.forEach(function(x){ c[x] = (c[x] || 0) + 1; }); a.forEach(function(x){ if (c[x]) { o++; c[x]--; } }); return o; }
+  var r = document.getElementById("rg_r"), g = document.getElementById("rg_g"), out = document.getElementById("rg_out"), toks = document.getElementById("rg_toks");
+  function f1(p, q){ return p + q ? 2 * p * q / (p + q) : 0; }
+  function upd(){
+    var res = [];
+    [1, 2].forEach(function(n){
+      var R = grams(r.value, n), G = grams(g.value, n), o = overlap(G, R);
+      var rec = R.length ? o / R.length : 0, pre = G.length ? o / G.length : 0;
+      res.push("<span>ROUGE-" + n + ": overlap <b>" + o + "</b> · recall <b>" + rec.toFixed(2) + "</b> · precision <b>" + pre.toFixed(2) + "</b> · F1 <b>" + f1(rec, pre).toFixed(2) + "</b></span>");
+    });
+    out.innerHTML = res.join("");
+    var ref = {}; grams(r.value, 1).forEach(function(x){ ref[x] = 1; });
+    toks.innerHTML = "model unigrams: " + grams(g.value, 1).map(function(x){ return '<span class="tok' + (ref[x] ? " hit" : "") + '">' + x + "</span>"; }).join("");
+  }
+  r.addEventListener("input", upd); g.addEventListener("input", upd); upd();
+  var tp = document.getElementById("cm_tp"), fp = document.getElementById("cm_fp"), fn = document.getElementById("cm_fn");
+  function set(id, v){ document.getElementById("cm_" + id).style.width = (v * 100) + "%"; }
+  function cm(){
+    var a = +tp.value, b = +fp.value, c = +fn.value, tn = Math.max(0, 100 - a - b - c);
+    document.getElementById("cm_tpo").textContent = a; document.getElementById("cm_fpo").textContent = b; document.getElementById("cm_fno").textContent = c;
+    var acc = (a + tn) / Math.max(1, a + b + c + tn), p = a + b ? a / (a + b) : 0, rr = a + c ? a / (a + c) : 0, f = f1(p, rr);
+    document.getElementById("cm_out").innerHTML = "<span>TP <b>" + a + "</b></span><span>FP <b>" + b + "</b></span><span>FN <b>" + c + "</b></span><span>TN <b>" + tn + "</b></span>";
+    set("a", acc); set("p", p); set("r", rr); set("f", f);
+    document.getElementById("cm_an").textContent = acc.toFixed(2); document.getElementById("cm_pn").textContent = p.toFixed(2);
+    document.getElementById("cm_rn").textContent = rr.toFixed(2); document.getElementById("cm_fn2").textContent = f.toFixed(2);
+  }
+  [tp, fp, fn].forEach(function(x){ x.addEventListener("input", cm); }); cm();
+})();
+</script>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · TASK-SPECIFIC LLM EVALUATIONS (2/3)</div><h2>Build your own quiz: multiple-choice questions, two ways to score them</h2></div><span class="chip">pdf p297–298</span></div>
+  <p>When the task can't be mapped directly to a classic ML task, you can build a <b>custom benchmark</b>, inspired by the general and domain datasets above. A common, successful pattern is <b>multiple-choice question answering</b>: the instruction is a question plus several options, and the expected output is one letter.</p>
+  <div class="box work"><b>Table 7.1 (book, pdf p297), restated · an MMLU abstract-algebra question</b>
+    <p><b>Instruction:</b> what is the degree of the field extension Q(√2, √3) over Q? Options: <b>A.</b> 0 &nbsp; <b>B.</b> 4 &nbsp; <b>C.</b> 2 &nbsp; <b>D.</b> 6.<br><b>Expected output:</b> <code>B</code></p>
+    <p class="note">Why 4 (our explanation, not the book's): adding √2 to the rationals doubles the dimension (basis 1, √2); adding √3 doubles it again (basis 1, √2, √3, √6), so the degree is 2 × 2 = 4.</p>
+  </div>
+  <p>There are <b>two main ways</b> to score a model on such questions:</p>
+  <div class="two">
+    <div class="card"><b>1 · Text generation</b><span>The model <b>writes</b> its answer (a letter A–D), which is compared to the correct one. This tests whether it can produce a coherent, correct reply <b>in the same format it would use in real life</b>.</span></div>
+    <div class="card"><b>2 · Log-likelihood (probabilities)</b><span>No text is generated. You read the model's <b>probability</b> for each option. For MMLU, <b>lm-evaluation-harness</b> compares the probabilities of the <b>full text of each answer</b>. It captures the model's <b>relative confidence</b> across options, even when it wouldn't actually generate the exact right text.</span></div>
+  </div>
+  <p>The book's recommendation: <b>use the text-generation version</b>, which mimics how a human takes a test. It is <b>easier to implement</b> and generally <b>more discriminative</b> (it separates good and bad models better), because <b>low-quality models tend to overperform on probability-based evaluations</b>. You can adapt the technique to quiz a model on your task, or extend it to a domain.</p>
+  <div class="box work"><b>Try it · the same weak model, scored both ways</b>
+    <div class="controls"><label>model <select id="mc_m"><option value="weak">weak model</option><option value="strong">strong model</option></select></label></div>
+    <div class="qa" id="mc_qa"></div>
+    <div class="two">
+      <div class="verdict" id="mc_ll"></div>
+      <div class="verdict" id="mc_tg"></div>
+    </div>
+    <p class="note">Probabilities and generated texts are modelled to show the book's point: a weak model can still rank the right option highest by a hair (log-likelihood counts that as correct) while failing to actually produce "B" when asked to answer.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Log-likelihood scoring is like a viva where the examiner reads out all four options and watches which one makes the student nod slightly more. Text generation is the written exam: the student must actually write "B" in the box. A weak student might nod a bit more at B by luck or vague familiarity, but in the written exam he writes "I think the answer involves fields…" and gets zero. <i>Where it breaks:</i> log-likelihood has real uses (fine-grained confidence, base models that can't follow instructions yet), so it's not "wrong", just less discriminative for this purpose.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Log-likelihood only asks for a <i>ranking</i> among options the evaluator provides, so the model never needs to follow the instruction format or commit. A tiny edge in probability counts as a full point. Text generation requires the whole chain: understand the question, follow the "answer with a letter" instruction, commit to one. That chain is what users actually experience, so it separates good and bad models more clearly.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you build a quick regression test for a domain LLM?"</i> → "Write a few hundred multiple-choice questions from our domain, ask the model to answer with just a letter, and compute accuracy by exact match. It's cheap, deterministic to grade, and catches regressions after each fine-tune or prompt change. I'd use generation-based scoring, not log-likelihood, since weaker models look better than they are under probability scoring."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s8">Plate 8</a>: lm-evaluation-harness.</li><li><a href="#s11">Plate 11</a>: when the task is too open for multiple choice.</li></ul></div>
+</section>
+<script>
+(function(){
+  var data = {
+    weak: { p: [0.22, 0.27, 0.26, 0.25], gen: "\"The degree relates to field theory and depends on the roots…\" (no letter)", ok: false },
+    strong: { p: [0.02, 0.81, 0.10, 0.07], gen: "\"B\"", ok: true }
+  };
+  var opts = ["A. 0", "B. 4", "C. 2", "D. 6"], sel = document.getElementById("mc_m"), qa = document.getElementById("mc_qa");
+  function upd(){
+    var d = data[sel.value], best = d.p.indexOf(Math.max.apply(null, d.p));
+    qa.innerHTML = opts.map(function(o, i){
+      return '<div class="opt' + (i === 1 ? " right" : "") + '"><b>' + o.charAt(0) + '</b><div class="meter' + (i === best ? " amber" : "") + '"><i style="width:' + (d.p[i] * 100) + '%"></i></div><span>' + d.p[i].toFixed(2) + "</span></div>";
+    }).join("");
+    var ll = document.getElementById("mc_ll"), tg = document.getElementById("mc_tg");
+    ll.className = "verdict " + (best === 1 ? "good" : "bad");
+    ll.textContent = "Log-likelihood: highest probability on " + "ABCD".charAt(best) + " → " + (best === 1 ? "counted CORRECT" : "wrong");
+    tg.className = "verdict " + (d.ok ? "good" : "bad");
+    tg.textContent = "Text generation: model wrote " + d.gen + " → " + (d.ok ? "CORRECT" : "WRONG");
+  }
+  sel.addEventListener("change", upd); upd();
+})();
+</script>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · TASK-SPECIFIC LLM EVALUATIONS (3/3)</div><h2>LLM-as-a-judge: let a big model grade open-ended answers</h2></div><span class="chip">pdf p298–300</span></div>
+  <p>If the task is <b>too open-ended</b>, neither classic metrics nor multiple choice fit. Then use <b>LLM-as-a-judge</b>, the technique introduced in <a href="ch05_supervised_fine_tuning.html">Chapter 5</a> (there it scored dataset quality): a strong LLM reads the instruction and the answer and gives a score.</p>
+  <p>The book's practical advice:</p>
+  <ul class="plain">
+    <li><b>Give the judge the ground-truth answer</b> if you have one, as extra context. It makes the evaluation more accurate.</li>
+    <li>If you don't have one, define <b>dimensions</b> to score (e.g. <b>relevance</b>, <b>toxicity</b>, depending on the task). Named dimensions make the scores more <b>interpretable</b>.</li>
+    <li>Use <b>large models</b> as judges, and <b>refine the judge prompt iteratively</b>.</li>
+    <li>Read the judge's <b>explanations</b>: they reveal errors in its reasoning, which you fix with more prompt engineering.</li>
+    <li>Make answers <b>easy to parse</b>: ask for a fixed structure in the instruction, or use <b>structured generation</b> (tools like <b>Outlines</b>, or <b>OpenAI's JSON mode</b>).</li>
+  </ul>
+  <h3>The book's general-purpose judge prompt (Table 7.2), restated</h3>
+  <p>The prompt tells the model it is an evaluator, asks for a score from <b>1 to 4</b> and defines each level. In our words:</p>
+  <ol class="plain">
+    <li>off-topic: the answer doesn't relate to the instruction;</li>
+    <li>on-topic but not useful;</li>
+    <li>on-topic and useful, but it could go into more detail;</li>
+    <li>on-topic, useful and detailed.</li>
+  </ol>
+  <p>It then fixes the output layout: an "Evaluation" header, an <b>Explanation</b> line (discuss relevance, helpfulness, complexity) and a <b>Total rating</b> line with the number; then slots for <code>{instruction}</code> and <code>{answer}</code>. It ends by pre-writing the start of the evaluation, so the model's first words are its explanation. You can change the scale, add a ground-truth answer, and customize it for your case.</p>
+  <pre><code># illustrative skeleton, our own wording
+JUDGE = """You grade how well an ANSWER serves an INSTRUCTION.
+Score 1-4: 1 off-topic | 2 on-topic, unhelpful
+           3 helpful, needs detail | 4 helpful and detailed
+Reply as:
+Explanation: &lt;why&gt;
+Total rating: &lt;1-4&gt;
+
+INSTRUCTION: {instruction}
+ANSWER: {answer}
+Explanation:"""</code></pre>
+  <ul class="codeexp">
+    <li><b>Scale with definitions</b>: each number means something concrete, so two runs (or two judges) agree more.</li>
+    <li><b>Explanation before score</b>: the model reasons first, then commits; and you get text to debug the judge.</li>
+    <li><b>Fixed "Total rating:" line</b>: a regex can pull the number out reliably.</li>
+    <li><b>Ending on "Explanation:"</b>: primes the model to start its answer in the right place.</li>
+  </ul>
+  <div class="box work"><b>Try it · LLM-judge rubric scorer</b>
+    <p>You are the judge. Instruction: <i>"How do I reset my UPI PIN?"</i> Pick a candidate answer, then check which rubric properties it has. The score follows the 1–4 scale. Then flip on a bias to see how a biased judge would drift.</p>
+    <div class="controls"><label style="width:100%">answer <select id="jd_a" style="width:100%;min-width:0">
+      <option value="0">"UPI was launched by NPCI in 2016."</option>
+      <option value="1">"You can reset it in your UPI app."</option>
+      <option value="2">"Open your UPI app → profile → UPI PIN → Forgot PIN, then verify with debit card details and OTP."</option>
+      <option value="3">"## Resetting your UPI PIN ✅ Great question! Open the app, go to settings, and you'll find many options there. UPI is a revolutionary system… (400 words, mostly history)"</option>
+    </select></label></div>
+    <div class="claims" id="jd_c">
+      <label><input type="checkbox" id="jd_rel"> relevant to the instruction</label>
+      <label><input type="checkbox" id="jd_help"> helpful (user can act on it)</label>
+      <label><input type="checkbox" id="jd_det"> detailed enough</label>
+    </div>
+    <div class="controls"><label><input type="checkbox" id="jd_bias"> simulate verbosity / confidence bias</label></div>
+    <div class="verdict" id="jd_v"></div>
+    <p class="note">Answers and the bias effect are modelled. The 1–4 scale follows the book's Table 7.2.</p>
+  </div>
+  <h3>Judge weaknesses and fixes</h3>
+  <ul class="plain">
+    <li><b>Bias toward assertive or verbose answers</b>: confident-sounding but less accurate answers get overrated.</li>
+    <li><b>Lack of domain expertise</b> on specialized topics → misjudgments.</li>
+    <li><b>Inconsistency</b>: similar answers may get different scores.</li>
+    <li><b>Implicit style preferences</b> unrelated to real quality.</li>
+  </ul>
+  <p>Mitigations: <b>combine</b> LLM judgments with other metrics, use <b>multiple judges</b>, and <b>design prompts carefully</b> to counter the biases.</p>
+  <p>Once a model is properly evaluated and works as intended, it may be placed inside a bigger <b>system</b>, which changes how you evaluate (plate 12).</p>
+  <div class="box picture"><b>Picture it</b><p>A senior teacher correcting answer sheets with a marking scheme. Without the scheme, she marks by gut feel and long, neat answers get more marks. With the scheme ("1 mark: mentions X; 2 marks: explains Y"), marks become consistent. Giving her the model answer (ground truth) helps even more. <i>Where it breaks:</i> a human teacher knows the subject; an LLM judge may confidently mis-mark a niche topic it doesn't understand, and it may give the same answer different marks on two reads.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Judging is easier than generating: checking an answer against a rubric needs less skill than writing it. That's why a large model can grade smaller ones. But the judge is still a next-token predictor trained on human preferences, so it inherits human tastes (length, confidence, polish). Structure (defined scales, explanation-first, JSON output) narrows the space of things it can say and makes its output machine-readable.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"What are the pitfalls of LLM-as-a-judge and how do you handle them?"</i> → "Judges favour long and confident answers, can lack domain knowledge, and are inconsistent across runs. I use a rubric with defined levels, ask for an explanation before the score, give a reference answer when I have one, force JSON output, and check the judge against a small human-labelled set. For important decisions I use multiple judges or combine with hard metrics." In a RAG memory system, the same pattern can score whether a recalled memory actually answers the user's question.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s17">Plate 17</a>: the book's own judge for TwinLlama (accuracy + style).</li><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: LLM-as-a-judge for dataset quality.</li><li><a href="../ai_engineering/ch03_evaluation_methodology.html">AI Engineering Ch.3</a>: AI as a judge, its biases, and reference-based vs reference-free judging.</li></ul></div>
+</section>
+<script>
+(function(){
+  var preset = [[0,0,0],[1,0,0],[1,1,1],[1,1,0]];
+  var a = document.getElementById("jd_a"), rel = document.getElementById("jd_rel"), help = document.getElementById("jd_help"), det = document.getElementById("jd_det"), bias = document.getElementById("jd_bias"), v = document.getElementById("jd_v");
+  var desc = ["1 · not relevant", "2 · relevant but not helpful", "3 · relevant, helpful, could be more detailed", "4 · relevant, helpful and detailed"];
+  function score(){
+    var s = !rel.checked ? 1 : !help.checked ? 2 : !det.checked ? 3 : 4;
+    var txt = "Fair judge: " + desc[s - 1] + ".";
+    if (bias.checked && a.value === "3") { txt += " Biased judge: long, formatted, confident → bumps it to 4 · relevant, helpful and detailed. That's the verbosity bias the book warns about."; v.className = "verdict bad"; }
+    else if (bias.checked && a.value === "2") { txt += " Biased judge: short, plain → might shave it to 3 despite being exactly right."; v.className = "verdict warn"; }
+    else v.className = "verdict " + (s >= 3 ? "good" : s === 2 ? "warn" : "bad");
+    v.textContent = txt;
+  }
+  function load(){ var p = preset[+a.value]; rel.checked = !!p[0]; help.checked = !!p[1]; det.checked = !!p[2]; score(); }
+  a.addEventListener("change", load); [rel, help, det, bias].forEach(function(x){ x.addEventListener("change", score); }); load();
+})();
+</script>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · RAG EVALUATION</div><h2>RAG evaluation: judge the whole pipeline, not only the model</h2></div><span class="chip">pdf p300–301</span></div>
+  <p>Model evaluation looks at what the model can do on its own. <b>RAG evaluation</b> needs a wider view: the model's ability to <b>generate</b> <i>and</i> how it <b>interacts with external information</b>.</p>
+  <p>RAG systems combine LLMs with <b>information retrieval</b>. Their answers can be coherent and fit the context, and also be <b>grounded</b> in <b>up-to-date</b>, externally sourced information. That makes RAG especially valuable where current, accurate information matters: <b>news reporting</b>, <b>research</b>, <b>customer support</b>.</p>
+  <p>So you examine the <b>entire system</b>, on three questions:</p>
+  <ul class="plain">
+    <li><b>Retrieval accuracy</b>: does the system fetch the relevant information?</li>
+    <li><b>Integration quality</b>: how well is the retrieved information worked into the answer?</li>
+    <li><b>Factuality and relevance</b>: does the final answer address the question, blending retrieved and generated content smoothly?</li>
+  </ul>
+  <p>Key metrics: <b>retrieval precision</b> (how much of what was fetched is relevant: accuracy) and <b>retrieval recall</b> (how much of what is relevant was fetched: comprehensiveness). Plus the <b>quality of integration</b> between retrieved data and generated text, and the overall <b>factuality and coherence</b> of the output.</p>
+  <div class="box work"><b>Step through · the book's customer-support example (Table 7.3)</b>
+    <svg viewBox="0 0 640 170" class="dg" role="img" aria-label="RAG pipeline with three evaluation points" style="width:100%;height:auto;max-width:640px" id="rq_svg">
+      <rect id="rq_b0" x="8" y="50" width="130" height="56" rx="6" class="f"/><text x="73" y="74" text-anchor="middle" class="b">User question</text><text x="73" y="92" text-anchor="middle" class="m">return policy?</text>
+      <rect id="rq_b1" x="172" y="50" width="130" height="56" rx="6" class="f"/><text x="237" y="74" text-anchor="middle" class="b">Retriever</text><text x="237" y="92" text-anchor="middle" class="m">finds 2 docs</text>
+      <rect id="rq_b2" x="336" y="50" width="130" height="56" rx="6" class="f"/><text x="401" y="74" text-anchor="middle" class="b">LLM + context</text><text x="401" y="92" text-anchor="middle" class="m">docs appended</text>
+      <rect id="rq_b3" x="500" y="50" width="132" height="56" rx="6" class="f"/><text x="566" y="74" text-anchor="middle" class="b">Answer</text><text x="566" y="92" text-anchor="middle" class="m">60-day return…</text>
+      <line x1="138" y1="78" x2="172" y2="78" class="on"/><line x1="302" y1="78" x2="336" y2="78" class="on"/><line x1="466" y1="78" x2="500" y2="78" class="on"/>
+      <text x="237" y="134" text-anchor="middle" class="m">① retrieval accuracy</text><text x="401" y="134" text-anchor="middle" class="m">② integration quality</text><text x="566" y="134" text-anchor="middle" class="m">③ factuality + relevance</text>
+    </svg>
+    <div class="stepbar"><button type="button" id="rq_prev">◀ Back</button><button type="button" id="rq_next">Next ▶</button><span id="rq_n"></span></div>
+    <div class="caption" id="rq_cap"></div>
+  </div>
+  <p>The book will cover <b>two methods</b> for evaluating how well RAG systems use external information: <a href="#s13">Ragas</a> and <a href="#s14">ARES</a>.</p>
+  <div class="box picture"><b>Picture it</b><p>An open-book exam. Three things can go wrong: the student opens the wrong chapter (retrieval), opens the right one but ignores it and writes from memory (integration), or copies something correct but not what was asked (relevance). A good examiner checks all three, not just the final mark. <i>Where it breaks:</i> in the exam the "book" is fixed; in RAG the knowledge base changes daily, so evaluation must be repeated as data changes.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A RAG answer is the product of a chain. If retrieval recall is 70% and the LLM uses retrieved facts correctly 90% of the time, roughly only ~63% of answers can be both complete and correct (modelled arithmetic). Measuring each link tells you which one to fix: the retriever (embedding model, chunking, reranker) or the generator (prompt, model).</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your RAG chatbot gives wrong answers. How do you debug it?"</i> → "Split it: first check retrieval on a labelled set: are the right chunks in the top-k (precision and recall)? If retrieval is fine, check integration: is the answer faithful to the retrieved context, or is the model ignoring it? Finally check answer relevance to the question. Comparing answers with and without context also shows whether retrieval actually helps." Directly relevant to RAG memory: wrong recall and unused recall are different bugs.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch04_rag_feature_pipeline.html">Ch.4</a> / <a href="ch09_rag_inference_pipeline.html">Ch.9</a>: the LLM Twin's RAG pipeline.</li><li><a href="../hands_on_llms/ch08_semantic_search_and_rag.html">Hands-On LLMs Ch.8</a>: search metrics (MAP, nDCG) and RAG evaluation.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: evaluating retrievers.</li></ul></div>
+</section>
+<script>
+(function(){
+  var steps = [
+    [0, "<b>Question.</b> The user asks about the return policy for laptops bought during the holiday sale."],
+    [1, "<b>Retrieval.</b> The pipeline finds documents on the <b>electronics return policy</b> and on the <b>holiday sale terms</b>. ① Evaluate <b>retrieval accuracy</b>: are these the documents we expected?"],
+    [2, "<b>Integration.</b> The documents are appended after the question and the model answers. ② Evaluate <b>integration quality</b>: compare the answer <i>with</i> and <i>without</i> this extra context. Without it, a model might say the generic 30 days."],
+    [3, "<b>Answer.</b> Holiday-sale laptops get an <b>extended 60-day</b> return window (longer than the standard <b>30 days</b> for electronics); keep the original packaging and all accessories for a full refund. ③ Evaluate <b>factuality and relevance</b>: is every claim grounded in the documents, and does it answer the question?"]
+  ];
+  var i = 0;
+  function show(){
+    for (var k = 0; k < 4; k++) document.getElementById("rq_b" + k).setAttribute("class", k === steps[i][0] ? "hi" : "f");
+    document.getElementById("rq_cap").innerHTML = steps[i][1];
+    document.getElementById("rq_n").textContent = "step " + (i + 1) + " / " + steps.length;
+  }
+  document.getElementById("rq_prev").addEventListener("click", function(){ i = Math.max(0, i - 1); show(); });
+  document.getElementById("rq_next").addEventListener("click", function(){ i = Math.min(steps.length - 1, i + 1); show(); });
+  show();
+})();
+</script>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · RAGAS</div><h2>Ragas: synthetic test sets + four LLM-assisted metrics</h2></div><span class="chip">pdf p301–303 · Fig 7-1</span></div>
+  <p><b>Ragas</b> (Retrieval-Augmented Generation Assessment) is an <b>open-source toolkit</b> for evaluating and optimizing RAG systems. It is built around <b>metrics-driven development (MDD)</b>: a product approach that relies on data for decisions, <b>monitoring key metrics over time</b> to understand how the application performs. With it, developers can assess RAG systems objectively, find what to improve, and track the effect of each change.</p>
+  <h3>Capability 1 · synthetic test data</h3>
+  <p>Writing hundreds of questions, answers and contexts by hand is slow and labour-intensive, a real pain point. Ragas can <b>generate diverse, complex test datasets synthetically</b>. It uses an <b>evolutionary</b> approach inspired by work like <b>Evol-Instruct</b>: start from simple questions and "evolve" them to have varied traits such as <b>reasoning complexity</b>, <b>conditional elements</b> and <b>multi-context requirements</b> (answers that need several documents). That way, different parts of the pipeline all get tested.</p>
+  <div class="box work"><b>Worked example · evolving one question (modelled)</b>
+    <ol class="plain">
+      <li><b>Seed:</b> "What is the return window for electronics?"</li>
+      <li><b>+ reasoning:</b> "If I buy a laptop on day 1 of the sale, by which date must I return it?"</li>
+      <li><b>+ conditional:</b> "If the laptop was bought in the holiday sale <i>and</i> opened, can I still get a full refund?"</li>
+      <li><b>+ multi-context:</b> "How does the holiday return window compare with the warranty period?" (needs the return-policy doc <i>and</i> the warranty doc)</li>
+    </ol>
+  </div>
+  <p>Ragas can also generate <b>conversational samples</b>: a question followed by follow-ups, like a real chat, so the system is tested in more realistic scenarios.</p>
+  <h3>Capability 2 · LLM-assisted metrics</h3>
+  <figure class="bookfig"><img src="figs/fig-7-1.png" alt="Ragas framework: Question to Answer labelled Answer Relevance, Answer to Context labelled Faithfulness, Question to Context labelled Context Precision, Context to human-curated Ground Truth labelled Context Recall" loading="lazy"><figcaption>Figure 7.1 (book, pdf p302): Overview of the Ragas evaluation framework</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Four green/pink boxes are the four things in a RAG test sample: <b>Question</b>, <b>Answer</b>, retrieved <b>Context</b>, and a <b>Ground Truth</b> answer written by humans (pink, because it's the only human-made part). Each arrow is a metric that compares two of them. <b>Answer Relevance</b> sits on the Question→Answer arrow (does the answer fit the question?). <b>Faithfulness</b> sits on Answer→Context (is the answer backed by the context?). <b>Context Precision</b> runs along the bottom from Question to Context (is the useful context ranked high for this question?). <b>Context Recall</b> is the curved arrow from Context to Ground Truth (does the context contain everything the true answer needs?). Two metrics judge generation (top), two judge retrieval (bottom/right).</p>
+  <ul class="plain">
+    <li><b>Faithfulness</b> (does the answer stick to the context?): chop the answer into small factual <b>claims</b> and ask, for each one, "could I deduce this from the retrieved text?" The score is the fraction of claims that pass.</li>
+    <li><b>Answer relevancy</b> (does the answer fit the question?): have an LLM read the answer and <b>invent several questions it would answer</b>; embed them and take the <b>average cosine similarity</b> to the real question. A true-but-wandering or half-done answer produces questions that drift, so the score falls.</li>
+    <li><b>Context precision</b> (is the good stuff at the top?): given which retrieved items are truly relevant, check <b>where</b> they sit in the ranking. Relevant chunks near the top score high; relevant chunks buried under noise score low.</li>
+    <li><b>Context recall</b> (did retrieval fetch everything needed?): take the human-written <b>reference answer</b>, split it into claims, and check which claims the retrieved context can support. Low recall means retrieval left gaps.</li>
+  </ul>
+  <div class="box work"><b>Try it · RAG metric explainer (toy example)</b>
+    <p><b>Question:</b> "What is the return policy for laptops bought in the holiday sale?"<br><b>Ground truth (human):</b> 60-day return window · longer than the standard 30 days · original packaging and accessories needed.</p>
+    <div class="controls" id="rm_tabs"><button type="button" data-t="f" class="on">Faithfulness</button><button type="button" data-t="a">Answer relevancy</button><button type="button" data-t="p">Context precision</button><button type="button" data-t="r">Context recall</button></div>
+    <div id="rm_f">
+      <p>The answer was split into claims. Tick the ones you can find in the retrieved context (docs: "electronics returns: 30 days, original packaging" and "holiday sale: returns extended to 60 days").</p>
+      <div class="claims" id="rm_fc">
+        <label><input type="checkbox" checked> Holiday-sale laptops can be returned within 60 days.</label>
+        <label><input type="checkbox" checked> The standard electronics window is 30 days.</label>
+        <label><input type="checkbox" checked> The laptop must be in its original packaging.</label>
+        <label><input type="checkbox"> Return shipping is free. <i>(not in any doc: hallucinated)</i></label>
+      </div>
+    </div>
+    <div id="rm_a" hidden>
+      <p>An LLM wrote 3 questions from the answer; each is compared with the original question by cosine similarity of embeddings. Pick which answer we are scoring:</p>
+      <div class="controls"><label>answer <select id="rm_as"><option value="on">on-topic answer (60-day window…)</option><option value="off">off-topic answer (laptop specs and sale prices)</option></select></label></div>
+      <div class="qa" id="rm_aq"></div>
+    </div>
+    <div id="rm_p" hidden>
+      <p>The retriever returned 4 chunks in this order. Click a chunk to mark it relevant / not relevant and watch how <b>position</b> changes the score.</p>
+      <div class="chunks" id="rm_pc"></div>
+      <p class="small" id="rm_pl"></p>
+    </div>
+    <div id="rm_r" hidden>
+      <p>Tick each ground-truth claim that can be attributed to the retrieved context.</p>
+      <div class="claims" id="rm_rc">
+        <label><input type="checkbox" checked> 60-day return window for holiday-sale laptops.</label>
+        <label><input type="checkbox" checked> Longer than the standard 30 days.</label>
+        <label><input type="checkbox"> Original packaging and accessories needed. <i>(suppose the packaging doc was not retrieved)</i></label>
+      </div>
+    </div>
+    <div class="verdict" id="rm_v"></div>
+    <div class="formula" id="rm_fx"></div>
+    <p class="note">Toy data and cosine values are modelled. Faithfulness, answer relevancy and context recall follow the book's definitions. The exact context-precision formula (average of precision@k at each relevant position) is <i>beyond the book</i>, from the Ragas documentation.</p>
+  </div>
+  <h3>Capability 3 · production monitoring</h3>
+  <p>Ragas also gives building blocks to <b>monitor RAG quality in production</b>, for continuous improvement. Combining test-set results with production insights, developers iterate: e.g. <b>fine-tuning retrieval algorithms</b>, <b>adjusting prompt engineering</b>, or <b>rebalancing retrieved context vs LLM generation</b>.</p>
+  <p>Ragas can be complemented by an approach based on <b>custom classifiers</b>: ARES (next plate).</p>
+  <div class="box picture"><b>Picture it</b><p>A newspaper fact-checking desk. <b>Faithfulness</b>: every sentence in the reporter's story must trace back to his notes. <b>Answer relevancy</b>: the story answers the headline's question, not a different one. <b>Context precision</b>: the most useful notes were on top of the pile, not buried. <b>Context recall</b>: the notes contained every fact the ideal story needs. <i>Where it breaks:</i> Ragas uses an LLM to do this checking, so the checker can itself make mistakes (plate 11 biases apply).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Faithfulness and answer relevancy need <b>no human ground truth</b>: they compare answer↔context and answer↔question. Context recall needs the human ground truth (the pink box). Context precision needs to know which chunks are relevant. Answer relevancy is clever: if an answer is on-topic, a question reconstructed from it should look like the original question in embedding space; an off-topic answer reconstructs a different question, so similarity drops.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Name some RAG evaluation metrics."</i> → "Ragas gives four: faithfulness (share of answer claims supported by retrieved context, which catches hallucination), answer relevancy (generate questions from the answer and compare them to the real question with cosine similarity), context precision (are the relevant chunks ranked at the top) and context recall (does the context cover every claim of a human reference answer). The first two need no labels, so they can run on production traffic."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: Evol-Instruct style data generation.</li><li><a href="#s14">Plate 14</a>: ARES as a complement.</li><li><a href="../ai_engineering/ch06_rag_and_agents.html">AI Engineering Ch.6</a>: context precision and recall for retrievers.</li></ul></div>
+</section>
+<script>
+(function(){
+  var tabs = document.querySelectorAll("#rm_tabs button"), cur = "f", v = document.getElementById("rm_v"), fx = document.getElementById("rm_fx");
+  var chunks = [["#1 sale T&amp;Cs (60 days)", true], ["#2 laptop specs", false], ["#3 returns policy (30 days)", true], ["#4 shipping FAQ", false]];
+  function chk(sel){ var bs = document.querySelectorAll(sel + " input"), k = 0; Array.prototype.forEach.call(bs, function(b){ if (b.checked) k++; }); return [k, bs.length]; }
+  function render(){
+    ["f","a","p","r"].forEach(function(t){ document.getElementById("rm_" + t).hidden = t !== cur; });
+    if (cur === "f") {
+      var c = chk("#rm_fc"), s = c[0] / c[1];
+      fx.textContent = "faithfulness = supported claims / all claims = " + c[0] + " / " + c[1] + " = " + s.toFixed(2);
+      v.className = "verdict " + (s === 1 ? "good" : s >= 0.75 ? "warn" : "bad");
+      v.textContent = s === 1 ? "Every claim is grounded in the context." : "Some claims are not backed by the context: possible hallucination.";
+    } else if (cur === "a") {
+      var on = document.getElementById("rm_as").value === "on";
+      var qs = on ? [["What is the return period for holiday-sale laptops?", 0.95], ["How long can I return a laptop bought in the sale?", 0.91], ["What do I need to return a laptop?", 0.78]]
+                  : [["What are the specs of sale laptops?", 0.41], ["How much do laptops cost in the sale?", 0.36], ["Which laptops are on discount?", 0.39]];
+      document.getElementById("rm_aq").innerHTML = qs.map(function(q){ return '<div class="opt"><b>Q</b><span>' + q[0] + '</span><span>' + q[1].toFixed(2) + "</span></div>"; }).join("");
+      var m = qs.reduce(function(a, q){ return a + q[1]; }, 0) / qs.length;
+      fx.textContent = "answer relevancy = mean cosine(generated Q, original Q) = " + m.toFixed(2);
+      v.className = "verdict " + (m > 0.8 ? "good" : "bad");
+      v.textContent = on ? "Reconstructed questions look like the original: the answer is on-topic." : "Reconstructed questions drift away: the answer may be true but it's off-topic.";
+    } else if (cur === "p") {
+      var box = document.getElementById("rm_pc"); box.innerHTML = "";
+      chunks.forEach(function(ch, i){
+        var b = document.createElement("button"); b.type = "button"; b.innerHTML = ch[0]; if (ch[1]) b.className = "rel";
+        b.addEventListener("click", function(){ chunks[i][1] = !chunks[i][1]; render(); });
+        box.appendChild(b);
+      });
+      var hits = 0, sum = 0, parts = [];
+      chunks.forEach(function(ch, i){ if (ch[1]) { hits++; var pk = hits / (i + 1); sum += pk; parts.push("P@" + (i + 1) + "=" + pk.toFixed(2)); } });
+      var cp = hits ? sum / hits : 0;
+      document.getElementById("rm_pl").textContent = "Green = relevant. Try moving relevance to the top two chunks: the score rises to 1.00.";
+      fx.textContent = "context precision = mean of P@k at relevant positions = (" + (parts.join(" + ") || "0") + ") / " + hits + " = " + cp.toFixed(2);
+      v.className = "verdict " + (cp > 0.9 ? "good" : cp > 0.6 ? "warn" : "bad");
+      v.textContent = cp > 0.9 ? "Relevant chunks are ranked at the top." : "Relevant chunks are there, but noise is ranked above them.";
+    } else {
+      var c2 = chk("#rm_rc"), s2 = c2[0] / c2[1];
+      fx.textContent = "context recall = ground-truth claims found in context / all ground-truth claims = " + c2[0] + " / " + c2[1] + " = " + s2.toFixed(2);
+      v.className = "verdict " + (s2 === 1 ? "good" : "warn");
+      v.textContent = s2 === 1 ? "Retrieval brought everything the ideal answer needs." : "Retrieval missed information the ideal answer needs: fix chunking, top-k or the embedding model.";
+    }
+  }
+  Array.prototype.forEach.call(tabs, function(b){ b.addEventListener("click", function(){ Array.prototype.forEach.call(tabs, function(x){ x.classList.remove("on"); }); b.classList.add("on"); cur = b.dataset.t; render(); }); });
+  document.querySelectorAll("#rm_fc input, #rm_rc input").forEach(function(x){ x.addEventListener("change", render); });
+  document.getElementById("rm_as").addEventListener("change", render);
+  render();
+})();
+</script>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · ARES</div><h2>ARES: synthetic data → trained classifier judges → RAG scores with confidence intervals</h2></div><span class="chip">pdf p303–304 · Fig 7-2</span></div>
+  <p><b>ARES</b> (an automated evaluation framework for RAG systems) is a comprehensive RAG evaluation tool. It automates the process by combining <b>synthetic data generation</b> with <b>fine-tuned classifiers</b> to judge <b>context relevance</b>, <b>answer faithfulness</b> and <b>answer relevance</b>.</p>
+  <p>It runs in <b>three stages</b>, each configurable to your needs and datasets:</p>
+  <figure class="bookfig"><img src="figs/fig-7-2.png" alt="ARES in three steps: Step 1 LLM generation of synthetic dataset from in-domain passages, Step 2 preparing LLM judges by training on synthetic data, Step 3 ranking RAG systems with confidence intervals using the judge with PPI and human labels" loading="lazy"><figcaption>Figure 7.2 (book, pdf p303): Overview of the ARES evaluation framework</figcaption></figure>
+  <p class="howread"><b>How to read this figure.</b> Three steps, left to right, each with an icon. <b>Step #1</b> (stack of documents): an LLM generates a <b>synthetic dataset</b> of queries and answers from your own in-domain passages. <b>Step #2</b> (branching arrows): <b>train LLM judges</b> on that synthetic data. <b>Step #3</b> (bar chart with a star): use the judges to <b>rank RAG systems</b>, with <b>confidence intervals</b>, combining the judge's predictions with a small set of <b>human labels</b> through "PPI". <i>Beyond the book:</i> PPI stands for <b>prediction-powered inference</b>, a statistical method that uses a few human labels to correct the bias of an automatic judge and give valid confidence intervals.</p>
+  <div class="box work"><b>Step through · the three ARES stages</b>
+    <div class="stepbar"><button type="button" id="ar_prev">◀ Back</button><button type="button" id="ar_next">Next ▶</button><span id="ar_n"></span></div>
+    <div class="caption" id="ar_cap"></div>
+  </div>
+  <ul class="plain">
+    <li><b>Stage 1 · synthetic data:</b> configure document paths, few-shot prompt files, output locations; generator default google/flan-t5-xxl; control how many documents are sampled (coverage vs compute).</li>
+    <li><b>Stage 2 · classifier training:</b> configure classification dataset (from stage 1), test set, label columns, model (default microsoft/deberta-v3-large, any Hugging Face model); tune epochs, early-stopping patience, learning rate.</li>
+    <li><b>Stage 3 · RAG evaluation:</b> provide evaluation datasets, few-shot examples, classifier checkpoints, gold label paths; get various metrics with confidence intervals.</li>
+  </ul>
+  <p>Execution is flexible: <b>cloud-based</b> or <b>local</b> runs (local through <b>vLLM</b> integration). ARES also supports many <b>artifact types</b>: code snippets, documents, HTML, images and more, so different kinds of RAG outputs can be evaluated.</p>
+  <h3>Ragas vs ARES: complements, not rivals</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Ragas</th><th>ARES</th></tr></thead>
+    <tbody>
+      <tr><td>Judge</td><td>LLM-assisted metrics (prompting an LLM)</td><td>Trained classifiers (default deberta-v3-large)</td></tr>
+      <tr><td>Synthetic data</td><td>Yes: evolutionary, Evol-Instruct-style, plus conversations</td><td>Yes: queries + answers from in-domain passages (default flan-t5-xxl)</td></tr>
+      <tr><td>Strength</td><td>Production monitoring; more nuanced judgments using LLM abilities</td><td>Highly configurable; consistent and potentially faster once classifiers are trained; confidence intervals</td></tr>
+      <tr><td>Best used for</td><td>Quick iterations</td><td>In-depth, customized evaluation at key stages</td></tr>
+    </tbody>
+  </table></div>
+  <p>Both generate synthetic data; they differ in <b>how</b> they score (context-based LLM metrics vs trained classifiers). Combined, they give a comprehensive framework.</p>
+  <div class="box picture"><b>Picture it</b><p>Ragas is like asking a senior professor to grade each answer sheet: nuanced, but slow and his mood varies. ARES is like using the professor's graded samples to train a team of TAs on one narrow skill each ("is this paragraph relevant? yes/no"). Training takes effort, but then the TAs grade thousands of sheets quickly and consistently, and a few sheets re-checked by the professor (human labels) tell you how much to trust the totals. <i>Where it breaks:</i> TAs trained on one subject's sheets don't transfer to another subject; ARES classifiers must be retrained per domain.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A fine-tuned classifier (DeBERTa) outputs a probability for "relevant" or "faithful" in one forward pass: cheap and deterministic, unlike sampling a big LLM judge. Its training labels come from the synthetic data (a query generated from passage X is "relevant" to X; mismatched pairs are negatives). Because it was trained on synthetic data, its errors are corrected statistically with a few human labels, producing confidence intervals rather than a bare number.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"LLM judges are slow and expensive at scale. Alternatives?"</i> → "Distil the judgment into a small classifier, like ARES does: generate synthetic query–passage–answer triples, train a DeBERTa-size classifier for context relevance and faithfulness, then score thousands of RAG outputs cheaply and consistently, with a small human-labelled set to calibrate and get confidence intervals. I'd still use an LLM judge (Ragas-style) for fast iteration while the system changes quickly."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s13">Plate 13</a>: Ragas.</li><li><a href="#s16">Plate 16</a>: vLLM, also used by ARES for local runs.</li><li><a href="../hands_on_llms/ch11_fine_tuning_for_classification.html">Hands-On LLMs Ch.11</a>: fine-tuning encoder classifiers like DeBERTa/BERT.</li></ul></div>
+</section>
+<script>
+(function(){
+  var st = [
+    "<b>Stage 1 · Synthetic data generation.</b> ARES builds datasets that mimic real use. You configure the <b>document file paths</b>, <b>few-shot prompt files</b> and <b>output locations</b> for the synthetic queries. Several pre-trained models can generate; the default is <b>google/flan-t5-xxl</b>. You can control the <b>number of documents sampled</b> and other parameters to balance coverage against compute.",
+    "<b>Stage 2 · Classifier training.</b> Train <b>high-precision classifiers</b> that decide whether RAG outputs are relevant and faithful. You set the <b>classification dataset</b> (usually from stage 1), a <b>test set</b>, <b>label columns</b> and the <b>model</b>. Default: <b>microsoft/deberta-v3-large</b>, but other Hugging Face models work. Tunable: <b>number of epochs</b>, <b>patience</b> for early stopping, <b>learning rate</b>.",
+    "<b>Stage 3 · RAG evaluation.</b> Use the trained classifiers and synthetic data to score the RAG system. You provide <b>evaluation datasets</b>, <b>few-shot examples</b> to guide evaluation, <b>classifier checkpoints</b> and <b>gold label paths</b>. ARES supports various metrics and can produce <b>confidence intervals</b>."
+  ];
+  var i = 0;
+  function show(){ document.getElementById("ar_cap").innerHTML = st[i]; document.getElementById("ar_n").textContent = "stage " + (i + 1) + " / 3"; }
+  document.getElementById("ar_prev").addEventListener("click", function(){ i = Math.max(0, i - 1); show(); });
+  document.getElementById("ar_next").addEventListener("click", function(){ i = Math.min(2, i + 1); show(); });
+  show();
+})();
+</script>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · EVALUATING TWINLLAMA-3.1-8B</div><h2>The plan: three models, one test set, one judge, two criteria</h2></div><span class="chip">pdf p304–305</span></div>
+  <p>Earlier chapters produced two models fine-tuned to write good posts and articles: <b>TwinLlama-3.1-8B</b> (SFT, <a href="ch05_supervised_fine_tuning.html">Ch.5</a>) and <b>TwinLlama-3.1-8B-DPO</b> (preference-aligned, <a href="ch06_preference_alignment.html">Ch.6</a>). The question now: do they write text that is both <b>accurate</b> and <b>well written</b>?</p>
+  <p>The contrast the authors care about: general-purpose fine-tuned models are accurate thanks to broad knowledge, but often sound <b>overly formal and verbose</b>. The goal of this fine-tuning was a <b>more natural writing style</b>, learned from the original articles in the training set.</p>
+  <p>The task is <b>open-ended</b> (plate 11), so a <b>judge LLM</b> evaluates the text. It reads the instruction and the answer and scores on a <b>1–3 scale</b> on two criteria:</p>
+  <ul class="plain">
+    <li><b>Accuracy</b>: how factually correct and comprehensive the information in the answer is.</li>
+    <li><b>Style</b>: is the tone and writing style right for <b>blog posts or social media</b> (no formal or academic expressions)?</li>
+  </ul>
+  <p>The framework, step by step:</p>
+  <svg viewBox="0 0 640 200" class="dg" role="img" aria-label="Evaluation framework for TwinLlama" style="width:100%;height:auto;max-width:640px">
+    <rect x="8" y="70" width="120" height="56" rx="6" class="f"/><text x="68" y="94" text-anchor="middle" class="b">Test split</text><text x="68" y="112" text-anchor="middle" class="m">mlabonne/llmtwin</text>
+    <rect x="160" y="10" width="150" height="44" rx="6" class="hi"/><text x="235" y="37" text-anchor="middle" class="b">TwinLlama-3.1-8B</text>
+    <rect x="160" y="76" width="150" height="44" rx="6" class="hi"/><text x="235" y="103" text-anchor="middle" class="b">TwinLlama…-DPO</text>
+    <rect x="160" y="142" width="150" height="44" rx="6" class="f"/><text x="235" y="162" text-anchor="middle" class="b">Llama-3.1-8B-Instruct</text><text x="235" y="178" text-anchor="middle" class="m">reference point</text>
+    <rect x="342" y="70" width="130" height="56" rx="6" class="f"/><text x="407" y="94" text-anchor="middle" class="b">GPT-4o-mini</text><text x="407" y="112" text-anchor="middle" class="m">judge</text>
+    <rect x="504" y="70" width="128" height="56" rx="6" class="f"/><text x="568" y="94" text-anchor="middle" class="b">Analysis</text><text x="568" y="112" text-anchor="middle" class="m">qualitative + scores</text>
+    <path d="M128 98 L160 32"/><path d="M128 98 L160 98"/><path d="M128 98 L160 164"/>
+    <path d="M310 32 L342 98" class="on"/><path d="M310 98 L342 98" class="on"/><path d="M310 164 L342 98" class="on"/>
+    <line x1="472" y1="98" x2="504" y2="98" class="on"/>
+    <text x="326" y="196" text-anchor="middle" class="m">answers via vLLM (plate 16) · scores accuracy + style 1–3 (plate 17) · read results (plate 18)</text>
+  </svg>
+  <ol class="plain">
+    <li>Take the <b>test split</b> of the book's instruction dataset as test instructions.</li>
+    <li>Feed them to the models and <b>generate answers</b>.</li>
+    <li>Have the judge, <b>GPT-4o-mini</b>, score them with a prompt that spells out the criteria.</li>
+    <li><b>Analyze</b> the scores, drawing conclusions from both qualitative and quantitative evidence.</li>
+  </ol>
+  <p>A third model joins as a <b>reference point</b>: <b>meta-llama/Meta-Llama-3.1-8B-Instruct</b>, the official instruct version of the same base model. It shows what trade-offs the custom fine-tuning made.</p>
+  <div class="box picture"><b>Picture it</b><p>A ghostwriter audition. Two trainee ghostwriters (SFT and DPO) and one experienced staff writer (Llama Instruct) each write answers to the same 334 prompts. An editor (GPT-4o-mini) gives each answer two marks: "is it correct?" and "does it sound like a LinkedIn post, not a thesis?". <i>Where it breaks:</i> a human editor knows the author's voice; GPT-4o-mini only knows the style described in its prompt.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Comparing against the official Instruct model isolates the effect of <i>our</i> fine-tuning: same base (Llama 3.1 8B), same prompts, same judge; only the post-training differs. Two separate criteria matter because the goal is a trade-off: change style without losing accuracy. A single "overall quality" score would hide that.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How did you check your fine-tune was worth it?"</i> → "Held-out test split, the fine-tuned model and the official instruct model of the same base as a baseline, identical prompts, and an LLM judge scoring separate criteria that match the goal: here accuracy and style. Separate criteria show the trade-off: our model may win on style while the baseline keeps an edge on accuracy."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: the SFT model and the instruction dataset (its test split).</li><li><a href="ch06_preference_alignment.html">Ch.6</a>: the DPO model trained to prefer a natural style.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · GENERATING ANSWERS</div><h2>Generating answers fast with vLLM</h2></div><span class="chip">pdf p305–307</span></div>
+  <p>Step one is to generate an answer for every test instruction, <b>efficiently</b>, for all three models. The book uses <b>vLLM</b>, which is much faster than Hugging Face <b>transformers</b> for <b>batch generation</b> with local models. The steps, with our own short versions of the code:</p>
+  <ol class="plain">
+    <li><b>Imports</b>: vLLM's <code>LLM</code> and <code>SamplingParams</code>, <code>load_dataset</code> from datasets, <code>tqdm</code> for progress bars, and <code>gc</code> for memory clean-up.</li>
+    <li><b>A function</b> <code>generate_answers(model_id, dataset_name)</code> that loads the dataset's <b>test</b> split.</li>
+    <li><b>Format prompts</b> with the chat template the models were trained on: an Alpaca-style template ("below is an instruction… ### Instruction: … ### Response:"). Llama-3.1-8B-Instruct was trained with a <b>different</b> template, but it can follow this simple one, so for simplicity the same template is used for every model. The whole test set is mapped into a new <code>prompt</code> column.</li>
+  </ol>
+  <pre><code>TEMPLATE = ("Below is an instruction that describes a task. "
+            "Write a response that appropriately completes the request.\n\n"
+            "### Instruction:\n{}\n\n### Response:\n")
+
+def build_prompt(row):
+    return {"prompt": TEMPLATE.format(row["instruction"])}
+
+test_set = load_dataset(dataset_name, split="test").map(build_prompt)</code></pre>
+  <ol class="plain" start="4">
+    <li><b>Create the vLLM engine</b> with a maximum length of <b>4,096 tokens</b> and set the <b>sampling parameters</b> (the decoding strategy). They <b>encourage diversity</b> with a high temperature while <b>removing the least likely tokens</b> with top_p and min_p. Then generate for the whole list of prompts at once.</li>
+  </ol>
+  <pre><code>engine = LLM(model=model_id, max_model_len=4096)
+params = SamplingParams(temperature=0.8, top_p=0.95,
+                        min_p=0.05, max_tokens=4096)
+results = engine.generate(test_set["prompt"], params)</code></pre>
+  <ul class="codeexp">
+    <li><code>max_model_len=4096</code>: the longest prompt + answer the engine will handle (also caps KV-cache memory).</li>
+    <li><code>temperature=0.8</code>: flattens the probability distribution a bit → more varied wording.</li>
+    <li><code>top_p=0.95</code>: keep only the smallest set of tokens whose probabilities add up to 95%.</li>
+    <li><code>min_p=0.05</code>: drop any token whose probability is below 5% of the top token's probability.</li>
+    <li><code>max_tokens=4096</code>: the longest answer allowed.</li>
+    <li><code>generate(list, params)</code>: passing the whole list lets vLLM batch everything on the GPU.</li>
+  </ul>
+  <div class="box work"><b>Try it · what temperature, top_p and min_p do to the next token</b>
+    <p>Toy next-token logits after "Algorithm bias is a ___". Move the sliders and see which tokens survive.</p>
+    <div class="controls">
+      <label>temperature <input type="range" id="sp_t" min="0.1" max="2" step="0.05" value="0.8"><output id="sp_to">0.80</output></label>
+      <label>top_p <input type="range" id="sp_p" min="0.5" max="1" step="0.01" value="0.95"><output id="sp_po">0.95</output></label>
+      <label>min_p <input type="range" id="sp_m" min="0" max="0.3" step="0.01" value="0.05"><output id="sp_mo">0.05</output></label>
+    </div>
+    <div class="qa" id="sp_out"></div>
+    <div class="readout" id="sp_r"></div>
+    <p class="note">Logits are modelled. Defaults are the book's values (0.8 / 0.95 / 0.05). Tokens in amber survive both filters and are re-normalised before sampling.</p>
+  </div>
+  <ol class="plain" start="5">
+    <li><b>Collect the answers.</b> With <b>334 prompts</b> this takes a few minutes. Each vLLM result holds a list of outputs; take the text of the first one and add all answers as a new <code>answers</code> column. Logging answers this way lets you review them later.</li>
+    <li><b>Save and free memory.</b> Push the results to the Hugging Face Hub as <code>mlabonne/&lt;model name&gt;-results</code>, then run <code>gc.collect()</code> to free memory before loading the next model.</li>
+    <li><b>Loop over the three models</b> (<code>mlabonne/TwinLlama-3.1-8B</code>, <code>mlabonne/TwinLlama-3.1-8B-DPO</code>, <code>meta-llama/Meta-Llama-3.1-8B-Instruct</code>) on the dataset <code>mlabonne/llmtwin</code>, one at a time. Each run uploads its own results dataset.</li>
+  </ol>
+  <pre><code>texts = [r.outputs[0].text for r in results]   # first completion per prompt
+test_set = test_set.add_column("answers", texts)
+test_set.push_to_hub(f"{hub_user}/{model_id.split('/')[-1]}-results")
+gc.collect()                                     # free memory before next model
+
+for mid in [twin_sft, twin_dpo, llama_instruct]:
+    generate_answers(mid, "mlabonne/llmtwin")</code></pre>
+  <div class="box picture"><b>Picture it</b><p>vLLM vs plain transformers is like a Mumbai dabbawala system vs one delivery boy per tiffin. The dabbawalas batch hundreds of tiffins through shared trains and sort them cleverly, so throughput is huge. For 334 prompts × 3 models, batching wins. <i>Where it breaks:</i> dabbawalas don't care about one tiffin's latency; vLLM also has to serve streaming users (Ch.8 and Ch.10 cover that).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Temperature divides the logits before softmax: below 1 sharpens, above 1 flattens. top_p (nucleus) and min_p then cut the long tail of unlikely tokens, so high temperature gives variety without nonsense. Using the same template for all models is a simplification: the Instruct model may perform slightly differently with its native Llama 3 template, which is a small bias in the comparison. Saving to the Hub after each model makes the pipeline restartable.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Why vLLM for offline evaluation?"</i> → "It does continuous batching and PagedAttention for the KV cache, so throughput on hundreds of prompts is far higher than looping over transformers' generate. I pass the whole prompt list in one call, then save outputs before moving to the next model, and free GPU memory between models." (PagedAttention and continuous batching are beyond this chapter; see Ch.8.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_inference_optimization.html">Ch.8</a>: why vLLM is fast (KV cache, batching).</li><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: chat templates (Alpaca format).</li><li><a href="../hands_on_llms/ch06_prompt_engineering.html">Hands-On LLMs Ch.6</a>: temperature and top_p.</li></ul></div>
+</section>
+<script>
+(function(){
+  var toks = [["problem", 3.0], ["concern", 2.6], ["form", 1.9], ["risk", 1.7], ["topic", 1.2], ["banana", -1.0], ["the", -0.5]];
+  var t = document.getElementById("sp_t"), p = document.getElementById("sp_p"), m = document.getElementById("sp_m"), out = document.getElementById("sp_out");
+  function upd(){
+    var T = +t.value, P = +p.value, M = +m.value;
+    document.getElementById("sp_to").textContent = T.toFixed(2); document.getElementById("sp_po").textContent = P.toFixed(2); document.getElementById("sp_mo").textContent = M.toFixed(2);
+    var ex = toks.map(function(x){ return Math.exp(x[1] / T); }), z = ex.reduce(function(a, b){ return a + b; }, 0);
+    var pr = ex.map(function(e){ return e / z; });
+    var order = pr.map(function(v, i){ return i; }).sort(function(a, b){ return pr[b] - pr[a]; });
+    var keep = {}, cum = 0, top = pr[order[0]];
+    order.forEach(function(i){ if (cum < P) { keep[i] = true; } cum += pr[i]; });
+    order.forEach(function(i){ if (pr[i] < M * top) keep[i] = false; });
+    var n = 0;
+    out.innerHTML = order.map(function(i){
+      if (keep[i]) n++;
+      return '<div class="opt"><b>' + (keep[i] ? "✓" : "✗") + '</b><div class="mrow" style="grid-template-columns:7em minmax(0,1fr)"><span>' + toks[i][0] + '</span><div class="meter' + (keep[i] ? " amber" : "") + '"><i style="width:' + (pr[i] * 100) + '%"></i></div></div><span>' + pr[i].toFixed(3) + "</span></div>";
+    }).join("");
+    document.getElementById("sp_r").innerHTML = "<span>tokens left to sample from: <b>" + n + "</b> of " + toks.length + "</span>";
+  }
+  [t, p, m].forEach(function(x){ x.addEventListener("input", upd); }); upd();
+})();
+</script>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · EVALUATING ANSWERS</div><h2>GPT-4o-mini as judge: the prompt, JSON output, and parallel batches</h2></div><span class="chip">pdf p307–312</span></div>
+  <p>Every generated answer from every model is scored by <b>GPT-4o-mini</b> on <b>accuracy</b> and <b>style</b>. The approach mirrors the data generation of <a href="ch05_supervised_fine_tuning.html">Ch.5</a>; in fact, the book notes you could adapt this same judge to <b>filter out bad samples</b> while generating training data. The <b>average scores</b> then show how our fine-tuning compares to Llama-3.1-8B-Instruct.</p>
+  <h3>Steps 1–4 · imports and the judge prompt</h3>
+  <p>Imports: <code>json</code>, <code>List</code> from typing, <code>Dataset</code>/<code>load_dataset</code>, the <code>OpenAI</code> client, <code>tqdm</code>, and <code>concurrent.futures</code> for threads. Then <code>evaluate_answer(instruction, answer, client)</code> builds the prompt. Its content, restated:</p>
+  <ul class="plain">
+    <li><b>Role</b>: you are an expert judge; rate the answer to an instruction on two criteria.</li>
+    <li><b>Accuracy</b>: how factually correct is the information? The judge is told to act as a <b>technical expert</b> on the topic.</li>
+    <li><b>Style</b>: does the tone fit a <b>blog post or social media</b>? It should use <b>simple but technical words</b> and avoid formal or academic language.</li>
+    <li><b>Two three-point Likert scales</b>, with a precise meaning for each score (table below).</li>
+    <li><b>Two style examples</b> to show what "complex words" and "formal or academic language" mean: a <i>bad</i> one that describes Llama2 7B in inflated, ceremonial language ("constitutes a noteworthy progression…"), and an <i>excellent</i> one that just says Llama2 7B beats the original Llama on several benchmarks.</li>
+    <li>The <code>{instruction}</code> and <code>{answer}</code>, then a request for <b>JSON</b> shaped as <code>accuracy: {analysis, score}</code> and <code>style: {analysis, score}</code>.</li>
+  </ul>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Score</th><th>Accuracy</th><th>Style</th></tr></thead>
+    <tbody>
+      <tr><td><b>1 · Poor</b></td><td>Has factual errors or misleading information.</td><td>Too formal; some overly complex words.</td></tr>
+      <tr><td><b>2 · Good</b></td><td>Mostly accurate; minor errors or omissions.</td><td>Balances technical content and accessibility, but still uses formal words and expressions.</td></tr>
+      <tr><td><b>3 · Excellent</b></td><td>Highly accurate and comprehensive.</td><td>Perfectly accessible for blog/social media; simple but precise technical terms when needed.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">A <b>Likert scale</b> is a small ordered rating scale (like 1–3 or 1–5) where each point has a label.</p>
+  <div class="box work"><b>Try it · score an answer like the book's judge</b>
+    <p>Instruction: <i>"Explain what a vector database is."</i> Pick an answer, then pick your scores. The page builds the JSON the judge is asked to return.</p>
+    <div class="controls"><label style="width:100%">answer <select id="tj_a" style="width:100%;min-width:0">
+      <option value="0">"A vector DB stores embeddings and finds the closest ones to a query fast. Think Qdrant: you search by meaning, not keywords."</option>
+      <option value="1">"A vector database constitutes a specialised persistence paradigm facilitating the retrieval of high-dimensional representations via approximate nearest-neighbour methodologies."</option>
+      <option value="2">"A vector DB is just a normal SQL table where you search with LIKE queries. Super easy!"</option>
+    </select></label></div>
+    <div class="controls">
+      <label>accuracy <select id="tj_acc"><option>1</option><option>2</option><option selected>3</option></select></label>
+      <label>style <select id="tj_sty"><option>1</option><option>2</option><option selected>3</option></select></label>
+      <button type="button" id="tj_hint">What would a fair judge say?</button>
+    </div>
+    <pre><code id="tj_json"></code></pre>
+    <div class="verdict" id="tj_v">Pick scores, or ask for the fair judge's view.</div>
+    <p class="note">Answers and "fair judge" scores are modelled; the scales and JSON shape follow the book.</p>
+  </div>
+  <h3>Step 5 · calling the API</h3>
+  <p>The prompt goes in as the <b>user</b> message. A <b>system</b> message reinforces the job: evaluate answers on accuracy and style, return JSON with a short analysis and a score per criterion.</p>
+  <pre><code>reply = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "system", "content": SYSTEM_NOTE},
+              {"role": "user", "content": judge_prompt}],
+    response_format={"type": "json_object"},   # JSON mode
+    max_tokens=1000,
+    temperature=0.8,
+)</code></pre>
+  <ul class="codeexp">
+    <li><code>response_format={"type": "json_object"}</code>: OpenAI's <b>JSON mode</b>; output is valid JSON, which makes parsing easy (plate 11's structured-generation advice).</li>
+    <li><code>max_tokens=1000</code>: room for two short analyses plus scores.</li>
+    <li><code>temperature=0.8</code>: the book's setting. Note (our remark, not the book's): a non-zero temperature makes the judge less deterministic; plate 11 lists inconsistency as a known judge weakness, so many teams use a low temperature for judges.</li>
+  </ul>
+  <h3>Steps 6–9 · batching and threads</h3>
+  <p>As in earlier chapters, requests are <b>batched</b>. <code>evaluate_batch(batch, start_index)</code> creates an OpenAI client and returns a list of <b>(index, evaluation)</b> pairs. The <b>indices</b> matter: threads finish in random order, and the index puts each result back in the right row. <code>evaluate_answers(model_id, num_threads=10, batch_size=5)</code> loads the saved results dataset, slices it into batches of <b>5</b> instruction–answer pairs, and submits them to a <b>ThreadPoolExecutor</b> with <b>10</b> workers. As futures complete, each evaluation is written into a pre-sized list at its index.</p>
+  <pre><code>batches = [(i, list(zip(ds["instruction"][i:i+size], ds["answers"][i:i+size])))
+           for i in range(0, len(ds), size)]
+results = [None] * len(ds)
+with ThreadPoolExecutor(max_workers=threads) as pool:
+    jobs = [pool.submit(evaluate_batch, b, start) for start, b in batches]
+    for job in as_completed(jobs):
+        for idx, ev in job.result():
+            results[idx] = ev          # index keeps the order right</code></pre>
+  <div class="box work"><b>Watch it · 334 answers, batches of 5, 10 threads</b>
+    <div class="stepbar"><button type="button" id="bt_go">▶ Run</button><button type="button" id="bt_reset">Reset</button><span id="bt_n"></span></div>
+    <div class="treebox"><svg viewBox="0 0 680 150" id="bt_svg" class="dg" role="img" aria-label="Batches of answers filling in out of order" style="width:100%;min-width:480px"></svg></div>
+    <p class="note">334 / 5 = 67 batches (the last one has 4). Each square is one batch; colours show which of the 10 threads handled it. Completion order is random (simulated), but each result lands in its own slot thanks to the index.</p>
+  </div>
+  <h3>Steps 10–14 · parse, store, push</h3>
+  <ul class="plain">
+    <li>Add an <code>evaluation</code> column with the judge's <b>raw JSON</b> (scores and explanations). If the column already exists from an earlier run, remove it first.</li>
+    <li>Parse each evaluation with <code>json.loads()</code> (if it's a string) and read <code>["accuracy"]["score"]</code> and <code>["style"]["score"]</code>. Generation is <b>best effort</b>: scores aren't guaranteed. On a <code>JSONDecodeError</code>, <code>KeyError</code> or <code>TypeError</code>, store <b>None</b> as a fallback.</li>
+    <li>Add <code>accuracy</code> and <code>style</code> columns (again dropping old ones first) and <b>push</b> the final dataset (answers, evaluations, scores) to the Hub.</li>
+    <li>Run <code>evaluate_answers()</code> for the three models.</li>
+  </ul>
+  <pre><code>def read_scores(raw):
+    try:
+        d = json.loads(raw) if isinstance(raw, str) else raw
+        return d["accuracy"]["score"], d["style"]["score"]
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None, None          # best effort: don't crash the run</code></pre>
+  <p>Saving intermediate results makes the framework <b>robust to failures</b>, and it is easy to <b>extend</b> to other models, datasets and criteria.</p>
+  <div class="box picture"><b>Picture it</b><p>A board-exam evaluation centre. 334 answer sheets are bundled in packets of 5 and handed to 10 examiners at once. Each packet carries roll numbers, so even if examiner 7 finishes before examiner 2, marks go into the right row of the register. A sheet with an illegible mark gets "absent" (None) instead of stopping the whole centre. <i>Where it breaks:</i> human examiners don't hit API rate limits; with real APIs, more threads can trigger throttling.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>API calls are I/O-bound (waiting on the network), so Python threads give real speed-up despite the GIL. Batching reduces client overhead; the index-based write makes the result independent of completion order. JSON mode guarantees valid JSON syntax but not the exact keys, which is why the parser still catches <code>KeyError</code>.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"How would you run an LLM judge over thousands of samples?"</i> → "Batch the samples, fan them out with a thread pool since the calls are I/O-bound, carry an index so results map back regardless of completion order, force JSON output, parse defensively with a None fallback and count failures, and persist intermediate results so a crash doesn't cost the whole run. I'd keep the judge temperature low for consistency and add retry with backoff for rate limits." Same pattern as fanning out tool calls in an agent backend.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="#s11">Plate 11</a>: judge design and biases.</li><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: same batching pattern for data generation.</li></ul></div>
+</section>
+<script>
+(function(){
+  var acc = document.getElementById("tj_acc"), sty = document.getElementById("tj_sty"), a = document.getElementById("tj_a"), js = document.getElementById("tj_json"), v = document.getElementById("tj_v");
+  var fair = [[3, 3, "Correct and plain-spoken; a concrete tool example."], [3, 1, "Correct, but inflated academic wording: exactly the 'bad style' the prompt warns about."], [1, 3, "Casual tone fits social media, but the claim is wrong: vector DBs use similarity search on embeddings, not LIKE queries."]];
+  function upd(){
+    var o = { accuracy: { analysis: "…", score: +acc.value }, style: { analysis: "…", score: +sty.value } };
+    js.textContent = JSON.stringify(o, null, 2);
+  }
+  document.getElementById("tj_hint").addEventListener("click", function(){
+    var f = fair[+a.value]; acc.value = String(f[0]); sty.value = String(f[1]); upd();
+    v.className = "verdict " + (f[0] + f[1] === 6 ? "good" : "warn"); v.textContent = "Fair judge: accuracy " + f[0] + ", style " + f[1] + ". " + f[2];
+  });
+  [acc, sty].forEach(function(x){ x.addEventListener("change", function(){ upd(); v.className = "verdict"; v.textContent = "Your scores: accuracy " + acc.value + ", style " + sty.value + "."; }); });
+  a.addEventListener("change", function(){ v.className = "verdict"; v.textContent = "Pick scores, or ask for the fair judge's view."; });
+  upd();
+  var svg = document.getElementById("bt_svg"), NS = "http://www.w3.org/2000/svg", cols = ["#d06f12","#1f7f8f","#8a4bb3","#1c9450","#cf3b3b","#b8860b","#2b6cb0","#c2185b","#00897b","#6d4c41"], timer = null;
+  function build(){
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    for (var i = 0; i < 67; i++) {
+      var r = document.createElementNS(NS, "rect"); r.setAttribute("x", 10 + (i % 23) * 29); r.setAttribute("y", 10 + Math.floor(i / 23) * 42);
+      r.setAttribute("width", 25); r.setAttribute("height", 34); r.setAttribute("rx", 3); r.setAttribute("class", "s"); r.id = "bt_r" + i; svg.appendChild(r);
+      var t = document.createElementNS(NS, "text"); t.setAttribute("x", 22 + (i % 23) * 29); t.setAttribute("y", 32 + Math.floor(i / 23) * 42); t.setAttribute("text-anchor", "middle"); t.setAttribute("class", "m"); t.setAttribute("font-size", "9"); t.textContent = i * 5; svg.appendChild(t);
+    }
+    document.getElementById("bt_n").textContent = "0 / 67 batches done";
+  }
+  function run(){
+    if (timer) return;
+    var order = []; for (var i = 0; i < 67; i++) order.push(i);
+    for (var j = 66; j > 0; j--) { var k = Math.floor(Math.random() * Math.min(j + 1, 12)); var lo = j - k; var tmp = order[j]; order[j] = order[lo]; order[lo] = tmp; }
+    order.reverse();
+    var n = 0;
+    timer = setInterval(function(){
+      if (n >= 67) { clearInterval(timer); timer = null; return; }
+      var b = order[n], r = document.getElementById("bt_r" + b);
+      r.setAttribute("class", ""); r.setAttribute("fill", cols[b % 10]); r.setAttribute("fill-opacity", "0.75");
+      n++; document.getElementById("bt_n").textContent = n + " / 67 batches done (last: batch starting at row " + (b * 5) + ", thread " + (b % 10 + 1) + ")";
+    }, 60);
+  }
+  document.getElementById("bt_go").addEventListener("click", run);
+  document.getElementById("bt_reset").addEventListener("click", function(){ if (timer) { clearInterval(timer); timer = null; } build(); });
+  build();
+})();
+</script>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · ANALYZING RESULTS</div><h2>Reading answers, explanations and scores: DPO wins style, Instruct wins accuracy</h2></div><span class="chip">pdf p312–315</span></div>
+  <p>At the end, there are <b>three things to review</b>: the <b>model answers</b>, the judge's <b>explanations</b>, and the <b>scores</b>.</p>
+  <p><b>Reading answers</b> doesn't scale, but it is crucial: it catches common mistakes such as a <b>wrong chat template</b> or the <b>wrong model</b> being loaded. The book reads the three answers to one instruction: <i>"Discuss the concept of algorithm bias and its implications."</i></p>
+  <h3>Table 7.4 (book, pdf p312–313), summarized</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Model</th><th>What its answer looked like</th></tr></thead>
+    <tbody>
+      <tr><td><b>TwinLlama-3.1-8B</b> (SFT)</td><td>One compact paragraph: defines algorithm bias as skewed or unfair outcomes from underlying assumptions or programming biases; notes the stakes in ML/AI decisions; examples of lending and hiring discrimination; ends by calling for fairness and accuracy in design.</td></tr>
+      <tr><td><b>TwinLlama-3.1-8B-DPO</b></td><td>Nearly the same paragraph, with slightly simpler wording: examples become denying loans and perpetuating stereotypes; ends by saying bias should be tackled proactively so technology is equitable and just.</td></tr>
+      <tr><td><b>Llama-3.1-8B-Instruct</b></td><td>Very long, essay-like: causes (data, algorithm, society), many examples (facial recognition and wrongful arrests, language models biased toward dominant dialects, healthcare misdiagnosis, education), mitigation techniques (data cleansing, regularization, debiasing, diverse datasets, involving stakeholders), and a formal "in conclusion" ending.</td></tr>
+    </tbody>
+  </table></div>
+  <p>The book's reading: the two Twin models' answers are <b>very close</b> to each other. Llama-3.1-8B-Instruct's is <b>extremely verbose</b> with many examples: correct, but it can feel <b>artificial and unpleasant to read</b> because of its length. The <b>DPO</b> model <b>slightly simplifies</b> the SFT model's language, making it less academic. That is exactly the goal: <b>change the writing style, not the content</b>.</p>
+  <h3>Table 7.5 (book, pdf p314), summarized · the judge's view of that one instruction</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Model</th><th>Accuracy</th><th>Style</th><th>Judge's reason (paraphrased)</th></tr></thead>
+    <tbody>
+      <tr><td>TwinLlama-3.1-8B</td><td><b>3</b></td><td><b>2</b></td><td>Accurate, no factual errors. Style informative and fairly accessible, but leans formal in places (it quotes "underlying assumptions or programming biases"); could be simpler for a blog audience.</td></tr>
+      <tr><td>TwinLlama-3.1-8B-DPO</td><td><b>3</b></td><td><b>3</b></td><td>Accurate, comprehensive overview. Style clear and accessible, communicates the concept without becoming overly formal; technical terms are appropriate.</td></tr>
+      <tr><td>Llama-3.1-8B-Instruct</td><td><b>3</b></td><td><b>2</b></td><td>Accurate and comprehensive (causes, domains, mitigation). Style accessible, but some phrases could be simpler and it would benefit from a more conversational tone.</td></tr>
+    </tbody>
+  </table></div>
+  <p>So the judge sees <b>no accuracy problem</b> (all 3s), rates SFT and Instruct <b>too formal</b> (2), and gives DPO a perfect style score, agreeing with the manual reading.</p>
+  <h3>Average scores over the whole test set (book's numbers)</h3>
+  <div class="box work"><b>Chart · average judge scores (1–3 scale)</b>
+    <div class="controls"><label><input type="checkbox" id="av_zoom" checked> zoom axis to 1.5–3 (uncheck for full 0–3 axis)</label></div>
+    <div class="sqbox"><svg viewBox="0 0 600 230" id="av_svg" class="narrow dg" role="img" aria-label="Bar chart of average accuracy and style per model"></svg></div>
+    <div class="legend"><span style="--sw:var(--c2)">accuracy</span><span style="--sw:var(--c1)">style</span></div>
+    <p class="note">Values from the book (pdf p315). Zooming exaggerates differences; with the full axis you see how close the models really are. That gap-size question is worth asking of any eval chart.</p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Model</th><th>Accuracy</th><th>Style</th></tr></thead>
+    <tbody>
+      <tr><td>TwinLlama-3.1-8B</td><td>2.45</td><td>2.04</td></tr>
+      <tr><td>TwinLlama-3.1-8B-DPO</td><td>2.46</td><td><b>2.12</b></td></tr>
+      <tr><td>Llama-3.1-8B-Instruct</td><td><b>2.62</b></td><td>1.86</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="plain">
+    <li><b>Accuracy</b>: the two fine-tuned models are about equal; Llama-3.1-8B-Instruct is highest at <b>2.62</b>. It may have a slight edge on facts, probably thanks to its huge post-training: <b>over 10 million samples</b> vs <b>13,000</b> for TwinLlama.</li>
+    <li><b>Style</b>: the pattern flips. <b>DPO leads with 2.12</b>: more accessible, less formal, without losing content quality. <b>SFT follows at 2.04</b>: improved, but still a bit formal. <b>Instruct trails at 1.86</b>, tending toward verbosity.</li>
+  </ul>
+  <p>Using this feedback plus manual review, you can find mistakes and areas to improve, mainly by refining <b>data generation</b>: more filtering, or adding missing information to the dataset. This first version already looks promising; iterating on datasets and models should beat the baseline clearly and give the best model for the use case.</p>
+  <div class="box picture"><b>Picture it</b><p>Three cooks make the same dish. The hotel's head chef (Instruct, trained on 10 million orders) gets the recipe most exactly right but serves a 12-course portion when you asked for a snack. Your home cook (SFT) gets it nearly as right in a sensible portion. After feedback on taste (DPO), the home cook's dish tastes most like what you wanted. <i>Where it breaks:</i> these are averages from one LLM judge with temperature 0.8; small differences like 2.45 vs 2.46 are within noise.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>SFT taught the format and some style from 13k examples; DPO then pushed the model toward preferred (more natural) answers and away from rejected (more formal) ones, which moves style without much effect on knowledge. Accuracy depends mostly on knowledge and on how much post-training data was used, where Meta's Instruct model has a big head start. Note also the judge's own preference: verbose answers are often rated higher (plate 11), yet here the verbose model got the <i>lowest</i> style score because the rubric explicitly asked for blog style.</p></div>
+  <div class="box interview"><b>Interview angle</b><p><i>"Your fine-tuned model scores lower on accuracy than the official instruct model. Ship it?"</i> → "Depends on the goal. Ours was style: DPO improved style from 1.86 to 2.12 while accuracy dropped from 2.62 to 2.46 on a 3-point judge scale. I'd check if that accuracy gap is real (confidence intervals, judge variance, a human spot-check), read the failing answers, and improve the data, e.g. filter weak samples with the same judge, before deciding. And I'd always read some raw outputs, since they catch template bugs that scores hide."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_preference_alignment.html">Ch.6</a>: how DPO shifts style.</li><li><a href="ch05_supervised_fine_tuning.html">Ch.5</a>: improving the dataset (filtering, augmentation).</li><li><a href="../ai_engineering/ch04_evaluate_ai_systems.html">AI Engineering Ch.4</a>: designing an evaluation pipeline and iterating on it.</li></ul></div>
+</section>
+<script>
+(function(){
+  var svg = document.getElementById("av_svg"), z = document.getElementById("av_zoom"), NS = "http://www.w3.org/2000/svg";
+  var d = [["TwinLlama-3.1-8B", 2.45, 2.04], ["TwinLlama-…-DPO", 2.46, 2.12], ["Llama-3.1-8B-Instruct", 2.62, 1.86]];
+  function el(n, a, txt){ var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; }
+  function draw(){
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var lo = z.checked ? 1.5 : 0, hi = 3, top = 20, bot = 190, h = bot - top;
+    function y(v){ return bot - (v - lo) / (hi - lo) * h; }
+    for (var t = lo; t <= hi + 1e-9; t += (z.checked ? 0.5 : 1)) { el("line", { x1: 50, x2: 590, y1: y(t), y2: y(t), "class": "ax" }); el("text", { x: 44, y: y(t) + 4, "text-anchor": "end", "class": "m", "font-size": "11" }, t.toFixed(1)); }
+    d.forEach(function(r, i){
+      var x0 = 80 + i * 175;
+      [[1, "bar1"], [2, "bar2"]].forEach(function(c, j){
+        var v = r[c[0]], x = x0 + j * 58;
+        el("rect", { x: x, y: y(v), width: 50, height: bot - y(v), "class": c[1], rx: 2 });
+        el("text", { x: x + 25, y: y(v) - 5, "text-anchor": "middle", "class": "b", "font-size": "12" }, v.toFixed(2));
+      });
+      el("text", { x: x0 + 54, y: bot + 18, "text-anchor": "middle", "class": "m", "font-size": "11" }, r[0]);
+    });
+  }
+  z.addEventListener("change", draw); draw();
+})();
+</script>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>Chapter summary and key terms</h2></div><span class="chip">pdf p315–316</span></div>
+  <p>The book's summary, in plain words:</p>
+  <ul class="plain">
+    <li>The chapter covered evaluating both <b>models</b> and <b>RAG systems</b>.</li>
+    <li>Classic benchmarks like <b>MMLU</b> help pick strong candidates to <b>use</b> or to <b>fine-tune</b>.</li>
+    <li><b>Domain-specific</b> and <b>task-specific</b> evaluations were explained, including how to build your own from public examples.</li>
+    <li>Two techniques form the backbone of custom evaluation: <b>multiple-choice question answering</b> and <b>LLM-as-a-judge</b>.</li>
+    <li>Models usually live inside bigger systems that add context, so two RAG frameworks were introduced: <b>Ragas</b> and <b>ARES</b>. They share ideas (e.g. <b>synthetic data generation</b>) but differ in scoring: <b>context-based metrics</b> vs <b>trained classifiers</b>.</li>
+    <li>Finally, TwinLlama-3.1-8B was evaluated with a judge LLM, giving insight into how to improve it.</li>
+    <li>Next chapter: <b>inference optimization</b>: faster, less memory-hungry inference without much quality loss; optimization methods, <b>model parallelism</b> and <b>quantization</b>.</li>
+  </ul>
+  <div class="box beyond"><b>A slip in the book's summary</b><p>The summary says TwinLlama was judged on "relevance, coherence, and conciseness". The actual evaluation in the chapter (pdf p305, p307–308) used <b>two</b> criteria: <b>accuracy</b> and <b>style</b>. This page follows the code and results, i.e. accuracy and style.</p></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>Model evaluation</td><td>Testing one model alone, without prompt engineering, RAG or tools.</td></tr>
+      <tr><td>Cross-entropy loss</td><td>Gap between predicted next-token distribution and the true next token; the training objective.</td></tr>
+      <tr><td>Perplexity</td><td>e<sup>loss</sup>: how "surprised" the model is by data. Lower is better.</td></tr>
+      <tr><td>Gradient norm</td><td>Size of the gradients; spikes or collapse signal unstable training.</td></tr>
+      <tr><td>MMLU</td><td>Multiple-choice knowledge benchmark over 57 subjects.</td></tr>
+      <tr><td>HellaSwag / ARC-C / Winogrande / PIQA</td><td>Reasoning benchmarks: plausible endings, science questions, pronoun resolution, physical common sense.</td></tr>
+      <tr><td>IFEval</td><td>Instruction following with checkable constraints.</td></tr>
+      <tr><td>Chatbot Arena</td><td>Humans vote between two models' answers, head to head.</td></tr>
+      <tr><td>AlpacaEval / MT-Bench / GAIA</td><td>Automatic Arena-like eval / multi-turn conversation / multi-step agentic tasks.</td></tr>
+      <tr><td>Contamination</td><td>Training data that overlaps the test set, inflating scores (e.g. +10 MMLU after fine-tuning).</td></tr>
+      <tr><td>Benchmark suite</td><td>A reproducible bundle of benchmarks covering several aspects of a domain.</td></tr>
+      <tr><td>Pass@1</td><td>Share of coding problems solved by the first generated solution.</td></tr>
+      <tr><td>ROUGE</td><td>N-gram overlap between generated and reference text (summarization).</td></tr>
+      <tr><td>Precision / recall / F1</td><td>Correct among predicted positives / found among actual positives / their harmonic mean.</td></tr>
+      <tr><td>Log-likelihood evaluation</td><td>Scoring multiple choice by the model's probability for each option, without generating text.</td></tr>
+      <tr><td>LLM-as-a-judge</td><td>A strong LLM scores answers with a rubric; biased toward long, confident answers.</td></tr>
+      <tr><td>Structured generation</td><td>Forcing output into a format (Outlines, OpenAI JSON mode) so it can be parsed.</td></tr>
+      <tr><td>Likert scale</td><td>Small ordered rating scale with labelled points (here 1–3).</td></tr>
+      <tr><td>Retrieval accuracy / integration quality / factuality</td><td>The three things RAG evaluation checks.</td></tr>
+      <tr><td>Ragas</td><td>Open-source RAG evaluation toolkit: synthetic test sets, LLM-assisted metrics, production monitoring.</td></tr>
+      <tr><td>Metrics-driven development (MDD)</td><td>Making product decisions by tracking key metrics over time.</td></tr>
+      <tr><td>Faithfulness</td><td>Share of answer claims that can be inferred from the retrieved context.</td></tr>
+      <tr><td>Answer relevancy</td><td>Mean cosine similarity between questions generated from the answer and the original question.</td></tr>
+      <tr><td>Context precision</td><td>Whether relevant context is ranked at the top.</td></tr>
+      <tr><td>Context recall</td><td>Share of ground-truth claims that the retrieved context supports.</td></tr>
+      <tr><td>ARES</td><td>RAG evaluation with synthetic data + fine-tuned classifiers + confidence intervals.</td></tr>
+      <tr><td>vLLM</td><td>Fast inference engine used for batch generation (and by ARES for local runs).</td></tr>
+      <tr><td>top_p / min_p</td><td>Sampling filters: keep the 95% probability nucleus / drop tokens below 5% of the top token's probability.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · WHERE YOU MEET THIS IN REAL SYSTEMS</div><h2>Tools, models and organisations named in the chapter</h2></div><span class="chip">pdf p290–316</span></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Name</th><th>What it does with the idea</th></tr></thead>
+    <tbody>
+      <tr><td><b>LMSYS Chatbot Arena</b></td><td>Crowd-sourced head-to-head human voting between chat models.</td></tr>
+      <tr><td><b>Hugging Face Hub leaderboards</b></td><td>Host domain boards: Open Medical-LLM, BigCodeBench, Hallucinations, Enterprise Scenarios, OpenKo-LLM, Open Portuguese, Open Arabic. The Hub also stores the book's results datasets.</td></tr>
+      <tr><td><b>EleutherAI lm-evaluation-harness</b></td><td>Standard library to run benchmarks; scores MMLU by comparing option probabilities.</td></tr>
+      <tr><td><b>Hugging Face lighteval</b></td><td>Hugging Face's library for running benchmark suites.</td></tr>
+      <tr><td><b>Outlines</b> / <b>OpenAI JSON mode</b></td><td>Structured generation so judge outputs are parseable.</td></tr>
+      <tr><td><b>Ragas</b></td><td>RAG metrics (faithfulness, answer relevancy, context precision/recall), synthetic test generation, production monitoring.</td></tr>
+      <tr><td><b>ARES</b></td><td>RAG evaluation via synthetic data (google/flan-t5-xxl) and trained classifiers (microsoft/deberta-v3-large), with confidence intervals.</td></tr>
+      <tr><td><b>Evol-Instruct</b></td><td>The "evolve the instruction" idea Ragas borrows to make harder test questions.</td></tr>
+      <tr><td><b>vLLM</b></td><td>Fast batched generation of answers for the 334 test prompts; local runs for ARES.</td></tr>
+      <tr><td><b>OpenAI GPT-4o-mini</b></td><td>The judge that scores accuracy and style, in JSON mode.</td></tr>
+      <tr><td><b>Meta Llama-3.1-8B-Instruct</b></td><td>Baseline: official instruct model of the same base, post-trained on 10M+ samples.</td></tr>
+      <tr><td><b>TwinLlama-3.1-8B / -DPO</b></td><td>The book's SFT and DPO models, published under mlabonne on the Hub.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Other common tools for the same jobs (not named in the chapter): DeepEval, TruLens, LangSmith and Arize Phoenix for RAG and judge-based evaluation and tracing; OpenAI Evals and Inspect for model evals. The concepts on this page carry over directly.</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (click to reveal)</h2></div><span class="chip">whole chapter</span></div>
+  <details class="ans"><summary>1. Name the three key differences between ML and LLM evaluation.</summary><p>Numerical metrics (ML has crisp ones; LLMs do many tasks and rarely share one metric), feature engineering (part of ML evaluation; LLMs read raw text), interpretability (easier for ML; for LLMs you can ask for explanations during generation).</p></details>
+  <details class="ans"><summary>2. What is perplexity, and is higher better?</summary><p>The exponential of the cross-entropy loss, measuring how surprised the model is by the data. Lower is better.</p></details>
+  <details class="ans"><summary>3. Why is running HellaSwag during pre-training risky?</summary><p>You may overfit to the evaluation: steering training toward the benchmark instead of general ability.</p></details>
+  <details class="ans"><summary>4. Fine-tuning raised a model's MMLU by 10 points. What should you suspect?</summary><p>Contamination: the instruction data is probably too close to the test set. Such a gain from fine-tuning is unlikely.</p></details>
+  <details class="ans"><summary>5. You need an LLM to extract fields from contracts, no fine-tuning. Arena or IFEval?</summary><p>IFEval. Extraction needs strong instruction-following, not conversational charm.</p></details>
+  <details class="ans"><summary>6. Give three flaws of benchmarks.</summary><p>Public sets can be gamed by training on test-like data; human raters prefer long, confident, nicely formatted answers; private sets are less scrutinized and may have their own biases. Hence: use them as signals and look for agreement.</p></details>
+  <details class="ans"><summary>7. What three principles should a good evaluation follow?</summary><p>Complex (separates good from bad), diverse (many topics and scenarios), practical (easy to run, e.g. with lm-evaluation-harness or lighteval).</p></details>
+  <details class="ans"><summary>8. Why does the book prefer text-generation scoring over log-likelihood for multiple choice?</summary><p>It mimics a human taking the test, is easier to implement and more discriminative; low-quality models tend to overperform on probability-based evaluation.</p></details>
+  <details class="ans"><summary>9. List four biases or weaknesses of LLM judges and three mitigations.</summary><p>Bias toward assertive/verbose answers, lack of domain expertise, inconsistency, implicit style preferences. Mitigate by combining with other metrics, using multiple judges, careful prompt design (plus ground-truth answers when available).</p></details>
+  <details class="ans"><summary>10. An answer has 5 claims; 4 can be inferred from the context. Faithfulness?</summary><p>4 / 5 = 0.8.</p></details>
+  <details class="ans"><summary>11. How does Ragas compute answer relevancy, and what does it catch?</summary><p>An LLM generates several questions from the answer; the score is the mean cosine similarity between them and the original question. It catches answers that are correct but off-topic or incomplete.</p></details>
+  <details class="ans"><summary>12. Which Ragas metric needs a human-curated ground truth answer?</summary><p>Context recall: it checks each ground-truth claim against the retrieved context.</p></details>
+  <details class="ans"><summary>13. What are ARES's three stages and default models?</summary><p>Synthetic data generation (google/flan-t5-xxl), classifier training (microsoft/deberta-v3-large), RAG evaluation with confidence intervals.</p></details>
+  <details class="ans"><summary>14. Why does evaluate_batch return indices with each result?</summary><p>Threads finish in any order; the index puts each evaluation back in the correct row.</p></details>
+  <details class="ans"><summary>15. Interview: Llama-3.1-8B-Instruct got the best accuracy (2.62) but worst style (1.86). Why, according to the book?</summary><p>Its huge post-training (over 10 million samples vs 13,000 for TwinLlama) likely gives it an edge in facts, but it tends to be verbose and formal, which the style rubric penalizes. DPO got the best style (2.12).</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>The chapter's references</h2></div><span class="chip">pdf p316–317</span></div>
+  <details><summary>10 references (click to open)</summary>
+    <ul class="plain">
+      <li>Lianmin Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena", arXiv:2306.05685, 2023.</li>
+      <li>Aymeric Roucher, "Using LLM-as-a-judge for an automated and versatile evaluation", Hugging Face Open-Source AI Cookbook (no date).</li>
+      <li>LangChain, "Aligning LLM-as-a-Judge with Human Preferences", blog.langchain.dev, 2024.</li>
+      <li>Dan Hendrycks et al., "Measuring Massive Multitask Language Understanding" (MMLU), arXiv:2009.03300, 2020.</li>
+      <li>Jeffrey Zhou et al., "Instruction-Following Evaluation for Large Language Models" (IFEval), arXiv:2311.07911, 2023.</li>
+      <li>Yann Dubois et al., "Length-Controlled AlpacaEval: A Simple Way to Debias Automatic Evaluators", arXiv:2404.04475, 2024.</li>
+      <li>Grégoire Mialon et al., "GAIA: a benchmark for General AI Assistants", arXiv:2311.12983, 2023.</li>
+      <li>Giwon Hong et al., "The Hallucinations Leaderboard – An Open Effort to Measure Hallucinations in Large Language Models", arXiv:2404.05904, 2024.</li>
+      <li>Shahul Es et al., "RAGAS: Automated Evaluation of Retrieval Augmented Generation", arXiv:2309.15217, 2023.</li>
+      <li>Jon Saad-Falcon et al., "ARES: An Automated Evaluation Framework for Retrieval-Augmented Generation Systems", arXiv:2311.09476, 2023.</li>
+    </ul>
+  </details>
+</section>
+</div>
+</body>
+</html>

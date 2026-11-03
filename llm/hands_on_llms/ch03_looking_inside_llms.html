@@ -1,0 +1,1656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hands-On LLMs Ch.3 Inside LLMs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ---- page-specific additions (Database Internals ch.2) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.flow .tag { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 3px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); }
+.treebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.treebox svg { display: block; height: auto; margin: 0 auto; }
+.caption { font-family: var(--mono); font-size: 13px; background: var(--paper); border-left: 3px solid var(--c1); padding: 8px 10px; min-height: 3.4em; line-height: 1.5; }
+.caption b { color: var(--c1); }
+pre.code { font-family: var(--mono); font-size: 12.5px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; line-height: 1.45; max-height: 560px; }
+.box.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.box.beyond > b { color: var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c2); grid-template-columns: minmax(0, 1fr); }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.note { font-size: 15px; color: var(--muted); }
+/* tree drawings (colors only via tokens) */
+.tnode rect.bg { fill: var(--plate); }
+.tnode rect.cell { fill: var(--plate); stroke: var(--rule); stroke-width: 1; }
+.tnode rect.cell.kcmp { fill: var(--tint2); }
+.tnode rect.cell.khit { fill: var(--buy); fill-opacity: .32; }
+.tnode rect.cell.knew { fill: var(--c3); fill-opacity: .30; }
+.tnode rect.cell.kover { fill: var(--sell); fill-opacity: .30; }
+.tnode rect.border { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.tnode.path rect.border { stroke: var(--c2); stroke-width: 2.6; }
+.tnode.cur rect.border { stroke: var(--c1); stroke-width: 3; }
+.tnode.newn rect.border { stroke: var(--buy); stroke-width: 3; stroke-dasharray: 5 3; }
+.tnode text, .bnode text { font-size: 11px; }
+.ptrdot { fill: var(--muted); }
+.tedge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.tedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.sib { stroke: var(--c3); stroke-width: 1.3; stroke-dasharray: 3 3; fill: none; }
+.sibh { fill: var(--c3); }
+.lvl { fill: var(--muted) !important; font-size: 11px; }
+.bnode circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.4; }
+.bnode.path circle { stroke: var(--c2); stroke-width: 3; }
+.bnode.hit circle { fill: var(--tint2); stroke: var(--buy); stroke-width: 3; }
+.bnode.miss circle { stroke: var(--sell); stroke-width: 3; }
+.bnode.piv circle { fill: var(--tint); stroke: var(--c1); stroke-width: 3; }
+.bnode text.ord { fill: var(--c1); font-size: 10px; }
+.bedge { stroke: var(--muted); stroke-width: 1.2; }
+.bedge.on { stroke: var(--c2); stroke-width: 2.6; }
+.ssd .free { fill: var(--plate); stroke: var(--rule); }
+.ssd .live { fill: var(--c2); fill-opacity: .28; stroke: var(--c2); }
+.ssd .stale { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); stroke-dasharray: 2 2; }
+.ssd .blk { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.ssd .blk.open { stroke: var(--c1); stroke-width: 3; }
+.ssd text { font-size: 10px; }
+.dg rect.f { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.dg rect.s { fill: var(--paper); stroke: var(--rule); }
+.dg rect.hi { fill: var(--tint); stroke: var(--c1); stroke-width: 2.4; }
+.dg rect.vbox { fill: var(--c3); fill-opacity: .22; stroke: var(--c3); }
+.dg line, .dg path { stroke: var(--muted); stroke-width: 1.3; fill: none; }
+.dg path.on, .dg line.on { stroke: var(--c1); stroke-width: 2.6; }
+.dg circle { fill: var(--muted); }
+.dg text.m { fill: var(--muted); }
+</style>
+<style>
+/* ---- page-specific additions (DDIA ch.5 Replication) ---- */
+.plate { grid-template-columns: minmax(0, 1fr); }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: calc(100vw - 80px); }
+.fig { grid-template-columns: minmax(0, 1fr); }
+.bookfig { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.bookfig img { background: #fff; padding: 10px; border: 1px solid var(--rule); border-radius: 6px; width: 100%; height: auto; display: block; }
+.bookfig figcaption { font-family: var(--mono); font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.howread { font-size: 16px; border-left: 3px solid var(--c2); padding-left: 10px; }
+.howread b:first-child { font-family: var(--display); }
+code { font-family: var(--mono); font-size: .86em; background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; padding: 0 3px; overflow-wrap: anywhere; }
+.sqbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 6px; }
+.sqbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.sq .lane { stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.sq .lanelbl { font-family: var(--display); font-size: 13px; font-weight: 600; }
+.sq .msg { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.sq .head { fill: var(--muted); }
+.sq .msg.on { stroke: var(--c1); stroke-width: 2.6; } .sq .head.on { fill: var(--c1); }
+.sq .msg.bad { stroke: var(--sell); } .sq .head.bad { fill: var(--sell); }
+.sq .msg.good { stroke: var(--buy); } .sq .head.good { fill: var(--buy); }
+.sq .msg.lost { stroke: var(--sell); stroke-dasharray: 5 4; }
+.sq text.ml { font-size: 11px; }
+.sq text.ml.on { fill: var(--c1); font-weight: 600; }
+.sq text.ml.bad { fill: var(--sell); font-weight: 600; }
+.sq text.ml.good { fill: var(--buy); font-weight: 600; }
+.sq rect.off { fill: var(--sell); fill-opacity: .14; stroke: var(--sell); stroke-dasharray: 3 3; }
+.sq rect.wait { fill: var(--c1); fill-opacity: .14; stroke: none; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.reps { display: flex; flex-wrap: wrap; gap: 8px; }
+.rep { border: 1.5px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 96px; background: var(--paper); font-family: var(--mono); font-size: 12px; line-height: 1.45; cursor: default; }
+.rep b { font-family: var(--display); font-size: 13px; display: block; }
+.rep.down { opacity: .5; border-style: dashed; }
+.rep.w { border-color: var(--c1); background: var(--tint); }
+.rep.r { box-shadow: 0 0 0 3px var(--c2); }
+.rep.stale { color: var(--sell); }
+.rep.fresh { color: var(--buy); }
+.rep.click { cursor: pointer; }
+.pill { font-family: var(--mono); font-size: 12px; border-radius: 99px; padding: 2px 9px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--buy); } .pill.bad { color: var(--sell); } .pill.warn { color: var(--c1); }
+.verdict { font-family: var(--mono); font-size: 13.5px; padding: 8px 10px; border-radius: 4px; background: var(--paper); border-left: 4px solid var(--rule); line-height: 1.5; }
+.verdict.good { border-left-color: var(--buy); } .verdict.bad { border-left-color: var(--sell); } .verdict.warn { border-left-color: var(--c1); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.log { display: flex; flex-wrap: wrap; gap: 3px; font-family: var(--mono); font-size: 11.5px; }
+.log span { border: 1px solid var(--rule); border-radius: 3px; padding: 2px 5px; background: var(--paper); }
+.log span.have { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.log span.snap { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.log span.miss { opacity: .45; }
+.log span.lost { background: var(--sell); color: var(--plate); border-color: var(--sell); text-decoration: line-through; }
+.cart { display: grid; gap: 6px; }
+.cart .sib { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.cart .ver { font-weight: 600; color: var(--c3); min-width: 4.5em; }
+.cart .item { border: 1px solid var(--rule); background: var(--paper); border-radius: 99px; padding: 1px 8px; }
+.cart .item.gone { text-decoration: line-through; color: var(--sell); }
+.cart .sib.dead { opacity: .4; text-decoration: line-through; }
+.topo circle.n { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; cursor: pointer; }
+.topo circle.n.got { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); stroke-width: 2.4; }
+.topo circle.n.src { fill: var(--c1); fill-opacity: .45; stroke: var(--c1); stroke-width: 3; }
+.topo circle.n.dead { fill: var(--sell); fill-opacity: .22; stroke: var(--sell); stroke-dasharray: 4 3; }
+.topo line.e { stroke: var(--muted); stroke-width: 1.3; }
+.topo line.e.used { stroke: var(--buy); stroke-width: 3; }
+.topo line.e.cut { stroke: var(--sell); stroke-dasharray: 4 4; opacity: .6; }
+.topo text { font-size: 13px; font-weight: 600; pointer-events: none; }
+.dg rect.dc { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg rect.ok { fill: var(--buy); fill-opacity: .18; stroke: var(--buy); }
+.dg rect.bad { fill: var(--sell); fill-opacity: .16; stroke: var(--sell); }
+.dg text.b { font-weight: 600; }
+.cyl ellipse, .cyl path { fill: var(--plate); stroke: var(--ink); stroke-width: 1.3; }
+.cyl.p1 ellipse, .cyl.p1 path { fill: var(--tint); }
+.cyl.p2 ellipse, .cyl.p2 path { fill: var(--tint2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: var(--paper); display: grid; gap: 4px; font-size: 15.5px; }
+.card > b { font-family: var(--display); }
+.small { font-size: 14px; }
+details.ans { background: var(--paper); }
+ol.refs { margin: 8px 0 0; padding-left: 26px; font-size: 14px; display: grid; gap: 3px; }
+</style>
+<style>
+/* ---- page-specific additions (Hands-On LLMs ch.3 Looking Inside LLMs) ---- */
+.toks { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.toks span { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 2px 7px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+.toks span.gen { background: var(--c3); color: var(--plate); border-color: var(--c3); }
+.toks span.newt { outline: 2px solid var(--c1); }
+.toks span.cur { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.toks span.click { cursor: pointer; }
+.toks span.dim { opacity: .45; }
+.bars { display: grid; gap: 4px; font-family: var(--mono); font-size: 12.5px; }
+.bars .b { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 4.2em; align-items: center; gap: 8px; }
+.bars .b > i { display: block; height: 14px; background: var(--c3); border-radius: 2px; min-width: 1px; }
+.bars .b.top > i { background: var(--c1); }
+.bars .b.pick > span:first-child { font-weight: 600; color: var(--c1); }
+.bars .b > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.mask { display: grid; gap: 2px; width: max-content; }
+.mask div { width: 18px; height: 18px; border-radius: 2px; background: var(--grid); }
+.mask div.self { background: var(--c2); }
+.mask div.see { background: var(--c2); opacity: .38; }
+.mask div.hl { outline: 2px solid var(--c1); }
+@media (max-width: 560px) { .mask div { width: 14px; height: 14px; } }
+.maskbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; padding: 10px; background: var(--plate); }
+.vec { display: inline-flex; gap: 2px; vertical-align: middle; }
+.vec b { display: inline-block; min-width: 3.2em; text-align: center; font-family: var(--mono); font-size: 12px; font-weight: 400; border: 1px solid var(--rule); background: var(--paper); padding: 1px 3px; border-radius: 2px; }
+.stack { display: grid; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.stack div { border: 1px solid var(--rule); border-radius: 4px; padding: 5px 9px; background: var(--paper); }
+.stack div.on { border-color: var(--c1); background: var(--tint); font-weight: 600; }
+.stack div.done { opacity: .55; }
+.streams { display: grid; gap: 3px; font-family: var(--mono); font-size: 12px; overflow-x: auto; }
+.streams .row { display: flex; gap: 3px; }
+.streams .row span { min-width: 54px; text-align: center; border: 1px solid var(--rule); border-radius: 3px; padding: 2px 3px; background: var(--paper); }
+.streams .row span.calc { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.streams .row span.cache { background: var(--c2); color: var(--plate); border-color: var(--c2); opacity: .55; }
+.streams .row span.lbl { min-width: 70px; border: none; background: none; text-align: left; color: var(--muted); }
+.kvg { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; font-family: var(--mono); font-size: 11px; }
+.kvg .col { display: grid; gap: 3px; justify-items: center; }
+.kvg .cell { width: 14px; height: 30px; border-radius: 3px; border: 1px solid var(--ink); }
+.kvg .q { background: var(--c3); opacity: .7; }
+.kvg .k { background: var(--c1); opacity: .7; }
+.kvg .v { background: var(--c2); opacity: .7; }
+.kvg .grp { display: grid; gap: 3px; border: 1px dashed var(--rule); border-radius: 4px; padding: 4px; justify-items: center; }
+.kvg .grp .qs { display: flex; gap: 2px; }
+.pack { display: grid; gap: 4px; font-family: var(--mono); font-size: 11px; }
+.pack .ctx { display: flex; height: 24px; border: 1px solid var(--ink); border-radius: 3px; overflow: hidden; }
+.pack .ctx span { display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; border-right: 1px solid var(--plate); }
+.pack .doc0 { background: var(--c1); color: var(--plate); } .pack .doc1 { background: var(--c2); color: var(--plate); } .pack .doc2 { background: var(--c3); color: var(--plate); }
+.pack .sep { background: var(--ink); color: var(--plate); } .pack .pad { background: var(--grid); color: var(--muted); }
+.blockcmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .blockcmp { grid-template-columns: 1fr; } }
+.blockcmp .stack div.diff { border-color: var(--c3); background: var(--tint3); }
+.box.work { grid-template-columns: minmax(0, 1fr); }
+pre.code .cm { color: var(--muted); }
+.shape { font-family: var(--mono); font-size: 13px; color: var(--c2); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch02_tokens_and_embeddings.html">← Ch.2 Tokens and Embeddings</a><a href="ch04_text_classification.html">Ch.4 Text Classification →</a></nav>
+
+<header class="hero">
+  <div class="kicker">JAY ALAMMAR &amp; MAARTEN GROOTENDORST · HANDS-ON LARGE LANGUAGE MODELS · CHAPTER 3 · PDF p95–130</div>
+  <h1>Looking inside an LLM: how one <em>next token</em> gets made</h1>
+  <p class="lede">From the outside an LLM looks like "text in, text out". This chapter opens the box. The model actually writes <b>one token at a time</b>, and software runs it in a loop, appending each new token to the prompt. One pass through the model goes <b>tokenizer → a stack of Transformer blocks → LM head</b>, which outputs a probability for every token in the vocabulary; a <b>decoding strategy</b> picks one. Every token flows down its own parallel stream, and a <b>KV cache</b> saves the work already done for earlier tokens. Inside each block, <b>attention</b> pulls in context from earlier tokens (score relevance, then combine) and a <b>feedforward network</b> holds most of what the model memorised. The chapter ends with the tweaks that make 2024-era models like Llama faster and better: sparse attention, multi-query and grouped-query attention, Flash Attention, pre-normalisation with RMSNorm, SwiGLU and rotary position embeddings (RoPE).</p>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter zooms in, one layer at a time: first the whole model as a black box, then its three parts, then one Transformer block, then one attention head, then the modern tweaks to each part. Read each row as "here is the thing → here is what's inside it → here is how people made it faster".</p>
+  <div class="flow" role="img" aria-label="Concept chain of chapter 3">
+    <div class="row"><span class="tag">Black box</span><span class="node">prompt in</span><span class="arr">→</span><span class="node key">one token out per forward pass</span><span class="arr">→</span><span class="node">append, repeat (autoregressive)</span></div>
+    <div class="row"><span class="tag">3 parts</span><span class="node">tokenizer + embeddings</span><span class="arr">→</span><span class="node key">stack of Transformer blocks</span><span class="arr">→</span><span class="node">LM head: score for each of 32,064 tokens</span><span class="arr">→</span><span class="node">decoding: greedy or sample</span></div>
+    <div class="row"><span class="tag">Parallel</span><span class="node">one stream per token (≤ context length)</span><span class="arr">→</span><span class="node">only last stream predicts</span><span class="arr">→</span><span class="node key">cache keys &amp; values (4.5 s vs 21.8 s)</span></div>
+    <div class="row"><span class="tag">1 block</span><span class="node key">self-attention: context</span><span class="arr">+</span><span class="node">feedforward: memory &amp; interpolation</span></div>
+    <div class="row"><span class="tag">1 head</span><span class="node">Q, K, V projections</span><span class="arr">→</span><span class="node key">score: query × keys → softmax</span><span class="arr">→</span><span class="node">combine: Σ score × value</span><span class="arr">→</span><span class="node">many heads in parallel</span></div>
+    <div class="row"><span class="tag">Make it cheaper</span><span class="node">local / sparse attention</span><span class="arr">→</span><span class="node key">multi-query → grouped-query</span><span class="arr">→</span><span class="node">Flash Attention (GPU memory)</span></div>
+    <div class="row"><span class="tag">Make it better</span><span class="node">pre-norm + RMSNorm</span><span class="arr">→</span><span class="node">SwiGLU</span><span class="arr">→</span><span class="node key">RoPE: position inside attention</span><span class="arr">→</span><span class="node">packing-friendly training</span></div>
+  </div>
+  <svg viewBox="0 0 640 200" class="dg" role="img" aria-label="Zoom levels: model, block, attention head" style="width:100%;height:auto;max-width:640px">
+    <text x="10" y="16" class="b">The model</text><text x="230" y="16" class="b">One block</text><text x="440" y="16" class="b">One attention head</text>
+    <rect x="10" y="26" width="180" height="160" rx="6" class="s"/>
+    <rect x="22" y="36" width="156" height="24" rx="3" class="f"/><text x="100" y="52" text-anchor="middle">Tokenizer</text>
+    <rect x="22" y="68" width="156" height="22" rx="3" class="f"/><text x="100" y="83" text-anchor="middle">Block 1</text>
+    <rect x="22" y="94" width="156" height="22" rx="3" class="hi"/><text x="100" y="109" text-anchor="middle">Block 2</text>
+    <rect x="22" y="120" width="156" height="22" rx="3" class="f"/><text x="100" y="135" text-anchor="middle">… Block N</text>
+    <rect x="22" y="152" width="156" height="24" rx="3" class="f"/><text x="100" y="168" text-anchor="middle">LM head</text>
+    <path d="M178 105 L230 40"/><path d="M178 105 L230 186"/>
+    <rect x="230" y="40" width="180" height="146" rx="6" class="s"/>
+    <rect x="242" y="56" width="156" height="50" rx="3" class="hi"/><text x="320" y="85" text-anchor="middle">Self-attention</text>
+    <rect x="242" y="120" width="156" height="50" rx="3" class="f"/><text x="320" y="149" text-anchor="middle">Feedforward NN</text>
+    <path d="M398 80 L440 40"/><path d="M398 80 L440 186"/>
+    <rect x="440" y="40" width="190" height="146" rx="6" class="s"/>
+    <text x="452" y="66">Q = x·W_q</text><text x="540" y="66">K = x·W_k</text>
+    <text x="452" y="88">V = x·W_v</text>
+    <rect x="450" y="100" width="170" height="30" rx="3" class="hi"/><text x="535" y="119" text-anchor="middle">1. score: q·K → softmax</text>
+    <rect x="450" y="140" width="170" height="30" rx="3" class="f"/><text x="535" y="159" text-anchor="middle">2. combine: Σ s·V</text>
+  </svg>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Opening: load Phi-3</a>
+    <a href="#s2"><span>02</span>Overview of Transformer models</a>
+    <a href="#s3"><span>03</span>Inputs and outputs</a>
+    <a href="#s4"><span>04</span>Components of the forward pass</a>
+    <a href="#s5"><span>05</span>Choosing a token (decoding)</a>
+    <a href="#s6"><span>06</span>Parallel streams, context size</a>
+    <a href="#s7"><span>07</span>KV cache</a>
+    <a href="#s8"><span>08</span>Inside the Transformer block</a>
+    <a href="#s9"><span>09</span>Feedforward network at a glance</a>
+    <a href="#s10"><span>10</span>Attention layer at a glance</a>
+    <a href="#s11"><span>11</span>Attention is all you need</a>
+    <a href="#s12"><span>12</span>How attention is calculated</a>
+    <a href="#s13"><span>13</span>Relevance scoring</a>
+    <a href="#s14"><span>14</span>Combining information</a>
+    <a href="#s15"><span>15</span>Recent improvements</a>
+    <a href="#s16"><span>16</span>Efficient + local/sparse attention</a>
+    <a href="#s17"><span>17</span>Multi-query &amp; grouped-query</a>
+    <a href="#s18"><span>18</span>From multi-head to GQA</a>
+    <a href="#s19"><span>19</span>Flash Attention</a>
+    <a href="#s20"><span>20</span>The Transformer block (2017 vs 2024)</a>
+    <a href="#s21"><span>21</span>Positional embeddings (RoPE)</a>
+    <a href="#s22"><span>22</span>Other experiments</a>
+    <a href="#summary"><span>Σ</span>Summary + key terms</a>
+    <a href="#systems"><span>⚙</span>Real systems</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+    <a href="#refs"><span>¶</span>References</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Getting a model ready: Phi-3 in a generation pipeline</h2></div><span class="chip">pdf p95</span></div>
+  <p>Chapter 2 covered <b>tokenization</b> (cutting text into tokens) and <b>embeddings</b> (a vector of numbers for each token). Now the book goes into the <b>language model</b> itself and the main intuitions of how <b>Transformer</b> language models work. The focus is on <b>text generation models</b> (generative LLMs), the kind that write text, not the kind that only represent it.</p>
+  <p>The chapter mixes concepts and code. The authors' advice: on your <b>first read, skip the code</b> and grasp the concepts; on a <b>second read</b>, use the code to start applying them. The first piece of code loads a model and wraps it in a <b>pipeline</b> for generation:</p>
+<pre class="code"><code>import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+<span class="cm"># Load model and tokenizer</span>
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=True,
+)
+
+<span class="cm"># Create a pipeline</span>
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,
+    max_new_tokens=50,
+    do_sample=False,
+)</code></pre>
+  <div class="tablewrap"><table>
+    <tr><th>Line</th><th>What it does and why</th></tr>
+    <tr><td><code>AutoTokenizer.from_pretrained(...)</code></td><td>Downloads the tokenizer that belongs to <b>Phi-3-mini-4k-instruct</b> (Microsoft's small instruction-tuned model with a 4K-token context). The model only understands the token IDs from <i>its own</i> tokenizer.</td></tr>
+    <tr><td><code>AutoModelForCausalLM</code></td><td>Loads the model with a <b>causal language modelling</b> head, i.e. "predict the next token" (the LM head of plate 4).</td></tr>
+    <tr><td><code>device_map="cuda"</code></td><td>Put the model on the GPU.</td></tr>
+    <tr><td><code>torch_dtype="auto"</code></td><td>Use the number format (precision) stored with the model instead of forcing one.</td></tr>
+    <tr><td><code>trust_remote_code=True</code></td><td>Allow running model-specific Python code that ships with the model on the Hugging Face Hub.</td></tr>
+    <tr><td><code>pipeline("text-generation", ...)</code></td><td>Wraps tokenizer + model + the generation loop in one callable, <code>generator(prompt)</code>.</td></tr>
+    <tr><td><code>return_full_text=False</code></td><td>Return only the newly generated text, not the prompt plus the text.</td></tr>
+    <tr><td><code>max_new_tokens=50</code></td><td>Stop after 50 new tokens. (Plate 3 shows the email cut off by this limit.)</td></tr>
+    <tr><td><code>do_sample=False</code></td><td>Don't sample randomly: always take the most likely token (greedy decoding, plate 5).</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>Loading the tokenizer and the model is like hiring a cook (model) together with the cook's own measuring cups (tokenizer). The pipeline is the restaurant's order counter: you hand in an order (prompt), the counter handles everything and gives back a plate (text). <i>Where it breaks:</i> a cook can use any cups; a model breaks if you feed it token IDs from a different tokenizer.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"How would you run an open model locally for a quick prototype?"</i> — "Load the tokenizer and the causal-LM model from the Hugging Face Hub with the same model ID, put it on the GPU with an automatic dtype, and wrap both in a text-generation pipeline. I would set <code>max_new_tokens</code> to bound latency and cost, and <code>do_sample=False</code> when I want reproducible outputs for testing."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: the tokenizer and token embeddings this chapter builds on.</li><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: first time the book loads Phi-3 and generates text.</li><li>Plates 3–5: what <code>generator(prompt)</code> does step by step.</li></ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · AN OVERVIEW OF TRANSFORMER MODELS</div><h2>The plan: first the big picture, then the 2017 → today improvements</h2></div><span class="chip">pdf p96</span></div>
+  <p>The chapter has two halves. The first half (<b>An Overview of Transformer Models</b>, plates 2–14) gives a high-level view of the model and then zooms in on its parts. The second half (<b>Recent Improvements to the Transformer Architecture</b>, plates 15–22) shows how later work improved on the Transformer since it was introduced in <b>2017</b> (in the paper "Attention is all you need").</p>
+  <div class="box picture"><b>Picture it</b><p>Like learning a car: first "you press the pedal and it moves", then engine, gearbox, wheels, then what changed between a 2017 model and a 2024 model (fuel injection, turbo). <i>Where it breaks:</i> a 2024 car engine is very different from 2017; the 2024 Transformer is still mostly the 2017 design with tweaks.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: the history from bag-of-words to attention and the 2017 Transformer.</li><li><a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a>: Chip Huyen's view of the Transformer architecture and model size.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · THE INPUTS AND OUTPUTS OF A TRAINED TRANSFORMER LLM</div><h2>Text in, text out — but really one token per pass, in a loop</h2></div><span class="chip">pdf p96–98 · Fig 3-1 to 3-3</span></div>
+  <p>The most common way to picture a Transformer LLM is as a <b>software system that takes in text and generates text in response</b>. Once a large enough text-in-text-out model is trained on a large enough, high-quality dataset, it can generate impressive and useful outputs. Figure 3-1 shows one used to write an email.</p>
+  <figure class="bookfig"><img src="figs/fig-3-1.png" alt="A prompt asking for an apology email to Sarah goes into a box labelled Transformer LLM, and an email starting 'Dear Sarah' comes out" loading="lazy"><figcaption>Figure 3-1 (book, pdf p96): At a high level of abstraction, Transformer LLMs take a text prompt and output generated text.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> top grey box = the prompt ("Write an email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."). Pink box = the model, treated as a black box. Bottom grey box = what comes out ("Dear Sarah, I'm writing to apologize for the incident last week. […]"). This is the "outside" view; the rest of the chapter opens the pink box.</p>
+  <p>But the model does <b>not</b> write the whole text in one go. It generates <b>one token at a time</b>. Each token-generation step is one <b>forward pass</b> through the model. "Forward pass" is machine-learning speak for: the inputs go into the neural network, flow through all the computations it needs, and produce an output at the other end of the <b>computation graph</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-2.png" alt="Same prompt and model; generation shown as four separate tokens #1 Dear, #2 Sarah, #3 comma, #4 newline, each on its own step" loading="lazy"><figcaption>Figure 3-2 (book, pdf p97): Transformer LLMs generate one token at a time, not the entire text at once.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the purple boxes are four generation steps, numbered #1 to #4, laid out like a staircase to show they happen one after another: "Dear", then "Sarah", then ",", then "\n" (a newline token). Even punctuation and line breaks are separate tokens, each costing a forward pass.</p>
+  <p>After each step, the input prompt is changed for the next step: the <b>output token is appended to the end of the input prompt</b>, and this longer text goes through the model again.</p>
+  <figure class="bookfig"><img src="figs/fig-3-3.png" alt="Two rows: first row prompt goes into the model and produces Dear; second row prompt plus Dear goes into the model and produces Sarah" loading="lazy"><figcaption>Figure 3-3 (book, pdf p97): An output token is appended to the prompt, then this new text is presented to the model again for another forward pass to generate the next token.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> row 1: prompt → model → "Dear". Row 2: the <i>same</i> prompt with "Dear" stuck underneath → the same model → "Sarah". The model has no memory between rows; the only thing that changes is that its input got one token longer.</p>
+  <p>So the accurate picture is: the model <b>simply predicts the next token from an input prompt</b>. <b>Software around the neural network runs it in a loop</b> to grow the text one token at a time until it is complete.</p>
+  <p>Models that consume their own earlier predictions to make later predictions (the first generated token is used to generate the second) are called <b>autoregressive models</b>. That is why text-generation LLMs are called autoregressive. The word is often used to tell them apart from <b>text representation models like BERT</b>, which are <b>not</b> autoregressive (BERT reads the whole text at once and outputs vectors; it doesn't write).</p>
+  <div class="box work"><b>Step through it · the generation loop</b>
+    <p>Each click is one forward pass. Watch the input grow by the token the model just produced. (Tokens are shown as words for readability; real tokens can be word pieces.)</p>
+    <div class="stepbar"><button id="ar_prev" type="button">◀ Back</button><button id="ar_next" type="button">Next ▶</button><span id="ar_n"></span></div>
+    <div class="toks" id="ar_in" aria-live="polite"></div>
+    <div class="caption" id="ar_cap"></div>
+  </div>
+  <p>This is what happens under the hood when we call the pipeline:</p>
+<pre class="code"><code>prompt = "Write an email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."
+output = generator(prompt)
+print(output[0]['generated_text'])</code></pre>
+  <p>which prints:</p>
+<pre class="code"><code>Solution 1:
+
+Subject: My Sincere Apologies for the Gardening Mishap
+
+Dear Sarah,
+
+I hope this message finds you well. I am writing to express my deep</code></pre>
+  <p>The model starts the email with a subject line, then stops abruptly mid-sentence ("my deep"). Why? It hit the token limit set by <code>max_new_tokens=50</code>. If we raise that number, it continues until it finishes the email. The "Solution 1:" header is just what this model happened to write first; the loop printed whatever 50 tokens it produced.</p>
+  <div class="box picture"><b>Picture it</b><p>Antakshari (the song chain game) played by one person with no memory: someone reads them the whole song so far, they sing one more word, then you read them the whole song again including their word, and they add the next one. <i>Where it breaks:</i> a person would remember the song; the model really gets the whole text again every pass (plate 7 shows how the KV cache avoids redoing the work).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The neural network is a pure function: <code>tokens → probabilities for the next token</code>. Everything that feels like "writing" (the loop, stopping at a limit or an end-of-text token, streaming words to the screen) is ordinary software around that function. That's why generation cost grows with output length: 50 tokens means 50 forward passes.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why are LLMs called autoregressive, and what does that mean for latency?"</i> — "A generative LLM predicts only the next token; a loop appends that token to the input and runs the model again, so each output token depends on the previous ones. That makes output generation sequential: latency grows roughly linearly with the number of output tokens, which is why we stream tokens to the user and cap <code>max_new_tokens</code>. In a voice agent, time-to-first-token matters most because TTS (text-to-speech) can start speaking as soon as the first words arrive."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 5: how the one token per pass is chosen.</li><li>Plate 7: caching so each pass doesn't redo old tokens.</li><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: representation (BERT) vs generative (GPT) models.</li><li><a href="ch06_prompt_engineering.html">Ch.6</a>: controlling generation with prompts and parameters.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · THE COMPONENTS OF THE FORWARD PASS</div><h2>Tokenizer → stack of Transformer blocks → LM head</h2></div><span class="chip">pdf p98–101 · Fig 3-4 to 3-6</span></div>
+  <p>Besides the loop, the two key internal components are the <b>tokenizer</b> and the <b>language modeling head (LM head)</b>. Figure 3-4 shows where they sit.</p>
+  <ul class="plain">
+    <li>The <b>tokenizer</b> (Chapter 2) breaks text into a sequence of <b>token IDs</b>, which become the model's input.</li>
+    <li>Then comes the neural network proper: a <b>stack of Transformer blocks</b> that does all the processing.</li>
+    <li>The stack is followed by the <b>LM head</b>, which turns the stack's output into <b>probability scores for what the most likely next token is</b>.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-3-4.png" alt="The Transformer LLM box zoomed in: a Tokenizer on top, a stack of Transformer blocks 1, 2 to N in the middle, an LM head at the bottom; output token Dear" loading="lazy"><figcaption>Figure 3-4 (book, pdf p99): A Transformer LLM is made up of a tokenizer, a stack of Transformer blocks, and a language modeling head.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the dotted lines "open up" the pink model box from Figure 3-1. Read the right panel top to bottom: tokenizer, then blocks 1, 2, … N (blue), then the LM head. The output is still just one token, "Dear".</p>
+  <p>Recall from Chapter 2 that the tokenizer contains a table of tokens, the <b>tokenizer's vocabulary</b>. The model holds a vector for each token in that vocabulary: the <b>token embeddings</b>. Figure 3-5 shows both for a model with a vocabulary of <b>50,000 tokens</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-5.png" alt="Tokenizer connected to a token vocabulary table with IDs 0 '!', 1 quote, ..., 50,000 'Zyzzyva'; the stack of blocks connected to a token embeddings matrix with one row per token ID 0 to 50,000" loading="lazy"><figcaption>Figure 3-5 (book, pdf p99): The tokenizer has a vocabulary of 50,000 tokens. The model has token embeddings associated with those embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> red line: the tokenizer owns the <b>vocabulary table</b> (Token ID → Token: 0 → "!", 1 → a quote mark, …, 50,000 → "Zyzzyva"; beyond the book: a real word, a genus of weevils, often the last entry in a dictionary). Blue line: the model owns the <b>embeddings matrix</b>, one row of numbers per token ID. So token ID 1,102 picks row 1,102 of the matrix. (The caption's "associated with those embeddings" is the book's wording; it means "associated with those tokens".)</p>
+  <p>Computation flows in the direction of the arrow, <b>top to bottom</b>. For each generated token, the process flows <b>once through each Transformer block in order</b>, then to the LM head, which outputs the <b>probability distribution for the next token</b> (Figure 3-6).</p>
+  <figure class="bookfig"><img src="figs/fig-3-6.png" alt="Left, a Transformer LLM box: tokenizer, a stack of Transformer blocks 1 to N, and an LM head at the bottom. The LM head connects to an Output box, Token probability: token 0 '!' 0.01%, token 1 quote 0.03%, token 1,102 'Dear' 40%, token 50,000 'Zyzzyva' 1.00%" loading="lazy"><figcaption>Figure 3-6 (book, pdf p100): At the end of the forward pass, the model predicts a probability score for each token in the vocabulary.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> on the left is the whole Transformer LLM, top to bottom: tokenizer, then the stack of Transformer blocks (1, 2 … N), then the <b>LM head</b>. A red line links the LM head to the "Output" box on the right. That output is the <i>same table</i> as the vocabulary, with one more column: a probability. "!" gets 0.01%, the quote mark 0.03%, "Dear" (ID 1,102) gets 40%, and "Zyzzyva" 1.00%. Every one of the 50,000 tokens gets a score; together they add up to 100%.</p>
+  <p>The LM head is itself a <b>simple neural network layer</b>. It is one of several possible <b>"heads"</b> you can attach to a stack of Transformer blocks to build different kinds of systems. Other heads include <b>sequence classification heads</b> (one label for the whole text, e.g. sentiment) and <b>token classification heads</b> (one label per token, e.g. marking names of people).</p>
+  <h3>Printing the model</h3>
+  <p>You can see the order of the layers by printing the <code>model</code> variable. For Phi-3-mini:</p>
+<pre class="code"><code>Phi3ForCausalLM(
+  (model): Phi3Model(
+    (embed_tokens): Embedding(32064, 3072, padding_idx=32000)
+    (embed_dropout): Dropout(p=0.0, inplace=False)
+    (layers): ModuleList(
+      (0-31): 32 x Phi3DecoderLayer(
+        (self_attn): Phi3Attention(
+          (o_proj): Linear(in_features=3072, out_features=3072, bias=False)
+          (qkv_proj): Linear(in_features=3072, out_features=9216, bias=False)
+          (rotary_emb): Phi3RotaryEmbedding()
+        )
+        (mlp): Phi3MLP(
+          (gate_up_proj): Linear(in_features=3072, out_features=16384, bias=False)
+          (down_proj): Linear(in_features=8192, out_features=3072, bias=False)
+          (activation_fn): SiLU()
+        )
+        (input_layernorm): Phi3RMSNorm()
+        (resid_attn_dropout): Dropout(p=0.0, inplace=False)
+        (resid_mlp_dropout): Dropout(p=0.0, inplace=False)
+        (post_attention_layernorm): Phi3RMSNorm()
+      )
+    )
+    (norm): Phi3RMSNorm()
+  )
+  (lm_head): Linear(in_features=3072, out_features=32064, bias=False)
+)</code></pre>
+  <p>What the book points out in this structure:</p>
+  <ul class="plain">
+    <li>It shows the <b>nested layers</b>. Most of the model is labelled <code>model</code>, followed by <code>lm_head</code>.</li>
+    <li>Inside <code>Phi3Model</code> is the embeddings matrix <code>embed_tokens</code>: <b>32,064 tokens, each with a vector of size 3,072</b>.</li>
+    <li>Skipping the dropout layer for now, the next big component is the <b>stack of Transformer decoder layers</b>: <b>32 blocks</b> of type <code>Phi3DecoderLayer</code>.</li>
+    <li>Each block has an <b>attention layer</b> and a <b>feedforward neural network</b> (also called an <code>mlp</code>; the book expands it as "multilevel perceptron", the usual name is <b>multilayer perceptron</b>). Both are covered later in the chapter.</li>
+    <li>Finally, <code>lm_head</code> takes a vector of size <b>3,072</b> and outputs a vector as long as the number of tokens the model knows (<b>32,064</b>). That output is the score for each token, used to pick the output token.</li>
+  </ul>
+  <div class="box work"><b>Interactive · click a line of the printout</b>
+    <p>Pick a module to see what it is and where it shows up in this chapter.</p>
+    <div class="seg" id="pm_btns" role="group" aria-label="Phi-3 modules"></div>
+    <div class="caption" id="pm_cap"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book · reading the numbers</b><p>Simple arithmetic on the printout: <code>qkv_proj</code> outputs 9,216 = 3 × 3,072, i.e. queries, keys and values (plate 12) computed in one matrix multiply, each 3,072 wide. <code>gate_up_proj</code> outputs 16,384 = 2 × 8,192: a "gate" half and an "up" half, which is why <code>down_proj</code> takes 8,192 in, not 16,384; that gated pattern with SiLU is the SwiGLU idea of plate 20. <code>padding_idx=32000</code> is the ID of the padding token. Phi-3-mini's config (not in the book) uses 32 attention heads of size 96 (32 × 96 = 3,072), with no key/value sharing.</p></div>
+  <div class="box picture"><b>Picture it</b><p>An IRCTC booking: the form converts your typed station names into station codes (tokenizer), the back-end runs the request through many checks in order (Transformer blocks), and the final screen ranks every train by how well it fits (LM head scores). <i>Where it breaks:</i> IRCTC shows you the list; the LM head scores <i>all 32,064 tokens</i> every single pass, even "Zyzzyva".</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Embedding lookup turns IDs into vectors of size 3,072 (the <b>model dimension</b>). Every block takes vectors of size 3,072 and returns vectors of size 3,072, so blocks can be stacked as deep as you like. The LM head is just a big matrix (3,072 × 32,064) that turns the final vector into one raw score per vocabulary token; a softmax turns raw scores into probabilities.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Walk me through what happens when an LLM generates a token."</i> — "The tokenizer maps text to IDs; IDs look up embedding vectors; those flow through N identical decoder blocks, each with self-attention and an MLP; the final vector for the last position goes through the LM head, a linear layer to vocabulary size, then softmax gives a distribution, and a decoding strategy picks one token. Swap the LM head for a classification head and the same backbone becomes a classifier."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: vocabulary, token IDs, token embeddings.</li><li><a href="ch04_text_classification.html">Ch.4</a> and <a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: classification heads on a Transformer backbone.</li><li>Plates 8–14: inside <code>Phi3DecoderLayer</code>; plate 20: RMSNorm and SiLU/SwiGLU; plate 21: <code>rotary_emb</code>.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · CHOOSING A SINGLE TOKEN FROM THE PROBABILITY DISTRIBUTION (SAMPLING/DECODING)</div><h2>Decoding: greedy pick or weighted dice roll</h2></div><span class="chip">pdf p101–103 · Fig 3-7</span></div>
+  <p>At the end of processing, the model outputs a probability score for <b>each token in the vocabulary</b> (Figure 3-6). The method for choosing a single token from that distribution is the <b>decoding strategy</b>. Figure 3-7 shows it picking "Dear".</p>
+  <figure class="bookfig"><img src="figs/fig-3-7.png" alt="The prompt 'Write an email apologizing to Sarah for the tragic gardening mishap. Explain how it happened.' goes into a Transformer LLM; output token probabilities (highest): Dear 40%, Title 13%, To 8%, Hi 2%, and more; a decoding strategy arrow picks Dear" loading="lazy"><figcaption>Figure 3-7 (book, pdf p102): The tokens with the highest probability after the model's forward pass. Our decoding strategy decides which of the tokens to output by sampling based on the probabilities.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the prompt (an apology email to Sarah about a gardening mishap) goes into the Transformer LLM. On the right, the bar chart shows only the top few of all tokens: "Dear" 40%, "Title" 13%, "To" 8%, "Hi" 2%, "…" for the long tail. The arrow labelled "Decoding strategy" is the separate step that turns this list into one token. Here it chose "Dear", but it didn't have to.</p>
+  <ul class="plain">
+    <li><b>Simplest strategy:</b> always pick the token with the highest score. In practice this <b>doesn't tend to give the best outputs</b> for most use cases.</li>
+    <li><b>Better:</b> add some randomness and sometimes choose the second or third most likely token. Statisticians call this <b>sampling from the probability distribution</b> based on the scores.</li>
+    <li>For Figure 3-7: if "Dear" has a <b>40%</b> probability, it has a <b>40% chance of being picked</b> (instead of being picked directly for having the top score, as greedy search does). Every other token also has a chance, according to its score.</li>
+    <li>Choosing the top token every time is called <b>greedy decoding</b>. It's what happens when you set the <b>temperature</b> parameter to <b>zero</b>. Temperature is covered in Chapter 6.</li>
+  </ul>
+  <div class="fig">
+    <h3>Simulator · greedy vs sampling on the book's distribution</h3>
+    <p class="note">"Dear" 40%, "Title" 13%, "To" 8%, "Hi" 2% are the book's numbers. The remaining 37% is spread over a modelled long tail ("Subject" 9%, "I" 7%, "Hello" 6%, "My" 5%, all other tokens 10%) so the bars add to 100%.</p>
+    <div class="controls">
+      <label for="tp5">temperature <input id="tp5" type="range" min="0" max="200" value="100"><output id="tp5o">1.00</output></label>
+      <button id="d5_one" type="button">Sample 1</button><button id="d5_100" type="button">Sample 100</button><button id="d5_reset" type="button">Reset</button>
+    </div>
+    <div class="bars" id="bars5"></div>
+    <div class="readout" id="r5"></div>
+    <p class="note">Beyond the book (temperature is explained in Ch.6): the slider divides the model's raw scores by the temperature before softmax. 1.00 = the distribution as given; lower sharpens it toward "Dear"; 0 = greedy (always "Dear"); higher flattens it.</p>
+  </div>
+  <h3>The same thing in code: model body, then LM head</h3>
+<pre class="code"><code>prompt = "The capital of France is"
+
+<span class="cm"># Tokenize the input prompt</span>
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+<span class="cm"># Tokenize the input prompt  (book's comment; this line moves the IDs to the GPU)</span>
+input_ids = input_ids.to("cuda")
+
+<span class="cm"># Get the output of the model before the lm_head</span>
+model_output = model.model(input_ids)
+
+<span class="cm"># Get the output of the lm_head</span>
+lm_head_output = model.lm_head(model_output[0])
+
+token_id = lm_head_output[0,-1].argmax(-1)
+tokenizer.decode(token_id)          <span class="cm"># → Paris</span></code></pre>
+  <ul class="plain">
+    <li><code>model.model(input_ids)</code> runs only the <b>body</b> (embeddings + 32 blocks), stopping before the LM head.</li>
+    <li><code>model.lm_head(model_output[0])</code> runs the LM head on it. <code>lm_head_output</code> has shape <span class="shape">[1, 6, 32064]</span>.</li>
+    <li><code>lm_head_output[0,-1]</code>: index <code>0</code> on the <b>batch</b> dimension (we sent one prompt), index <code>-1</code> = the <b>last token</b> in the sequence. That gives the list of scores for all 32,064 tokens.</li>
+    <li><code>.argmax(-1)</code> takes the top-scoring token ID (greedy), and <code>tokenizer.decode</code> turns it into text: <b>Paris</b>.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Ordering at a chai stall where the owner knows you usually take masala chai (40%), sometimes ginger (13%), sometimes elaichi (8%). Greedy: he always makes masala chai. Sampling: he rolls a weighted dice, so most days masala, some days ginger. <i>Where it breaks:</i> you'd be annoyed by a random drink; for writing, a bit of randomness makes text less repetitive and more natural.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The LM head gives raw scores (logits); softmax turns them into probabilities that sum to 1. Decoding is a separate, tiny step outside the network, so you can change it per request without retraining. Greedy is deterministic: same prompt, same output. Sampling is random: same prompt, different outputs.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"When would you use temperature 0?"</i> — "When I want deterministic, most-likely output: extraction, classification, tool-call arguments, JSON. For open-ended text I sample with a moderate temperature so it doesn't loop or sound flat. Greedy is simply argmax over the LM head's distribution at the last position; sampling draws from it."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_prompt_engineering.html">Ch.6</a>: temperature and top_p in depth.</li><li><a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a>: sampling strategies, logits, top-k/top-p.</li><li>Plate 6: why <code>[1, 6, 32064]</code> has a "6" in it.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · PARALLEL TOKEN PROCESSING AND CONTEXT SIZE</div><h2>One stream per token, and only the last one speaks</h2></div><span class="chip">pdf p103–105 · Fig 3-8, 3-9</span></div>
+  <p>One of the most compelling features of Transformers: they suit <b>parallel computing</b> better than earlier neural network architectures for language (beyond the book, an example: RNNs, recurrent neural networks, which read one word after another). You first see this in how each token is processed. The tokenizer splits the text into tokens, and <b>each input token flows through its own computation path</b> (a good first intuition, at least). Figure 3-8 shows these <b>processing tracks, or streams</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-8.png" alt="The prompt is tokenized into Write, ..., Explain, how, it, happen, ##ed, period; each token has its own vertical arrow going down through blocks 1, 2, N and the LM head; the last arrow for the period is highlighted blue" loading="lazy"><figcaption>Figure 3-8 (book, pdf p103): Each token is processed through its own stream of computation (with some interaction between them in attention steps, as we'll later see).</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the tokenizer row shows the tokens (note "happen" + "##ed": "happened" is split into two tokens). Each token gets a vertical arrow running down through every block. The arrows are drawn separately to show they can be computed side by side. The last arrow (".") is blue because it's the one that matters for the next token.</p>
+  <p>Current Transformer models have a limit on how many tokens they can process at once: the model's <b>context length</b>. A model with a <b>4K context length</b> can process only 4K tokens and would have only 4K of these streams. (Phi-3-mini-<b>4k</b>-instruct has exactly this.)</p>
+  <p>Each stream starts with an <b>input vector</b> (the token's embedding vector plus some <b>positional information</b>, covered in plate 21). At the end of the stream, another vector comes out as the result of the model's processing (Figure 3-9).</p>
+  <figure class="bookfig"><img src="figs/fig-3-9.png" alt="Each token has a blue embedding vector entering the stack and an orange output vector of the same size leaving it; only the last token's stream continues into the LM head" loading="lazy"><figcaption>Figure 3-9 (book, pdf p104): Each processing stream takes a vector as input and produces a final resulting vector of the same size (often referred to as the model dimension).</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> blue three-cell bars = embeddings going in; orange three-cell bars = output vectors coming out, the same size (the <b>model dimension</b>; 3,072 for Phi-3). Only the far-right stream's arrow continues through the LM head and out of the model. The other orange outputs just stop.</p>
+  <p>For text generation, <b>only the output of the last stream is used to predict the next token</b>. That vector is the only input into the LM head.</p>
+  <p>So why compute all the other streams if we throw away their outputs? Because <b>the earlier streams' calculations are needed to compute the final stream</b>. We don't use their <i>final</i> output vectors, but we do use their <b>earlier outputs (inside each Transformer block) in the attention mechanism</b>. The last token needs to "look at" the earlier ones at every layer.</p>
+  <p>Back to the code: <code>lm_head</code>'s output had shape <span class="shape">[1, 6, 32064]</span> because its input had shape <span class="shape">[1, 6, 3072]</span>: a batch of <b>one</b> input string, with <b>six</b> tokens, each a vector of size <b>3,072</b> (the output vectors after the stack of blocks).</p>
+<pre class="code"><code>model_output[0].shape     <span class="cm"># torch.Size([1, 6, 3072])</span>
+lm_head_output.shape      <span class="cm"># torch.Size([1, 6, 32064])</span></code></pre>
+  <div class="fig">
+    <h3>Interactive · tensor shapes through the forward pass</h3>
+    <div class="controls">
+      <label for="b6">batch <input id="b6" type="range" min="1" max="8" value="1"><output id="b6o">1</output></label>
+      <label for="n6">tokens <input id="n6" type="range" min="1" max="40" value="6"><output id="n6o">6</output></label>
+    </div>
+    <div class="streams" id="st6"></div>
+    <div class="formula" id="f6"></div>
+    <p class="note">Model sizes are Phi-3-mini's from the printout (d = 3,072, vocabulary = 32,064, context 4K). Up to 12 streams are drawn.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A row of cricket fielders passing information: every fielder (token) has their own lane and does their own work at the same time, but at each "block" they glance at the fielders before them. Only the last fielder throws the ball to the keeper (LM head). <i>Where it breaks:</i> fielders can see everyone; in a generative model a token can only look at tokens <i>before</i> it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>All tokens of the prompt go through each layer as one matrix <code>[tokens × 3,072]</code>, so a GPU does them in one big multiply instead of one by one. That's why reading a long prompt (prefill) is fast per token, while generating is slow: generation produces one new stream at a time.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"What is context length, and why does a 4K-context model fail on a 6K prompt?"</i> — "Context length is the maximum number of token positions the model processes at once, one stream per token. Prompt plus generated tokens must fit. Beyond it you must truncate, summarise, or retrieve only relevant chunks (RAG). In RAG memory systems this is why chunking and top-k retrieval sizes are tuned to the context budget."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 7: caching the earlier streams' attention inputs.</li><li>Plate 10: how streams "interact" through attention.</li><li><a href="ch08_semantic_search_and_rag.html">Ch.8</a>: fitting retrieved text into the context.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SPEEDING UP GENERATION BY CACHING KEYS AND VALUES</div><h2>The KV cache: don't redo the old streams</h2></div><span class="chip">pdf p105–107 · Fig 3-10</span></div>
+  <p>When generating the second token, we append the output token to the input and do another forward pass. If the model can <b>cache the results of the previous calculation</b> (especially some specific vectors in the attention mechanism), it no longer needs to repeat the calculations of the previous streams. Now <b>only the last stream needs computing</b>. This optimisation is the <b>keys and values (kv) cache</b>, and it gives a <b>significant speedup</b> of generation. Keys and values are central parts of attention (plate 12).</p>
+  <figure class="bookfig"><img src="figs/fig-3-10.png" alt="The earlier tokens' streams go into a dotted box labelled Cached calculation; only the new token 'Dear' has an active blue stream computing through to an orange output vector and the LM head" loading="lazy"><figcaption>Figure 3-10 (book, pdf p106): When generating text, it's important to cache the computation results of previous tokens instead of repeating the same calculation over and over again.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the newly appended token "Dear" (red text) is the only bright stream. All the earlier tokens' work sits in a dotted box, "Cached calculation", drawn faded. Their arrows still go down (their stored results feed attention) but nothing is recomputed for them.</p>
+  <p>In <b>Hugging Face Transformers, the cache is on by default</b>. You can turn it off with <code>use_cache=False</code>. To see the difference, ask for a long generation and time it with and without caching:</p>
+<pre class="code"><code>prompt = "Write a very long email apologizing to Sarah for the tragic gardening mishap. Explain how it happened."
+<span class="cm"># Tokenize the input prompt</span>
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+input_ids = input_ids.to("cuda")
+
+%%timeit -n 1
+<span class="cm"># Generate the text</span>
+generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=True        <span class="cm"># second run: use_cache=False</span>
+)</code></pre>
+  <p><code>%%timeit</code> is a Jupyter/Colab "magic" command that runs the cell several times and reports the average (<code>-n 1</code> = one loop per run). Results on a <b>Colab with a T4 GPU</b>, generating <b>100 tokens</b>:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Setting</th><th>Time for 100 tokens</th></tr>
+    <tr><td><code>use_cache=True</code></td><td class="num">4.5 s</td></tr>
+    <tr><td><code>use_cache=False</code></td><td class="num">21.8 s</td></tr>
+  </table></div>
+  <div class="box work"><b>Worked example · per-token cost</b><p>4.5 s ÷ 100 tokens ≈ <b>45 ms per token</b> with the cache; 21.8 s ÷ 100 ≈ <b>218 ms per token</b> without. At 218 ms/token, a 300-token answer would take over a minute; at 45 ms it takes about 13.5 s, and with streaming the user sees the first words after a fraction of a second. (Division is ours; the two timings are the book&#39;s.)</p></div>
+  <p>A dramatic difference (about 4.8× here). And even 4 seconds is a long time for a user staring at a screen waiting for output. That's one reason <b>LLM APIs stream output tokens as they are generated</b> instead of waiting for the whole generation to finish.</p>
+  <div class="box work"><b>Step through it · work done with and without the cache</b>
+    <p>Each row is one generation step; each cell is one token's stream through the model. Orange = computed this step, teal = reused from the cache.</p>
+    <div class="controls"><label><input type="checkbox" id="kv7c" checked> use_cache</label></div>
+    <div class="stepbar"><button id="kv_prev" type="button">◀ Back</button><button id="kv_next" type="button">Next ▶</button><span id="kv_n"></span></div>
+    <div class="streams" id="kv7"></div>
+    <div class="readout" id="kv7r"></div>
+    <p class="note">Modelled: a 4-token prompt, 6 new tokens. Counting stream computations only; real speedups also depend on memory bandwidth.</p>
+  </div>
+  <div class="fig">
+    <h3>Beyond the book · how big is the cache?</h3>
+    <p>The cache stores one key vector and one value vector per token, per layer, per key/value head. Memory = 2 × layers × kv_heads × head_dim × bytes × tokens. Defaults below are Phi-3-mini's published config (32 layers, 32 KV heads of 96), not numbers from the book.</p>
+    <div class="controls">
+      <label for="kvL">layers <input id="kvL" type="number" min="1" max="200" value="32"></label>
+      <label for="kvH">kv heads <input id="kvH" type="number" min="1" max="128" value="32"></label>
+      <label for="kvD">head dim <input id="kvD" type="number" min="16" max="512" value="96"></label>
+      <label for="kvT">tokens <input id="kvT" type="number" min="1" max="1000000" value="4096"></label>
+      <label for="kvB">bytes <select id="kvB"><option value="2" selected>2 (fp16/bf16)</option><option value="1">1 (int8)</option><option value="4">4 (fp32)</option></select></label>
+      <label for="kvN">users <input id="kvN" type="number" min="1" max="1000" value="1"></label>
+    </div>
+    <div class="readout" id="kvR"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A kirana shop's running khata (credit notebook). Without it, every time you buy one more item the shopkeeper re-adds your whole month's purchases from the bills. With the khata he only adds today's item to the running total. <i>Where it breaks:</i> the khata is one number; the KV cache grows with every token, and that memory is what limits how many users a GPU can serve at once.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>For earlier tokens, each layer's keys and values never change once computed (a token can't see later tokens, so new tokens don't alter old ones). So they can be stored and reused. Each new step computes the new token's query, key and value, appends its key/value to the cache, and runs attention of one query against all cached keys. Compute per step becomes roughly constant instead of growing with length; memory grows instead.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"What is the KV cache, and what does it cost?"</i> — "During decoding, each layer's key and value vectors for past tokens are stored so each new token only computes its own and attends to the cache; without it you redo the whole prefix every step (the book measures 4.5 s vs 21.8 s for 100 tokens on a T4). The cost is GPU memory that grows with sequence length × batch × layers × KV heads, which is why serving engines like vLLM manage it in pages and why grouped-query attention exists. For a voice agent it also means long conversations get slower and more expensive to keep warm."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 12–14: what keys and values are.</li><li>Plates 17–18: multi-query and grouped-query attention shrink this cache.</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a> and <a href="../llm_engineers_handbook/ch08_inference_optimization.html">LLM Engineer's Handbook Ch.8</a>: KV cache, batching, PagedAttention.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · INSIDE THE TRANSFORMER BLOCK</div><h2>The blocks do almost all the work: attention + feedforward</h2></div><span class="chip">pdf p107–108 · Fig 3-11, 3-12</span></div>
+  <p>The <b>Transformer blocks</b> are where the vast majority of processing happens. A Transformer LLM is a <b>series of Transformer blocks</b>, from about <b>six in the original Transformer paper to over a hundred</b> in many large LLMs. Each block processes its inputs, then passes the results to the next block.</p>
+  <figure class="bookfig"><img src="figs/fig-3-11.png" alt="Tokens Say, something, smart become embeddings that enter Transformer block 1; red vectors labelled Output of Transformer block 1 go into block 2, then block N, then output vectors go to the LM head" loading="lazy"><figcaption>Figure 3-11 (book, pdf p108): The bulk of the Transformer LLM processing happens inside a series of Transformer blocks, each handing the result of its processing as input to the subsequent block.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> three tokens ("Say", "something", "smart") → three blue embeddings → block 1 → three <span style="color:var(--sell)">red</span> vectors ("Output of Transformer block 1") → block 2 → … → block N → three output vectors. The tokenizer and LM head are faded: the focus is the stack. The number of vectors never changes, only their contents.</p>
+  <p>A Transformer block (Figure 3-12) is made of <b>two successive components</b>:</p>
+  <ol class="plain">
+    <li>The <b>attention layer</b> is mainly concerned with <b>incorporating relevant information from other input tokens and positions</b>.</li>
+    <li>The <b>feedforward layer</b> houses <b>the majority of the model's processing capacity</b>.</li>
+  </ol>
+  <figure class="bookfig"><img src="figs/fig-3-12.png" alt="Transformer block 1 in the stack is zoomed in to show two parts: Self-attention on top and Feedforward neural network below" loading="lazy"><figcaption>Figure 3-12 (book, pdf p108): A Transformer block is made up of a self-attention layer and a feedforward neural network.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the dotted lines zoom into block 1. Inside: a beige <b>Self-attention</b> box above a dark blue <b>Feedforward neural network</b> box. Every block in the stack has this same two-part layout (with its own learned weights).</p>
+  <div class="box work"><b>Step through it · "Say something smart" through the stack</b>
+    <div class="stepbar"><button id="bl_prev" type="button">◀ Back</button><button id="bl_next" type="button">Next ▶</button><span id="bl_n"></span></div>
+    <div class="stack" id="bl8"></div>
+    <div class="caption" id="bl8c"></div>
+    <p class="note">Shown with Phi-3-mini's 32 blocks, collapsed. The "what it might be doing" notes are illustrative intuitions, not the book's claims about specific layers.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A file moving through a government office: at each desk (block) the clerk first reads the other related files on the table (attention), then applies their own rulebook and experience (feedforward), and passes the updated file to the next desk. <i>Where it breaks:</i> clerks differ in role; Transformer blocks all have the same structure and differ only in learned numbers.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Attention is the only place where tokens exchange information; the feedforward network works on each token's vector on its own. Alternating the two, many times, lets the model mix context, then think about it, then mix again with richer vectors.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"What are the two sub-layers of a decoder block, and which has more parameters?"</i> — "Self-attention, which mixes information across positions, and a position-wise feedforward MLP. The MLP usually holds most of the parameters and, per the book, most of the model's memorised knowledge; attention is where the sequence-length cost lives."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 9 (feedforward) and plates 10–14 (attention).</li><li>Plate 20: the full block with residuals and normalisation.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · THE FEEDFORWARD NEURAL NETWORK AT A GLANCE</div><h2>Feedforward: where facts are stored and patterns are blended</h2></div><span class="chip">pdf p109–110 · Fig 3-13</span></div>
+  <p>An intuition: pass the input <b>"The Shawshank"</b> to a language model. We expect it to generate <b>"Redemption"</b> as the most probable next word (the 1994 film).</p>
+  <p>The <b>feedforward neural network</b> (collectively, across all the model's layers) is the source of this information (Figure 3-13). When the model was trained on a massive text archive that included many mentions of "The Shawshank Redemption", it <b>learned and stored the information (and behaviours)</b> that make it succeed at this task.</p>
+  <figure class="bookfig"><img src="figs/fig-3-13.png" alt="Tokens The and Shawshank go through blocks 1, 2, N; block 1 is zoomed to highlight its Feedforward neural network; the LM head outputs Redemption" loading="lazy"><figcaption>Figure 3-13 (book, pdf p109): The feedforward neural network component of a Transformer block likely does the majority of the model's memorization and interpolation.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> only the feedforward part of the zoomed block is drawn (attention is left out on purpose). The "Shawshank" stream goes through the LM head and comes out as "Redemption". Note the word "likely" in the caption: this is an intuition about where knowledge lives, not a proven rule.</p>
+  <p>For an LLM to be trained successfully, it needs to <b>memorise a lot of information</b>. But it is <b>not simply a large database</b>. Memorisation is only one ingredient. The model uses the same machinery to <b>interpolate</b> between data points and more complex patterns so it can <b>generalise</b>: do well on inputs it hadn't seen before and that weren't in its training dataset.</p>
+  <div class="box"><b>Book's sidebar · why a chat model answers differently</b>
+    <p>A modern commercial LLM doesn't behave like a "language model" in the strict sense. Pass "The Shawshank" to a chat LLM like <b>GPT-4</b> and it doesn't just say "Redemption". It writes something like: <i>"The Shawshank Redemption" is a 1994 film directed by Frank Darabont and is based on the novella "Rita Hayworth and Shawshank Redemption" written by Stephen King. …</i></p>
+    <p>That's because <b>raw language models (like GPT-3) are hard for people to use well</b>. So the language model is further trained with <b>instruction-tuning</b> and <b>human preference and feedback fine-tuning</b> to match what people expect it to output.</p>
+  </div>
+  <div class="box work"><b>Compare · raw model vs chat model on the same input</b>
+    <div class="seg" role="group" aria-label="Model type"><button id="ff_raw" type="button" class="on">Raw LM (e.g. GPT-3)</button><button id="ff_chat" type="button">Chat LLM (e.g. GPT-4)</button></div>
+    <div class="caption" id="ff_out"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A seasoned Mumbai dabbawala doesn't look up a database to know where a tiffin goes; years of routes are "in his head", and he can also figure out a new building he has never delivered to from the pattern of nearby ones (interpolation). <i>Where it breaks:</i> a dabbawala knows when he doesn't know; an LLM's interpolation can produce a confident wrong answer (a hallucination).</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The feedforward network widens each token's vector (for Phi-3, 3,072 → 8,192 after gating), applies a non-linear activation, and shrinks it back (that reading of the printout is beyond the book). Those big weight matrices are where most parameters sit, which is why they are the natural home for stored associations like "Shawshank → Redemption".</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why does a base model just continue text while ChatGPT answers questions?"</i> — "A base model is trained only to predict the next token, so it continues the pattern. Chat models get extra training: supervised instruction-tuning on prompt/response pairs and preference tuning (RLHF, reinforcement learning from human feedback, or DPO, direct preference optimization) so they follow instructions in a helpful format. Same architecture, different training stages."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: instruction tuning and preference tuning.</li><li><a href="../llm_engineers_handbook/ch05_supervised_fine_tuning.html">LLM Engineer's Handbook Ch.5</a> and <a href="../llm_engineers_handbook/ch06_preference_alignment.html">Ch.6</a>: SFT and preference alignment in practice.</li><li><a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a>: post-training.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · THE ATTENTION LAYER AT A GLANCE</div><h2>Attention: deciding what "it" refers to</h2></div><span class="chip">pdf p110–111 · Fig 3-14</span></div>
+  <p><b>Context</b> is vital for modelling language. Simple memorisation and interpolation based only on the <b>previous token</b> can only take us so far. We know this because that was one of the leading ways to build language models <b>before neural networks</b>: <b>n-gram language models</b> (see Chapter 3, "N-gram Language Models", of <i>Speech and Language Processing</i> by Daniel Jurafsky and James H. Martin). An n-gram model predicts the next word from only the last n − 1 words.</p>
+  <p><b>Attention</b> is a mechanism that helps the model <b>incorporate context</b> as it processes a specific token. Take the prompt:</p>
+  <p style="font-family:var(--mono);font-size:15px">"The dog chased the squirrel because it"</p>
+  <p>To predict what comes after "it", the model needs to know what "it" refers to: the dog or the squirrel? In a trained Transformer LLM, the <b>attention mechanism makes that determination</b>. Attention <b>adds information from the context into the representation of the "it" token</b> (Figure 3-14).</p>
+  <figure class="bookfig"><img src="figs/fig-3-14.png" alt="Tokens The dog chased the squirrel because it; an orange attention arrow inside Transformer block 1 goes from the 'it' stream to the 'squirrel' stream; the zoomed block shows Self-attention above the feedforward network" loading="lazy"><figcaption>Figure 3-14 (book, pdf p111): The self-attention layer incorporates relevant information from previous positions that help process the current token.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the red arrow is the "it" stream, being processed now. Inside block 1, an orange curved arrow labelled "Attention" reaches back from "it" to the "squirrel" stream: the model pulls squirrel information into the "it" vector. This is the "interaction between streams" promised in Figure 3-8.</p>
+  <p>The model does this based on <b>patterns seen and learned from the training data</b>. Earlier sentences may also give clues: for example, if the text had referred to the dog as <b>"she"</b>, it becomes clear that "it" refers to the squirrel.</p>
+  <div class="box work"><b>Interactive · what does "it" attend to?</b>
+    <p>Choose the earlier context. The bars are a <i>modelled</i> attention pattern for the "it" token, to show the idea of shifting weight; real heads learn their own patterns.</p>
+    <div class="seg" role="group" aria-label="Context"><button id="it_a" type="button" class="on">No extra context</button><button id="it_b" type="button">"…the dog, she was fast…"</button><button id="it_c" type="button">"…the squirrel was hungry…"</button></div>
+    <div class="toks" id="it_t"></div>
+    <div class="bars" id="it_bars"></div>
+    <div class="caption" id="it_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>In a WhatsApp family group, someone writes "Did he reach?" You scroll up to see who was travelling. That scroll-and-check is attention: the meaning of "he" comes from earlier messages. <i>Where it breaks:</i> you scroll to one message; attention blends information from all earlier tokens at once, with different weights.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An n-gram model's context is a fixed tiny window of previous words. Attention gives every token a learned, content-based way to reach any earlier token in the context window, however far back. That's the key jump from older language models.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why did attention beat n-grams and RNNs?"</i> — "N-grams only see a fixed short window; RNNs squeeze all history into one hidden state updated word by word. Attention lets each token directly look at every previous token and weight them by relevance, and it's parallel across tokens, which suits GPUs."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch01_introduction_to_llms.html">Ch.1</a>: attention's history (RNNs, encoder-decoder, "Attention is all you need").</li><li>Plates 11–14: how attention computes this.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · ATTENTION IS ALL YOU NEED</div><h2>Two steps (score, combine), done by many heads in parallel</h2></div><span class="chip">pdf p111–113 · Fig 3-15 to 3-17</span></div>
+  <p>(The heading borrows the title of the 2017 paper that introduced the Transformer.) The most stripped-down version of attention is Figure 3-15. Several token positions go into the attention layer; the <b>final one is the one currently being processed</b> (the pink arrow). Attention operates on the input vector at that position and <b>incorporates relevant information from the context into the vector it produces as the output</b> for that position.</p>
+  <figure class="bookfig"><img src="figs/fig-3-15.png" alt="Four grey arrows for other positions in the sequence and a red arrow for the position currently being processed pass through a Self-attention bar; the current position's blue input vector becomes a red output vector enriched with context information from other positions" loading="lazy"><figcaption>Figure 3-15 (book, pdf p112): A simplified framing of attention: an input sequence and a current position being processed. As we're mainly concerned with this position, the figure shows an input vector and an output vector that incorporates information from the previous elements in the sequence according to the attention mechanism.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> blue vector at the top right = "current position information" going in. Red vector at the bottom right = the same position coming out, "enriched with context information from other positions". The grey arrows are the other positions, passing through. This colour code (blue in, red out) is used in all the attention figures that follow.</p>
+  <p>Attention has <b>two main steps</b>:</p>
+  <ol class="plain">
+    <li><b>Relevance scoring:</b> score how relevant each of the previous input tokens is to the current token being processed (the pink arrow).</li>
+    <li><b>Combining information:</b> using those scores, combine the information from the various positions into a single output vector.</li>
+  </ol>
+  <figure class="bookfig"><img src="figs/fig-3-16.png" alt="Inside the Self-attention bar there are now two white boxes: Relevance scoring, then Combining information" loading="lazy"><figcaption>Figure 3-16 (book, pdf p112): Attention is made up of two major steps: relevance scoring for each position, then a step where we combine the information based on those scores.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the same picture as 3-15, with the attention bar opened up into two stacked boxes, run in order: first <b>Relevance scoring</b>, then <b>Combining information</b>. All positions feed both boxes.</p>
+  <p>To give the Transformer more attention capability, the attention mechanism is <b>duplicated and run several times in parallel</b>. Each parallel copy is an <b>attention head</b>. This increases the model's ability to model complex patterns in the input that require <b>paying attention to different patterns at once</b>. Figure 3-17 shows the intuition: heads run in parallel, with a step before that <b>splits</b> the information and a step after that <b>combines</b> the results of all heads.</p>
+  <figure class="bookfig"><img src="figs/fig-3-17.png" alt="The two steps relevance scoring and combining information are now wrapped in a dark grey box labelled Attention head, inside the Self-attention box" loading="lazy"><figcaption>Figure 3-17 (book, pdf p113): We get better LLMs by doing attention multiple times in parallel, increasing the model's capacity to attend to different types of information.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the two steps now sit inside a dark grey box called <b>Attention head</b>. Picture several of these grey boxes side by side inside the beige self-attention layer; the figure draws one to keep it simple. Figure 3-26 (plate 18) draws three heads with split and combine steps.</p>
+  <div class="box work"><b>Interactive · what different heads might look at</b>
+    <p>Sentence: "The dog chased the squirrel because it". Pick a head. These patterns are <i>modelled</i> examples of the kinds of things heads are often found to track; the book only says heads attend to "different types of information".</p>
+    <div class="seg" id="hd_btns" role="group" aria-label="Heads"></div>
+    <div class="bars" id="hd_bars"></div>
+    <div class="caption" id="hd_cap"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Three friends proofread your resume at once: one checks grammar, one checks dates line up, one checks it matches the job ad. Then you merge their notes. That's multi-head attention: same text, different questions, combined result. <i>Where it breaks:</i> you assign the friends their jobs; heads learn their roles on their own during training, and not every head has a neat human-readable job.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>One head produces one weighted mix of the context, so it can focus on only one "kind" of relevance at a time. Splitting the vector into several smaller heads lets the layer compute several different mixes in the same cost, then concatenate and project them back to the model dimension.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why multi-head attention instead of one big head?"</i> — "Each head computes its own relevance scores, so different heads can track different relationships (previous token, subject of a pronoun, syntax) at the same time. The model dimension is split across heads, so the total compute is about the same as one big head, but the representation is richer."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 12–14: the maths inside one head.</li><li>Plate 18: heads sharing keys and values (MQA, GQA).</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · HOW ATTENTION IS CALCULATED</div><h2>Queries, keys and values: three projections of the same tokens</h2></div><span class="chip">pdf p113–115 · Fig 3-18, 3-19</span></div>
+  <p>Now look inside a <b>single attention head</b>. The starting position:</p>
+  <ul class="plain">
+    <li>The attention layer (of a generative LLM) is processing attention for <b>a single position</b>.</li>
+    <li>The inputs to the layer are:
+      <ul><li>the vector representation of the <b>current position or token</b>;</li><li>the vector representations of the <b>previous tokens</b>.</li></ul></li>
+    <li>The goal is to produce a <b>new representation of the current position</b> that incorporates relevant information from the previous tokens.
+      <ul><li>Example: processing the last position in <b>"Sarah fed the cat because it"</b>, we want "it" to represent the cat, so attention <b>bakes in "cat information"</b> from the cat token.</li></ul></li>
+    <li>The training process produces <b>three projection matrices</b> that create the components that interact in this calculation:
+      <ul><li>a <b>query projection matrix</b>;</li><li>a <b>key projection matrix</b>;</li><li>a <b>value projection matrix</b>.</li></ul></li>
+  </ul>
+  <p>Figure 3-18 shows this starting position. For simplicity, look at only <b>one attention head</b>: the other heads do identical calculations, but with their own projection matrices.</p>
+  <figure class="bookfig"><img src="figs/fig-3-18.png" alt="Inside Attention head number 1 is a grey box of Projection matrices: a purple Query projection, an orange Key projection and a blue Value projection; a legend shows a light grid for other positions in the sequence and a dark row for the current position" loading="lazy"><figcaption>Figure 3-18 (book, pdf p114): Before starting the self-attention calculation, we have the inputs to the layer and projection matrices for queries, keys, and values.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the legend (top right) shows inputs as a light-blue grid (one row per earlier position) plus a dark-blue row (the current position). An arrow labelled "position currently being processed" enters <b>attention head #1</b>, inside the self-attention layer. Inside the head sit three learned 3×3 grids: purple = query projection, orange = key projection, blue = value projection. A red arrow leaves the bottom: the output will be a vector "enriched with context information from other positions" (pink in the legend). Nothing has been computed yet.</p>
+  <p>Attention starts by <b>multiplying the inputs by the projection matrices</b> to create three new matrices: the <b>queries</b>, <b>keys</b> and <b>values</b> matrices. They hold the input tokens' information projected into three different spaces that help carry out the two steps of attention: (1) <b>relevance scoring</b> and (2) <b>combining information</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-19.png" alt="Below the projection matrices are three new matrices: Queries (purple), Keys (orange) and Values (blue); in the queries matrix the top rows are marked previous tokens and the bottom row current token" loading="lazy"><figcaption>Figure 3-19 (book, pdf p115): Attention is carried out by the interaction of the queries, keys, and values matrices. Those are produced by multiplying the layer's inputs with the projection matrices.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the new matrices have <b>one row per token</b>. The <b>bottom row</b> of each belongs to the <b>current position</b>; the rows above belong to previous positions (labelled on the queries matrix: "Previous tokens", "Current token"). The earlier query rows are drawn faded: for generating the next token, only the current token's query is used, while all keys and values are used.</p>
+  <div class="box work"><b>Worked example · projecting one token (modelled, 3-number vectors)</b>
+    <p>Real Phi-3 vectors are 3,072 numbers wide; here they are 3 wide so you can check the arithmetic. The input vector for "it" is <span class="vec"><b>1.0</b><b>0.5</b><b>0.0</b></span>. Pick which projection to apply:</p>
+    <div class="seg" role="group" aria-label="Projection"><button id="pj_q" type="button" class="on">× W_query</button><button id="pj_k" type="button">× W_key</button><button id="pj_v" type="button">× W_value</button></div>
+    <div class="formula" id="pj_f"></div>
+    <p class="note">The same input gives three different vectors because the three matrices are different. Training chooses the matrices so that queries and keys are good for scoring, and values are good for passing information along.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A matrimonial site. Each profile has a <b>key</b> (what you advertise about yourself), a <b>value</b> (what you actually bring to the family), and you also have a <b>query</b> (what you're looking for). Your query is compared with everyone's keys to find matches; then you gather the values of the best matches. <i>Where it breaks:</i> on the site you pick one match; attention takes a weighted blend of <i>all</i> of them.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Why three projections instead of using the raw vectors? Because "what I am looking for", "what I can be found by", and "what I hand over if chosen" are different jobs. Separate learned matrices let one token, say "cat", be easy to find for pronouns (its key) while passing along a different set of features (its value). In Phi-3 these three are computed together by <code>qkv_proj</code> (3,072 → 9,216).</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Explain Q, K and V."</i> — "Each token's input vector is multiplied by three learned matrices. The query is what the current token is looking for, keys are what each token offers to be matched on, and values are the content passed along. Score = query · key for each previous token, softmax, then a weighted sum of values. During generation we cache K and V for past tokens, because only the new token's query is new."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 13–14: the two steps using Q, K, V.</li><li>Plate 7: the cached keys and values.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: dot products and vector similarity.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · SELF-ATTENTION: RELEVANCE SCORING</div><h2>Step 1: current query × all keys → softmax → scores that add to 1</h2></div><span class="chip">pdf p115–116 · Fig 3-20</span></div>
+  <p>In a generative Transformer, we generate one token at a time, which means we process <b>one position at a time</b>. So the attention mechanism here is only concerned with <b>this one position</b>, and how information from other positions can be pulled in to inform it.</p>
+  <p>Relevance scoring is done by <b>multiplying the query vector of the current position with the keys matrix</b>. This gives a <b>score for how relevant each previous token is</b>. Passing these through a <b>softmax</b> operation <b>normalises the scores so they sum to 1</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-20.png" alt="Current token's query row times the Keys matrix equals relevance scores: Sarah 3%, fed 5%, the 35%, cat 50%, because 2%, it 5%" loading="lazy"><figcaption>Figure 3-20 (book, pdf p116): Scoring the relevance of previous tokens is accomplished by multiplying the query associated with the current position with the keys matrix.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> one purple row (the current token's query) × the orange keys matrix (one row per token) = one score per token. The bar chart shows the result after softmax for "Sarah fed the cat because it": Sarah 3%, fed 5%, the 35%, cat 50%, because 2%, it 5% (total 100%). "cat" wins, so "it" will mostly absorb cat information. "it" also scores itself: a token can attend to its own position.</p>
+  <div class="fig">
+    <h3>Simulator · compute relevance scores yourself</h3>
+    <p>Modelled 2-number keys for each token. Drag the query sliders to change what the current token ("it") is "looking for". The raw score is the dot product q · k; softmax turns raw scores into percentages.</p>
+    <div class="controls">
+      <label for="q1">query[0] <input id="q1" type="range" min="-30" max="30" value="20"><output id="q1o">2.0</output></label>
+      <label for="q2">query[1] <input id="q2" type="range" min="-30" max="30" value="12"><output id="q2o">1.2</output></label>
+      <label><input type="checkbox" id="qs"> scale by 1/√d</label>
+    </div>
+    <div class="tablewrap"><table id="att13"></table></div>
+    <div class="readout" id="r13"></div>
+    <p class="note">The keys are invented so that the default query roughly matches the book's pattern ("cat" highest, then "the"). Beyond the book: the original Transformer divides scores by √d (d = vector size) before softmax so that large vectors don't make softmax too peaky; tick the box to see the scores soften.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A Swiggy search for "something spicy and quick": the app compares your query with every restaurant's tags (keys), gives each a match score, then turns the scores into shares of your attention that add up to 100%. <i>Where it breaks:</i> the app shows you a ranked list; attention keeps all scores and uses them as blending weights in step 2.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The dot product of two vectors is large when they point the same way, so q · k measures "does this token have what I'm looking for?". Softmax exponentiates and normalises: big scores get much bigger shares, negative ones shrink toward 0, and the result is a probability-like distribution. In a generative (decoder) model, only previous positions and the current one get scores; future positions are masked out (plate 16).</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"What is the complexity of attention and where does it come from?"</i> — "Scoring compares every query with every key, so for a sequence of n tokens it's O(n²) scores per head per layer. During generation with a KV cache it's O(n) per new token. That quadratic cost is why long contexts are expensive and why sparse attention and FlashAttention exist."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 14: what the scores are used for.</li><li>Plate 21: RoPE rotates Q and K right before this step.</li><li><a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a>: the attention formula.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SELF-ATTENTION: COMBINING INFORMATION</div><h2>Step 2: weight each value by its score and add them up</h2></div><span class="chip">pdf p116–117 · Fig 3-21</span></div>
+  <p>With the relevance scores in hand, <b>multiply the value vector of each token by that token's score</b>. <b>Summing</b> the resulting vectors gives the <b>output of this attention step</b> (Figure 3-21).</p>
+  <figure class="bookfig"><img src="figs/fig-3-21.png" alt="Relevance scores Sarah 3%, fed 5%, the 35%, cat 50%, because 2%, it 5% multiplied by the value vectors gives weighted vectors, where the rows for the and cat are dark and the others pale; the sum is one vector" loading="lazy"><figcaption>Figure 3-21 (book, pdf p117): Attention combines the relevant information of previous positions by multiplying their relevance scores by their respective value vectors.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> left = the scores from step 1. Middle = the value vector of each token (all equally dark). Right = each value multiplied by its score: "the" (35%) and "cat" (50%) stay dark; the others turn pale because they're multiplied by small numbers. The line and "Sum" at the bottom add the six weighted vectors into one: the output for the "it" position, mostly made of cat and "the" information.</p>
+  <div class="box work"><b>Worked example · the sum, with the book's scores</b>
+    <p>Value vectors are modelled (3 numbers each); the scores are the book's. Click a token to zero its score and renormalise, to see how much it was contributing.</p>
+    <div class="toks" id="cm_t"></div>
+    <div class="tablewrap"><table id="cm14"></table></div>
+    <div class="formula" id="cm_f"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Making a masala blend: 50% from the cat jar, 35% from the "the" jar, a pinch from the others. The output is one powder that tastes mostly of the big shares. <i>Where it breaks:</i> spices mix physically; here each "jar" is a vector of thousands of numbers, and the blend is done position by position on every number.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The output is a <b>weighted average of value vectors</b>. Because the weights sum to 1, the output stays on a similar scale as the inputs. In each head the result is a smaller vector; the heads' outputs are concatenated and passed through an output projection (<code>o_proj</code> in Phi-3, 3,072 → 3,072) to get back to the model dimension, and then added to the token's stream.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Write the attention formula."</i> — "softmax(Q·Kᵀ / √d)·V (the √d scaling comes from the original paper; this chapter does not mention it). The softmax part is the relevance score matrix; multiplying by V takes weighted sums of value vectors. For one generating token, Q is a single row, so it's one score per past token and one weighted sum."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 11: these two steps per head; plate 18: heads sharing K and V.</li><li>Plate 20: the residual "add" after attention.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · RECENT IMPROVEMENTS TO THE TRANSFORMER ARCHITECTURE</div><h2>Since 2017: most of the design is unchanged, a few tweaks matter</h2></div><span class="chip">pdf p117</span></div>
+  <p>Since the Transformer was released, a lot of work has gone into improving it and creating better models. This covers:</p>
+  <ul class="plain">
+    <li><b>training on larger datasets</b>;</li>
+    <li><b>optimisations of the training process</b> and the <b>learning rates</b> to use;</li>
+    <li>and the <b>architecture itself</b>.</li>
+  </ul>
+  <p>At the time of writing, <b>many ideas of the original Transformer are unchanged</b>. A few architectural ideas have proved valuable and contribute to the performance of recent models like <b>Llama 2</b>. The rest of the chapter goes over these developments:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Area</th><th>Tweak</th><th>What it buys</th><th>Plate</th></tr>
+    <tr><td>Attention</td><td>Local / sparse attention</td><td>less compute on long sequences</td><td>16</td></tr>
+    <tr><td>Attention</td><td>Multi-query, grouped-query</td><td>smaller K/V matrices, faster inference</td><td>17–18</td></tr>
+    <tr><td>Attention</td><td>Flash Attention</td><td>faster training and inference on GPUs, same result</td><td>19</td></tr>
+    <tr><td>Block</td><td>Pre-normalisation, RMSNorm, SwiGLU</td><td>less training time, simpler/faster norm, better activation</td><td>20</td></tr>
+    <tr><td>Positions</td><td>Rotary embeddings (RoPE)</td><td>absolute + relative position, works with packing</td><td>21</td></tr>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>The Indian Railways coach design has stayed recognisable for decades, but the newer LHB coaches changed the bogies, brakes and couplers: same idea of a train, better parts. <i>Where it breaks:</i> coaches are swapped over years; a new LLM is trained from scratch with the new parts already built in.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Is the Transformer in Llama the same as the 2017 one?"</i> — "Mostly yes: the same decoder blocks of attention plus MLP with residuals. The gains came from more and better data, better training recipes, and a handful of architecture tweaks: grouped-query attention, FlashAttention kernels, pre-norm with RMSNorm, SwiGLU and rotary position embeddings."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="../ai_engineering/ch02_understanding_foundation_models.html">AI Engineering Ch.2</a>: model architecture and size trends.</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a>: these tweaks from the serving side.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · MORE EFFICIENT ATTENTION · LOCAL/SPARSE ATTENTION</div><h2>Look at fewer tokens: local, strided and fixed patterns</h2></div><span class="chip">pdf p118–119 · Fig 3-22 to 3-24</span></div>
+  <p>The part of the Transformer that gets the most research focus is the <b>attention layer</b>, because the attention calculation is the <b>most computationally expensive part</b> of the process.</p>
+  <h3>Local/sparse attention</h3>
+  <p>As Transformers grew larger, ideas like <b>sparse attention</b> ("Generating long sequences with sparse transformers") and <b>sliding window attention</b> ("Longformer: The long-document transformer") made the attention calculation more efficient. Sparse attention <b>limits the context of previous tokens the model can attend to</b> (Figure 3-22).</p>
+  <figure class="bookfig"><img src="figs/fig-3-22.png" alt="Left: global autoregressive self-attention, token 7 attends to tokens 1 to 7 (a long triangle). Right: local autoregressive self-attention, token 7 attends only to tokens 4 to 7; tokens 1 to 3 are greyed out" loading="lazy"><figcaption>Figure 3-22 (book, pdf p118): Local attention boosts performance by only paying attention to a small number of previous positions.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> seven input tokens. Left (<b>global</b>): when processing token 7 (dotted line), the dark triangle stretches back over all seven tokens. Right (<b>local</b>): tokens 1–3 are blank and the triangle covers only 4–7. "Autoregressive" in both labels means only earlier tokens are visible, never later ones.</p>
+  <p>One model with such a mechanism is <b>GPT-3</b>. But it doesn't use it for all blocks: generation quality would degrade badly if the model could only see a few previous tokens. GPT-3 <b>interweaves full-attention and efficient-attention blocks</b>, so blocks alternate between <b>full attention</b> (e.g. blocks 1 and 3) and <b>sparse attention</b> (e.g. blocks 2 and 4).</p>
+  <p>Figure 3-23 shows how different attention mechanisms work: which previous tokens (light blue) can be attended to while processing the current token (dark blue).</p>
+  <figure class="bookfig"><img src="figs/fig-3-23.png" alt="Three 16 by 16 grids: (a) Transformer, the whole lower triangle is light blue; (b) Sparse Transformer strided, a band near the diagonal plus every few columns; (c) Sparse Transformer fixed, blocks along the diagonal plus certain fixed columns" loading="lazy"><figcaption>Figure 3-23 (book, pdf p119): Full attention versus sparse attention. Figure 3-24 explains the coloring. (Source: "Generating long sequences with sparse transformers".)</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> each <b>row</b> is a token being processed (dark blue cell on the diagonal); light-blue cells in that row are tokens it may attend to; grey cells are off limits. (a) Full: the whole lower triangle, every earlier token. (b) <b>Strided</b>: a band of the last few tokens plus a lighter diagonal stripe every few positions back. (c) <b>Fixed</b>: tokens attend within their own block (the triangles), plus a few fixed "summary" columns that everyone can see. (b) and (c) have far fewer coloured cells, so far less work.</p>
+  <figure class="bookfig"><img src="figs/fig-3-24.png" alt="A 3 by 3 example grid: row 1 'The' dark; row 2 'The' light and 'dog' dark; row 3 'The' and 'dog' light and 'chased' dark. Arrows label the dark cell as the token being processed and light cells as tokens it can pay attention to" loading="lazy"><figcaption>Figure 3-24 (book, pdf p119): Attention figures show which token is being processed, and which previous tokens an attention mechanism allows it to attend to.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> a tiny full-attention grid for "The dog chased". Row = token 1, 2, 3. (1) Dark cell = the token being processed. (2) Light cells to its left = the tokens it can pay attention to. Grey cells to its right = future tokens, hidden. So "chased" sees "The" and "dog"; "The" sees only itself.</p>
+  <p>This also shows the <b>autoregressive nature of decoder Transformer blocks</b> (which make up most text generation models): they can <b>only pay attention to previous tokens</b>. Contrast with <b>BERT</b>, which can attend to <b>both sides</b>; hence the "B" in BERT stands for <b>bidirectional</b>.</p>
+  <div class="fig">
+    <h3>Interactive · attention masks (16 tokens)</h3>
+    <div class="seg" id="mk_btns" role="group" aria-label="Attention pattern"></div>
+    <div class="controls"><label for="mkw">window / stride <input id="mkw" type="range" min="2" max="8" value="4"><output id="mkwo">4</output></label></div>
+    <div class="maskbox"><div class="mask" id="mk16" aria-label="attention mask grid"></div></div>
+    <div class="readout" id="r16"></div>
+    <p class="note">Hover or tap a row to highlight it. Strided and fixed patterns follow the shapes in Figure 3-23 with the chosen size; exact details in the paper differ.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Reading a long cricket commentary: full attention re-reads every ball since the first over before each comment; local attention only looks at the last few overs; strided also glances at the score at the end of every 5th over. GPT-3's mix is like a commentator who, every other ball, checks the whole scorecard. <i>Where it breaks:</i> a commentator chooses; the pattern is fixed by the architecture.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Full causal attention for n tokens computes about n²/2 scores. A local window of w computes about n·w. When n = 4,096 and w = 512, that's about 8× fewer. The price is that information from far back must travel indirectly, through other tokens or through the full-attention layers. That's why GPT-3 alternates them.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"How do models handle long context efficiently?"</i> — "One family of tricks restricts who attends to whom: sliding-window (local) attention like Longformer, or sparse strided/fixed patterns like the Sparse Transformer. GPT-3 alternated full and sparse blocks to keep quality. Another family keeps full attention but makes it cheaper on hardware (FlashAttention) or shrinks the KV cache (GQA)."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 13: the full causal scoring this restricts.</li><li><a href="ch01_introduction_to_llms.html">Ch.1</a> and <a href="ch11_fine_tuning_for_classification.html">Ch.11</a>: BERT's bidirectional attention.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · MULTI-QUERY AND GROUPED-QUERY ATTENTION</div><h2>Fewer keys and values for the same number of queries</h2></div><span class="chip">pdf p120 · Fig 3-25</span></div>
+  <p>A more recent efficiency tweak is <b>grouped-query attention</b> (GQA; paper: "GQA: Training generalized multi-query transformer models from multi-head checkpoints"), used by models like <b>Llama 2 and 3</b>. Figure 3-25 shows the different types.</p>
+  <figure class="bookfig"><img src="figs/fig-3-25.png" alt="Three panels. Multi-head: 8 queries, 8 keys, 8 values, each query linked to its own key. Grouped-query: 8 queries, 4 keys, 4 values, pairs of queries share a key. Multi-query: 8 queries all linked to a single key and single value" loading="lazy"><figcaption>Figure 3-25 (book, pdf p120): A comparison of different kinds of attention: the original multi-head, grouped-query attention, and multi-query attention (source: "Fast transformer decoding: One write-head is all you need").</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> each pill is one head's matrix: purple = queries, orange = keys, blue = values; dotted lines = which query uses which key/value. <b>Multi-head</b>: 8 queries, 8 keys, 8 values, one-to-one. <b>Grouped-query</b>: still 8 queries, but only 4 keys and 4 values; each pair of queries shares. <b>Multi-query</b>: 8 queries share a single key and value.</p>
+  <p>Grouped-query attention builds on <b>multi-query attention</b> (MQA; "Fast transformer decoding: One write-head is all you need"). Both <b>improve the inference scalability of larger models by reducing the size of the matrices involved</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>An exam hall. Multi-head: every student has their own textbook (key/value). Multi-query: the whole hall shares one textbook. Grouped-query: one textbook per bench of two. Each student still asks their own questions (queries). <i>Where it breaks:</i> sharing a book slows students down; sharing K/V actually speeds the model up, because loading less memory is what decoding is bottlenecked on.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why does Llama use grouped-query attention?"</i> — "To make inference scale: fewer key/value matrices means a smaller KV cache and less memory to read per generated token, while keeping more quality than sharing a single K/V (multi-query)."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 18: the same idea drawn inside the self-attention layer, plus a cache calculator.</li><li>Plate 7: the KV cache this shrinks.</li></ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · OPTIMIZING ATTENTION: FROM MULTI-HEAD TO MULTI-QUERY TO GROUPED QUERY</div><h2>Share keys and values across heads — but not too much</h2></div><span class="chip">pdf p120–122 · Fig 3-26 to 3-28</span></div>
+  <p>Earlier (plate 11) we saw how the Transformer paper described <b>multi-headed attention</b>. (The Illustrated Transformer, Jay Alammar's blog post, discusses in detail how the queries, keys and values matrices are used.) Figure 3-26 shows that each attention head has its <b>own distinct query, key and value matrices</b> for a given input.</p>
+  <figure class="bookfig"><img src="figs/fig-3-26.png" alt="Self-attention: a Split into heads bar, then attention heads 1, 2 and 3 each with their own queries, keys and values matrices, then a Combine information from all heads bar" loading="lazy"><figcaption>Figure 3-26 (book, pdf p121): Attention is conducted using matrices of queries, keys, and values. In multi-head attention, each head has a distinct version of each of these matrices.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> top bar: <b>Split into heads</b>. Three boxes: head #1 drawn with its queries (purple), keys (orange), values (blue); heads #2 and #3 each have their own stacked set. Bottom bar: <b>Combine information from all heads</b>. Count the orange/blue matrices: three of each.</p>
+  <p><b>Multi-query attention</b> optimises this by <b>sharing the keys and values matrices between all the heads</b>. The only matrices unique to each head are the <b>queries</b> (Figure 3-27).</p>
+  <figure class="bookfig"><img src="figs/fig-3-27.png" alt="Same layout, but the Split into heads bar holds one shared Keys and one shared Values matrix; heads 1, 2 and 3 each hold only their own Queries" loading="lazy"><figcaption>Figure 3-27 (book, pdf p121): Multi-query attention presents a more efficient attention mechanism by sharing the keys and values matrices across all the attention heads.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> the keys and values have moved up into the split bar, labelled <b>"Shared:"</b>, one of each. The three heads now hold only queries. Matrices to store: 3 queries + 1 key + 1 value.</p>
+  <p>As models grow, though, this optimisation can be <b>too punishing</b>; we can afford <b>a little more memory to improve model quality</b>. That's where <b>grouped-query attention</b> comes in. Instead of cutting keys and values down to one of each, it allows <b>more (but fewer than the number of heads)</b>. Figure 3-28 shows the groups: each <b>group of attention heads shares keys and values matrices</b>.</p>
+  <figure class="bookfig"><img src="figs/fig-3-28.png" alt="Split into heads; Group 1 with shared keys and values serving attention heads 1 and 2; Group 2 with shared keys and values serving heads 3 and 4; labels n_groups and n_attention_heads; then Combine information from all heads" loading="lazy"><figcaption>Figure 3-28 (book, pdf p122): Grouped-query attention sacrifices a little bit of the efficiency of multi-query attention in return for a large improvement in quality by allowing multiple groups of shared key/value matrices; each group has its respective set of attention heads.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> two settings label the rows: <code>n_groups</code> (here 2) and <code>n_attention_heads</code> (here 4). Group 1's shared keys/values serve heads #1–#2; group 2's serve heads #3–#4. Each head still has its own queries. With <code>n_groups = 1</code> this becomes multi-query; with <code>n_groups = n_attention_heads</code> it's back to multi-head.</p>
+  <div class="fig">
+    <h3>Interactive · heads, groups and the KV cache</h3>
+    <div class="controls">
+      <label for="gh">query heads <select id="gh"><option>4</option><option>8</option><option>16</option><option selected>32</option><option>64</option></select></label>
+      <label for="gg">KV groups <select id="gg"></select></label>
+    </div>
+    <div class="kvg" id="gq18"></div>
+    <div class="readout" id="r18"></div>
+    <p class="note">Beyond the book, modelled: cache = 2 × 32 layers × groups × 128 head dim × 2 bytes × 8,192 tokens. With 32 query heads and 8 groups this matches Llama 3 8B's published layout (32 query heads, 8 KV heads), not a number from this chapter.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A housing society's water tanks. Multi-head: every flat has its own tank (lots of space). Multi-query: one tank for the whole building (cheap, but pressure suffers for top floors). Grouped-query: one tank per wing (a little more space, most of the benefit, good pressure). <i>Where it breaks:</i> water is the same in every tank; each K/V group learns different keys and values, which is where the quality comes back.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>During generation, each new token must read the whole KV cache from GPU memory for every layer. That memory traffic, not the arithmetic, is usually the bottleneck. Fewer K/V heads means a smaller cache to read and store, so more users or longer contexts fit on one GPU. Queries are not cached (only the new token's query is used), so keeping many query heads costs little.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"MHA vs MQA vs GQA?"</i> — "Multi-head gives every head its own K and V; multi-query shares one K/V across all heads, shrinking the KV cache by the number of heads but costing quality; grouped-query is the middle ground, one K/V per group of heads. Llama 2 and 3 use GQA. If I'm sizing GPUs for a serving gateway, the KV-head count directly sets cache memory per token and therefore max batch size."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 7: KV cache size formula.</li><li>Plate 20: Figure 3-30 shows GQA inside the 2024-era block.</li><li><a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a>: attention mechanism optimisation and KV cache size.</li></ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · FLASH ATTENTION</div><h2>Same maths, smarter use of GPU memory</h2></div><span class="chip">pdf p122</span></div>
+  <p><b>Flash Attention</b> is a popular method <i>and</i> implementation that gives <b>significant speedups for both training and inference</b> of Transformer LLMs on GPUs. It speeds up attention by <b>optimising which values are loaded and moved between a GPU's shared memory (SRAM) and high bandwidth memory (HBM)</b>. Details are in the papers "FlashAttention: Fast and memory-efficient exact attention with IO-awareness" and the follow-up "FlashAttention-2: Faster attention with better parallelism and work partitioning".</p>
+  <div class="tablewrap"><table>
+    <tr><th>GPU memory</th><th>Size</th><th>Speed</th><th>Role in Flash Attention</th></tr>
+    <tr><td><b>SRAM</b> (on-chip shared memory)</td><td>tiny (MBs in total)</td><td>very fast</td><td>holds small tiles of Q, K, V while computing</td></tr>
+    <tr><td><b>HBM</b> (high bandwidth memory, the "GPU RAM")</td><td>large (tens of GBs)</td><td>much slower than SRAM</td><td>holds the full matrices; read/written as few times as possible</td></tr>
+  </table></div>
+  <p class="note">Beyond the book: sizes and speeds are rough orders of magnitude for modern data-centre GPUs.</p>
+  <div class="box work"><b>Step through it · naive attention vs tiled (Flash-style) attention</b>
+    <div class="stepbar"><button id="fa_prev" type="button">◀ Back</button><button id="fa_next" type="button">Next ▶</button><span id="fa_n"></span></div>
+    <div class="two"><div><h3>Naive</h3><div class="stack" id="fa_a"></div></div><div><h3>Flash-style (tiled)</h3><div class="stack" id="fa_b"></div></div></div>
+    <div class="caption" id="fa_c"></div>
+    <p class="note">Beyond the book: a simplified view of the papers' idea (tiling and avoiding writing the full score matrix to HBM).</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Cooking in a tiny kitchen (SRAM) with a big storeroom down the corridor (HBM). The naive cook carries every ingredient back to the storeroom after each step. The Flash cook brings one tray at a time, finishes everything that tray needs, and only walks back with the finished dish. <i>Where it breaks:</i> cooking order can change the dish; Flash Attention is <b>exact</b>, giving the same numbers as normal attention.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Attention's n × n score matrix is big, and writing it to HBM and reading it back dominates time. Flash Attention processes Q, K, V in blocks that fit in SRAM and keeps running softmax totals, so the full score matrix never hits HBM. Less memory traffic, the same result. That's why the papers call it "IO-aware".</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Does FlashAttention approximate attention?"</i> — "No, it's exact. It restructures the computation to be IO-aware: tile Q/K/V into SRAM, compute softmax incrementally, and avoid materialising the n² score matrix in HBM. It speeds up training and inference and lowers memory, and it's the default in most serving stacks."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 13: the n × n scoring it speeds up.</li><li><a href="../llm_engineers_handbook/ch08_inference_optimization.html">LLM Engineer's Handbook Ch.8</a> and <a href="../ai_engineering/ch09_inference_optimization.html">AI Engineering Ch.9</a>: FlashAttention in inference optimisation.</li></ul></div>
+</section>
+
+<!-- 20 -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · THE TRANSFORMER BLOCK</div><h2>2017 vs 2024: residuals, pre-norm, RMSNorm, SwiGLU</h2></div><span class="chip">pdf p123–124 · Fig 3-29, 3-30</span></div>
+  <p>The two major components of a block are an attention layer and a feedforward network. A more detailed view also shows the <b>residual connections</b> and <b>layer-normalisation</b> operations (Figure 3-29).</p>
+  <figure class="bookfig"><img src="figs/fig-3-29.png" alt="Original Transformer block: inputs Thinking (x1) and Machines (x2) plus positional encoding go into Self-attention, then Add and normalize, then a separate Feedforward for each token, then Add and normalize; dotted lines show residual connections skipping around each part" loading="lazy"><figcaption>Figure 3-29 (book, pdf p123): A Transformer block from the original Transformer paper.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> two tokens, "Thinking" (x₁) and "Machines" (x₂). A ⊕ adds <b>positional encoding</b> to each <b>before</b> the block. Then: self-attention → <b>Add and normalize</b> → a feedforward for each token (drawn twice: it works on each position separately) → <b>Add and normalize</b>. The dotted lines are <b>residual connections</b>: each part's input skips around it and is added back to its output ("Add"); then the sum is normalised.</p>
+  <p>The latest Transformer models at the time of writing still have the major components, but with several tweaks (Figure 3-30):</p>
+  <ul class="plain">
+    <li><b>Pre-normalisation:</b> normalisation happens <b>before</b> the attention and feedforward layers (not after). This has been reported to <b>reduce the required training time</b> ("On layer normalization in the Transformer architecture").</li>
+    <li><b>RMSNorm</b> instead of the original <b>LayerNorm</b>: simpler and more efficient ("Root mean square layer normalization").</li>
+    <li><b>SwiGLU</b> instead of the original <b>ReLU</b> activation function ("GLU Variants Improve Transformer") is now more common.</li>
+  </ul>
+  <figure class="bookfig"><img src="figs/fig-3-30.png" alt="2024-era Transformer block: Thinking and Machines go into Normalize (RMSNorm), then Self-attention (grouped-query attention, rotary embeddings), then a plus with the residual, then Normalize (RMSNorm), then Feedforward per token, then a plus with the residual; no positional encoding added at the input" loading="lazy"><figcaption>Figure 3-30 (book, pdf p124): The Transformer block of a 2024-era Transformer like Llama 3 features some tweaks like pre-normalization and an attention optimized with grouped-query attention and rotary embeddings.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> compare with 3-29. <b>Normalize (RMSNorm)</b> now comes <i>first</i>, before self-attention and again before the feedforward. Self-attention is labelled "grouped-query attention, rotary embeddings". The ⊕ residual adds now sit <i>after</i> each part, with no normalisation right after. And there is <b>no positional encoding ⊕ at the input</b>: position is handled inside attention by RoPE (plate 21).</p>
+  <div class="box work"><b>Toggle · walk one token through each block</b>
+    <div class="seg" role="group" aria-label="Block version"><button id="tb_o" type="button" class="on">Original (2017)</button><button id="tb_n" type="button">2024-era (Llama 3)</button></div>
+    <div class="stepbar"><button id="tb_prev" type="button">◀ Back</button><button id="tb_next" type="button">Next ▶</button><span id="tb_nn"></span></div>
+    <div class="stack" id="tb20"></div>
+    <div class="caption" id="tb20c"></div>
+  </div>
+  <div class="fig">
+    <h3>Beyond the book · LayerNorm vs RMSNorm on a toy vector</h3>
+    <div class="controls"><label for="nv">vector <input id="nv" type="text" value="2, 4, 6, 8" style="width:12em"></label></div>
+    <div class="formula" id="nf"></div>
+    <p class="note">Formulas from the cited papers, without the learned scale/shift. LayerNorm subtracts the mean and divides by the standard deviation; RMSNorm skips the mean and divides by the root mean square, one less pass over the numbers.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A residual connection is the original photocopy stapled to every edited draft: each desk adds its notes on top, but the original is never lost. Pre-norm is cleaning your spectacles <i>before</i> reading each draft instead of after. <i>Where it breaks:</i> a stapled original stays separate; a residual literally adds the numbers together.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Residuals give each token a "stream" (plate 6) that every block writes into by addition, which keeps gradients flowing through 32–100+ blocks during training. Normalising the input to each sub-layer (pre-norm) keeps values in a stable range so training needs less careful tuning. RMSNorm saves the mean computation. SwiGLU multiplies two projections (one through a SiLU "gate"), which in Phi-3's printout is <code>gate_up_proj</code> + <code>SiLU</code> + <code>down_proj</code>.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"What changed in the Transformer block between the original paper and Llama?"</i> — "Pre-normalisation instead of post-norm, RMSNorm instead of LayerNorm, SwiGLU instead of ReLU in the MLP, grouped-query attention instead of full multi-head, and rotary position embeddings applied to Q and K inside attention instead of absolute positional encodings added at the input. The core attention + MLP + residual design is unchanged."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plate 4: <code>input_layernorm</code>, <code>post_attention_layernorm</code> (both RMSNorm) and <code>SiLU</code> in Phi-3.</li><li>Plates 18 and 21: GQA and RoPE inside the block.</li></ul></div>
+</section>
+
+<!-- 21 -->
+<section class="plate" id="s21">
+  <div class="plate-head"><div><div class="secno">21 · POSITIONAL EMBEDDINGS (RoPE)</div><h2>Rotary embeddings: position added inside attention</h2></div><span class="chip">pdf p124–127 · Fig 3-31 to 3-33</span></div>
+  <p><b>Positional embeddings</b> have been a key component since the original Transformer. They let the model keep track of the <b>order of tokens/words</b> in a sequence or sentence, an indispensable source of information in language. (Attention by itself sees a set of vectors; without position, "dog bites man" and "man bites dog" would look alike.) Among the many schemes proposed, <b>rotary positional embeddings</b> ("<b>RoPE</b>", introduced in "RoFormer: Enhanced Transformer with rotary position embedding") are especially important.</p>
+  <p>The original Transformer and some early variants used <b>absolute positional embeddings</b>: in essence, mark the first token as position 1, the second as position 2, and so on. These could be:</p>
+  <ul class="plain">
+    <li><b>static</b>: the positional vectors are generated with geometric functions (sines and cosines in the original paper);</li>
+    <li><b>learned</b>: training assigns them their values.</li>
+  </ul>
+  <p>Some challenges arise with these methods when models scale up. For example, when efficiently training models with a large context, <b>many training documents are much shorter than the context</b>. It would be wasteful to give the whole, say, <b>4K context to a short 10-word sentence</b>. So during training, <b>documents are packed together</b> into each context in the training batch (Figure 3-31).</p>
+  <figure class="bookfig"><img src="figs/fig-3-31.png" alt="Top: naive organisation, document 1 then a long padding, document 2 then a long padding, each in its own context. Bottom: efficient packing, documents 1, 2 and 3 separated by Sep tokens with a small padding, and documents 4 and 5 with Sep tokens and a small padding" loading="lazy"><figcaption>Figure 3-31 (book, pdf p125): Packing is the process of efficiently organizing short training documents into the context. It includes grouping multiple documents in a single context while minimizing the padding at the end of the context.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> each bar is one context-size row in a training batch. Top, <b>naive</b>: one document per row, the rest is blue <b>padding</b> (wasted compute). Bottom, <b>packed</b>: documents 1, 2, 3 share one row, separated by <b>Sep</b> (separator) tokens; documents 4 and 5 share another; only a little padding is left at the end.</p>
+  <p>To learn more about packing: "Efficient sequence packing without cross-contamination: Accelerating large language models without impacting performance", and the visuals in "Introducing packed BERT for 2X training speed-up in natural language processing".</p>
+  <div class="fig">
+    <h3>Simulator · naive vs packed batches</h3>
+    <div class="controls">
+      <label for="pkc">context <select id="pkc"><option>512</option><option selected>1024</option><option>2048</option><option>4096</option></select></label>
+      <button id="pkr" type="button">New random documents</button>
+      <div class="seg" role="group" aria-label="Layout"><button id="pk_n" type="button">Naive</button><button id="pk_p" type="button" class="on">Packed</button></div>
+    </div>
+    <div class="pack" id="pk21"></div>
+    <div class="readout" id="r21"></div>
+    <p class="note">Modelled document lengths (40–700 tokens), packed in order (next-fit: start a new row when the next document does not fit); one Sep token after each document.</p>
+  </div>
+  <p>Positional methods must adapt to this and other practical issues. If, for example, <b>Document 50 starts at position 50</b>, we'd be misinforming the model by telling it that its first token is number 50. That would hurt performance: the model would assume there is earlier context, while in reality the earlier tokens belong to a <b>different, unrelated document it should ignore</b>.</p>
+  <p>Instead of static, absolute embeddings added at the <b>start</b> of the forward pass, <b>rotary embeddings</b> encode positional information in a way that captures <b>both absolute and relative token position</b>. The idea is based on <b>rotating vectors in their embedding space</b>. In the forward pass, they are added in the <b>attention step</b> (Figure 3-32).</p>
+  <figure class="bookfig"><img src="figs/fig-3-32.png" alt="Tokenizer and embeddings enter the stack with no positional encoding; purple lines labelled Rotary embeddings connect into the Self-attention part of Transformer block 1 and Transformer block 2" loading="lazy"><figcaption>Figure 3-32 (book, pdf p126): Rotary embeddings are applied in the attention step, not at the start of the forward pass.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> embeddings go straight from the tokenizer into the stack, with no position added. The purple "Rotary embeddings" lines plug into the <b>self-attention</b> of <i>every</i> block (block 1 and block 2 shown), not the feedforward network and not the input.</p>
+  <p>During attention, positional information is mixed in <b>specifically into the queries and keys matrices, just before we multiply them for relevance scoring</b> (Figure 3-33).</p>
+  <figure class="bookfig"><img src="figs/fig-3-33.png" alt="Inside attention head 1: the queries row and keys matrix pass through an arrow labelled Apply rotary positional embeddings and become queries and keys with positional information" loading="lazy"><figcaption>Figure 3-33 (book, pdf p127): Rotary positional embeddings are added to the representation of tokens just before the relevance scoring step in self-attention.</figcaption></figure>
+  <p class="howread"><b>How to read this figure:</b> left, the query (current token) and keys come out of the projection matrices. The purple arrow "Apply rotary positional embeddings" turns them into "Queries, Keys (with positional information)". Values are not in the picture: RoPE does not touch them. Scoring (plate 13) then uses the rotated Q and K.</p>
+  <div class="fig">
+    <h3>Beyond the book · why rotation gives relative position</h3>
+    <p>A 2-number toy. The query sits at position m and the key at position n. RoPE rotates the query by m·θ and the key by n·θ. Move both positions by the same amount and the score stays the same: it depends only on the distance m − n.</p>
+    <div class="controls">
+      <label for="rm">query position m <input id="rm" type="range" min="0" max="40" value="7"><output id="rmo">7</output></label>
+      <label for="rn">key position n <input id="rn" type="range" min="0" max="40" value="3"><output id="rno">3</output></label>
+      <button id="rsh" type="button">Shift both +10</button>
+    </div>
+    <div class="treebox"><svg id="rope" viewBox="0 0 300 220" width="300" height="220" role="img" aria-label="Rotated query and key vectors"></svg></div>
+    <div class="readout" id="r21b"></div>
+    <p class="note">θ = 0.3 radians per position, one rotation frequency. Real RoPE splits each head's vector into many pairs, each rotated at its own frequency. The book only says "rotating vectors in their embedding space" and "absolute and relative"; this demo shows the relative part.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two clock hands. Each token's arrow is turned by an amount that depends on where it sits, like a clock hand moving with time. What attention compares is the <i>angle between</i> two hands, so "3 positions apart" looks the same at 9 a.m. or 3 p.m. <i>Where it breaks:</i> a clock has one hand speed; RoPE uses many speeds at once so both near and far distances can be told apart.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A rotation keeps the vector's length but changes its direction. Rotating q by mθ and k by nθ makes q·k depend on cos((m − n)θ)-like terms: the relative offset. Each token's absolute position is still in its own rotation. Because position lives in the Q·K comparison of every layer, nothing is baked into the input embedding.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Why do modern LLMs use RoPE instead of absolute positional embeddings?"</i> — "RoPE rotates queries and keys by a position-dependent angle right before the attention score, so the score depends on relative distance while each token still has an absolute position. It's applied in every attention layer rather than added once at the input, and it copes better with practical training setups like packed sequences. It's also the knob people adjust when extending context length."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Plates 12–13: Q, K and scoring, where RoPE plugs in.</li><li>Plate 4: <code>Phi3RotaryEmbedding</code> inside <code>self_attn</code>.</li><li><a href="ch02_tokens_and_embeddings.html">Ch.2</a>: token embeddings (which, in RoPE models, carry no position).</li><li><a href="ch10_creating_text_embedding_models.html">Ch.10</a> and <a href="ch12_fine_tuning_generation_models.html">Ch.12</a>: training setups where packing matters.</li></ul></div>
+</section>
+
+<!-- 22 -->
+<section class="plate" id="s22">
+  <div class="plate-head"><div><div class="secno">22 · OTHER ARCHITECTURAL EXPERIMENTS AND IMPROVEMENTS</div><h2>Transformers keep evolving, and spreading beyond text</h2></div><span class="chip">pdf p127</span></div>
+  <p>Many tweaks of the Transformer are proposed and researched continuously. "A Survey of Transformers" highlights the main directions. Transformer architectures are also constantly adapted to <b>domains beyond LLMs</b>:</p>
+  <div class="grid2">
+    <div class="card"><b>Computer vision</b><span>A lot of Transformer research happens here. See "Transformers in vision: A survey" and "A survey on vision transformer".</span></div>
+    <div class="card"><b>Robotics</b><span>See "Open X-Embodiment: Robotic learning datasets and RT-X models".</span></div>
+    <div class="card"><b>Time series</b><span>See "Transformers in time series: A survey".</span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>The same engine design ending up in cars, boats and generators. Attention is a general "mix information between parts" engine; the parts can be words, image patches, robot sensor readings or time steps. <i>Where it breaks:</i> each domain needs its own way to turn raw data into tokens.</p></div>
+  <div class="box"><b>Interview angle</b><p><i>"Are Transformers only for text?"</i> — "No. Anything you can cut into a sequence of tokens works: image patches (vision Transformers), robot observations and actions (RT-X), or time-series windows. The attention + MLP block is the same; what changes is the tokenisation and the output head."</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch09_multimodal_llms.html">Ch.9</a>: vision Transformers and multimodal LLMs.</li><li><a href="ch04_text_classification.html">Ch.4</a>: Part II starts using these models for real tasks.</li></ul></div>
+</section>
+
+<!-- summary -->
+<section class="plate" id="summary">
+  <div class="plate-head"><div><div class="secno">Σ · SUMMARY</div><h2>The chapter in plain words</h2></div><span class="chip">pdf p128–129</span></div>
+  <p>The chapter covered the main intuitions of Transformers and the recent developments behind the latest Transformer LLMs. The key concepts:</p>
+  <ul class="plain">
+    <li>A Transformer LLM generates <b>one token at a time</b>.</li>
+    <li>That output token is <b>appended to the prompt</b>, and the updated prompt goes through the model again (another forward pass) for the next token.</li>
+    <li>The three major components are the <b>tokenizer</b>, a <b>stack of Transformer blocks</b>, and a <b>language modeling head</b>.</li>
+    <li>The tokenizer holds the model's <b>token vocabulary</b>; the model has <b>token embeddings</b> for those tokens. Splitting text into tokens and using their embeddings is the first step of generation.</li>
+    <li>The forward pass flows through all the stages <b>once, one by one</b>.</li>
+    <li>Near the end, the <b>LM head scores the probabilities</b> of the next possible token. <b>Decoding strategies</b> decide which token to actually output (sometimes the most probable, but not always).</li>
+    <li>One reason Transformers excel is <b>parallel processing of tokens</b>: each input token flows down its own track or stream. The number of streams is the model's <b>context size</b>, the maximum number of tokens it can work on.</li>
+    <li>Because LLMs loop to generate one token at a time, it's smart to <b>cache each step's results</b> so the work isn't repeated (stored as various matrices inside the layers).</li>
+    <li>Most processing happens in <b>Transformer blocks</b>, made of two components. One is the <b>feedforward neural network</b>, which can store information and make predictions and interpolations from its training data.</li>
+    <li>The other is the <b>attention layer</b>, which brings in contextual information so the model captures the nuance of language.</li>
+    <li>Attention happens in two major steps: (1) <b>scoring relevance</b> and (2) <b>combining information</b>.</li>
+    <li>An attention layer runs several attention operations <b>in parallel</b>, each in an <b>attention head</b>; their outputs are aggregated into the layer's output.</li>
+    <li>Attention can be sped up by <b>sharing the keys and values matrices</b> between all heads (multi-query), or between groups of heads (<b>grouped-query attention</b>).</li>
+    <li>Methods like <b>Flash Attention</b> speed up attention by optimising how the operation uses the GPU's different memory systems.</li>
+  </ul>
+  <p>Transformers keep getting new developments and proposed tweaks for language models and other domains. Part II of the book covers practical applications of LLMs, starting with <b>text classification</b> in Chapter 4, which introduces applying both generative and representation models.</p>
+  <h3>Key terms</h3>
+  <div class="tablewrap"><table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td>Forward pass</td><td>Inputs flow through the network's computations once to produce an output; one per generated token.</td></tr>
+    <tr><td>Autoregressive model</td><td>Uses its own earlier predictions as input to make later ones (GPT-style generators; BERT is not).</td></tr>
+    <tr><td>Tokenizer / vocabulary</td><td>Turns text into token IDs from a fixed table (32,064 tokens for Phi-3).</td></tr>
+    <tr><td>Token embeddings</td><td>One learned vector per vocabulary token (3,072 numbers for Phi-3).</td></tr>
+    <tr><td>Transformer block (decoder layer)</td><td>Self-attention + feedforward network (+ residuals and normalisation); stacked 6 to 100+ times.</td></tr>
+    <tr><td>LM head</td><td>Final linear layer: model dimension → one score per vocabulary token.</td></tr>
+    <tr><td>Other heads</td><td>Sequence classification head, token classification head.</td></tr>
+    <tr><td>Decoding strategy</td><td>How one token is picked from the distribution.</td></tr>
+    <tr><td>Greedy decoding</td><td>Always pick the top token; equivalent to temperature 0.</td></tr>
+    <tr><td>Sampling</td><td>Pick tokens at random in proportion to their probabilities.</td></tr>
+    <tr><td>Context length</td><td>Max tokens (streams) the model handles at once, e.g. 4K.</td></tr>
+    <tr><td>Model dimension</td><td>Size of each stream's vector, the same in and out of every block.</td></tr>
+    <tr><td>KV cache</td><td>Stored keys and values of earlier tokens so each step computes only the new token.</td></tr>
+    <tr><td>Feedforward network (MLP)</td><td>Per-token network that does most memorisation and interpolation.</td></tr>
+    <tr><td>Self-attention</td><td>Adds relevant information from previous positions into the current token's vector.</td></tr>
+    <tr><td>Attention head</td><td>One parallel copy of attention with its own projections.</td></tr>
+    <tr><td>Query / key / value</td><td>Three projections of the inputs: query × keys → relevance; scores × values → output.</td></tr>
+    <tr><td>Softmax</td><td>Turns scores into positive weights that sum to 1.</td></tr>
+    <tr><td>Sparse / local / sliding-window attention</td><td>Attend to only some previous tokens to save compute.</td></tr>
+    <tr><td>Multi-query attention (MQA)</td><td>All heads share one keys and one values matrix.</td></tr>
+    <tr><td>Grouped-query attention (GQA)</td><td>Groups of heads share keys/values; between MHA and MQA.</td></tr>
+    <tr><td>Flash Attention</td><td>Exact attention, faster by optimising movement between GPU SRAM and HBM.</td></tr>
+    <tr><td>SRAM / HBM</td><td>GPU's small fast on-chip shared memory / large high-bandwidth memory.</td></tr>
+    <tr><td>Residual connection</td><td>Adding a sub-layer's input back to its output.</td></tr>
+    <tr><td>Pre-normalisation</td><td>Normalising before attention and feedforward, not after.</td></tr>
+    <tr><td>LayerNorm / RMSNorm</td><td>Normalisation layers; RMSNorm is simpler and more efficient.</td></tr>
+    <tr><td>ReLU / SwiGLU</td><td>Activation functions; SwiGLU is more common in newer models.</td></tr>
+    <tr><td>Absolute positional embeddings</td><td>Position 1, 2, 3 … added at the start; static (geometric) or learned.</td></tr>
+    <tr><td>Packing</td><td>Putting several short documents into one training context to avoid padding.</td></tr>
+    <tr><td>RoPE</td><td>Rotary positional embeddings: rotate Q and K in attention; absolute + relative position.</td></tr>
+  </table></div>
+</section>
+
+<!-- systems -->
+<section class="plate" id="systems">
+  <div class="plate-head"><div><div class="secno">⚙ · WHERE YOU MEET THIS IN REAL SYSTEMS</div><h2>Models, libraries and tools named in the chapter</h2></div><span class="chip">pdf p95–127</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Name</th><th>What it does with these ideas</th></tr>
+    <tr><td><b>Hugging Face Transformers</b></td><td>The library used throughout: <code>AutoTokenizer</code>, <code>AutoModelForCausalLM</code>, <code>pipeline</code>, <code>model.generate(use_cache=...)</code>. KV cache is on by default.</td></tr>
+    <tr><td><b>Microsoft Phi-3-mini-4k-instruct</b></td><td>The chapter's model: 32,064-token vocabulary, 3,072-dim vectors, 32 decoder layers, RMSNorm, SiLU, rotary embeddings, 4K context.</td></tr>
+    <tr><td><b>PyTorch</b> (<code>torch</code>)</td><td>Tensors and shapes like <code>torch.Size([1, 6, 3072])</code>; runs the model on CUDA GPUs.</td></tr>
+    <tr><td><b>Google Colab, T4 GPU</b></td><td>Where the book timed 100 tokens: 4.5 s with cache, 21.8 s without; <code>%%timeit</code> magic.</td></tr>
+    <tr><td><b>LLM APIs</b> (e.g. OpenAI)</td><td>Stream tokens as they're generated because even a few seconds is long to wait.</td></tr>
+    <tr><td><b>GPT-3</b></td><td>Raw language model; alternates full and sparse attention blocks.</td></tr>
+    <tr><td><b>GPT-4</b></td><td>Chat LLM, instruction- and preference-tuned; answers "The Shawshank" with facts, not just "Redemption".</td></tr>
+    <tr><td><b>BERT</b></td><td>Representation model, not autoregressive; bidirectional attention.</td></tr>
+    <tr><td><b>Llama 2 / Llama 3</b></td><td>Use grouped-query attention; Llama 3's block is the "2024-era" block with RMSNorm pre-norm and RoPE.</td></tr>
+    <tr><td><b>Sparse Transformer, Longformer</b></td><td>Sparse (strided/fixed) and sliding-window attention for long sequences.</td></tr>
+    <tr><td><b>FlashAttention / FlashAttention-2</b></td><td>IO-aware exact attention kernels for GPUs (training and inference).</td></tr>
+    <tr><td><b>RoFormer</b></td><td>The model/paper that introduced rotary position embeddings.</td></tr>
+    <tr><td><b>Packed BERT</b></td><td>Sequence packing for about 2× training speed-up.</td></tr>
+    <tr><td><b>RT-X / Open X-Embodiment</b></td><td>Transformers in robotics.</td></tr>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book · where these ideas show up in serving</b><p>Serving engines such as vLLM, Hugging Face TGI (Text Generation Inference) and NVIDIA TensorRT-LLM are built around the KV cache (paged cache memory, continuous batching), FlashAttention kernels and GQA-aware layouts. Hosted APIs bill input and output tokens separately partly because output tokens each need a sequential forward pass.</p></div>
+</section>
+
+<!-- quiz -->
+<section class="plate" id="quiz">
+  <div class="plate-head"><div><div class="secno">✓ · CHECK YOURSELF</div><h2>Questions (tap to reveal)</h2></div><span class="chip">15 questions</span></div>
+  <details class="ans"><summary>1. Does an LLM generate a whole reply in one forward pass? What does the loop around it do?</summary><p>No. Each forward pass produces one token. Software appends that token to the input and runs the model again, until a stop condition (end token or <code>max_new_tokens</code>).</p></details>
+  <details class="ans"><summary>2. Why was the book's apology email cut off at "my deep"?</summary><p>The pipeline was set to <code>max_new_tokens=50</code>; generation stopped at 50 tokens. Raise the limit and it finishes the email.</p></details>
+  <details class="ans"><summary>3. Name the three components of a Transformer LLM, in order.</summary><p>Tokenizer, stack of Transformer blocks, LM head.</p></details>
+  <details class="ans"><summary>4. Phi-3's <code>lm_head</code> is <code>Linear(3072 → 32064)</code>. What do the two numbers mean?</summary><p>3,072 = the model dimension (size of each token's vector); 32,064 = vocabulary size, one score per token.</p></details>
+  <details class="ans"><summary>5. "Dear" has 40% probability. How often is it chosen under greedy decoding, and under sampling?</summary><p>Greedy: 100% of the time (it's the top token). Sampling: about 40% of the time.</p></details>
+  <details class="ans"><summary>6. <code>lm_head_output</code> has shape [1, 6, 32064]. What does <code>lm_head_output[0, -1]</code> select, and why the last position?</summary><p>Batch item 0, last token: the 32,064 scores for the next token. Only the last stream's output is used to predict the next token.</p></details>
+  <details class="ans"><summary>7. If only the last stream predicts, why compute the other streams at all?</summary><p>Their intermediate results inside each block (their keys and values) are used by the last token's attention.</p></details>
+  <details class="ans"><summary>8. What would happen to generation time if you set <code>use_cache=False</code>? Give the book's numbers.</summary><p>Every step recomputes all earlier streams. 100 tokens on a T4: 21.8 s vs 4.5 s with cache.</p></details>
+  <details class="ans"><summary>9. Which part of a block does most of the memorisation, and which brings in context?</summary><p>Feedforward network: memorisation and interpolation. Attention: incorporating context from other positions.</p></details>
+  <details class="ans"><summary>10. Describe the two steps of attention, with Q, K and V.</summary><p>(1) Relevance scoring: the current token's query × the keys matrix, then softmax so scores sum to 1. (2) Combining: multiply each value vector by its score and sum into one output vector.</p></details>
+  <details class="ans"><summary>11. Why can't GPT-3 use sparse attention in every block?</summary><p>Quality would degrade badly if the model could only see a few previous tokens; so it alternates full-attention and sparse-attention blocks.</p></details>
+  <details class="ans"><summary>12. A model has 32 query heads. How many K/V matrices does it have per layer under MHA, MQA and GQA with 8 groups?</summary><p>MHA: 32 keys + 32 values. MQA: 1 + 1. GQA (8 groups): 8 + 8.</p></details>
+  <details class="ans"><summary>13. Does Flash Attention change the attention output? What does it optimise?</summary><p>No, it's exact. It optimises what is loaded and moved between GPU SRAM and HBM.</p></details>
+  <details class="ans"><summary>14. Name three differences between the original Transformer block and a 2024-era block like Llama 3's.</summary><p>Any three: normalisation before (not after) attention/FFN; RMSNorm instead of LayerNorm; SwiGLU instead of ReLU; grouped-query attention; rotary embeddings in attention instead of positional encoding added at the input.</p></details>
+  <details class="ans"><summary>15. With packing, why are absolute positions a problem, and where does RoPE apply position instead?</summary><p>A document packed after others would start at, say, position 50, falsely implying earlier context. RoPE mixes position into the queries and keys inside attention, just before relevance scoring, capturing absolute and relative position.</p></details>
+</section>
+
+<!-- refs -->
+<section class="plate" id="refs">
+  <div class="plate-head"><div><div class="secno">¶ · REFERENCES</div><h2>Papers and sources named in the chapter</h2></div><span class="chip">cited in the text, pdf p110–127</span></div>
+  <p class="note">The chapter has no separate reference list; these are the works it names in the text. Years are the original publication years (beyond the book where the book gives no year).</p>
+  <details><summary>Show the list (19 works)</summary>
+    <ol class="refs">
+      <li>Vaswani et al., "Attention Is All You Need", 2017 (the original Transformer).</li>
+      <li>Daniel Jurafsky &amp; James H. Martin, <i>Speech and Language Processing</i>, Ch.3 "N-gram Language Models".</li>
+      <li>Jay Alammar, "The Illustrated Transformer", 2018 (blog post).</li>
+      <li>Child et al., "Generating long sequences with sparse transformers", 2019.</li>
+      <li>Beltagy et al., "Longformer: The long-document transformer", 2020.</li>
+      <li>Shazeer, "Fast transformer decoding: One write-head is all you need", 2019 (multi-query attention).</li>
+      <li>Ainslie et al., "GQA: Training generalized multi-query transformer models from multi-head checkpoints", 2023.</li>
+      <li>Dao et al., "FlashAttention: Fast and memory-efficient exact attention with IO-awareness", 2022.</li>
+      <li>Dao, "FlashAttention-2: Faster attention with better parallelism and work partitioning", 2023.</li>
+      <li>Xiong et al., "On layer normalization in the Transformer architecture", 2020.</li>
+      <li>Zhang &amp; Sennrich, "Root mean square layer normalization", 2019.</li>
+      <li>Shazeer, "GLU Variants Improve Transformer", 2020.</li>
+      <li>Su et al., "RoFormer: Enhanced Transformer with rotary position embedding", 2021.</li>
+      <li>Krell et al., "Efficient sequence packing without cross-contamination: Accelerating large language models without impacting performance", 2021.</li>
+      <li>"Introducing packed BERT for 2X training speed-up in natural language processing" (Graphcore blog post), 2021.</li>
+      <li>Lin et al., "A Survey of Transformers", 2021.</li>
+      <li>Khan et al., "Transformers in vision: A survey", 2021; Han et al., "A survey on vision transformer", 2022.</li>
+      <li>Open X-Embodiment Collaboration, "Open X-Embodiment: Robotic learning datasets and RT-X models", 2023.</li>
+      <li>Wen et al., "Transformers in time series: A survey", 2022.</li>
+    </ol>
+  </details>
+</section>
+
+<footer>Study page for <i>Hands-On Large Language Models</i> (Jay Alammar &amp; Maarten Grootendorst, O'Reilly 2024), Chapter 3. Figures are the book's, cropped from the PDF for personal study. Numbers marked "modelled" or "Beyond the book" are not from the book. <a href="ch02_tokens_and_embeddings.html">← Ch.2</a> · <a href="index.html">All chapters</a> · <a href="ch04_text_classification.html">Ch.4 →</a></footer>
+
+</div>
+
+<script>
+(function () {
+"use strict";
+var $ = function (id) { return document.getElementById(id); };
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function run(name, fn) { try { fn(); } catch (e) { console.error("widget " + name + " failed:", e); } }
+function fmtBytes(b) {
+  var u = ["B", "KiB", "MiB", "GiB", "TiB"], i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return (b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)) + " " + u[i];
+}
+function pct(x) { return (x * 100).toFixed(x < 0.1 ? 1 : 0) + "%"; }
+function softmax(a) {
+  var m = Math.max.apply(null, a), e = a.map(function (x) { return Math.exp(x - m); }), s = e.reduce(function (p, c) { return p + c; }, 0);
+  return e.map(function (x) { return x / s; });
+}
+/* generic Back/Next stepper */
+function stepper(prefix, count, render, labId) {
+  var i = 0, prev = $(prefix + "_prev"), next = $(prefix + "_next"), lab = $(labId || (prefix + "_n"));
+  function draw() { if (i > count() - 1) i = count() - 1; if (lab) lab.textContent = "step " + (i + 1) + " / " + count(); prev.disabled = i === 0; next.disabled = i >= count() - 1; render(i); }
+  prev.addEventListener("click", function () { if (i > 0) { i--; draw(); } });
+  next.addEventListener("click", function () { if (i < count() - 1) { i++; draw(); } });
+  draw();
+  return { reset: function () { i = 0; draw(); }, redraw: draw };
+}
+function segToggle(ids, onPick) {
+  ids.forEach(function (id, k) {
+    $(id).addEventListener("click", function () {
+      ids.forEach(function (o) { $(o).classList.remove("on"); });
+      $(id).classList.add("on"); onPick(k);
+    });
+  });
+}
+function barsHTML(rows, opts) {
+  opts = opts || {};
+  var mx = Math.max.apply(null, rows.map(function (r) { return r.p; })) || 1;
+  return rows.map(function (r) {
+    var w = (opts.abs ? r.p : r.p / mx) * 100;
+    return '<div class="b' + (r.cls ? " " + r.cls : "") + '"><span>' + esc(r.label) + '</span><i style="width:' + w.toFixed(1) + '%"></i><span>' + (r.text != null ? esc(r.text) : pct(r.p)) + '</span></div>';
+  }).join("");
+}
+
+/* ---------- s3: autoregressive loop ---------- */
+run("s3", function () {
+  var gen = ["Dear", " Sarah", ",", "\\n", "I", "'m", " writing", " to", " apologize"];
+  stepper("ar", function () { return gen.length; }, function (k) {
+    var h = '<span title="Write an email apologizing to Sarah for the tragic gardening mishap. Explain how it happened.">[prompt: Write an email apologizing to Sarah …]</span>';
+    for (var j = 0; j < k; j++) h += '<span class="gen">' + esc(gen[j]) + '</span>';
+    h += '<span class="cur newt">→ ' + esc(gen[k]) + '</span>';
+    $("ar_in").innerHTML = h;
+    $("ar_cap").innerHTML = "<b>Forward pass " + (k + 1) + ":</b> the input is the prompt" + (k ? " + " + k + " generated token" + (k > 1 ? "s" : "") : "") + ". The model outputs one token, <b>" + esc(gen[k]) + "</b>, which the loop appends before pass " + (k + 2) + ". " + (k === gen.length - 1 ? "With max_new_tokens=50 this would continue to 50 passes." : "");
+  });
+});
+
+/* ---------- s4: Phi-3 module explorer ---------- */
+run("s4", function () {
+  var mods = [
+    ["embed_tokens", "Embedding(32064, 3072): the token embeddings matrix. One row of 3,072 numbers for each of the 32,064 vocabulary tokens; token ID → row lookup. Plate 4, Ch.2."],
+    ["embed_dropout", "Dropout(p=0.0): randomly zeroes values during training to fight overfitting. p=0.0 means it does nothing here. The book skips it."],
+    ["32 x Phi3DecoderLayer", "The stack of Transformer blocks: 32 identical blocks (numbered 0–31), each with its own weights. Plates 8–14, 20."],
+    ["self_attn", "Phi3Attention: the attention layer of each block. Brings in information from earlier tokens. Plates 10–14."],
+    ["qkv_proj", "Linear(3072 → 9216): computes queries, keys and values in one go (9,216 = 3 × 3,072). These are the projection matrices of Figure 3-18. Plate 12."],
+    ["o_proj", "Linear(3072 → 3072): the output projection after all heads are combined, back to the model dimension. Plate 14."],
+    ["rotary_emb", "Phi3RotaryEmbedding: rotary positional embeddings (RoPE), applied to queries and keys inside attention. Plate 21."],
+    ["mlp", "Phi3MLP: the feedforward neural network of the block, where most memorisation happens. Plate 9."],
+    ["gate_up_proj / down_proj / SiLU", "Linear(3072 → 16384), SiLU activation, Linear(8192 → 3072). The 16,384 output is two 8,192 halves (gate and up) combined, the SwiGLU-style activation of plate 20 (gate/up reading is beyond the book)."],
+    ["input_layernorm / post_attention_layernorm", "Phi3RMSNorm: normalisation before attention and before the MLP: pre-normalisation with RMSNorm, plate 20."],
+    ["resid_*_dropout", "Dropout on the residual paths (p=0.0, inactive). Residual connections: plate 20."],
+    ["norm", "A final Phi3RMSNorm after the last block, before the LM head."],
+    ["lm_head", "Linear(3072 → 32064): turns the last token's 3,072-number vector into one score per vocabulary token. Plates 4–5."]
+  ];
+  var box = $("pm_btns"), cap = $("pm_cap");
+  mods.forEach(function (m, k) {
+    var b = document.createElement("button"); b.type = "button"; b.textContent = m[0];
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(box.children, function (c) { c.classList.remove("on"); });
+      b.classList.add("on"); cap.innerHTML = "<b>" + esc(m[0]) + "</b>: " + esc(m[1]);
+    });
+    box.appendChild(b);
+    if (k === 0) { b.classList.add("on"); cap.innerHTML = "<b>" + esc(m[0]) + "</b>: " + esc(m[1]); }
+  });
+});
+
+/* ---------- s5: decoding simulator ---------- */
+run("s5", function () {
+  var toks = ["Dear", "Title", "To", "Hi", "Subject", "I", "Hello", "My", "(all others)"];
+  var base = [0.40, 0.13, 0.08, 0.02, 0.09, 0.07, 0.06, 0.05, 0.10];
+  var counts = base.map(function () { return 0; }), n = 0, last = null;
+  var sl = $("tp5"), out = $("tp5o");
+  function dist() {
+    var T = +sl.value / 100;
+    if (T === 0) { var m = 0; base.forEach(function (p, i) { if (p > base[m]) m = i; }); return base.map(function (p, i) { return i === m ? 1 : 0; }); }
+    return softmax(base.map(function (p) { return Math.log(p) / T; }));
+  }
+  function sample(d) { var r = Math.random(), c = 0; for (var i = 0; i < d.length; i++) { c += d[i]; if (r < c) return i; } return d.length - 1; }
+  function draw() {
+    var T = +sl.value / 100; out.textContent = T.toFixed(2);
+    var d = dist();
+    var rows = toks.map(function (t, i) { return { label: t, p: d[i], cls: (i === 0 ? "top" : "") + (last === i ? " pick" : ""), text: pct(d[i]) + (n ? " · " + counts[i] : "") }; });
+    $("bars5").innerHTML = barsHTML(rows, { abs: true });
+    $("r5").innerHTML = "<span>mode: <b>" + (T === 0 ? "greedy (argmax)" : "sampling") + "</b></span><span>samples: <b>" + n + "</b></span>" + (n ? "<span>'Dear' picked: <b>" + counts[0] + " (" + pct(counts[0] / n) + ")</b></span>" : "") + (last != null ? "<span>last pick: <b>" + esc(toks[last]) + "</b></span>" : "");
+  }
+  function take(k) { var d = dist(); for (var j = 0; j < k; j++) { last = sample(d); counts[last]++; n++; } draw(); }
+  sl.addEventListener("input", function () { counts = counts.map(function () { return 0; }); n = 0; last = null; draw(); });
+  $("d5_one").addEventListener("click", function () { take(1); });
+  $("d5_100").addEventListener("click", function () { take(100); });
+  $("d5_reset").addEventListener("click", function () { counts = counts.map(function () { return 0; }); n = 0; last = null; draw(); });
+  draw();
+});
+
+/* ---------- s6: streams and shapes ---------- */
+run("s6", function () {
+  var words = ["Write", "an", "email", "apolog", "izing", "to", "Sarah", "for", "the", "tragic", "garden", "ing", "mis", "hap", ".", "Explain", "how", "it", "happen", "ed", "."];
+  function draw() {
+    var b = +$("b6").value, n = +$("n6").value; $("b6o").textContent = b; $("n6o").textContent = n;
+    var shown = Math.min(n, 12), r1 = '<div class="row"><span class="lbl">token</span>', r2 = '<div class="row"><span class="lbl">stream in</span>', r3 = '<div class="row"><span class="lbl">stream out</span>';
+    for (var i = 0; i < shown; i++) {
+      var idx = n > 12 && i === shown - 1 ? n - 1 : i, last = idx === n - 1;
+      var w = idx < words.length ? words[idx] : "t" + (idx + 1);
+      if (n > 12 && i === shown - 2) { r1 += "<span>…</span>"; r2 += "<span>…</span>"; r3 += "<span>…</span>"; continue; }
+      r1 += "<span" + (last ? ' class="calc"' : "") + ">" + esc(w) + "</span>";
+      r2 += "<span>[3072]</span>";
+      r3 += "<span" + (last ? ' class="calc"' : "") + ">" + (last ? "→ LM head" : "[3072]") + "</span>";
+    }
+    $("st6").innerHTML = r1 + "</div>" + r2 + "</div>" + r3 + "</div>";
+    $("f6").textContent =
+      "input_ids                 [" + b + ", " + n + "]\n" +
+      "embeddings (+ position)   [" + b + ", " + n + ", 3072]\n" +
+      "after block 1 … 32        [" + b + ", " + n + ", 3072]   (same size every block)\n" +
+      "lm_head output            [" + b + ", " + n + ", 32064]\n" +
+      "lm_head_output[0, -1]     [32064]   ← scores for the next token\n" +
+      "streams used: " + n + " of 4,096 (context length)";
+  }
+  $("b6").addEventListener("input", draw); $("n6").addEventListener("input", draw); draw();
+});
+
+/* ---------- s7: KV cache stepper + calculator ---------- */
+run("s7", function () {
+  var P = 4, G = 6, names = ["Write", "an", "email", "…", "Dear", "Sarah", ",", "I", "am", "sorry"];
+  var st = stepper("kv", function () { return G; }, function (k) {
+    var cache = $("kv7c").checked, h = "", tot = 0;
+    for (var s = 0; s <= k; s++) {
+      var len = P + s, row = '<div class="row"><span class="lbl">pass ' + (s + 1) + "</span>";
+      for (var t = 0; t < len; t++) {
+        var compute = !cache || s === 0 || t === len - 1;
+        if (compute) tot++;
+        row += '<span class="' + (compute ? "calc" : "cache") + '">' + esc(names[t]) + "</span>";
+      }
+      h += row + "</div>";
+    }
+    var other = 0; for (var s2 = 0; s2 <= k; s2++) other += cache ? (P + s2) : (s2 === 0 ? P : 1);
+    $("kv7").innerHTML = h;
+    $("kv7r").innerHTML = "<span>stream computations so far: <b>" + tot + "</b></span><span>" + (cache ? "without" : "with") + " cache it would be: <b>" + other + "</b></span><span>new token this pass: <b>" + esc(names[P + k]) + "</b></span>";
+  });
+  $("kv7c").addEventListener("change", function () { st.redraw(); });
+  function calc() {
+    var L = +$("kvL").value || 0, H = +$("kvH").value || 0, D = +$("kvD").value || 0, T = +$("kvT").value || 0, B = +$("kvB").value, N = +$("kvN").value || 0;
+    var per = 2 * L * H * D * B, tot = per * T * N;
+    $("kvR").innerHTML = "<span>per token: <b>" + fmtBytes(per) + "</b></span><span>per sequence (" + T.toLocaleString() + " tokens): <b>" + fmtBytes(per * T) + "</b></span><span>× " + N + " users: <b>" + fmtBytes(tot) + "</b></span>";
+  }
+  ["kvL", "kvH", "kvD", "kvT", "kvB", "kvN"].forEach(function (id) { $(id).addEventListener("input", calc); $(id).addEventListener("change", calc); });
+  calc();
+});
+
+/* ---------- s8: block stack stepper ---------- */
+run("s8", function () {
+  var rows = ["Tokenizer + embeddings: 'Say' 'something' 'smart' → 3 vectors [3072]", "Block 1: attention + feedforward", "Block 2: attention + feedforward", "Blocks 3 … 31", "Block 32: attention + feedforward", "LM head (last stream only) → next token"];
+  var caps = [
+    "Three tokens become three embedding vectors (plus position information). These are the blue vectors of Figure 3-11.",
+    "Block 1 mixes in context with attention, then each vector goes through the feedforward network. Out come three new vectors of the same size: the red 'Output of Transformer block 1'.",
+    "Block 2 takes block 1's output as its input and does the same two steps with its own weights. (Illustrative: early blocks are often found to handle local, surface patterns.)",
+    "The same hand-off repeats. Each block refines every token's vector a bit more.",
+    "The last block hands over the final output vectors, still three of them, still 3,072 numbers each.",
+    "Only the last stream's vector ('smart') goes into the LM head, which scores all 32,064 tokens for what comes next."
+  ];
+  stepper("bl", function () { return rows.length; }, function (k) {
+    $("bl8").innerHTML = rows.map(function (r, i) { return '<div class="' + (i === k ? "on" : i < k ? "done" : "") + '">' + esc(r) + "</div>"; }).join("");
+    $("bl8c").innerHTML = "<b>Step " + (k + 1) + ":</b> " + esc(caps[k]);
+  });
+});
+
+/* ---------- s9: raw vs chat ---------- */
+run("s9", function () {
+  var outs = [
+    "<b>Input:</b> \"The Shawshank\" → <b>next token:</b> \"Redemption\". A raw language model only continues the text. Loop it and it keeps writing whatever text is most likely to follow the title.",
+    "<b>Input:</b> \"The Shawshank\" → <b>GPT-4 (book's example):</b> \"The Shawshank Redemption\" is a 1994 film directed by Frank Darabont and is based on the novella \"Rita Hayworth and Shawshank Redemption\" written by Stephen King. …etc. Same next-token machinery, but instruction- and preference-tuned to give a helpful answer."
+  ];
+  segToggle(["ff_raw", "ff_chat"], function (k) { $("ff_out").innerHTML = outs[k]; });
+  $("ff_out").innerHTML = outs[0];
+});
+
+/* ---------- s10: what does "it" attend to ---------- */
+run("s10", function () {
+  var toks = ["The", "dog", "chased", "the", "squirrel", "because", "it"];
+  var sets = [
+    { w: [0.04, 0.34, 0.08, 0.03, 0.38, 0.06, 0.07], c: "Without more context the model is split between 'dog' and 'squirrel' (modelled). It leans a little to 'squirrel', the nearer noun, but either reading is plausible." },
+    { w: [0.03, 0.08, 0.05, 0.03, 0.68, 0.05, 0.08], c: "Earlier text called the dog \"she\". So \"it\" is not the dog; the weight moves onto 'squirrel'. This is the book's example of earlier sentences giving clues." },
+    { w: [0.03, 0.66, 0.06, 0.03, 0.10, 0.05, 0.07], c: "Earlier text said the dog was hungry. Now \"because it [was hungry]\" points at the dog (modelled pattern)." }
+  ];
+  function draw(k) {
+    var s = sets[k];
+    $("it_t").innerHTML = toks.map(function (t, i) { return '<span class="' + (i === 6 ? "cur" : "") + '">' + esc(t) + "</span>"; }).join("");
+    $("it_bars").innerHTML = barsHTML(toks.map(function (t, i) { var mx = Math.max.apply(null, s.w); return { label: t, p: s.w[i], cls: s.w[i] === mx ? "top" : "" }; }));
+    $("it_cap").textContent = s.c;
+  }
+  segToggle(["it_a", "it_b", "it_c"], draw); draw(0);
+});
+
+/* ---------- s11: heads ---------- */
+run("s11", function () {
+  var toks = ["The", "dog", "chased", "the", "squirrel", "because", "it"];
+  var heads = [
+    { n: "Head A: previous token", w: [0.02, 0.03, 0.04, 0.05, 0.10, 0.70, 0.06], c: "Looks mostly at the token just before: 'because'. Useful for local grammar." },
+    { n: "Head B: pronoun → noun", w: [0.03, 0.30, 0.04, 0.03, 0.52, 0.03, 0.05], c: "Links 'it' to candidate nouns 'squirrel' and 'dog': the coreference job from plate 10." },
+    { n: "Head C: the action", w: [0.04, 0.08, 0.66, 0.04, 0.08, 0.05, 0.05], c: "Focuses on the verb 'chased', which tells what 'it' might do or feel next." },
+    { n: "Head D: start / self", w: [0.55, 0.03, 0.03, 0.03, 0.03, 0.03, 0.30], c: "Parks attention on the first token and itself, a 'nothing special to look at' pattern often seen in real models." }
+  ];
+  var box = $("hd_btns");
+  function draw(k) {
+    var h = heads[k], mx = Math.max.apply(null, h.w);
+    $("hd_bars").innerHTML = barsHTML(toks.map(function (t, i) { return { label: t, p: h.w[i], cls: h.w[i] === mx ? "top" : "" }; }));
+    $("hd_cap").innerHTML = "<b>" + esc(h.n) + ":</b> " + esc(h.c) + " The layer's output combines all heads.";
+    Array.prototype.forEach.call(box.children, function (c, i) { c.classList.toggle("on", i === k); });
+  }
+  heads.forEach(function (h, k) { var b = document.createElement("button"); b.type = "button"; b.textContent = h.n; b.addEventListener("click", function () { draw(k); }); box.appendChild(b); });
+  draw(0);
+});
+
+/* ---------- s12: projections ---------- */
+run("s12", function () {
+  var x = [1.0, 0.5, 0.0];
+  var W = {
+    q: [[0.8, 0.2, 0.0], [0.4, 1.0, 0.2], [0.1, 0.0, 0.9]],
+    k: [[0.1, 0.9, 0.3], [0.7, 0.0, 0.5], [0.2, 0.3, 0.4]],
+    v: [[0.5, 0.0, 0.6], [0.0, 0.8, 0.2], [0.3, 0.3, 0.3]]
+  };
+  var nm = { q: "query", k: "key", v: "value" };
+  function draw(key) {
+    var M = W[key], y = [0, 1, 2].map(function (j) { return x[0] * M[0][j] + x[1] * M[1][j] + x[2] * M[2][j]; });
+    var lines = "x = [1.0, 0.5, 0.0]     W_" + nm[key] + " = [" + M.map(function (r) { return "[" + r.join(", ") + "]"; }).join(", ") + "]\n";
+    [0, 1, 2].forEach(function (j) { lines += nm[key] + "[" + j + "] = 1.0×" + M[0][j] + " + 0.5×" + M[1][j] + " + 0.0×" + M[2][j] + " = " + y[j].toFixed(2) + "\n"; });
+    lines += nm[key] + " vector for 'it' = [" + y.map(function (v) { return v.toFixed(2); }).join(", ") + "]";
+    $("pj_f").textContent = lines;
+  }
+  segToggle(["pj_q", "pj_k", "pj_v"], function (k) { draw(["q", "k", "v"][k]); });
+  draw("q");
+});
+
+/* ---------- s13: relevance scoring ---------- */
+run("s13", function () {
+  var toks = ["Sarah", "fed", "the", "cat", "because", "it"];
+  var keys = [[-0.5, 0.2], [0.1, -0.4], [0.6, 0.9], [0.9, 0.8], [-0.6, -0.2], [0.2, -0.3]];
+  var book = [0.03, 0.05, 0.35, 0.50, 0.02, 0.05];
+  function draw() {
+    var q = [+$("q1").value / 10, +$("q2").value / 10]; $("q1o").textContent = q[0].toFixed(1); $("q2o").textContent = q[1].toFixed(1);
+    var sc = $("qs").checked ? 1 / Math.sqrt(2) : 1;
+    var raw = keys.map(function (k) { return (q[0] * k[0] + q[1] * k[1]) * sc; }), p = softmax(raw);
+    var mx = Math.max.apply(null, p);
+    var h = "<tr><th>token</th><th>key</th><th>raw q·k" + (sc !== 1 ? " /√2" : "") + "</th><th>softmax</th><th>book</th></tr>";
+    toks.forEach(function (t, i) {
+      h += "<tr><td>" + esc(t) + "</td><td class=\"num\">[" + keys[i].join(", ") + "]</td><td class=\"num\">" + raw[i].toFixed(2) + "</td><td class=\"num\"" + (p[i] === mx ? ' style="color:var(--c1);font-weight:600"' : "") + ">" + pct(p[i]) + "</td><td class=\"num\">" + pct(book[i]) + "</td></tr>";
+    });
+    $("att13").innerHTML = h;
+    var s = p.reduce(function (a, b) { return a + b; }, 0);
+    $("r13").innerHTML = "<span>query = <b>[" + q[0].toFixed(1) + ", " + q[1].toFixed(1) + "]</b></span><span>top token: <b>" + esc(toks[p.indexOf(mx)]) + "</b></span><span>sum of softmax: <b>" + s.toFixed(3) + "</b></span>";
+  }
+  ["q1", "q2", "qs"].forEach(function (id) { $(id).addEventListener("input", draw); $(id).addEventListener("change", draw); });
+  draw();
+});
+
+/* ---------- s14: combining ---------- */
+run("s14", function () {
+  var toks = ["Sarah", "fed", "the", "cat", "because", "it"];
+  var sc = [0.03, 0.05, 0.35, 0.50, 0.02, 0.05];
+  var vals = [[0.9, 0.1, 0.0], [0.1, 0.8, 0.1], [0.2, 0.2, 0.2], [0.1, 0.1, 0.95], [0.3, 0.3, 0.0], [0.4, 0.2, 0.3]];
+  var off = toks.map(function () { return false; });
+  function draw() {
+    var w = sc.map(function (s, i) { return off[i] ? 0 : s; }), tot = w.reduce(function (a, b) { return a + b; }, 0) || 1;
+    w = w.map(function (x) { return x / tot; });
+    $("cm_t").innerHTML = toks.map(function (t, i) { return '<span class="click' + (off[i] ? " dim" : "") + '" data-i="' + i + '" role="button" tabindex="0">' + esc(t) + "</span>"; }).join("");
+    var out = [0, 0, 0], h = "<tr><th>token</th><th>score</th><th>value (person, action, animal)</th><th>score × value</th></tr>";
+    toks.forEach(function (t, i) {
+      var sv = vals[i].map(function (v) { return v * w[i]; }); sv.forEach(function (v, j) { out[j] += v; });
+      h += "<tr><td>" + esc(t) + "</td><td class=\"num\">" + pct(w[i]) + "</td><td class=\"num\">[" + vals[i].join(", ") + "]</td><td class=\"num\">[" + sv.map(function (v) { return v.toFixed(3); }).join(", ") + "]</td></tr>";
+    });
+    $("cm14").innerHTML = h;
+    $("cm_f").textContent = "output for 'it' = Σ score × value = [" + out.map(function (v) { return v.toFixed(3); }).join(", ") + "]\n" +
+      (out[2] >= out[0] && out[2] >= out[1] ? "→ the 'animal' feature dominates: 'it' now carries cat information." : "→ with cat switched off, the output is no longer mostly 'animal'.");
+    Array.prototype.forEach.call($("cm_t").children, function (el) {
+      function flip() { var i = +el.getAttribute("data-i"); off[i] = !off[i]; if (off.every(function (o) { return o; })) off[i] = false; draw(); }
+      el.addEventListener("click", flip);
+      el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } });
+    });
+  }
+  draw();
+});
+
+/* ---------- s16: masks ---------- */
+run("s16", function () {
+  var N = 16, modes = ["Full (causal)", "Local window", "Strided", "Fixed", "Bidirectional (BERT)"], mode = 0, hl = -1;
+  var box = $("mk_btns");
+  function can(i, j, w) {
+    if (mode === 4) return true;
+    if (j > i) return false;
+    if (mode === 0) return true;
+    if (mode === 1) return i - j < w;
+    if (mode === 2) return i - j < w || (i - j) % w === 0;
+    return Math.floor(j / w) === Math.floor(i / w) || j % w === w - 1;
+  }
+  function draw() {
+    var w = +$("mkw").value; $("mkwo").textContent = w;
+    var g = $("mk16"); g.style.gridTemplateColumns = "repeat(" + N + ", auto)";
+    var h = "", cnt = 0;
+    for (var i = 0; i < N; i++) for (var j = 0; j < N; j++) {
+      var ok = can(i, j, w); if (ok) cnt++;
+      h += '<div data-r="' + i + '" class="' + (i === j ? "self" : ok ? "see" : "") + (i === hl ? " hl" : "") + '"></div>';
+    }
+    g.innerHTML = h;
+    var full = N * (N + 1) / 2;
+    $("r16").innerHTML = "<span>pattern: <b>" + esc(modes[mode]) + "</b></span><span>attention scores computed: <b>" + cnt + "</b> (full causal = " + full + ")</span>" + (hl >= 0 ? "<span>row " + (hl + 1) + " sees: <b>" + (function () { var c = 0; for (var j = 0; j < N; j++) if (can(hl, j, w)) c++; return c; })() + "</b> tokens</span>" : "");
+  }
+  modes.forEach(function (m, k) { var b = document.createElement("button"); b.type = "button"; b.textContent = m; if (!k) b.classList.add("on"); b.addEventListener("click", function () { mode = k; Array.prototype.forEach.call(box.children, function (c, i) { c.classList.toggle("on", i === k); }); draw(); }); box.appendChild(b); });
+  $("mkw").addEventListener("input", draw);
+  function pick(e) { var t = e.target; if (t && t.getAttribute && t.getAttribute("data-r") != null) { var r = +t.getAttribute("data-r"); if (r !== hl) { hl = r; draw(); } } }
+  $("mk16").addEventListener("mouseover", pick); $("mk16").addEventListener("click", pick);
+  draw();
+});
+
+/* ---------- s18: MHA / GQA / MQA ---------- */
+run("s18", function () {
+  var gh = $("gh"), gg = $("gg");
+  function fillGroups() {
+    var H = +gh.value, prev = +gg.value || 8; gg.innerHTML = "";
+    for (var g = 1; g <= H; g *= 2) { var o = document.createElement("option"); o.value = g; o.textContent = g + (g === 1 ? " (multi-query)" : g === H ? " (multi-head)" : " (grouped-query)"); gg.appendChild(o); }
+    var opts = Array.prototype.map.call(gg.options, function (o) { return +o.value; });
+    gg.value = opts.indexOf(prev) >= 0 ? prev : opts[Math.min(opts.length - 1, 3)];
+  }
+  function draw() {
+    var H = +gh.value, G = +gg.value, per = H / G, show = Math.min(G, 8), h = "";
+    for (var g = 0; g < show; g++) {
+      var qs = ""; for (var q = 0; q < Math.min(per, 16); q++) qs += '<span class="cell q" title="query head"></span>';
+      h += '<div class="grp"><div class="qs"><span class="cell k" title="shared key"></span><span class="cell v" title="shared value"></span></div><div class="qs">' + qs + (per > 16 ? "…" : "") + "</div><span>group " + (g + 1) + "</span></div>";
+    }
+    if (G > show) h += '<div class="col">… ' + (G - show) + " more groups</div>";
+    $("gq18").innerHTML = h;
+    var bytes = 2 * 32 * G * 128 * 2 * 8192, mha = 2 * 32 * H * 128 * 2 * 8192;
+    $("r18").innerHTML = "<span>query heads: <b>" + H + "</b></span><span>K/V matrices per layer: <b>" + G + " + " + G + "</b></span><span>heads per group: <b>" + per + "</b></span><span>KV cache, 8K tokens: <b>" + fmtBytes(bytes) + "</b> (multi-head: " + fmtBytes(mha) + ", " + (mha / bytes) + "× more)</span>";
+  }
+  gh.addEventListener("change", function () { fillGroups(); draw(); });
+  gg.addEventListener("change", draw);
+  fillGroups(); gg.value = 8; draw();
+});
+
+/* ---------- s19: flash attention stepper ---------- */
+run("s19", function () {
+  var A = ["Read Q, K from HBM", "Compute S = Q·Kᵀ (n × n), write S to HBM", "Read S, softmax → P, write P to HBM", "Read P and V, compute output, write O to HBM"];
+  var B = ["Load a tile of Q into SRAM", "Load a tile of K, V into SRAM", "Scores + running softmax for this tile, in SRAM", "Repeat for all K/V tiles; write only the final O tile to HBM"];
+  var C = [
+    "Both start by reading inputs from HBM (big, slow). Flash loads only a tile that fits in SRAM (small, fast).",
+    "Naive writes the full n × n score matrix to HBM: for 8K tokens that's 64 million scores per head. Flash keeps the tile's scores in SRAM.",
+    "Naive reads all scores back, softmaxes, and writes them out again. Flash keeps a running max and sum, so softmax can be done tile by tile without the full matrix.",
+    "Naive does a third round trip. Flash writes only the output. Same numbers at the end, far less HBM traffic, so it's faster."
+  ];
+  stepper("fa", function () { return 4; }, function (k) {
+    $("fa_a").innerHTML = A.map(function (s, i) { return '<div class="' + (i === k ? "on" : i < k ? "done" : "") + '">' + esc(s) + "</div>"; }).join("");
+    $("fa_b").innerHTML = B.map(function (s, i) { return '<div class="' + (i === k ? "on" : i < k ? "done" : "") + '">' + esc(s) + "</div>"; }).join("");
+    $("fa_c").innerHTML = "<b>Step " + (k + 1) + ":</b> " + esc(C[k]);
+  });
+});
+
+/* ---------- s20: block comparison + norms ---------- */
+run("s20", function () {
+  var V = [
+    [["Input: token embedding x", ""], ["+ positional encoding (absolute)", "diff"], ["Self-attention (multi-head)", ""], ["Add residual, then LayerNorm (post-norm)", "diff"], ["Feedforward, ReLU", "diff"], ["Add residual, then LayerNorm", "diff"], ["Output to next block", ""]],
+    [["Input: token embedding x (no position added)", "diff"], ["RMSNorm (pre-norm)", "diff"], ["Self-attention: grouped-query + RoPE on Q, K", "diff"], ["Add residual", ""], ["RMSNorm (pre-norm)", "diff"], ["Feedforward, SwiGLU", "diff"], ["Add residual", ""], ["Output to next block", ""]]
+  ];
+  var C = [
+    ["Each token's embedding enters the block.", "The original adds a position vector before the first block (static sine/cosine or learned).", "Full multi-head attention: each head has its own Q, K, V.", "Residual: add the attention input back to its output. Then normalise with LayerNorm (subtract mean, divide by std).", "Feedforward network per token, with the ReLU activation.", "Second residual add, then LayerNorm again.", "Vector of the same size goes to the next block."],
+    ["Same embedding in, but no position vector is added here.", "Normalise first (pre-norm), with RMSNorm: reported to reduce training time; simpler than LayerNorm.", "Attention uses grouped-query attention, and rotary embeddings are applied to queries and keys here.", "Residual add, with no normalisation after it.", "Normalise again before the feedforward.", "Feedforward with the SwiGLU activation (more common now than ReLU).", "Second residual add.", "Vector of the same size goes to the next block."]
+  ];
+  var ver = 0;
+  var st = stepper("tb", function () { return V[ver].length; }, function (k) {
+    $("tb20").innerHTML = V[ver].map(function (r, i) { return '<div class="' + (i === k ? "on" : r[1]) + '">' + esc(r[0]) + "</div>"; }).join("");
+    $("tb20c").innerHTML = "<b>" + (ver ? "2024-era" : "Original") + ", step " + (k + 1) + ":</b> " + esc(C[ver][k]) + ' <span class="note">(purple = differs from the other version)</span>';
+  }, "tb_nn");
+  segToggle(["tb_o", "tb_n"], function (k) { ver = k; st.reset(); });
+  function norms() {
+    var v = $("nv").value.split(/[,\s]+/).filter(function (s) { return s !== ""; }).map(Number).filter(function (n) { return isFinite(n); });
+    if (!v.length) { $("nf").textContent = "Type some numbers, e.g. 2, 4, 6, 8"; return; }
+    var n = v.length, mean = v.reduce(function (a, b) { return a + b; }, 0) / n;
+    var vr = v.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / n, sd = Math.sqrt(vr + 1e-6);
+    var rms = Math.sqrt(v.reduce(function (a, b) { return a + b * b; }, 0) / n + 1e-6);
+    function f(a) { return "[" + a.map(function (x) { return x.toFixed(3); }).join(", ") + "]"; }
+    $("nf").textContent = "x          = " + f(v) + "\n" +
+      "LayerNorm:  mean = " + mean.toFixed(3) + ", std = " + sd.toFixed(3) + "  →  (x − mean) / std = " + f(v.map(function (x) { return (x - mean) / sd; })) + "\n" +
+      "RMSNorm:    rms = √(mean(x²)) = " + rms.toFixed(3) + "  →  x / rms = " + f(v.map(function (x) { return x / rms; }));
+  }
+  $("nv").addEventListener("input", norms); norms();
+});
+
+/* ---------- s21: packing + RoPE ---------- */
+run("s21", function () {
+  var docs = [], packed = true;
+  function newDocs() { docs = []; for (var i = 0; i < 8; i++) docs.push(40 + Math.floor(Math.random() * 661)); }
+  function draw() {
+    var C = +$("pkc").value, L = docs.map(function (d) { return Math.min(d, C - 1); }), rows = [];
+    if (!packed) { L.forEach(function (d, i) { rows.push([{ d: i, n: d }]); }); }
+    else {
+      var cur = [], used = 0;
+      L.forEach(function (d, i) {
+        if (used + d + 1 > C && cur.length) { rows.push(cur); cur = []; used = 0; }
+        cur.push({ d: i, n: d }); used += d + 1;
+      });
+      if (cur.length) rows.push(cur);
+    }
+    var pad = 0, h = "", firstStart = null;
+    rows.forEach(function (r) {
+      var used = 0, s = '<div class="ctx">';
+      r.forEach(function (it, j) {
+        if (packed && j === 1 && firstStart === null) firstStart = { doc: it.d + 1, pos: used };
+        s += '<span class="doc' + (it.d % 3) + '" style="width:' + (it.n / C * 100) + '%">D' + (it.d + 1) + "</span>"; used += it.n;
+        if (packed) { s += '<span class="sep" style="width:' + Math.max(0.6, 1 / C * 100) + '%"></span>'; used += 1; }
+      });
+      var p = C - used; pad += p;
+      if (p > 0) s += '<span class="pad" style="width:' + (p / C * 100) + '%">' + (p / C > 0.12 ? "padding" : "") + "</span>";
+      h += s + "</div>";
+    });
+    $("pk21").innerHTML = h;
+    $("r21").innerHTML = "<span>rows (contexts) needed: <b>" + rows.length + "</b></span><span>padding: <b>" + pct(pad / (rows.length * C)) + "</b> of all positions</span>" +
+      (firstStart ? "<span>e.g. Document " + firstStart.doc + " starts at position <b>" + firstStart.pos + "</b>: absolute embeddings would wrongly tell the model there are " + firstStart.pos + " tokens of its own context before it.</span>" : "<span>naive: every document starts at position 0, but most of each row is wasted</span>");
+  }
+  $("pkc").addEventListener("change", draw);
+  $("pkr").addEventListener("click", function () { newDocs(); draw(); });
+  segToggle(["pk_n", "pk_p"], function (k) { packed = k === 1; draw(); });
+  newDocs(); draw();
+
+  var th = 0.3, q0 = [1.0, 0.25], k0 = [0.85, 0.55];
+  function rot(v, a) { return [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)]; }
+  function rope() {
+    var m = +$("rm").value, n = +$("rn").value; $("rmo").textContent = m; $("rno").textContent = n;
+    var q = rot(q0, m * th), k = rot(k0, n * th), dot = q[0] * k[0] + q[1] * k[1], raw = q0[0] * k0[0] + q0[1] * k0[1];
+    var cx = 150, cy = 110, R = 80;
+    function line(v, col, lab) { var x = cx + v[0] * R, y = cy - v[1] * R; return '<line x1="' + cx + '" y1="' + cy + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) + '" style="stroke:' + col + ';stroke-width:3"/><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4" style="fill:' + col + '"/><text x="' + (x + 6).toFixed(1) + '" y="' + (y - 4).toFixed(1) + '">' + lab + "</text>"; }
+    $("rope").innerHTML = '<circle cx="' + cx + '" cy="' + cy + '" r="' + (R * 1.05) + '" style="fill:none;stroke:var(--rule)"/><line x1="' + (cx - R - 10) + '" y1="' + cy + '" x2="' + (cx + R + 10) + '" y2="' + cy + '" style="stroke:var(--grid)"/><line x1="' + cx + '" y1="' + (cy - R - 10) + '" x2="' + cx + '" y2="' + (cy + R + 10) + '" style="stroke:var(--grid)"/>' + line(q, "var(--c3)", "q@" + m) + line(k, "var(--c1)", "k@" + n);
+    $("r21b").innerHTML = "<span>distance m − n: <b>" + (m - n) + "</b></span><span>rotated score q·k: <b>" + dot.toFixed(3) + "</b></span><span>unrotated score: <b>" + raw.toFixed(3) + "</b></span>";
+  }
+  $("rm").addEventListener("input", rope); $("rn").addEventListener("input", rope);
+  $("rsh").addEventListener("click", function () {
+    var m = +$("rm").value, n = +$("rn").value, d = Math.max(m, n) + 10 <= 40 ? 10 : Math.min(m, n) - 10 >= 0 ? -10 : 0;
+    $("rm").value = m + d; $("rn").value = n + d; rope();
+  });
+  rope();
+});
+
+})();
+</script>
+</body>
+</html>

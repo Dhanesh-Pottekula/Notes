@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.18 Stock Market Indicators</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* page additions: keep long select labels from widening the page on phones */
+select { max-width: 100%; }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch17_intermarket.html">← Ch.17 Intermarket analysis</a><a href="ch19_checklist.html">Ch.19 Checklist →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John J. Murphy · Technical Analysis of the Financial Markets · Chapter 18 · pdf p484–505</div>
+  <h1>Stock market indicators: <em>are the troops following?</em></h1>
+  <p class="lede">An index like the Dow can rise while most stocks fall. This chapter is about the tools that count what the whole market is doing: advancing vs declining stocks, new highs vs new lows, and up vs down volume. Most charts below are built live from one simulated market of 3,500 stocks, so you can see each indicator being computed from the stocks underneath it; sections 07, 14 and 17–18 use their own small simulations, labelled as such. All data is simulated, not real.</p>
+  <div class="topbar">
+    <button id="reroll" type="button">Roll a new market</button>
+    <span class="readout">market #<b id="seedOut">1</b> · 3,500 simulated stocks · 750 trading days shown (plus one hidden year of history for 52-week highs/lows)</span>
+  </div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Every day the exchange produces three pairs of raw counts. Each indicator in this chapter is one way of turning a pair into a line, and every line is used the same way: compare it with the popular averages and ask whether they agree.</p>
+  <div class="map">
+  <svg viewBox="0 0 820 300" width="100%" role="img" aria-label="Breadth data feeds indicators which are compared with the market averages">
+    <defs><marker id="ar18" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker></defs>
+    <g font-size="12">
+      <rect x="6" y="20" width="170" height="60" rx="5" fill="var(--tint)" stroke="var(--rule)"/><text x="16" y="44">Advancing vs</text><text x="16" y="62">declining stocks</text>
+      <rect x="6" y="120" width="170" height="60" rx="5" fill="var(--tint)" stroke="var(--rule)"/><text x="16" y="144">New 52-week highs</text><text x="16" y="162">vs new lows</text>
+      <rect x="6" y="220" width="170" height="60" rx="5" fill="var(--tint)" stroke="var(--rule)"/><text x="16" y="244">Up volume vs</text><text x="16" y="262">down volume</text>
+      <rect x="236" y="8" width="230" height="84" rx="5" fill="var(--tint2)" stroke="var(--rule)"/><text x="246" y="30">AD line (daily, weekly)</text><text x="246" y="50">AD ratio, McClellan Osc.</text><text x="246" y="70">McClellan Summation</text>
+      <rect x="236" y="118" width="230" height="64" rx="5" fill="var(--tint2)" stroke="var(--rule)"/><text x="246" y="142">NH vs NL (10-day avgs)</text><text x="246" y="162">New High–New Low Index</text>
+      <rect x="236" y="208" width="230" height="84" rx="5" fill="var(--tint2)" stroke="var(--rule)"/><text x="246" y="230">Up vs down volume lines</text><text x="246" y="250">Arms Index (TRIN), TICK</text><text x="246" y="270">Open Arms, Equivolume</text>
+      <rect x="526" y="60" width="140" height="70" rx="5" fill="var(--tint3)" stroke="var(--rule)"/><text x="536" y="84">Compare with</text><text x="536" y="102">Dow, S&amp;P 500,</text><text x="536" y="120">NYSE, Nasdaq, R2000</text>
+      <rect x="526" y="170" width="140" height="70" rx="5" fill="var(--tint3)" stroke="var(--rule)"/><text x="536" y="194">Agree = confirm</text><text x="536" y="212">Disagree =</text><text x="536" y="230">divergence (warning)</text>
+      <rect x="700" y="110" width="114" height="80" rx="5" fill="var(--plate)" stroke="var(--c1)"/><text x="708" y="134">More lines</text><text x="708" y="152">pointing the</text><text x="708" y="170">same way = trend</text><text x="708" y="186">more likely to last</text>
+    </g>
+    <g stroke="var(--muted)" stroke-width="1.4" fill="none" marker-end="url(#ar18)">
+      <path d="M176,50 L234,50"/><path d="M176,150 L234,150"/><path d="M176,250 L234,250"/>
+      <path d="M466,50 L524,90"/><path d="M466,150 L524,110"/><path d="M466,250 L524,210"/>
+      <path d="M596,130 L596,168"/><path d="M666,100 L698,140"/><path d="M666,205 L698,170"/>
+    </g>
+  </svg>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Measuring market breadth</a>
+    <a href="#s2"><span>02</span>Sample data: one day's diary</a>
+    <a href="#s3"><span>03</span>Comparing averages (one day)</a>
+    <a href="#s4"><span>04</span>The advance-decline line</a>
+    <a href="#s5"><span>05</span>AD divergence</a>
+    <a href="#s6"><span>06</span>Daily vs weekly AD lines</a>
+    <a href="#s7"><span>07</span>Variations in the AD line</a>
+    <a href="#s8"><span>08</span>McClellan Oscillator</a>
+    <a href="#s9"><span>09</span>McClellan Summation Index</a>
+    <a href="#s10"><span>10</span>New highs vs new lows</a>
+    <a href="#s11"><span>11</span>New High–New Low Index</a>
+    <a href="#s12"><span>12</span>Upside vs downside volume</a>
+    <a href="#s13"><span>13</span>The Arms Index (TRIN)</a>
+    <a href="#s14"><span>14</span>TRIN vs TICK</a>
+    <a href="#s15"><span>15</span>Smoothing the Arms Index</a>
+    <a href="#s16"><span>16</span>Open Arms</a>
+    <a href="#s17"><span>17</span>Equivolume charting</a>
+    <a href="#s18"><span>18</span>CandlePower</a>
+    <a href="#s19"><span>19</span>Comparing market averages</a>
+    <a href="#s20"><span>20</span>Conclusion</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+  <div class="box behind"><b>The simulated market used on this page (not in the book)</b><p>3,500 stocks. The 30 biggest are the "generals" (about 40% of total market value); the rest are the "troops". The story is fixed, the noise changes when you roll: <b>A</b> a broad rally (days 0–300), <b>B</b> a narrowing rally in which the generals keep climbing while the typical stock slips (300–465), <b>C</b> a sell-off (465–562), <b>D</b> a sharp breadth thrust off the low and a broad recovery (562–750). A stock counts as unchanged if it moved less than 0.25%. Volume rises on days a stock moves a lot. These are design choices to make the ideas visible; nothing here is real market evidence.</p></div>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · MEASURING MARKET BREADTH</div><h2>Count the stocks, not just the index</h2></div><span class="chip">pdf p484</span></div>
+  <p>Chapter 17 described the top-down approach: first judge the health of the whole market, then work down to sectors and industry groups, and only then pick individual stocks. The goal is the best stocks in the best groups, while the overall market is technically healthy. Sectors and stocks can be studied with the tools from the rest of the book (chart patterns, volume, trendlines, moving averages, oscillators), and those tools also work on the big market averages.</p>
+  <p>But there is a separate family of indicators whose only job is to judge the health of the whole market by measuring its <b>breadth</b>: how many stocks are taking part. They are built from three pairs of numbers: <b>advancing vs declining issues</b>, <b>new highs vs new lows</b>, and <b>up volume vs down volume</b>.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch18_class_average_vs_breadth.svg" alt="A teacher looks at a class whose average score rose, but only three top students scored full marks while most others did worse." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A school's average exam score went up. Did the whole class improve, or did three top students score 100 while everyone else did worse? The average can't tell you. Counting how many students improved can. Breadth indicators count.</p></div>
+  <div class="fig">
+    <h3>The simulated market on one day: one square per stock</h3>
+    <canvas id="c1" class="tall" aria-label="Grid of 3500 squares, one per stock, coloured by whether it rose or fell"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls"><label for="day1">Day <input id="day1" type="range" min="1" max="749" value="200"><output id="day1o">200</output></label><button type="button" id="jump1a">a day in the broad rally</button><button type="button" id="jump1b">a day in the narrowing phase</button><button type="button" id="jump1c">a sell-off day</button></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The top-left 30 squares (outlined) are the generals. They carry about 40% of the market value, so a cap-weighted index mostly follows them. The other 3,470 squares are the troops. Every breadth number in this chapter is just a count of colours on a grid like this one, taken every day. Step through the narrowing phase: the generals' index often rises on days when most squares are red.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch17_intermarket.html">Chapter 17</a>: the top-down approach and sector work that this chapter's market-health check sits on top of.</li>
+    <li>Your <code>backtest_results_summary.md</code>: a 200-day market filter (Nifty above its 200-day average) was "the one consistent winner" (+0.26 Sharpe, −8 points drawdown out-of-sample). That filter asks the same question as breadth, "is the overall market healthy?", using only the index. Breadth asks it by counting stocks. Whether a breadth filter would add anything is an untested idea, not a result.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SAMPLE DATA</div><h2>Reading one day's market diary</h2></div><span class="chip">pdf p485–486</span></div>
+  <p>The Wall Street Journal's Stock Market Data Bank (Section C, page 2) printed these numbers every day for the previous session, for the NYSE, the Nasdaq and the American Stock Exchange. Murphy uses one real NYSE day (a Monday) and works only with the NYSE. The calculator below starts with his day's numbers; change any of them.</p>
+  <div class="fig">
+    <div class="controls">
+      <label for="a2">Advances <input id="a2" type="number" value="1327" min="0" style="width:7ch"></label>
+      <label for="d2">Declines <input id="d2" type="number" value="1559" min="1" style="width:7ch"></label>
+      <label for="u2">Unchanged <input id="u2" type="number" value="546" min="0" style="width:6ch"></label>
+      <label for="nh2">New highs <input id="nh2" type="number" value="78" min="0" style="width:6ch"></label>
+      <label for="nl2">New lows <input id="nl2" type="number" value="43" min="0" style="width:6ch"></label>
+      <label for="av2">Adv vol (000) <input id="av2" type="number" value="248215" min="1" style="width:9ch"></label>
+      <label for="dv2">Decl vol (000) <input id="dv2" type="number" value="279557" min="1" style="width:9ch"></label>
+      <label for="tk2">Closing tick <input id="tk2" type="number" value="-135" style="width:7ch"></label>
+      <button type="button" id="rs2">Murphy's day</button>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Reading</th><th>Value</th><th>What it says</th></tr></thead><tbody id="t2"></tbody></table></div>
+  </div>
+  <p>Murphy's reading of that day: the Dow gained 12.20 points, so "the market" was up. But 1,559 stocks fell and only 1,327 rose, and more volume went into falling stocks than rising ones. Breadth was negative even though the Dow closed higher. The rest was mixed: more stocks made new 52-week highs (78) than new lows (43), which is positive. The closing tick was −135, meaning 135 more stocks closed on a downtick than an uptick, a short-term negative. The closing Arms reading of .96 was mildly positive (explained in section 13). The point of all these internal readings is a truer picture of the market's health than the Dow alone gives.</p>
+  <div class="box behind"><b>What's happening behind it (arithmetic on the book's numbers)</b><p>1,327 + 1,559 + 546 = 3,432, the issues traded. The Arms Index recomputes exactly: (1,327 ÷ 1,559) ÷ (248,215 ÷ 279,557) = 0.851 ÷ 0.888 = <b>0.96</b>. Why is it "positive" when declining volume was bigger? Rearrange the formula: TRIN = (volume per declining stock) ÷ (volume per advancing stock) = 179.3 ÷ 187.0. The average rising stock traded slightly more shares than the average falling stock. Also note the total volume (553,914) is more than advancing + declining volume (527,772); the difference is presumably the volume of unchanged stocks.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Each row of this table becomes one of the lines in the sections below: advances/declines → 04–09, new highs/lows → 10–11, up/down volume → 12, all four together → 13–16 (Arms), the tick → 14.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · COMPARING MARKET AVERAGES</div><h2>The broader the average, the worse it did</h2></div><span class="chip">pdf p486</span></div>
+  <p>Another way to read breadth is to compare the averages themselves. On the same day, the Dow was the only major average that rose. TV news told investors the market was up, but every other measure fell, and the more stocks an average contained, the worse it did:</p>
+  <svg viewBox="0 0 640 210" width="100%" role="img" aria-label="Bar chart of the percentage change of four averages on Murphy's sample day">
+    <g font-size="12">
+      <line x1="330" y1="10" x2="330" y2="200" stroke="var(--muted)" stroke-dasharray="3 3"/>
+      <text x="8" y="40">Dow Industrials (30 stocks)</text><rect x="330" y="26" width="38" height="20" fill="var(--buy)"/><text x="374" y="41">+12.20 pts (+0.16%)</text>
+      <text x="8" y="85">S&amp;P 500 (500 stocks)</text><rect x="313" y="71" width="17" height="20" fill="var(--sell)"/><text x="336" y="86">−0.64 pts (−0.07%)</text>
+      <text x="8" y="130">Nasdaq Composite (5,000+)</text><rect x="109" y="116" width="221" height="20" fill="var(--sell)"/><text x="336" y="131">−14.47 pts (−0.92%)</text>
+      <text x="8" y="175">Russell 2000 (2,000 small caps)</text><rect x="116" y="161" width="214" height="20" fill="var(--sell)"/><text x="336" y="176">−3.80 pts (−0.89%)</text>
+    </g>
+  </svg>
+  <p>Murphy's message: the Dow gained, but the market as a whole lost ground as measured by the broader averages. He returns to this idea at the end of the chapter (section 19).</p>
+  <div class="box picture"><b>Picture it</b><p>A newspaper reports "the army advanced today" because the generals moved their tent forward. Meanwhile most of the soldiers retreated. Which headline describes the army?</p></div>
+  <div class="fig">
+    <h3>Find days like Murphy's in the simulated market</h3>
+    <div class="controls"><button type="button" id="b3">Show another day where the generals rose but most stocks fell</button></div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A cap-weighted average is a vote weighted by size. 30 giant stocks can outvote thousands of small ones. An average with more stocks (or an equal-weighted count) gives the small ones a voice, so it shows what the typical stock did. In the simulation such days turn up in every phase (one day of noise proves little), but they come noticeably more often in the narrowing phase; compare the two counts in the readout. A run of them is the warning the rest of the chapter teaches you to read.</p></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · THE ADVANCE-DECLINE LINE</div><h2>A running total of advances minus declines</h2></div><span class="chip">pdf p487–489 · Fig 18.1</span></div>
+  <p>The best-known breadth indicator, and very simple. Every day the NYSE produces a number of advancing stocks, declining stocks and unchanged stocks (published in The Wall Street Journal and Investor's Business Daily). The most common method: take <b>advances − declines</b>. More advances gives a positive number for the day, more declines a negative one. Add that number to yesterday's total. The running total is the AD line. It has a trend of its own, and the idea is to check that the AD line and the market averages trend the same way. Figure 18.1 shows the healthy case: the NYSE AD line and the Dow rising together. (The scan repeats this page three times, pdf p487, p488 and p489.)</p>
+  <div class="formula">net(today)  = advances − declines
+AD(today)   = AD(yesterday) + net(today)</div>
+  <div class="fig">
+    <h3>Building it by hand: the first 8 days of the simulation</h3>
+    <div class="win" id="w4"></div>
+  </div>
+  <div class="fig">
+    <h3>Figure 18.1 idea, recreated: the index above, the AD line below</h3>
+    <canvas id="c4" class="tall" aria-label="Generals index and the advance-decline line"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls"><label for="z4">Show days <select id="z4"><option value="a">0–300 (broad rally, like Fig 18.1)</option><option value="all">all 750</option></select></label></div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A tug-of-war score kept all season. Each day you add (stocks pulling up − stocks pulling down). The total doesn't care how far any one stock moved, only which side it pulled.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The level of the AD line means nothing (it depends on the day you started adding); only its direction and its peaks and troughs matter. Because every stock counts once, a ₹50 crore company and a ₹5 lakh crore company have equal votes. That's what makes it the opposite of a cap-weighted index, and why comparing the two is informative.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_dow_theory.html">Chapter 2</a>: Dow Theory's averages must confirm each other. The AD line is another confirmation test, this time between an index and the whole list of stocks.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · AD DIVERGENCE</div><h2>Generals at new highs, troops falling behind</h2></div><span class="chip">pdf p490</span></div>
+  <p>The AD line answers one question: is the broad universe of about 3,500 NYSE stocks moving with the popular averages, which hold only 30 (Dow) or 500 (S&amp;P 500) stocks? In the words of a Wall Street saying, are the "troops" keeping up with the "generals"? While the AD line rises with the Dow, breadth is good. The danger comes when they diverge: the Dow makes new highs and the AD line doesn't follow. Technicians then start to worry about bad market breadth, an AD divergence. Historically the AD line has peaked well ahead of the market averages, which is why it's watched so closely.</p>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Generals index with unconfirmed new highs marked, and the AD line below"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls"><label for="lb5">New-high look-back (days) <input id="lb5" type="range" min="20" max="120" step="5" value="60"><output id="lb5o">60</output></label><label><input id="eq5" type="checkbox"> also show the Russell-like average (2,000 smallest, equal weight)</label></div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch18_drum_major_band_falling_apart.svg" alt="A marching band where the drum major keeps striding forward while the rows behind him slow down and stop, seen from the front and from the side." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A marching band where the drum major keeps stepping forward while the rows behind him slow down and stop. From the front row of the audience the band still looks like it's advancing. From the side, you can see it's falling apart.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Hollow red triangles mark days when the generals' index made a new high for the look-back window but the AD line did not. In the narrowing phase, the generals' extra buying lifts the index while the typical stock drifts down, so net advances turn negative and the AD line rolls over months before the index peaks. The readout measures that lead on this roll.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch10_oscillators.html">Chapter 10</a>: the same price-vs-indicator divergence logic as oscillators.</li>
+    <li>Your <code>order_flow.md</code>: "Price makes a new high, CVD doesn't" means the push is weakening. Same idea, with order flow instead of stock counts.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · DAILY VERSUS WEEKLY AD LINES</div><h2>Short-term warning, long-term confirmation</h2></div><span class="chip">pdf p490</span></div>
+  <p>The daily AD line is best for short- to intermediate-term comparisons with the averages, and less useful when comparing over several years. A <b>weekly</b> AD line counts the stocks that advanced vs declined over the whole week (published in Barron's every weekend). It is considered more useful for trend comparisons that span several years. A negative divergence in the daily line can warn of short- to intermediate-term trouble; a similar divergence in the weekly line is needed to confirm that a more serious problem is developing.</p>
+  <div class="fig">
+    <canvas id="c6" class="tall" aria-label="Daily and weekly AD lines, rescaled, under the index"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls"><label for="sel6">Lower panel <select id="sel6"><option value="both">daily and weekly (both rescaled 0–100)</option><option value="d">daily AD line only</option><option value="w">weekly AD line only</option></select></label></div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Daily weigh-ins jump around with what you ate yesterday; the weekly weigh-in shows the real direction. If the daily scale says "up" one morning, wait for the weekly number before buying new clothes.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The weekly line asks a different question: did each stock end the <em>week</em> higher or lower? A stock can have three up days and two big down days and still count as a decliner for the week. Small daily wobbles cancel out, so the weekly line is calmer and its turns are more meaningful, but they come later.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_long_term_charts.html">Chapter 8</a>: same logic as weekly and monthly price charts; longer bars filter noise and confirm major trends.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · VARIATIONS IN AD LINE</div><h2>Difference, ratio, or with unchanged stocks</h2></div><span class="chip">pdf p490–491</span></div>
+  <p>The number of stocks traded on the NYSE has grown over the years, so some analysts think subtracting declines from advances gives too much weight to recent data. Many technicians prefer an <b>advance/decline ratio</b>: advances ÷ declines. Some also think the number of <b>unchanged</b> issues belongs in the calculation. Whichever way it's calculated, the AD line's use is always the same: measure the direction of the broad market and make sure it agrees with the narrower but popular averages. AD lines can also be built for the American Stock Exchange and the Nasdaq. Technicians also build overbought/oversold oscillators on the AD numbers to spot short- to intermediate-term extremes in breadth; one of the best known is the McClellan Oscillator (next section).</p>
+  <div class="fig">
+    <h3>A separate simulation: the same market mood while the list grows from 1,000 to 3,500 stocks</h3>
+    <canvas id="c7" aria-label="Daily breadth measure for a growing number of listed stocks"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="controls"><label for="sel7">Measure <select id="sel7"><option value="diff">advances − declines</option><option value="ratio">advances ÷ declines</option><option value="unch">(adv − decl) ÷ all issues, incl. unchanged</option></select></label></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>In this simulation the "mood" (the share of stocks rising) has the same randomness every year. With the difference, swings get bigger just because more stocks are listed, so recent years dominate a cumulative line. The ratio and the share-of-all-issues version stay on the same scale throughout. The third formula is one common way to include unchanged issues; Murphy names the idea but not a formula, so it's an example, not the book's.</p></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · McCLELLAN OSCILLATOR</div><h2>Two exponential averages of net advances, subtracted</h2></div><span class="chip">pdf p491–492 · Fig 18.2</span></div>
+  <p>Developed by Sherman McClellan. Take the daily NYSE net advances (advances − declines). Compute a <b>19-day exponential average (a 10% trend)</b> and a <b>39-day exponential average (a 5% trend)</b>. The oscillator is the 19-day minus the 39-day. It swings around zero, with upper and lower extremes from +100 to −100. Above <b>+100</b> the stock market is overbought; below <b>−100</b> it is oversold. Crossings above and below zero are read as short- to intermediate-term buy and sell signals. Figure 18.2 plots it as a histogram and points to an extreme oversold reading in October 1997.</p>
+  <div class="formula">EMA19 = 0.10 × net(today) + 0.90 × EMA19(yesterday)      0.10 = 2 ÷ (19 + 1)
+EMA39 = 0.05 × net(today) + 0.95 × EMA39(yesterday)      0.05 = 2 ÷ (39 + 1)
+McClellan Oscillator = EMA19 − EMA39</div>
+  <p><small>(Not in the book: the 2 ÷ (N + 1) weight rule is the standard EMA convention; the book gives only the pairs 19-day = 10% and 39-day = 5%.)</small></p>
+  <div class="fig">
+    <h3>Step 1: the two averages of net advances (zoom on 120 days)</h3>
+    <canvas id="c8a" class="short" aria-label="Daily net advances with 19-day and 39-day exponential averages"></canvas>
+    <div class="legend" id="c8aL"></div>
+    <div class="controls"><label for="st8">Window start <input id="st8" type="range" min="40" max="620" step="10" value="420"><output id="st8o">420</output></label></div>
+  </div>
+  <div class="fig">
+    <h3>Step 2: the oscillator as a histogram (Fig 18.2 idea)</h3>
+    <canvas id="c8" class="tall" aria-label="Index with zero-cross signals and McClellan oscillator histogram"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls"><label><input id="mk8" type="checkbox"> mark zero crossings on the index</label></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two thermometers in the same room: one reacts in minutes, one in hours. When the quick one reads warmer than the slow one, the room is heating up. When the gap gets very large, the heating can't continue at that pace for long.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>When breadth improves, the faster average rises before the slower one, so the gap turns positive; when breadth fades, it turns negative. A reading beyond ±100 means the recent run of net advances is unusually lopsided. In this simulation the deepest oversold readings come in the sell-off and the biggest overbought readings in the breadth thrust right after the low. (My note, not the book's: the ±100 levels suit a list of roughly 3,500 stocks; with a much bigger or smaller list the same mood gives bigger or smaller numbers, see section 07.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch09_moving_averages.html">Chapter 9</a>: an EMA weight of 2 ÷ (N + 1) makes 19 days exactly 10% and 39 days exactly 5%. Murphy's Chapter 9 equates a 10% weight with roughly a 20-day average and 5% with roughly a 40-day one; that fits the 19 and 39 used here.</li>
+    <li><a href="ch10_oscillators.html">Chapter 10</a>: overbought/oversold and zero-line crossings. It's built like MACD (difference of two EMAs), only on breadth instead of price (that comparison is mine, not Murphy's).</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · McCLELLAN SUMMATION INDEX</div><h2>Add up the oscillator for the long view</h2></div><span class="chip">pdf p492–493 · Fig 18.3</span></div>
+  <p>The Summation Index is a longer-range version of the oscillator: a running total of each day's positive or negative McClellan Oscillator readings. The oscillator is for short- to intermediate-term trading; the Summation Index gives a longer view of breadth and is used to spot major turning points. Figure 18.3: it is used for major trend analysis, crossings below zero are negative, and its February 1998 signal was positive.</p>
+  <div class="formula">Summation(today) = Summation(yesterday) + McClellan Oscillator(today)</div>
+  <div class="fig">
+    <canvas id="c9" class="tall" aria-label="Index with Summation Index zero-cross signals and the Summation Index"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>The oscillator is today's weather; the Summation Index is the season. A few cold days don't end summer, but once the running total of "colder than usual" turns negative, the season has changed.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>(My maths, not the book's.) Adding up the oscillator undoes the daily step: apart from a small constant, the Summation Index equals the 19-day EMA of the AD line minus its 39-day EMA. So it is the McClellan construction applied to the AD line itself. It does not climb with the AD line; it swings around zero in long waves, turning positive when the AD line's fast average rises above its slow one. It crosses zero far less often than the oscillator, so each crossing marks a bigger shift. Compare the number of crossings in the readout with section 08's.</p></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · NEW HIGHS VERSUS NEW LOWS</div><h2>How many stocks are at 52-week highs vs lows?</h2></div><span class="chip">pdf p493–494 · Fig 18.4</span></div>
+  <p>The press also publishes the number of stocks hitting new 52-week highs and new 52-week lows, daily and weekly. One way to show them is two separate lines. The daily numbers can be erratic, so moving averages (usually <b>10 days</b>) are used (Figure 18.4). The rules:</p>
+  <ul class="plain">
+    <li>In a strong market, new highs should be much greater than new lows.</li>
+    <li>When new highs start to decline, or new lows start to expand: <b>caution</b>.</li>
+    <li>When the moving average of new lows crosses above the moving average of new highs: a <b>negative market signal</b>.</li>
+    <li>When new highs reach an extreme, the market tends to top; when new lows reach an extreme, the market is near a bottom.</li>
+  </ul>
+  <p>Figure 18.4: during October 1997 the two 10-day lines almost crossed, then went back to their bullish alignment. The other way to use the numbers is to plot the difference (next section).</p>
+  <div class="fig">
+    <canvas id="c10" class="tall" aria-label="Index with crossover signals; 10-day averages of new highs and new lows"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls"><label for="n10">Average length <input id="n10" type="range" min="1" max="30" value="10"><output id="n10o">10</output></label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A school sports day: count how many kids set a personal best and how many had their worst-ever time. If personal bests are thinning out while the headline winner still breaks records, the school's form is fading.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A 52-week high needs a stock's whole past year to be below today, so the count of new highs shrinks as soon as most stocks stop climbing, even while a few leaders keep rising. Watch the narrowing phase: the new-highs line sags long before the generals' index tops. In the sell-off, new lows explode; their extreme sits near the low.</p></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · NEW HIGH-NEW LOW INDEX</div><h2>New highs minus new lows, as one line</h2></div><span class="chip">pdf p494–495 · Fig 18.5</span></div>
+  <p>Plot the difference: new highs − new lows. Its advantage is that it can be compared directly with a major average, just like an AD line (Figure 18.5 against the NYSE Composite; a rising line is positive; note the sharp drop in October 1997). Its trend can be charted and used to spot divergences: a new high in the Dow that isn't matched by a new high in the high-low line can be a sign of weakness in the broad market. Trendlines and moving averages can be applied to the line itself, but its main value is confirming or diverging from the major stock trends and warning early of trend changes. Dr. Alexander Elder (<i>Trading for a Living</i>, Wiley) calls it "probably the best leading indicator of the stock market". Elder suggests plotting it as a histogram around a zero line, which makes divergences easier to see; crossings above and below zero reflect bullish and bearish shifts in market psychology.</p>
+  <div class="fig">
+    <canvas id="c11" class="tall" aria-label="Index with unconfirmed highs and the new high minus new low index"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls"><label for="sel11">Draw as <select id="sel11"><option value="hist">histogram around zero (Elder)</option><option value="line">line (Fig 18.5)</option></select></label><label for="sm11">Smoothing <input id="sm11" type="range" min="1" max="20" value="1"><output id="sm11o">1</output></label></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The hollow triangles mark days when the generals' index made a 60-day high but the (smoothed) high-low line did not make its own 60-day high. Above zero more stocks are breaking out than breaking down; below zero the reverse. A zero crossing is the moment the crowd's balance flips.</p></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · UPSIDE VERSUS DOWNSIDE VOLUME</div><h2>Where is the volume going?</h2></div><span class="chip">pdf p496–497 · Fig 18.6</span></div>
+  <p>The third and last breadth data set. The NYSE also reports the volume traded in advancing stocks and in declining stocks (in the financial press the next day). Compare upside volume with downside volume to see which side dominates (Figure 18.6 uses 10-day averages of each). Show them as two lines, like new highs and lows, or as one line of the difference; the reading is the same either way. <b>Upside volume dominant: the market is strong. Downside volume greater: the market is weak.</b> Combining the advancing/declining counts with the advancing/declining volume is what Richard Arms did when he created the Arms Index.</p>
+  <div class="fig">
+    <canvas id="c12" class="tall" aria-label="Index and 10-day averages of up and down volume"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls"><label for="sel12">Lower panel <select id="sel12"><option value="two">two lines (Fig 18.6)</option><option value="diff">one line: up − down</option></select></label><label for="n12">Average length <input id="n12" type="range" min="1" max="30" value="10"><output id="n12o">10</output></label></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Counting stocks is counting hands raised. Volume is counting how much money each hand is holding. A rally where the big money sits on the selling side is weaker than the hand count suggests.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_volume_open_interest.html">Chapter 7</a>: volume should expand in the direction of the trend. Up vs down volume applies that rule to the whole market at once.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · THE ARMS INDEX</div><h2>A ratio of ratios that moves opposite to the market</h2></div><span class="chip">pdf p497–498 · Fig 18.7</span></div>
+  <p>Named after its creator Richard Arms. The numerator is advancing issues ÷ declining issues; the denominator is advancing volume ÷ declining volume. It asks whether there is more volume in rising or in falling stocks.</p>
+  <div class="formula">Arms Index (TRIN) = (advancing issues ÷ declining issues) ÷ (advancing volume ÷ declining volume)</div>
+  <ul class="plain">
+    <li><b>Below 1.0:</b> more volume in rising stocks: positive.</li>
+    <li><b>Above 1.0:</b> more volume in declining stocks: negative.</li>
+    <li><b>Intraday:</b> a very high reading is positive and a very low reading is negative (extremes are read the contrary way).</li>
+    <li>So it is a contrary indicator that trends opposite to the market. It's used intraday by following its direction, and for spotting short-term market extremes. Figure 18.7 (also called TRIN): exceptionally high spikes usually signal market bottoms, and a 10-day moving average is a popular way to view it.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c13" class="tall" aria-label="Index and the daily Arms Index with its 10-day average"></canvas>
+    <div class="legend" id="c13L"></div>
+    <div class="controls"><label><input id="ma13" type="checkbox" checked> 10-day average</label><label for="top13">Mark the highest <input id="top13" type="range" min="1" max="10" value="5"><output id="top13o">5</output> spikes</label></div>
+    <div class="readout" id="r13"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch18_trin_busy_tills.svg" alt="Two shop cash counters side by side: a quiet till for rising shops and a mobbed till for falling shops where panicked sellers crowd in." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A shop's cash register. TRIN compares how busy the average "falling" stock's till is with the average "rising" stock's till. When panicked sellers crowd the falling stocks, TRIN jumps; that panic often comes near the end of a fall.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Rearranged, TRIN = (down volume ÷ declining issues) ÷ (up volume ÷ advancing issues): volume per falling stock over volume per rising stock. On a big down day the falling stocks are the ones moving hard and trading heavily, so TRIN rises; on a big up day it falls. That's why it moves opposite to the index (the readout shows the correlation on this roll). The red dots mark the highest daily readings; check where they sit relative to the sell-off low.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch10_oscillators.html">Chapter 10</a>: contrary opinion. A very high TRIN is a crowd-panic reading, read the opposite way.</li><li>Section 02: the book's own day gives TRIN = 0.96 from these exact formulas.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · TRIN VERSUS TICK</div><h2>Two intraday gauges used together</h2></div><span class="chip">pdf p497</span></div>
+  <p>For intraday trading the Arms Index (TRIN) can be paired with the <b>TICK</b>: the number of stocks trading on an uptick minus the number trading on a downtick. The TICK is a minute-by-minute version of the daily advance-decline line, used for the same purpose. During the day, a <b>rising TICK with a falling TRIN is positive</b>; a <b>falling TICK with a rising TRIN is negative</b>. The Arms Index can also be used for longer-range analysis (next two sections).</p>
+  <div class="fig">
+    <h3>A simulated trading day: morning slide, afternoon recovery</h3>
+    <canvas id="c14" class="tall" aria-label="Intraday index with TICK histogram"></canvas>
+    <div class="legend" id="c14L"></div>
+    <canvas id="c14b" class="short" aria-label="Intraday cumulative TRIN"></canvas>
+    <div class="legend" id="c14bL"></div>
+    <div class="controls"><label for="m14">Minute <input id="m14" type="range" min="20" max="389" value="120"><output id="m14o">120</output></label><button type="button" id="new14">New day</button></div>
+    <div class="readout" id="r14"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The TICK is a snapshot of the last trade of each stock, so it reacts within a minute. The intraday TRIN counts stocks up or down versus the prior close, with their volume accumulated since the open, so it moves more slowly. When both agree (TICK climbing, TRIN falling) buying is broad and has volume behind it. The readout compares the last 30 minutes of each.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Your <code>backtest_results_summary.md</code>: no intraday strategy passed your tests; 5-min ORB long + short is only a lead. Whether TICK/TRIN as a filter would help it is an open question, not something tested.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SMOOTHING THE ARMS INDEX</div><h2>10-day average, 1.20 and .70, Fibonacci lengths</h2></div><span class="chip">pdf p498–499</span></div>
+  <p>The Arms Index is quoted all day and has some short-term forecasting value, but most traders use a <b>10-day moving average</b>. According to Arms, a 10-day average above <b>1.20 is oversold</b> and below <b>.70 is overbought</b>, though these levels can shift with the overall trend of the market. Arms also likes Fibonacci numbers: he suggests a <b>21-day</b> Arms Index as well as the 10-day, and uses <b>21-day and 55-day moving-average crossovers</b> of the Arms Index for good intermediate-term trades. For more, Murphy recommends <i>The Arms Index (TRIN)</i> by Richard W. Arms, Jr.</p>
+  <div class="fig">
+    <canvas id="c15" class="tall" aria-label="Index and smoothed Arms Index with thresholds"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls">
+      <label for="sel15">Show <select id="sel15"><option value="10">10-day average with 1.20 / .70</option><option value="21">21-day average</option><option value="x">21-day vs 55-day crossovers</option></select></label>
+      <label for="hi15">oversold above <input id="hi15" type="range" min="1.05" max="1.5" step="0.01" value="1.20"><output id="hi15o">1.20</output></label>
+      <label for="lo15">overbought below <input id="lo15" type="range" min="0.6" max="0.95" step="0.01" value="0.70"><output id="lo15o">0.70</output></label>
+    </div>
+    <div class="readout" id="r15"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>One day of panic tells you little. Ten days in a row with more volume in falling stocks than rising ones is an exhausted crowd; that's the oversold zone.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In this simulation the 10-day average spends far more time above 1.20 than below .70. Two reasons (my reasoning, not the book's): the simulated market has a sharp sell-off but no equally violent buying mania, and averaging a ratio leans upward (a 0.5 day and a 2.0 day average to 1.25, not 1.0). That's one reason fixed thresholds can drift; drag them and see how the counts change. For the 21/55 crossovers, remember TRIN is inverted: the 21-day falling below the 55-day means volume is shifting toward rising stocks, which is the bullish cross. That direction is our reading; the book only says crossovers give intermediate-term trades.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch13_elliott_wave.html">Chapter 13</a>: 21 and 55 are Fibonacci numbers. <a href="ch09_moving_averages.html">Chapter 9</a>: two-average crossovers, applied here to an indicator instead of price.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · OPEN ARMS</div><h2>Average the ingredients first, then divide</h2></div><span class="chip">pdf p499 · Fig 18.8</span></div>
+  <p>In the normal 10-day Arms Index, each day's closing value is computed from the four inputs and then that final value is smoothed with a 10-day moving average. In the <b>Open</b> version, each of the four components is averaged separately over 10 days, and the Arms Index is then calculated from those four averages. Many analysts prefer Open Arms. Other lengths, like 21 and 55 days, can be used too. Figure 18.8: the 10-day Open Arms gives a much smoother look but still trends opposite to the market, and a crossing of its own 10-day moving average often signals turning points.</p>
+  <div class="formula">10-day Arms (normal) = average of the last 10 daily values of (A/D) ÷ (AV/DV)
+10-day Open Arms     = (ΣA ÷ ΣD) ÷ (ΣAV ÷ ΣDV)      each Σ over the last 10 days</div>
+  <div class="fig">
+    <canvas id="c16" class="tall" aria-label="Index and the normal versus Open Arms Index"></canvas>
+    <div class="legend" id="c16L"></div>
+    <div class="controls"><label for="sel16">Length <select id="sel16"><option value="10">10 days</option><option value="21">21 days</option><option value="55">55 days</option></select></label><label><input id="sig16" type="checkbox"> add the 10-day average of Open Arms (signal line)</label></div>
+    <div class="readout" id="r16"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Your average speed on a trip. Averaging each hour's speed treats a 10-minute crawl and a 3-hour highway stretch as equal. Total distance ÷ total time gives the honest answer. Open Arms is total-over-total.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The normal version averages ratios, so one panic day with a reading of 3 can dominate ten days. Open Arms sums the shares and the stocks first, so a big day counts in proportion to its size and the ratio-skew from section 15 mostly disappears. The readout compares how much each version moves day to day on this roll and where each sits on average. Be honest about the size: on this simulation the two 10-day versions are close (Open sits a few hundredths lower and moves only slightly less per day). Both are far smoother than the raw daily readings of section 13; the caption's point about a much smoother look is easiest to see against those. (My reading of the simulation, not the book's.)</p></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · EQUIVOLUME CHARTING</div><h2>Make each bar as wide as its volume</h2></div><span class="chip">pdf p500–501 · Fig 18.9</span></div>
+  <p>Beyond his index, Arms worked on several ways to read price and volume together. One of them became a chart type of its own: <b>Equivolume</b>. On a normal bar chart the range sits on the price bar and the volume is a separate bar at the bottom, so you have to look at two places at once. On an Equivolume chart each day is a <b>rectangle</b>: its <b>height is the day's trading range</b> and its <b>width is the day's volume</b>. Heavy-volume days make wide boxes; light days make narrow ones. Figure 18.9 (Intel): the rectangles started to widen during Intel's last sell-off, a negative sign.</p>
+  <ul class="plain">
+    <li>As a rule a bullish breakout should come with a burst of trading, so on Equivolume it should show a noticeably wider rectangle.</li>
+    <li>In an uptrend, up days should have wider rectangles and down days narrower ones.</li>
+    <li>It works for market averages and individual stocks, on daily and weekly charts. For more: <i>Volume Cycles in the Stock Market</i> by Richard Arms (Dow Jones-Irwin, 1983).</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c17" class="tall" aria-label="Simulated stock as a bar chart with volume, or as an Equivolume chart"></canvas>
+    <div class="legend" id="c17L"></div>
+    <div class="controls"><label for="sel17">Chart <select id="sel17"><option value="equi">Equivolume (width = volume)</option><option value="bar">ordinary bars + volume panel</option></select></label><button type="button" id="new17">New stock</button></div>
+    <div class="readout" id="r17"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch18_gate_height_and_width.svg" alt="Two crowds passing through a stadium gate: three people trickling through a narrow gate, and a broad stampede pushing through a wide gate." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A crowd walking through a gate. Height is how far they moved; width is how many people pushed through. A breakout through a narrow gate with three people isn't the same as one with a stampede.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>On Equivolume the horizontal axis is cumulative volume, not time. Busy periods stretch out; quiet ones shrink. In this simulated stock the base is narrow, the breakout box is wide, rallies are wider than pullbacks, and the boxes swell again in the final sell-off. Switch to the ordinary chart and you need two panels to see the same thing.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_volume_open_interest.html">Chapter 7</a>: volume confirms breakouts and trends. <a href="ch03_chart_construction.html">Chapter 3</a>: the ordinary bar chart with volume underneath.</li>
+    <li>Your <code>intraday_swing_playbook.md</code> ORB filter needs relative volume (first-15-min volume ÷ its 20-day average) above 2: the "burst of trading activity" rule, written as a number.</li>
+  </ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · CANDLEPOWER</div><h2>Candlesticks drawn as wide as their volume</h2></div><span class="chip">pdf p501–502 · Fig 18.10</span></div>
+  <p>Candlesticks were explained by Greg Morris in Chapter 12. In a 1990 article in <i>Technical Analysis of Stocks and Commodities</i> ("East Meets West: CandlePower Charting"), Morris proposed combining candlesticks with Arms' Equivolume: the candle's width is set by volume, so the bigger the volume, the wider the candle. He called it CandlePower and argued it gives information at least as good as either Equivolume or candlesticks, and is as visually appealing as either. It was offered in the Metastock charting software (Equis International; the book prints the company's contact details), later renamed <b>Candlevolume</b>. Figure 18.10 shows Intel as a CandlePower chart.</p>
+  <div class="fig">
+    <canvas id="c18" class="tall" aria-label="The same simulated stock as a CandlePower chart"></canvas>
+    <div class="legend" id="c18L"></div>
+    <div class="controls"><label for="sel18">Chart <select id="sel18"><option value="cp">CandlePower (width = volume)</option><option value="plain">ordinary candlesticks (equal width)</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>It's the same stock as section 17. A candle adds what Equivolume lacks: the open and close (hollow = close above open, filled = close below open). A wide, filled candle is a heavy-volume down day; a wide hollow candle out of a narrow base is the breakout with volume behind it.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_candlesticks.html">Chapter 12</a>: candle bodies and shadows.</li></ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · COMPARING MARKET AVERAGES</div><h2>Do the Dow, S&amp;P, NYSE, Nasdaq and Russell agree?</h2></div><span class="chip">pdf p502–504 · Fig 18.11, 18.12</span></div>
+  <p>Back to the idea from section 03. The main averages are the Dow Industrials, the S&amp;P 500, the New York Stock Exchange Index, the Nasdaq Composite and the Russell 2000, and each measures a slightly different part of the market:</p>
+  <ul class="plain">
+    <li><b>Dow and S&amp;P 500:</b> the trends of a fairly small number of large-capitalization stocks.</li>
+    <li><b>NYSE Composite:</b> all stocks on the NYSE, a slightly broader view. As a rule, a breakout in the Dow should be confirmed by similar breakouts in both the S&amp;P 500 and the NYSE Composite if it is to have staying power.</li>
+    <li><b>Nasdaq Composite:</b> the most stocks (5,000), but it's capitalization-weighted, so it's usually dominated by the hundred largest technology stocks (like Intel and Microsoft). It's more often a measure of the technology sector.</li>
+    <li><b>Russell 2000:</b> a truer measure of the smaller-stock universe.</li>
+  </ul>
+  <p>The most important divergences involve the Nasdaq and the Russell 2000; both should be trending up along with the Dow and the S&amp;P 500 if the market is truly healthy. Relative strength helps: a <b>Nasdaq ÷ S&amp;P 500 ratio</b> shows whether technology stocks are leading or lagging; it's usually better for the market when they lead and the ratio rises (Figure 18.11). A <b>Russell 2000 vs S&amp;P 500</b> comparison shows whether the "troops" are following the "generals"; when small stocks show poor relative strength or lag too far behind the large ones, it often warns that breadth is weakening (Figure 18.12 overlays the Russell 2000 and the Dow; it's usually better when both rise together).</p>
+  <div class="fig">
+    <canvas id="c19" class="tall" aria-label="Five simulated averages normalised to 100 and a relative strength ratio"></canvas>
+    <div class="legend" id="c19L"></div>
+    <div class="controls"><label for="sel19">Ratio panel <select id="sel19"><option value="tech">tech-heavy ÷ S&amp;P-like (Fig 18.11 idea)</option><option value="small">small caps ÷ S&amp;P-like (troops vs generals)</option></select></label><label for="lb19">Breakout look-back <input id="lb19" type="range" min="20" max="120" step="5" value="60"><output id="lb19o">60</output></label></div>
+    <div class="readout" id="r19"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The five simulated averages are built from the same 3,500 stocks: the 30 largest (Dow-like), the 500 largest weighted by size (S&amp;P-like), all 3,500 weighted by size (NYSE-like), the about 22% of stocks tagged "tech" weighted by size (Nasdaq-like), and the 2,000 smallest equally weighted (Russell-like). In the narrowing phase the four size-based averages (Dow-, S&amp;P-, NYSE- and Russell-like) fan out in the order Murphy's rule predicts: the fewer and bigger the stocks, the better the average looks. The Nasdaq-like line follows the simulated tech factor instead, so it need not land last as the real Nasdaq did on Murphy's sample day. The readout checks the breakout-confirmation rule: of the Dow-like average's new highs, how many came with new highs in both the S&amp;P-like and NYSE-like averages.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch17_intermarket.html">Chapter 17</a>: ratio (relative strength) lines between markets and sectors.</li>
+    <li>Your momentum rotation ranks Nifty 200 stocks by return ÷ volatility (<code>backtest_results_summary.md</code>): relative strength again, used for picking stocks rather than reading breadth.</li>
+    <li>Beyond the book: in India the same check would compare Nifty 50 with broader or smaller-company indices; nothing on this page tests that.</li>
+  </ul></div>
+</section>
+
+<!-- 20 -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · CONCLUSION</div><h2>The more lines agree, the likelier the trend continues</h2></div><span class="chip">pdf p505</span></div>
+  <p>Dow Theory is another example of comparing two averages: in Chapter 2, a Dow Theory buy signal needs both the Dow Industrials and the Dow Transports at new highs, and a divergence between them is a caution signal. Breadth, confirmation and divergence come in many forms. Murphy's general rule: <b>the greater the number of stock market averages trending in the same direction, the greater the chance that the trend continues.</b> Also check that the advance-decline line, the new highs–new lows line and the upside-downside volume lines are trending in the same direction.</p>
+  <div class="fig">
+    <h3>A confirmation scoreboard (the scoring is mine, the rule is Murphy's)</h3>
+    <canvas id="c20" class="tall" aria-label="Index and the number of breadth lines agreeing with it"></canvas>
+    <div class="legend" id="c20L"></div>
+    <div class="controls"><label for="day20">Day <input id="day20" type="range" min="60" max="749" value="420"><output id="day20o">420</output></label><label for="lb20">Trend = change over <input id="lb20" type="range" min="10" max="100" step="5" value="50"><output id="lb20o">50</output> days</label></div>
+    <div class="readout" id="r20"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The Dow-like average is the reference. Six other lines are checked against it: three more averages (S&amp;P-like, NYSE-like, Russell-like), the AD line, the 10-day NH−NL line and the 10-day up−down volume line. A line's trend is "up" if it is higher than it was N days ago, "down" if lower. The lower panel counts how many of the six point the same way as the Dow-like average (0–6). In the broad rally almost all agree. In the narrowing phase the count drops while the Dow-like average keeps rising: fewer lines confirm, which is the warning. The vertical line is the day you picked.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch02_dow_theory.html">Chapter 2</a>: Industrials and Transports must confirm each other. <a href="ch19_checklist.html">Chapter 19</a>: item 1 of Murphy's checklist asks for the direction of the overall market.</li></ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. The Dow closes up 12 points but 1,559 stocks fell and 1,327 rose. Was it a good day for the market?</summary><p>For the broad market, no: breadth was negative (more decliners and more declining volume). Only the 30-stock Dow was up (sections 02–03).</p></details>
+  <details><summary>2. Write the AD line formula from memory.</summary><p>Each day add (advances − declines) to yesterday's total. Only its direction and peaks matter, not its level (section 04).</p></details>
+  <details><summary>3. The Dow makes a new high but the AD line is below its last peak. What's that called and why does it matter?</summary><p>An AD divergence ("bad breadth"): the troops aren't following the generals. Historically the AD line has peaked well ahead of the averages (section 05).</p></details>
+  <details><summary>4. The daily AD line diverges. What does Murphy want before calling it a serious problem?</summary><p>A similar divergence on the weekly AD line (section 06).</p></details>
+  <details><summary>5. What are the McClellan Oscillator's two averages, and its overbought/oversold levels?</summary><p>19-day (10%) and 39-day (5%) exponential averages of NYSE net advances; oscillator = 19 − 39. Above +100 overbought, below −100 oversold; zero crossings are short- to intermediate-term signals (section 08).</p></details>
+  <details><summary>6. How do you get the Summation Index, and what is it used for?</summary><p>A running total of the daily McClellan Oscillator readings. It's the long-range version, used for major turning points (section 09).</p></details>
+  <details><summary>7. Which new-high/new-low event is a negative market signal?</summary><p>The 10-day average of new lows crossing above the 10-day average of new highs. Shrinking new highs or growing new lows is an earlier caution (section 10).</p></details>
+  <details><summary>8. The closing Arms Index is 2.4. Bullish or bearish?</summary><p>Above 1.0 means more volume per falling stock, a negative reading. But Murphy notes very high readings are read the contrary way: exceptionally high spikes usually come near market bottoms (section 13).</p></details>
+  <details><summary>9. Intraday the TICK is rising and TRIN is falling. Read it.</summary><p>Positive. Falling TICK with rising TRIN is negative (section 14).</p></details>
+  <details><summary>10. Give Arms' levels for the 10-day average, and his Fibonacci settings.</summary><p>Above 1.20 oversold, below .70 overbought (levels can shift with the trend). A 21-day version, and 21/55-day moving-average crossovers for intermediate trades (section 15).</p></details>
+  <details><summary>11. What's the difference between the 10-day Arms Index and 10-day Open Arms?</summary><p>Normal: compute each day's ratio, then average the ratios. Open: average each of the four inputs over 10 days, then compute the ratio once (section 16).</p></details>
+  <details><summary>12. On an Equivolume chart, what should a healthy bullish breakout look like?</summary><p>A noticeably wider rectangle (heavy volume). In an uptrend up days should be wider than down days (section 17).</p></details>
+  <details><summary>13. Why plot new highs minus new lows as one line, and how does Elder suggest drawing it?</summary><p>As one line it can be compared directly with a major average, like an AD line: a Dow high not matched by a high in the high-low line warns of weakness underneath. Elder draws it as a histogram around zero, which makes divergences easier to see; zero crossings mark bullish and bearish shifts in market psychology (section 11).</p></details>
+  <details><summary>14. The Dow breaks out to a new high. What should you check, and why is the Nasdaq Composite a poor stand-in for "the typical stock"?</summary><p>That the S&amp;P 500 and the NYSE Composite break out too, or the move may lack staying power. The Nasdaq has the most stocks but is cap-weighted, so its biggest technology names dominate it; it measures the tech sector more than the broad market. The Russell 2000 is the truer small-stock gauge (section 19).</p></details>
+  <details><summary>15. State the chapter's general rule in one sentence.</summary><p>The more market averages trend the same way, the better the chance the trend continues, and the AD line, the new highs–new lows line and the up-down volume lines should be trending that way too (section 20).</p></details>
+</section>
+
+<footer>Built from Murphy, <i>Technical Analysis of the Financial Markets</i>, Chapter 18 "Stock Market Indicators" (printed pp. 433–452, PDF pages 484–505), summarised in my own words. Every chart uses a simulated market of 3,500 stocks, not real market data; simulated results are not evidence about real markets. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ================= chapter 18: simulated stock market =================
+  const PHASES = [
+    { to: 0.00, fd: 0.0004, fv: 0.0042, gx: 0, tx: 0, tk: 0.0003, name: 'history' },
+    { to: 0.40, fd: 0.0012, fv: 0.0042, gx: 0, tx: 0, tk: 0.0006, name: 'A · broad rally' },
+    { to: 0.62, fd: 0.0001, fv: 0.0040, gx: 0.0014, tx: -0.0009, tk: 0.0010, name: 'B · narrowing rally' },
+    { to: 0.75, fd: -0.0026, fv: 0.0085, gx: 0, tx: -0.0004, tk: -0.0010, name: 'C · sell-off' },
+    { to: 0.79, fd: 0.0050, fv: 0.0040, gx: 0, tx: 0.0006, tk: 0.0004, name: 'D · breadth thrust' },
+    { to: 1.00, fd: 0.0011, fv: 0.0045, gx: 0, tx: 0.0003, tk: 0.0004, name: 'D · broad recovery' }
+  ];
+  const UNCH = 0.0025;
+  function genBreadth(sd) {
+    const r = rng(sd * 7919 + 13);
+    const N = 3500, WU = 252, D = 750, T = WU + D, NG = 30, L = 252;
+    const phase = new Array(T);
+    for (let t = 0; t < T; t++) { if (t < WU) { phase[t] = 0; continue; } const f = (t - WU) / D; let k = 1; while (k < PHASES.length - 1 && f >= PHASES[k].to) k++; phase[t] = k; }
+    const fac = new Float64Array(T), tech = new Float64Array(T);
+    for (let t = 1; t < T; t++) { const p = PHASES[phase[t]]; fac[t] = p.fd + p.fv * gauss(r); tech[t] = p.tk + 0.006 * gauss(r); }
+    const caps = []; for (let i = 0; i < N; i++) caps.push(Math.pow(i + 1, -0.95) * (0.85 + 0.3 * r()));
+    const adv = new Float64Array(D), dec = new Float64Array(D), unch = new Float64Array(D), nh = new Float64Array(D), nl = new Float64Array(D), av = new Float64Array(D), dv = new Float64Array(D);
+    const WN = Math.floor(D / 5); const wadv = new Float64Array(WN), wdec = new Float64Array(WN);
+    const ix = { gen: new Float64Array(D), s5: new Float64Array(D), cap: new Float64Array(D), small: new Float64Array(D), tech: new Float64Array(D) };
+    let cG = 0, cS = 0, cA = 0, cT = 0, nSm = 0;
+    const status = new Int8Array(N * D);
+    const p = new Float64Array(T), g = new Float64Array(T), h = new Float64Array(T), gl = new Float64Array(T), hl = new Float64Array(T);
+    for (let i = 0; i < N; i++) {
+      const gen = i < NG, small = i >= N - 2000, isTech = r() < 0.22;
+      const beta = 0.7 + 0.6 * r(), sig = 0.012 + 0.012 * (i / N) + 0.004 * r();
+      const v0 = Math.pow(caps[i], 0.75), w = caps[i];
+      p[0] = 20 + 60 * r();
+      for (let t = 1; t < T; t++) {
+        const P = PHASES[phase[t]];
+        const ret = beta * fac[t] + sig * gauss(r) + (gen ? P.gx : P.tx) + (isTech ? 0.8 * tech[t] : 0);
+        p[t] = p[t - 1] * (1 + ret);
+        if (t < WU) continue;
+        const d = t - WU; const vol = v0 * Math.exp(0.3 * gauss(r)) * (1 + 150 * Math.abs(ret));
+        let s = 0;
+        if (ret > UNCH) { adv[d]++; av[d] += vol; s = 1; } else if (ret < -UNCH) { dec[d]++; dv[d] += vol; s = -1; } else unch[d]++;
+        status[i * D + d] = s;
+      }
+      // rolling 252-day max/min of the previous closes (block algorithm) -> 52-week highs/lows
+      for (let s0 = 0; s0 < T; s0 += L) {
+        const e = Math.min(T, s0 + L); g[s0] = gl[s0] = p[s0];
+        for (let t = s0 + 1; t < e; t++) { g[t] = Math.max(g[t - 1], p[t]); gl[t] = Math.min(gl[t - 1], p[t]); }
+        h[e - 1] = hl[e - 1] = p[e - 1];
+        for (let t = e - 2; t >= s0; t--) { h[t] = Math.max(h[t + 1], p[t]); hl[t] = Math.min(hl[t + 1], p[t]); }
+      }
+      for (let t = WU; t < T; t++) {
+        const a = t - L, b = t - 1; const d = t - WU;
+        if (p[t] > Math.max(h[a], g[b])) { nh[d]++; status[i * D + d] = 2; } else if (p[t] < Math.min(hl[a], gl[b])) { nl[d]++; status[i * D + d] = -2; }
+      }
+      for (let k = 0; k < WN; k++) { const a = p[WU + 5 * k + 4], b = p[WU + 5 * k - 1]; if (a > b * (1 + UNCH)) wadv[k]++; else if (a < b * (1 - UNCH)) wdec[k]++; }
+      const base = p[WU];
+      for (let d = 0; d < D; d++) { const rel = p[WU + d] / base; ix.cap[d] += w * rel; if (gen) ix.gen[d] += w * rel; if (i < 500) ix.s5[d] += w * rel; if (small) ix.small[d] += rel; if (isTech) ix.tech[d] += w * rel; }
+      cA += w; if (gen) cG += w; if (i < 500) cS += w; if (small) nSm++; if (isTech) cT += w;
+    }
+    const arr = (x, k) => Array.from(x, (v) => v * k);
+    return {
+      N, D, NG, status, phase: phase.slice(WU), genShare: cG / cA,
+      adv: Array.from(adv), dec: Array.from(dec), unch: Array.from(unch), nh: Array.from(nh), nl: Array.from(nl), av: Array.from(av), dv: Array.from(dv),
+      wadv: Array.from(wadv), wdec: Array.from(wdec),
+      gen: arr(ix.gen, 100 / cG), s5: arr(ix.s5, 100 / cS), cap: arr(ix.cap, 100 / cA), small: arr(ix.small, 100 / nSm), tech: arr(ix.tech, 100 / cT)
+    };
+  }
+
+  // growing-universe breadth (section 07)
+  function genGrowing(sd) {
+    const r = rng(sd * 31 + 5); const T = 1000; const out = { n: [], a: [], d: [], u: [] }; let z = 0;
+    for (let t = 0; t < T; t++) {
+      z = 0.6 * z + gauss(r); const N = Math.round(1000 + 2500 * t / (T - 1)); const U = Math.round(N * 0.15);
+      const pUp = Math.min(0.9, Math.max(0.1, 0.5 + 0.1 * z)); const m = N - U;
+      const A = Math.max(1, Math.min(m - 1, Math.round(m * pUp + Math.sqrt(m * pUp * (1 - pUp)) * gauss(r))));
+      out.n.push(N); out.a.push(A); out.d.push(m - A); out.u.push(U);
+    }
+    return out;
+  }
+
+  // one intraday session (section 14)
+  function genDay(sd) {
+    const r = rng(sd * 97 + 1); const N = 3500, M = 390;
+    const beta = new Float64Array(N), R = new Float64Array(N), R0 = new Float64Array(N), V = new Float64Array(N), v0 = new Float64Array(N);
+    for (let i = 0; i < N; i++) { beta[i] = 0.7 + 0.6 * r(); v0[i] = Math.pow(i + 1, -0.4); R[i] = R0[i] = 0.004 * gauss(r); V[i] = 0; }
+    const idx = [], tick = [], trin = [];
+    for (let t = 0; t < M; t++) {
+      const drift = t < 150 ? -0.00011 : t < 230 ? 0.00002 : 0.00013;
+      const m = drift + 0.00022 * gauss(r);
+      let up = 0, dn = 0, A = 0, Dd = 0, AV = 0, DV = 0, sum = 0;
+      for (let i = 0; i < N; i++) {
+        const x = beta[i] * m + 0.0011 * gauss(r); R[i] += x; const mv = Math.abs(R[i] - R0[i]); if (mv > V[i]) V[i] = mv; const vol = v0[i] * (t + 1 + 30000 * V[i]); // stocks that have moved further since the open have traded more
+        if (x > 0) up++; else dn++;
+        if (R[i] > UNCH) { A++; AV += vol; } else if (R[i] < -UNCH) { Dd++; DV += vol; }
+        sum += R[i];
+      }
+      idx.push(100 * sum / N); tick.push(up - dn); trin.push(A && Dd && AV && DV ? (A / Dd) / (AV / DV) : null);
+    }
+    return { idx, tick, trin, M };
+  }
+
+  // one stock with OHLC + volume (sections 17-18)
+  function genStock(sd) {
+    const r = rng(sd * 131 + 7); const segs = [
+      { n: 18, d: -0.006, v: 0.016, vol: 1.0, upV: 1, dnV: 1.2 },
+      { n: 28, d: 0.0, v: 0.007, vol: 0.55, upV: 1, dnV: 1, rev: 0.25 },
+      { n: 2, d: 0.03, v: 0.004, vol: 4.2, upV: 1, dnV: 1 },
+      { n: 30, d: 0.0045, v: 0.013, vol: 1.0, upV: 1.6, dnV: 0.6 },
+      { n: 8, d: 0.0, v: 0.012, vol: 1.1, upV: 1, dnV: 1.2 },
+      { n: 20, d: -0.008, v: 0.018, vol: 1.0, upV: 0.8, dnV: 1.7 }
+    ];
+    const o = [], hi = [], lo = [], c = [], vol = [], seg = []; let p = 80, center = 0;
+    segs.forEach((s, k) => {
+      center = p;
+      for (let i = 0; i < s.n; i++) {
+        const open = p * (1 + 0.003 * gauss(r));
+        let ret = s.d + s.v * gauss(r); if (s.rev) ret += s.rev * (center - open) / open;
+        const close = open * (1 + ret);
+        const high = Math.max(open, close) * (1 + Math.abs(gauss(r)) * s.v * 0.5 + 0.002);
+        const low = Math.min(open, close) * (1 - Math.abs(gauss(r)) * s.v * 0.5 - 0.002);
+        const upDay = close >= p;
+        const v = 100 * s.vol * (upDay ? s.upV : s.dnV) * Math.exp(0.22 * gauss(r)) * (k === 5 ? 1 + i / 25 : 1);
+        o.push(open); hi.push(high); lo.push(low); c.push(close); vol.push(v); seg.push(k); p = close;
+      }
+    });
+    return { o, hi, lo, c, vol, seg, n: c.length };
+  }
+
+  // ---------- small analysis helpers ----------
+  const cumsum = (a) => { let s = 0; return a.map((v) => (v == null ? null : (s += v))); };
+  const konst = (n, v) => new Array(n).fill(v);
+  const pct = (a, b) => (b / a - 1) * 100;
+  const sgnPct = (v, d = 1) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+  const nf = (v) => Math.round(v).toLocaleString('en-US');
+  function argMax(a, from, to) { let m = -Infinity, k = -1; for (let i = from; i < to; i++) if (a[i] != null && a[i] > m) { m = a[i]; k = i; } return k; }
+  function argMin(a, from, to) { let m = Infinity, k = -1; for (let i = from; i < to; i++) if (a[i] != null && a[i] < m) { m = a[i]; k = i; } return k; }
+  function corr(x, y) { const n = x.length; let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += x[i]; my += y[i]; } mx /= n; my /= n; let sxy = 0, sx = 0, sy = 0; for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sx += (x[i] - mx) ** 2; sy += (y[i] - my) ** 2; } return sxy / Math.sqrt(sx * sy); }
+  function rescale(a) { let lo = Infinity, hi = -Infinity; a.forEach((v) => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }); return a.map((v) => (v == null ? null : (100 * (v - lo)) / (hi - lo || 1))); }
+  function crossings(a, b) { const up = [], dn = []; for (let i = 1; i < a.length; i++) { const p0 = a[i - 1], p1 = a[i], q0 = b == null ? 0 : b[i - 1], q1 = b == null ? 0 : b[i]; if (p0 == null || p1 == null || q0 == null || q1 == null) continue; if (p0 <= q0 && p1 > q1) up.push(i); else if (p0 >= q0 && p1 < q1) dn.push(i); } return { up, dn }; }
+  // new highs in `price` over lb days that `ind` did not confirm (first of each cluster)
+  function unconfirmed(price, ind, lb) {
+    const marks = []; let tot = 0, last = -99;
+    for (let i = lb; i < price.length; i++) {
+      let pm = -Infinity, im = -Infinity, imn = Infinity, ok = true;
+      for (let k = i - lb; k < i; k++) { if (price[k] > pm) pm = price[k]; if (ind[k] == null) { ok = false; break; } if (ind[k] > im) im = ind[k]; if (ind[k] < imn) imn = ind[k]; }
+      if (!ok || ind[i] == null || !(price[i] > pm)) continue;
+      tot++;
+      // 'not confirmed' = the indicator is clearly below its own high (more than a quarter of its recent range), not just a day or two behind
+      if (ind[i] < im - 0.25 * (im - imn) && i - last > 8) { marks.push(i); last = i; }
+    }
+    return { marks, tot };
+  }
+  const phaseOf = (d) => PHASES[B.phase[d]].name;
+  const sh = (d) => [{ a: 300, b: 465, col: 'c3', alpha: 0.07 }, { a: 465, b: 562, col: 'sell', alpha: 0.07 }];
+  const PH_LEG = ['narrowing (B) / sell-off (C) shaded', 'muted'];
+
+  // ---------- data ----------
+  let seed = 7, sub14 = 0, sub17 = 0;
+  let B, G7, DAY, STK, S;
+  function derive() {
+    const n = B.D; S = {};
+    S.net = B.adv.map((a, i) => a - B.dec[i]);
+    S.ad = cumsum(S.net);
+    S.e19 = ema(S.net, 19, 0.10); S.e39 = ema(S.net, 39, 0.05);
+    S.osc = S.net.map((_, i) => (S.e19[i] == null || S.e39[i] == null ? null : S.e19[i] - S.e39[i]));
+    S.summ = cumsum(S.osc);
+    const vs = 500 / (B.av.reduce((x, y) => x + y, 0) / n + B.dv.reduce((x, y) => x + y, 0) / n);
+    S.av = B.av.map((v) => v * vs); S.dv = B.dv.map((v) => v * vs);
+    S.trin = B.adv.map((a, i) => (a / B.dec[i]) / (S.av[i] / S.dv[i]));
+    S.wnet = B.wadv.map((a, k) => a - B.wdec[k]); S.wad = cumsum(S.wnet);
+    S.wline = nulls(n); for (let d = 4; d < n; d++) { const k = Math.floor((d - 4) / 5); if (k < S.wad.length) S.wline[d] = S.wad[k]; }
+    S.hl = B.nh.map((v, i) => v - B.nl[i]);
+    S.rng = (a) => a;
+  }
+  function buildData() {
+    B = genBreadth(seed); G7 = genGrowing(seed); DAY = genDay(seed + sub14); STK = genStock(seed + sub17); derive();
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+  const onChange = (id, f) => $(id).addEventListener('change', f);
+
+  // ---------- section 1: the grid ----------
+  function drawGrid(id, d) {
+    const cv = $(id); if (!cv) return; const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const cols = 70, rows = Math.ceil(B.N / cols); const cs = Math.min((W - 8) / cols, (H - 8) / rows); const ox = (W - cs * cols) / 2, oy = (H - cs * rows) / 2;
+    const col = { 1: colorOf('buy', 0.55), '-1': colorOf('sell', 0.55), 0: colorOf('muted', 0.25), 2: colorOf('c2'), '-2': colorOf('c3') };
+    for (let i = 0; i < B.N; i++) { const s = B.status[i * B.D + d]; g.fillStyle = col[s]; g.fillRect(ox + (i % cols) * cs + 0.5, oy + Math.floor(i / cols) * cs + 0.5, Math.max(1, cs - 1), Math.max(1, cs - 1)); }
+    g.strokeStyle = colorOf('c1'); g.lineWidth = 1.6;
+    for (let i = 0; i < B.NG; i++) g.strokeRect(ox + (i % cols) * cs + 0.5, oy + Math.floor(i / cols) * cs + 0.5, Math.max(1, cs - 1), Math.max(1, cs - 1));
+    const L = $(id + 'L'); if (L) L.innerHTML = [['advancing', 'buy'], ['declining', 'sell'], ['unchanged', 'muted'], ['new 52-week high', 'c2'], ['new 52-week low', 'c3'], ['outlined: the 30 generals (largest first, row by row)', 'c1']].map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+  }
+  const d1 = reg(() => {
+    const d = val('day1'); drawGrid('c1', d);
+    const A = B.adv[d], Dd = B.dec[d], U = B.unch[d];
+    const upShare = 100 * S.av[d] / (S.av[d] + S.dv[d]);
+    $('r1').innerHTML = `day <b>${d}</b> (${phaseOf(d)}) · advances <b>${nf(A)}</b> · declines <b>${nf(Dd)}</b> · unchanged <b>${nf(U)}</b> · new highs <b>${B.nh[d]}</b> · new lows <b>${B.nl[d]}</b> · up volume <b>${upShare.toFixed(0)}%</b> of total · generals' index <b class="${B.gen[d] >= B.gen[d - 1] ? 'good' : 'bad'}">${sgnPct(pct(B.gen[d - 1], B.gen[d]), 2)}</b> · all-stock cap-weighted <b>${sgnPct(pct(B.cap[d - 1], B.cap[d]), 2)}</b>`;
+  });
+  bindRange('day1', d1);
+  function setDay1(d) { $('day1').value = d; $('day1o').textContent = d; d1(); }
+  $('jump1a').addEventListener('click', () => setDay1(150));
+  $('jump1b').addEventListener('click', () => { let k = 380; for (let d = 330; d < 460; d++) if (B.gen[d] > B.gen[d - 1] && S.net[d] < -300) { k = d; break; } setDay1(k); });
+  $('jump1c').addEventListener('click', () => setDay1(argMin(S.net, 465, 562)));
+
+  // ---------- section 2: diary calculator ----------
+  const BOOK2 = { a2: 1327, d2: 1559, u2: 546, nh2: 78, nl2: 43, av2: 248215, dv2: 279557, tk2: -135 };
+  function d2() {
+    const A = val('a2'), Dd = val('d2'), U = val('u2'), NH = val('nh2'), NL = val('nl2'), AV = val('av2'), DV = val('dv2'), TK = val('tk2');
+    const tr = (A / Dd) / (AV / DV); const pa = AV / A, pd = DV / Dd;
+    const row = (k, v, s, cls) => `<tr><td>${k}</td><td class="num">${v}</td><td class="${cls || ''}">${s}</td></tr>`;
+    const good = (b) => (b ? 'positive' : 'negative');
+    $('t2').innerHTML = [
+      row('Issues traded', nf(A + Dd + U), 'advances + declines + unchanged'),
+      row('Advances − declines', (A - Dd >= 0 ? '+' : '') + nf(A - Dd), 'breadth ' + good(A >= Dd) + ' (adds to the AD line, section 04)'),
+      row('Advance/decline ratio', isFinite(A / Dd) ? (A / Dd).toFixed(2) : '—', 'above 1 = more rising than falling stocks (section 07)'),
+      row('New highs − new lows', (NH - NL >= 0 ? '+' : '') + nf(NH - NL), good(NH >= NL) + ' (sections 10–11)'),
+      row('Up volume share', (100 * AV / (AV + DV)).toFixed(1) + '%', (AV >= DV ? 'more' : 'less') + ' volume in rising stocks (section 12)'),
+      row('Volume per rising / falling stock', `${pa.toFixed(1)} / ${pd.toFixed(1)}`, 'thousand shares each, on average'),
+      row('Arms Index (TRIN)', isFinite(tr) ? tr.toFixed(2) : '—', tr < 1 ? 'below 1.0: positive (section 13)' : 'above 1.0: negative (section 13)'),
+      row('Closing tick', (TK >= 0 ? '+' : '') + nf(TK), TK >= 0 ? 'more stocks closed on an uptick: short-term positive' : 'more stocks closed on a downtick: short-term negative')
+    ].join('');
+  }
+  ['a2', 'd2', 'u2', 'nh2', 'nl2', 'av2', 'dv2', 'tk2'].forEach((id) => $(id).addEventListener('input', d2));
+  $('rs2').addEventListener('click', () => { Object.keys(BOOK2).forEach((k) => { $(k).value = BOOK2[k]; }); d2(); });
+  d2();
+
+  // ---------- section 3: days like Murphy's ----------
+  let k3 = -1;
+  const d3 = reg(() => {
+    const days = []; for (let d = 1; d < B.D; d++) if (B.gen[d] > B.gen[d - 1] && S.net[d] < 0) days.push(d);
+    const cnt = (a, b) => days.filter((d) => d >= a && d < b).length;
+    const msg = `In this roll: <b>${cnt(1, 300)}</b> of 299 days in the broad rally (${Math.round(100 * cnt(1, 300) / 299)}%), <b>${cnt(300, 465)}</b> of 165 in the narrowing phase (${Math.round(100 * cnt(300, 465) / 165)}%).`;
+    if (k3 < 0 || !days.length) { $('r3').innerHTML = msg + ' Press the button to see one.'; return; }
+    const d = days[k3 % days.length];
+    $('r3').innerHTML = `day <b>${d}</b> (${phaseOf(d)}) · Dow-like (30 largest) <b class="good">${sgnPct(pct(B.gen[d - 1], B.gen[d]), 2)}</b> · S&amp;P-like <b>${sgnPct(pct(B.s5[d - 1], B.s5[d]), 2)}</b> · NYSE-like (all 3,500) <b>${sgnPct(pct(B.cap[d - 1], B.cap[d]), 2)}</b> · Russell-like (2,000 small) <b>${sgnPct(pct(B.small[d - 1], B.small[d]), 2)}</b> · advances <b>${nf(B.adv[d])}</b> vs declines <b class="bad">${nf(B.dec[d])}</b><br>${msg}`;
+  });
+  $('b3').addEventListener('click', () => { k3++; d3(); });
+
+  // ---------- section 4: AD line ----------
+  const d4 = reg(() => {
+    $('w4').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map((d) => `<div><small>day ${d}</small>${nf(B.adv[d])} − ${nf(B.dec[d])}<br><b>${S.net[d] >= 0 ? '+' : ''}${nf(S.net[d])}</b><small>AD total ${nf(S.ad[d] - S.ad[0])}</small></div>`).join('');
+    const all = $('z4').value === 'all'; const x1 = all ? B.D - 1 : 300;
+    const ad0 = S.ad.map((v) => v - S.ad[0]);
+    plot('c4', { n: B.D, x0: 0, x1, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index: 30 generals (simulated)' }], sub: { lines: [{ d: ad0, col: 'c2', w: 1.8, label: 'advance-decline line' }], label: 'AD line' }, shade: all ? sh() : [], legend: all ? [PH_LEG] : [] });
+    $('r4').innerHTML = `over the days shown: index <b>${sgnPct(pct(B.gen[0], B.gen[x1]))}</b> · AD line <b>${ad0[x1] >= 0 ? '+' : ''}${nf(ad0[x1])}</b> · days with more advances than declines <b>${S.net.slice(1, x1 + 1).filter((v) => v > 0).length}</b> of ${x1}`;
+  });
+  onChange('z4', d4);
+
+  // ---------- section 5: AD divergence ----------
+  const d5 = reg(() => {
+    const lb = val('lb5'); const u = unconfirmed(B.gen, S.ad, lb);
+    const pAD = argMax(S.ad, 0, 562), pG = argMax(B.gen, 0, 562);
+    const lines = [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index (30 generals)' }];
+    if ($('eq5').checked) lines.push({ d: B.small.map((v, i) => v), col: 'muted', w: 1.2, dash: [4, 3], label: 'Russell-like (2,000 small, equal weight)' });
+    plot('c5', { n: B.D, lines, marks: u.marks.map((i) => ({ i, v: B.gen[i], kind: 'alertDown' })), vlines: [{ i: pAD, col: 'c2', label: 'AD peak' }, { i: pG, col: 'c1', label: 'index peak', row: 1 }], sub: { lines: [{ d: S.ad, col: 'c2', w: 1.8, label: 'AD line' }] }, shade: sh(), legend: [['hollow ▽ = new index high the AD line did not confirm', 'sell'], PH_LEG] });
+    $('r5').innerHTML = `AD line peaked on day <b>${pAD}</b> · Dow-like index peaked on day <b>${pG}</b> · lead <b class="${pG > pAD ? 'bad' : ''}">${pG - pAD}</b> days · index made <b>${u.tot}</b> new ${lb}-day highs; unconfirmed clusters marked: <b>${u.marks.length}</b> (broad rally <b>${u.marks.filter((i) => i < 300).length}</b>, narrowing phase <b>${u.marks.filter((i) => i >= 300 && i < 465).length}</b>, later <b>${u.marks.filter((i) => i >= 465).length}</b>)`;
+  });
+  bindRange('lb5', d5); onChange('eq5', d5);
+
+  // ---------- section 6: daily vs weekly ----------
+  const d6 = reg(() => {
+    const v = $('sel6').value; const lines = [];
+    const dl = v === 'both' ? rescale(S.ad) : S.ad, wl = v === 'both' ? rescale(S.wline) : S.wline;
+    if (v !== 'w') lines.push({ d: dl, col: 'c2', w: 1.3, label: 'daily AD line' + (v === 'both' ? ' (rescaled)' : '') });
+    if (v !== 'd') lines.push({ d: wl, col: 'c1', w: 2, step: true, label: 'weekly AD line' + (v === 'both' ? ' (rescaled)' : '') });
+    plot('c6', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], sub: { lines }, shade: sh(), legend: [PH_LEG] });
+    const turns = (a) => { let t = 0, prev = 0; for (let i = 1; i < a.length; i++) { const s = Math.sign(a[i] - a[i - 1]); if (s && prev && s !== prev) t++; if (s) prev = s; } return t; };
+    const pw = argMax(S.wad, 0, 112);
+    $('r6').innerHTML = `daily line changed direction <b>${turns(S.ad)}</b> times in ${B.D} days (${(100 * turns(S.ad) / B.D).toFixed(0)}% of days) · weekly line <b>${turns(S.wad)}</b> times in ${S.wad.length} weeks · daily AD peak day <b>${argMax(S.ad, 0, 562)}</b>, weekly AD peak around day <b>${pw * 5 + 4}</b>`;
+  });
+  onChange('sel6', d6);
+
+  // ---------- section 7: variations ----------
+  const d7 = reg(() => {
+    const v = $('sel7').value; const n = G7.n.length;
+    const m = v === 'diff' ? G7.a.map((a, i) => a - G7.d[i]) : v === 'ratio' ? G7.a.map((a, i) => a / G7.d[i]) : G7.a.map((a, i) => (a - G7.d[i]) / (G7.n[i]));
+    const spec = { n, legend: [] };
+    if (v === 'ratio') { spec.lines = [{ d: m, col: 'c2', w: 1, label: 'advances ÷ declines' }, { d: konst(n, 1), col: 'muted', w: 1, dash: [4, 4], label: '1.0' }]; }
+    else { spec.bars = [{ d: m, col: (i, x) => (x >= 0 ? colorOf('buy', 0.6) : colorOf('sell', 0.6)) }]; spec.zero = true; spec.legend.push([v === 'diff' ? 'advances − declines' : '(adv − decl) ÷ all issues', 'c2']); }
+    spec.sub = { lines: [{ d: G7.n, col: 'muted', w: 1.4, label: 'number of listed stocks' }] };
+    plot('c7', spec);
+    const dev = (a, b) => { let s = 0; for (let i = a; i < b; i++) s += Math.abs(v === 'ratio' ? Math.log(m[i]) : m[i]); return s / (b - a); };
+    const e = dev(0, 200), l = dev(n - 200, n);
+    $('r7').innerHTML = `average size of a day's reading${v === 'ratio' ? ' (|log ratio|)' : ''}: first 200 days <b>${v === 'diff' ? nf(e) : e.toFixed(3)}</b> · last 200 days <b>${v === 'diff' ? nf(l) : l.toFixed(3)}</b> · late ÷ early <b>${(l / e).toFixed(2)}×</b> (listed stocks grew 3.5×)`;
+  });
+  onChange('sel7', d7);
+
+  // ---------- section 8: McClellan ----------
+  const d8a = reg(() => {
+    const s = val('st8'); const x1 = Math.min(B.D - 1, s + 120);
+    plot('c8a', { n: B.D, x0: s, x1, bars: [{ d: S.net, col: (i, x) => (x >= 0 ? colorOf('buy', 0.45) : colorOf('sell', 0.45)) }], zero: true, lines: [{ d: S.e19, col: 'c1', w: 2.2, label: '19-day EMA (10%)' }, { d: S.e39, col: 'c2', w: 2.2, label: '39-day EMA (5%)' }], legend: [['bars: daily net advances', 'muted']] });
+  });
+  bindRange('st8', d8a);
+  const d8 = reg(() => {
+    const cr = crossings(S.osc, null); const marks = $('mk8').checked ? cr.up.map((i) => ({ i, v: B.gen[i], kind: 'buy', size: 4 })).concat(cr.dn.map((i) => ({ i, v: B.gen[i], kind: 'sell', size: 4 }))) : [];
+    plot('c8', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], marks, shade: sh(), sub: { bars: [{ d: S.osc, col: (i, x) => (x >= 0 ? colorOf('buy', 0.7) : colorOf('sell', 0.7)), label: 'McClellan Oscillator' }], lines: [{ d: konst(B.D, 100), col: 'muted', w: 1, dash: [4, 3], label: '+100 / −100' }, { d: konst(B.D, -100), col: 'muted', w: 1, dash: [4, 3] }], zero: true }, legend: [['▲▼ = zero-line crossings', 'buy'], PH_LEG] });
+    const o = S.osc; const lo = argMin(o, 0, B.D), hi = argMax(o, 0, B.D);
+    $('r8').innerHTML = `zero crossings: <b>${cr.up.length}</b> up, <b>${cr.dn.length}</b> down · days above +100 <b>${o.filter((v) => v > 100).length}</b> · below −100 <b>${o.filter((v) => v < -100).length}</b> · deepest <b class="bad">${o[lo].toFixed(0)}</b> on day ${lo} (${phaseOf(lo)}) · highest <b class="good">${o[hi].toFixed(0)}</b> on day ${hi} (${phaseOf(hi)})`;
+  });
+  onChange('mk8', d8);
+
+  // ---------- section 9: Summation ----------
+  const d9 = reg(() => {
+    const cr = crossings(S.summ, null); const c8 = crossings(S.osc, null);
+    plot('c9', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], marks: cr.up.map((i) => ({ i, v: B.gen[i], kind: 'buy' })).concat(cr.dn.map((i) => ({ i, v: B.gen[i], kind: 'sell' }))), shade: sh(), sub: { lines: [{ d: S.summ, col: 'c3', w: 2, label: 'McClellan Summation Index' }], zero: true }, legend: [['▲▼ = Summation crosses zero', 'buy'], PH_LEG] });
+    $('r9').innerHTML = `Summation zero crossings <b>${cr.up.length + cr.dn.length}</b> (oscillator: ${c8.up.length + c8.dn.length}) · ${cr.dn.length ? 'first downward crossing after day 250: day <b>' + (cr.dn.find((i) => i > 250) ?? '—') + '</b> · ' : ''}Dow-like index peak day <b>${argMax(B.gen, 0, 562)}</b> · first upward crossing after the sell-off: day <b>${cr.up.find((i) => i > 480) ?? '—'}</b>`;
+  });
+
+  // ---------- section 10: new highs vs new lows ----------
+  const d10 = reg(() => {
+    const n = val('n10'); const H = sma(B.nh, n), Lw = sma(B.nl, n); const cr = crossings(Lw, H);
+    plot('c10', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], marks: cr.up.map((i) => ({ i, v: B.gen[i], kind: 'sell' })), shade: sh(), sub: { lines: [{ d: H, col: 'c2', w: 1.8, label: `new highs (${n}-day avg)` }, { d: Lw, col: 'c3', w: 1.8, label: `new lows (${n}-day avg)` }] }, legend: [['▼ = new-lows average crosses above new-highs average', 'sell'], PH_LEG] });
+    const pH = argMax(H, 0, 465), pL = argMax(Lw, 0, B.D), low = argMin(B.cap, 400, B.D);
+    $('r10').innerHTML = `negative signals (lows cross above highs): <b>${cr.up.length}</b> · new-highs average peaked day <b>${pH}</b> while the Dow-like index peaked day <b>${argMax(B.gen, 0, 562)}</b> · new-lows extreme day <b>${pL}</b> · all-stock index low day <b>${low}</b>`;
+  });
+  bindRange('n10', d10);
+
+  // ---------- section 11: NH-NL index ----------
+  const d11 = reg(() => {
+    const m = val('sm11'); const hl = m > 1 ? sma(S.hl, m) : S.hl; const hist = $('sel11').value === 'hist';
+    const u = unconfirmed(B.gen, hl, 60); const cr = crossings(hl, null);
+    const subSpec = hist ? { bars: [{ d: hl, col: (i, x) => (x >= 0 ? colorOf('buy', 0.65) : colorOf('sell', 0.65)), label: 'new highs − new lows' }], zero: true } : { lines: [{ d: hl, col: 'c2', w: 1.3, label: 'new highs − new lows' }], zero: true };
+    plot('c11', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], marks: u.marks.map((i) => ({ i, v: B.gen[i], kind: 'alertDown' })), shade: sh(), sub: subSpec, legend: [['hollow ▽ = index 60-day high not confirmed', 'sell'], PH_LEG] });
+    $('r11').innerHTML = `zero-line crossings <b>${cr.up.length + cr.dn.length}</b> · days below zero <b>${hl.filter((v) => v != null && v < 0).length}</b> · unconfirmed index highs (clusters) <b>${u.marks.length}</b>${u.marks.length ? ', first on day <b>' + u.marks[0] + '</b>' : ''}`;
+  });
+  onChange('sel11', d11); bindRange('sm11', d11);
+
+  // ---------- section 12: up vs down volume ----------
+  const d12 = reg(() => {
+    const n = val('n12'); const U = sma(S.av, n), Dn = sma(S.dv, n); const two = $('sel12').value === 'two';
+    const subSpec = two ? { lines: [{ d: U, col: 'buy', w: 1.8, label: `up volume (${n}-day avg)` }, { d: Dn, col: 'sell', w: 1.8, label: `down volume (${n}-day avg)` }] } : { lines: [{ d: U.map((v, i) => (v == null ? null : v - Dn[i])), col: 'c2', w: 1.6, label: 'up − down volume' }], zero: true };
+    plot('c12', { n: B.D, lines: [{ d: B.cap, col: 'price', w: 1.4, label: 'NYSE-like index (all 3,500, cap-weighted)' }], shade: sh(), sub: subSpec, legend: [['volume in simulated millions of shares', 'muted'], PH_LEG] });
+    const share = (a, b) => { let k = 0, t = 0; for (let i = a; i < b; i++) if (U[i] != null) { t++; if (U[i] > Dn[i]) k++; } return t ? Math.round(100 * k / t) : 0; };
+    $('r12').innerHTML = `share of days with up volume on top: broad rally <b>${share(0, 300)}%</b> · narrowing <b>${share(300, 465)}%</b> · sell-off <b>${share(465, 562)}%</b> · recovery <b>${share(562, 750)}%</b>`;
+  });
+  onChange('sel12', d12); bindRange('n12', d12);
+
+  // ---------- section 13: Arms Index ----------
+  const d13 = reg(() => {
+    const k = val('top13'); const order = S.trin.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, k).map((x) => x[1]).sort((a, b) => a - b);
+    const sub = { lines: [{ d: S.trin, col: 'c3', w: 1, alpha: 0.6, label: 'daily Arms Index' }, { d: konst(B.D, 1), col: 'muted', w: 1, dash: [4, 3], label: '1.0' }] };
+    if ($('ma13').checked) sub.lines.push({ d: sma(S.trin, 10), col: 'c1', w: 2, label: '10-day average' });
+    plot('c13', { n: B.D, lines: [{ d: B.cap, col: 'price', w: 1.4, label: 'NYSE-like index' }], marks: order.map((i) => ({ i, v: B.cap[i], col: 'sell', r: 4 })), shade: sh(), sub, legend: [['● = highest daily readings', 'sell'], PH_LEG] });
+    const ret = B.cap.map((v, i) => (i ? v / B.cap[i - 1] - 1 : 0));
+    const low = argMin(B.cap, 400, B.D);
+    $('r13').innerHTML = `correlation of daily TRIN with the index's daily change <b>${corr(S.trin.slice(1), ret.slice(1)).toFixed(2)}</b> (negative = opposite) · highest readings on days <b>${order.join(', ')}</b> · index low on day <b>${low}</b> · days above 1.0 <b>${S.trin.filter((v) => v > 1).length}</b> of ${B.D}`;
+  });
+  onChange('ma13', d13); bindRange('top13', d13);
+
+  // ---------- section 14: TRIN vs TICK ----------
+  const d14 = reg(() => {
+    const m = val('m14'); const M = DAY.M;
+    plot('c14', { n: M, lines: [{ d: DAY.idx, col: 'price', w: 1.5, label: 'average stock, % since prior close (simulated)' }], vlines: [{ i: m, col: 'c1', label: 'minute ' + m }], sub: { bars: [{ d: DAY.tick, col: (i, x) => (x >= 0 ? colorOf('buy', 0.6) : colorOf('sell', 0.6)), label: 'TICK (upticks − downticks)' }], zero: true } });
+    plot('c14b', { n: M, lines: [{ d: DAY.trin, col: 'c3', w: 1.8, label: 'intraday TRIN (since the open)' }, { d: konst(M, 1), col: 'muted', w: 1, dash: [4, 3], label: '1.0' }], vlines: [{ i: m, col: 'c1' }] });
+    const avg = (a, i, w) => { let s = 0, k = 0; for (let j = Math.max(0, i - w + 1); j <= i; j++) if (a[j] != null) { s += a[j]; k++; } return s / k; };
+    const tNow = avg(DAY.tick, m, 10), tThen = avg(DAY.tick, m - 30, 10), rNow = DAY.trin[m], rThen = DAY.trin[m - 30];
+    const tUp = tNow > tThen, rUp = rNow > rThen;
+    const verdict = tUp && !rUp ? '<b class="good">positive</b> (rising TICK, falling TRIN)' : !tUp && rUp ? '<b class="bad">negative</b> (falling TICK, rising TRIN)' : '<b>mixed</b>: the two disagree, no clear reading';
+    $('r14').innerHTML = `minute <b>${m}</b> · TICK (10-min avg) <b>${tThen.toFixed(0)} → ${tNow.toFixed(0)}</b> over 30 min · TRIN <b>${rThen.toFixed(2)} → ${rNow.toFixed(2)}</b> · reading: ${verdict}`;
+  });
+  bindRange('m14', d14);
+  $('new14').addEventListener('click', () => { sub14++; DAY = genDay(seed + sub14); d14(); });
+
+  // ---------- section 15: smoothing ----------
+  const d15 = reg(() => {
+    const v = $('sel15').value, hi = val('hi15'), lo = val('lo15'); const t10 = sma(S.trin, 10), t21 = sma(S.trin, 21), t55 = sma(S.trin, 55);
+    let sub, marks = [], msg;
+    if (v === 'x') {
+      const cr = crossings(t21, t55);
+      sub = { lines: [{ d: t21, col: 'c1', w: 1.8, label: '21-day average' }, { d: t55, col: 'c2', w: 1.8, label: '55-day average' }] };
+      marks = cr.dn.map((i) => ({ i, v: B.cap[i], kind: 'buy' })).concat(cr.up.map((i) => ({ i, v: B.cap[i], kind: 'sell' })));
+      msg = `21/55 crossovers: <b>${cr.dn.length}</b> with the 21 falling below the 55 (▲, volume moving to rising stocks) · <b>${cr.up.length}</b> rising above (▼)`;
+    } else {
+      const s = v === '10' ? t10 : t21;
+      sub = { lines: [{ d: s, col: 'c3', w: 1.8, label: `${v}-day Arms average` }, { d: konst(B.D, hi), col: 'buy', w: 1, dash: [4, 3], label: `oversold > ${hi.toFixed(2)}` }, { d: konst(B.D, lo), col: 'sell', w: 1, dash: [4, 3], label: `overbought < ${lo.toFixed(2)}` }] };
+      const into = (a, f) => { const o = []; for (let i = 1; i < a.length; i++) if (a[i] != null && a[i - 1] != null && f(a[i]) && !f(a[i - 1])) o.push(i); return o; };
+      marks = into(s, (x) => x > hi).map((i) => ({ i, v: B.cap[i], kind: 'alertUp' })).concat(into(s, (x) => x < lo).map((i) => ({ i, v: B.cap[i], kind: 'alertDown' })));
+      msg = `days oversold (above ${hi.toFixed(2)}) <b>${s.filter((x) => x != null && x > hi).length}</b> · days overbought (below ${lo.toFixed(2)}) <b>${s.filter((x) => x != null && x < lo).length}</b> · lowest ${v}-day value <b>${Math.min(...s.filter((x) => x != null)).toFixed(2)}</b> · highest <b>${Math.max(...s.filter((x) => x != null)).toFixed(2)}</b>`;
+    }
+    plot('c15', { n: B.D, lines: [{ d: B.cap, col: 'price', w: 1.4, label: 'NYSE-like index' }], marks, shade: sh(), sub, legend: [v === 'x' ? ['▲▼ = crossovers', 'buy'] : ['hollow △ = enters oversold, ▽ = enters overbought', 'buy'], PH_LEG] });
+    $('r15').innerHTML = msg;
+  });
+  onChange('sel15', d15); bindRange('hi15', d15); bindRange('lo15', d15);
+
+  // ---------- section 16: Open Arms ----------
+  const d16 = reg(() => {
+    const L = +$('sel16').value; const normal = sma(S.trin, L);
+    const sA = sma(B.adv, L), sD = sma(B.dec, L), sAV = sma(S.av, L), sDV = sma(S.dv, L);
+    const open = sA.map((a, i) => (a == null ? null : (a / sD[i]) / (sAV[i] / sDV[i])));
+    const lines = [{ d: normal, col: 'c3', w: 1.4, label: `${L}-day average of daily TRIN` }, { d: open, col: 'c1', w: 2, label: `${L}-day Open Arms` }];
+    let marks = []; let extra = '';
+    if ($('sig16').checked) { const sg = sma(open, 10); lines.push({ d: sg, col: 'price', w: 1.4, dash: [5, 3], label: '10-day average of Open Arms' }); const cr = crossings(open, sg); marks = cr.up.concat(cr.dn).map((i) => ({ i, v: B.cap[i], col: 'c1', r: 3 })); extra = ` · Open Arms crossed its 10-day average <b>${marks.length}</b> times (● on the index)`; }
+    plot('c16', { n: B.D, lines: [{ d: B.cap, col: 'price', w: 1.4, label: 'NYSE-like index' }], marks, shade: sh(), sub: { lines: lines.concat([{ d: konst(B.D, 1), col: 'muted', w: 1, dash: [4, 3] }]) }, legend: [PH_LEG] });
+    const stats = (a) => { const v = a.filter((x) => x != null); const m = v.reduce((x, y) => x + y, 0) / v.length; let ch = 0; for (let i = 1; i < v.length; i++) ch += Math.abs(v[i] - v[i - 1]); return [m, ch / (v.length - 1)]; };
+    const [mn, cn] = stats(normal), [mo, co] = stats(open);
+    $('r16').innerHTML = `average level: normal <b>${mn.toFixed(3)}</b> · Open <b>${mo.toFixed(3)}</b> · average day-to-day move: normal <b>${cn.toFixed(4)}</b> · Open <b>${co.toFixed(4)}</b>${extra}`;
+  });
+  onChange('sel16', d16); onChange('sig16', d16);
+
+  // ---------- sections 17-18: Equivolume / CandlePower ----------
+  function drawVol(id, st, mode) {
+    const cv = $(id); if (!cv) return; const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 6, padR = 48, padT = 10, padB = 8; const volPanel = mode === 'bar' ? Math.round((H - padT - padB) * 0.25) : 0; const gap = volPanel ? 12 : 0;
+    const mainH = H - padT - padB - volPanel - gap; const n = st.n;
+    let lo = Math.min(...st.lo), hi = Math.max(...st.hi); const pad = (hi - lo) * 0.05; lo -= pad; hi += pad;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH; const PW = W - padL - padR;
+    g.font = '11px ' + css('mono'); g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    const vt = st.vol.reduce((a, b) => a + b, 0), vmax = Math.max(...st.vol);
+    let x = padL;
+    for (let i = 0; i < n; i++) {
+      const up = i ? st.c[i] >= st.c[i - 1] : st.c[i] >= st.o[i]; const colr = up ? 'buy' : 'sell';
+      let x0, w;
+      if (mode === 'equi' || mode === 'cp') { w = st.vol[i] / vt * PW; x0 = x; x += w; } else { w = PW / n; x0 = padL + i * w; }
+      const cx = x0 + w / 2; const inner = Math.max(1, w - Math.min(2, w * 0.15));
+      if (mode === 'equi') { g.fillStyle = colorOf(colr, 0.22); g.strokeStyle = colorOf(colr, 0.95); g.lineWidth = 1; g.fillRect(x0 + 0.5, Y(st.hi[i]), inner, Y(st.lo[i]) - Y(st.hi[i])); g.strokeRect(x0 + 0.5, Y(st.hi[i]), inner, Y(st.lo[i]) - Y(st.hi[i])); }
+      else if (mode === 'bar') {
+        g.strokeStyle = colorOf('price'); g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx, Y(st.hi[i])); g.lineTo(cx, Y(st.lo[i])); g.moveTo(cx - w * 0.35, Y(st.o[i])); g.lineTo(cx, Y(st.o[i])); g.moveTo(cx, Y(st.c[i])); g.lineTo(cx + w * 0.35, Y(st.c[i])); g.stroke();
+        const vh = st.vol[i] / vmax * volPanel; g.fillStyle = colorOf(colr, 0.55); g.fillRect(x0 + w * 0.15, H - padB - vh, w * 0.7, vh);
+      } else {
+        const bw = mode === 'cp' ? inner : w * 0.7; const bx = mode === 'cp' ? x0 + 0.5 : x0 + w * 0.15; const upC = st.c[i] >= st.o[i];
+        g.strokeStyle = colorOf('price'); g.lineWidth = 1; g.beginPath(); g.moveTo(cx, Y(st.hi[i])); g.lineTo(cx, Y(st.lo[i])); g.stroke();
+        const yt = Y(Math.max(st.o[i], st.c[i])), yb = Y(Math.min(st.o[i], st.c[i])); const bh = Math.max(1, yb - yt);
+        g.fillStyle = upC ? colorOf('plate') : colorOf('sell', 0.85); g.fillRect(bx, yt, bw, bh); g.strokeStyle = upC ? colorOf('buy') : colorOf('sell'); g.lineWidth = 1.2; g.strokeRect(bx, yt, bw, bh);
+      }
+    }
+    if (mode === 'bar') { g.fillStyle = colorOf('muted'); g.fillText('volume', padL + 4, H - padB - volPanel + 10); }
+    const Lg = $(id + 'L'); if (Lg) {
+      const items = mode === 'equi' ? [['box height = day\'s range, width = volume', 'price'], ['up day (close above previous close)', 'buy'], ['down day', 'sell'], ['x-axis = cumulative volume, not time', 'muted']]
+        : mode === 'bar' ? [['OHLC bars (time axis)', 'price'], ['volume: up day', 'buy'], ['volume: down day', 'sell']]
+        : mode === 'cp' ? [['candle width = volume', 'price'], ['hollow = close above open', 'buy'], ['filled = close below open', 'sell'], ['x-axis = cumulative volume', 'muted']]
+        : [['ordinary candles: equal width (time axis)', 'price'], ['hollow = close above open', 'buy'], ['filled = close below open', 'sell']];
+      Lg.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+  const d17 = reg(() => {
+    drawVol('c17', STK, $('sel17').value);
+    const avgV = (f) => { let s = 0, k = 0; for (let i = 1; i < STK.n; i++) if (f(i)) { s += STK.vol[i]; k++; } return k ? s / k : 0; };
+    const base = avgV((i) => STK.seg[i] === 1), bo = avgV((i) => STK.seg[i] === 2), upU = avgV((i) => STK.seg[i] === 3 && STK.c[i] >= STK.c[i - 1]), dnU = avgV((i) => STK.seg[i] === 3 && STK.c[i] < STK.c[i - 1]), sellD = avgV((i) => STK.seg[i] === 5 && STK.c[i] < STK.c[i - 1]);
+    $('r17').innerHTML = `breakout day volume <b>${(bo / base).toFixed(1)}×</b> the base average · in the uptrend, up days averaged <b>${(upU / dnU).toFixed(1)}×</b> the volume of down days · down days in the final sell-off <b>${(sellD / dnU).toFixed(1)}×</b> the uptrend's down days`;
+  });
+  onChange('sel17', d17);
+  $('new17').addEventListener('click', () => { sub17++; STK = genStock(seed + sub17); d17(); d18(); });
+  const d18 = reg(() => drawVol('c18', STK, $('sel18').value === 'cp' ? 'cp' : 'plain'));
+  onChange('sel18', d18);
+
+  // ---------- section 19: comparing averages ----------
+  const d19 = reg(() => {
+    const lb = val('lb19'); const small = $('sel19').value === 'small';
+    const ratio = (small ? B.small : B.tech).map((v, i) => v / B.s5[i]);
+    plot('c19', { n: B.D, lines: [{ d: B.gen, col: 'c1', w: 1.8, label: 'Dow-like (30 largest)' }, { d: B.s5, col: 'c2', w: 1.5, label: 'S&P-like (500 largest)' }, { d: B.cap, col: 'price', w: 1.3, label: 'NYSE-like (all, cap-weighted)' }, { d: B.tech, col: 'c3', w: 1.3, label: 'Nasdaq-like (tech, cap-weighted)' }, { d: B.small, col: 'muted', w: 1.6, dash: [5, 3], label: 'Russell-like (2,000 small, equal)' }], shade: sh(), sub: { lines: [{ d: ratio, col: small ? 'muted' : 'c3', w: 1.8, label: small ? 'Russell-like ÷ S&P-like' : 'Nasdaq-like ÷ S&P-like' }] }, legend: [PH_LEG] });
+    const isHigh = (a, i) => { for (let k = i - lb; k < i; k++) if (a[k] >= a[i]) return false; return true; };
+    let tot = 0, conf = 0, unB = 0; let last = -99;
+    for (let i = lb; i < B.D; i++) {
+      if (!isHigh(B.gen, i) || i - last <= 5) continue; last = i; tot++;
+      let s5 = false, cp = false; for (let j = Math.max(lb, i - 3); j <= Math.min(B.D - 1, i + 3); j++) { if (isHigh(B.s5, j)) s5 = true; if (isHigh(B.cap, j)) cp = true; }
+      if (s5 && cp) conf++; else if (i >= 300 && i < 465) unB++;
+    }
+    $('r19').innerHTML = `Dow-like ${lb}-day breakouts: <b>${tot}</b> · confirmed by both S&amp;P-like and NYSE-like within 3 days: <b class="good">${conf}</b> · unconfirmed: <b class="bad">${tot - conf}</b> (of which <b>${unB}</b> in the narrowing phase) · end of narrowing phase (day 464): Dow-like <b>${sgnPct(pct(B.gen[0], B.gen[464]), 0)}</b>, S&amp;P-like <b>${sgnPct(pct(B.s5[0], B.s5[464]), 0)}</b>, NYSE-like <b>${sgnPct(pct(B.cap[0], B.cap[464]), 0)}</b>, Russell-like <b>${sgnPct(pct(B.small[0], B.small[464]), 0)}</b>`;
+  });
+  onChange('sel19', d19); bindRange('lb19', d19);
+
+  // ---------- section 20: confirmation scoreboard ----------
+  const d20 = reg(() => {
+    const day = val('day20'), lb = val('lb20');
+    const others = [['S&P-like', B.s5], ['NYSE-like', B.cap], ['Russell-like', B.small], ['AD line', S.ad], ['NH−NL (10-day)', sma(S.hl, 10)], ['up−down volume (10-day)', sma(S.av.map((v, i) => v - S.dv[i]), 10)]];
+    const dir = (a, i) => (a[i] == null || a[i - lb] == null ? 0 : Math.sign(a[i] - a[i - lb]));
+    const score = nulls(B.D);
+    for (let i = lb + 10; i < B.D; i++) { const g0 = dir(B.gen, i); score[i] = others.filter(([, a]) => dir(a, i) === g0).length; }
+    plot('c20', { n: B.D, lines: [{ d: B.gen, col: 'price', w: 1.4, label: 'Dow-like index' }], vlines: [{ i: day, col: 'c1', label: 'day ' + day }], shade: sh(), sub: { lines: [{ d: score, col: 'c2', w: 1, alpha: 0.35, step: true, label: 'lines agreeing with the Dow-like trend (0–6)' }, { d: sma(score.map((v) => (v == null ? 0 : v)), 10).map((v, i) => (i < lb + 20 ? null : v)), col: 'c2', w: 2.2, label: '10-day average of that count' }], ymin: 0, ymax: 6 }, legend: [PH_LEG] });
+    const g0 = dir(B.gen, day); const arrow = (s) => (s > 0 ? '↑' : s < 0 ? '↓' : '→');
+    $('r20').innerHTML = `day <b>${day}</b> (${phaseOf(day)}) · Dow-like trend <b>${arrow(g0)}</b> · ` + others.map(([nm, a]) => { const s = dir(a, day); return `${nm} <b class="${s === g0 ? 'good' : 'bad'}">${arrow(s)}</b>`; }).join(' · ') + ` · agreeing: <b>${score[day] == null ? '—' : score[day]} of 6</b>`;
+  });
+  bindRange('day20', d20); bindRange('lb20', d20);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; k3 = -1; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

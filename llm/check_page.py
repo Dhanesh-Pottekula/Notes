@@ -13,7 +13,8 @@ html = open(path, encoding="utf-8").read()
 problems = []
 
 ids = []
-for line in open(os.path.join(book, "figs", "MANIFEST.tsv"), encoding="utf-8"):
+manifest = os.path.join(book, "figs", "MANIFEST.tsv")   # books without extracted figures (trading) have none
+for line in (open(manifest, encoding="utf-8") if os.path.exists(manifest) else []):
     fid = line.split("\t")[0]
     if fid.split("-")[0] == ch and fid not in ids:
         ids.append(fid)

@@ -61,7 +61,9 @@ def strip(html):
 def add_theme(html):
     html = strip(html)
     html = html.replace("</head>", HEAD_JS + "\n</head>", 1)
-    i = html.rindex("</body>")
+    i = html.rfind("</body>")
+    if i < 0:   # </body> is optional in HTML; such pages just end, so the switch goes last
+        return html.rstrip("\n") + "\n" + BODY_UI + "\n"
     return html[:i] + BODY_UI + "\n" + html[i:]
 
 

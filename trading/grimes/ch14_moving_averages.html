@@ -1,0 +1,1523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.14 Moving Averages</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* ch14 additions (template styles above are unchanged) */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .node.bad { border-color: var(--sell); }
+.flow .node.good { border-color: var(--buy); }
+.flow .arr { color: var(--c1); }
+.beyond { border: 1px dashed var(--muted); background: var(--paper); }
+.work { background: var(--paper); border: 1px solid var(--rule); }
+.checks { font-family: var(--mono); font-size: 13px; display: grid; gap: 3px; }
+.checks .ok { color: var(--buy); } .checks .no { color: var(--sell); }
+table.es { font-size: 13px; }
+table.es td, table.es th { padding: 4px 7px; font-family: var(--mono); white-space: nowrap; }
+table.es th { font-family: var(--display); }
+.sig2 { color: var(--c1); font-weight: 600; }
+.quote { font-style: italic; border-left: 3px solid var(--c1); padding-left: 12px; color: var(--muted); }
+svg.diagram { width: 100%; height: auto; max-width: 820px; }
+svg.diagram rect.n { fill: var(--paper); stroke: var(--rule); }
+svg.diagram rect.k { fill: var(--tint); stroke: var(--c1); }
+svg.diagram line, svg.diagram path.a { stroke: var(--c1); stroke-width: 1.6; fill: none; }
+svg.diagram text.s { font-size: 11px; fill: var(--muted); }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch13_fibonacci_retracements.html">← Ch.13 Fibonacci Retracements</a><a href="ch15_the_opening_range_phenomenon.html">Ch.15 The Opening Range Phenomenon →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Adam Grimes · The Art and Science of Trading: Course Workbook (2017) · Chapter 14 · pdf p492–532</div>
+  <h1>Moving averages, <em>tested</em> instead of believed</h1>
+  <p class="lede">Traders repeat three ideas about moving averages: they are support and resistance, they define the trend, and their crossovers predict what comes next. Grimes puts each idea through a plain statistical test on thousands of stocks, futures and currencies. This page follows the chapter in order: every test, every rule, every table's message, and the one place where moving averages really did help. All prices on this page are simulated (made by code to show one idea), so they are never evidence about real markets. The book's own numbers are shown as the book gives them and are labelled that way.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b> · every simulated chart and pooled test below re-runs</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter is one long experiment. It starts with a trap in how moving-average charts are drawn, then tests the "support" claim three ways, finds an edge, and shows that the edge has nothing to do with the average. It then tests crossovers and trend indicators, and ends with the one use that survives.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Warning</span><span class="node">Today's MA uses today's live price</span><span class="arr">→</span><span class="node key">The touch you see on a chart may never have happened</span></div>
+    <div class="row"><span class="tag">Method</span><span class="node">Event study (Pythia)</span><span class="arr">→</span><span class="node">Return after signal − normal return = excess return</span></div>
+    <div class="row"><span class="tag">Support?</span><span class="node">Touch &amp; hold: 50</span><span class="node">45</span><span class="node">random length</span><span class="node">200</span><span class="arr">→</span><span class="node bad">No length is special</span></div>
+    <div class="row"><span class="tag">Break?</span><span class="node">Fade a close through the MA</span><span class="arr">→</span><span class="node key">Edge in stocks</span><span class="arr">→</span><span class="node good">Same edge with no MA: mean reversion</span></div>
+    <div class="row"><span class="tag">Crossovers</span><span class="node">Great in trends, shredded in ranges</span><span class="arr">→</span><span class="node">Brock et al. 1992</span><span class="arr">→</span><span class="node bad">Stopped working after 1986</span><span class="arr">→</span><span class="node">Optimization traps</span></div>
+    <div class="row"><span class="tag">Trend tools</span><span class="node">50-MA slope</span><span class="node">10/20/50 stack</span><span class="arr">→</span><span class="node bad">Lag + mean reversion: wrong side in stocks</span></div>
+    <div class="row"><span class="tag">What works</span><span class="node good">Long only above the 200-day</span><span class="arr">→</span><span class="node key">Lower volatility, because falling markets are wilder</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Intro: better than a coin?</a>
+    <a href="#s2"><span>02</span>MAs as support or resistance</a>
+    <a href="#s3"><span>03</span>Moving moving averages?</a>
+    <a href="#s4"><span>04</span>Moving average variations</a>
+    <a href="#s5"><span>05</span>The tests</a>
+    <a href="#s6"><span>06</span>Touch and hold on close</a>
+    <a href="#s7"><span>07</span>Is the 50 special? 45 and random</a>
+    <a href="#s8"><span>08</span>The 200-day</a>
+    <a href="#s9"><span>09</span>Price crossing a MA</a>
+    <a href="#s10"><span>10</span>The test without the MA</a>
+    <a href="#s11"><span>11</span>Moving average crossovers</a>
+    <a href="#s12"><span>12</span>Academic research</a>
+    <a href="#s13"><span>13</span>Optimization</a>
+    <a href="#s14"><span>14</span>Testing MA trend indicators</a>
+    <a href="#s15"><span>15</span>Volatility and the 200-day</a>
+    <a href="#s16"><span>16</span>Conclusions</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER 14: MOVING AVERAGES (INTRODUCTION)</div><h2>A tool must beat a coin flip</h2></div><span class="chip">pdf p492–493</span></div>
+  <p class="quote">"Statistics are used much like a drunk uses a lamppost; for support, not illumination." (Vin Scully, the chapter's epigraph)</p>
+  <p>Grimes has already used moving averages for a few specific jobs earlier in the book. Here he looks hard at how price actually behaves around them. What surprises him is how often the same claims are repeated by traders, books and the media without anyone testing them:</p>
+  <ul class="plain">
+    <li>moving averages are support and resistance;</li>
+    <li>moving averages define the trend;</li>
+    <li>moving average crossovers predict future price movement.</li>
+  </ul>
+  <p>Testing is awkward because many traders use averages in ways you can't test. Sometimes the average is one part of a bigger method with many judgment calls. Sometimes the thinking is just sloppy: "the average <em>sometimes</em> acts as support", "a crossover is <em>sometimes</em> a good trend signal". You can always find a chart where something worked, and traders give too much attention to a few outstanding examples. The real questions are: does it repeat reliably over a large sample, and does it add predictive value to your trading?</p>
+  <p>His parable: flip a coin at every trading decision. Sometimes the coin will seem to help. After many trades you will remember a few dramatic cases where it made you money: it got you out of a loser early, or kept you in a big trend. You might decide that it doesn't work all the time, but nothing in trading does, so you'll keep it and "use it sometimes", or say you "have to know when to look at it", which is exactly what many traders say about their indicators. It's a joke with a serious point: you have to be sure your tools are better than random chance.</p>
+  <div class="box picture"><b>Picture it</b><p>Give a coin to a hundred traders. By luck, a handful will have a great year. Each of them will have a story about the coin's brilliant call. The stories are true; the coin is still a coin.</p></div>
+  <div class="fig">
+    <canvas id="c1" aria-label="Equity curves of traders who let a coin decide long or short on a simulated random walk"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls"><button id="b1" type="button">Hand out new coins</button></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <p>Each line is one simulated trader on a simulated random-walk market (no edge exists by construction). Every 5 days the coin says long or short. The bright line is the luckiest trader of the twelve. The readout pools 400 coin traders, so you can see that the luckiest ones are what chance alone produces.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>With no edge, each trader's total return is a sum of random wins and losses. The spread of totals grows like √(number of trades), so a large group of traders always contains some big winners and some big losers. Looking only at the winners (or only at the memorable trades) is selection bias. The cure is the one Grimes uses all chapter: count <em>every</em> signal and compare the average result to what the market does anyway.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.12 Test Universe and Methodology (pdf p468): Grimes' random-walk spreadsheet exercise, where you see trends and patterns in data you know is random.</li>
+    <li>Ch.13 Fibonacci Retracements: the same "test the lore" approach, which found no special ratios.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · MOVING AVERAGES AS SUPPORT OR RESISTANCE</div><h2>What the line is, and why it moves while you watch</h2></div><span class="chip">pdf p493</span></div>
+  <p>A moving average averages a window of prices; the window slides forward one bar and is recalculated each bar. A standard 50-period average is the mean of the last 50 closes, <b>including the current bar's close</b>. The current bar hasn't closed yet, so until it does the platform uses the current price in its place.</p>
+  <p>That has an important consequence: the average for the current bar changes with every tick while the bar is forming. For a long average, today's price is one of several hundred, so it takes a very large move today to shift the line much. For short averages (some traders use 3 to 5 bars), the last price can move the line a lot. And so the average you see on a historical chart did not exist in that form in real time.</p>
+  <div class="box picture"><b>Picture it</b><p>A class average where one student's mark keeps changing until the bell. In a class of 200 it hardly matters. In a class of 3, that one student drags the average all over the place.</p></div>
+  <div class="fig">
+    <canvas id="c2" aria-label="Candles with a moving average whose last value depends on today's still-forming close"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="n2">Average length <input id="n2" type="range" min="3" max="200" value="50"><output id="n2o">50</output></label>
+      <label for="m2">Today's move % ×10 <input id="m2" type="range" min="-50" max="50" value="20"><output id="m2o">20</output></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>(This algebra is not in the book.) Today's average is (sum of the previous N−1 closes + today's price) ÷ N. If today's price moves by Δ, the average moves by Δ ÷ N. So a 2% move moves a 3-bar average by about 0.67% of price, but a 200-bar average by only 0.01%. Drag the length slider down to 3 and watch the last point of the line jump as you move "today's" price.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Murphy Ch.9 (<a href="../murphy/ch09_moving_averages.html">Moving Averages page</a>): how the window is built and why longer averages lag more.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · MOVING MOVING AVERAGES?</div><h2>The perfect bounce that never happened</h2></div><span class="chip">pdf p493–495 · Fig 14.1–14.2</span></div>
+  <p>Some writers (Grimes names Kirkpatrick, 2006) say moving averages work as support and resistance. Part of this belief may come from casually looking at old charts. But some of the most dramatic "tests" of an average never actually happened, because the average moves while the bar is forming.</p>
+  <p>His Figure 14.1 is a daily SPY (S&amp;P 500) chart where price seems to drop to its 20-period average almost to the tick, then explode to close at the high of the day. It looks as if a trader buying at the average would have bought the exact low, at a structurally important point, with a shot at a 13% advance over the next few months.</p>
+  <p>Figure 14.2 replays that day at five moments. At the open the average was well below the day's low. When price fell to the session low (108.94), the average was still below it. As price rallied in the afternoon the average rose too, but stayed under the low. Only as the market surged into the close was the average pulled up to touch the low, which had been set hours earlier. (The five averages printed in the figure climb from about 108.88 to 108.96.) A trader acting on this "signal" would have had to buy the close, not the low. It was an illusion; the trade never happened. Any backtest built on price touching a moving average, including some tests in this chapter, suffers from this effect.</p>
+  <div class="box picture"><b>Picture it</b><p>A finish line that walks toward the runner. The runner stopped short of it hours ago; at the end of the day the line walked over to where the runner's footprint was, and the photo shows them touching.</p></div>
+  <div class="fig">
+    <canvas id="c3" class="tall" aria-label="Replay of a forming daily bar with its 20-period average recalculated at each moment"></canvas>
+    <div class="legend" id="c3L"></div>
+    <canvas id="c3b" class="short" aria-label="Intraday path of price, the live 20-period average and the low of the day"></canvas>
+    <div class="legend" id="c3bL"></div>
+    <div class="controls">
+      <label for="t3">Time of day <input id="t3" type="range" min="0" max="40" value="0"><output id="t3o">0</output></label>
+      <button id="play3" type="button">Play the day</button><button id="reset3" type="button">Reset</button>
+    </div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <p>This replay uses made-up prices shaped like the book's example (a 20-period average, a low of 108.94, a strong close), not SPY data. Step through the day: the yellow live average stays below the low until the last minutes.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>(This shortcut is not in the book.) Price meets the live average only when price = (S + price) ÷ N, where S is the sum of the previous N−1 closes. Solve it and you get price = S ÷ (N−1): <b>the average of the previous N−1 closes</b>. That fixed level, not the line on the chart, is what price had to reach in real time. Here it is 108.86, below the 108.94 low, so the touch was impossible. On the finished chart the plotted average is that level plus (close − level) ÷ N, so a big up-close lifts the line into the bar. That's why the illusion shows up on strong reversal days, the very bars that look most convincing.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 06: the touch-and-hold test buys on the close of the bar for exactly this reason.</li>
+    <li>Any backtest you write (see your <code>backtest_results_summary.md</code> runs): a rule that fills "at the moving average" on the same bar the average is computed from has this look-ahead built in.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · MOVING AVERAGE VARIATIONS</div><h2>Offset the line so it is fixed before the bar starts</h2></div><span class="chip">pdf p495–496</span></div>
+  <p>One fix is to offset the average by some bars: use yesterday's average (calculated on yesterday's close) as today's, or even the value from 5 to 10 bars ago. The offset line is known before the current bar begins. Whether it hurts or helps depends on what you use the average for.</p>
+  <p>There are other variations too: averages that weight recent prices more than old ones, and averages that don't drop old data but let it fade away exponentially (EMA). Grimes notes that an earlier chapter of the book studies simple (SMA) and exponential (EMA) averages in detail from a discretionary trader's view; that chapter is not one of this PDF's modules (see Murphy Ch.9 on this site for the SMA/EMA/WMA mechanics). This chapter sticks to the hard facts of price behaviour around <b>simple</b> moving averages.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_target_on_truck.svg" alt="An archer aims at a target painted on a moving truck, while a second identical target painted on the road stays where it was yesterday." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>The live average is a target painted on a moving truck. The offset average is the same target painted on the road yesterday: a bit behind, but it stays where it is.</p></div>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Candles with a live simple average, an offset average and phantom touches marked"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <label for="n4">Average length <input id="n4" type="range" min="3" max="100" value="20"><output id="n4o">20</output></label>
+      <label for="k4">Offset bars <input id="k4" type="range" min="1" max="10" value="1"><output id="k4o">1</output></label>
+      <label><input id="chk4" type="checkbox"> also show EMA</label>
+    </div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>(The counting rule is not in the book; it applies the section 03 shortcut.) A bar "touches" the live average on the finished chart when the plotted value sits inside the bar's high–low range. It touched it <em>in real time</em> only if the average of the previous N−1 closes sits inside that range. Red dots mark phantom touches: on the chart, but never reachable live. The offset average never has phantoms, because its value was fixed before the bar opened. Shorter averages make more phantoms, since today's price carries a weight of 1/N.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Murphy Ch.9, sections on SMA, WMA and EMA, and on centring (shifting) an average.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · THE TESTS</div><h2>Building-block tests, not trading systems</h2></div><span class="chip">pdf p496</span></div>
+  <p>Grimes doesn't test complete systems or complex methods. He only asks whether there is any visible, non-random price movement around moving averages. The questions:</p>
+  <ul class="plain">
+    <li>Does it make sense to buy or sell based on where price is relative to an average?</li>
+    <li>Do moving averages provide support?</li>
+    <li>Are some averages more useful ("special") than others?</li>
+    <li>Can moving averages define the trend of a market?</li>
+  </ul>
+  <p>Treat these as tests of the basic building blocks. Other conditions, not covered here, might show an edge when combined with averages, and there may be profitable ways to trade them outside these tests. He starts at the beginning: what happens when price touches a simple moving average?</p>
+  <div class="box picture"><b>Picture it</b><p>Before testing a car you test the bricks it's built from. If one brick is made of sand, no clever design built on it will save the car.</p></div>
+  <div class="fig map">
+    <svg class="diagram" viewBox="0 0 820 200" role="img" aria-label="Event study pipeline: signal, follow returns for 20 days, subtract baseline, test significance">
+      <defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--c1)"/></marker></defs>
+      <rect class="k" x="6" y="30" width="170" height="70" rx="5"/><text x="18" y="56">1 · exact rule</text><text class="s" x="18" y="76">e.g. touch &amp; hold,</text><text class="s" x="18" y="91">no judgment allowed</text>
+      <rect class="n" x="216" y="30" width="170" height="70" rx="5"/><text x="228" y="56">2 · enter on close</text><text class="s" x="228" y="76">buy rule; sell rule is</text><text class="s" x="228" y="91">the mirror image</text>
+      <rect class="n" x="426" y="30" width="170" height="70" rx="5"/><text x="438" y="56">3 · follow 20 days</text><text class="s" x="438" y="76">return from entry at</text><text class="s" x="438" y="91">day 1–5, 10, 15, 20</text>
+      <rect class="k" x="636" y="30" width="178" height="70" rx="5"/><text x="648" y="56">4 · minus baseline</text><text class="s" x="648" y="76">excess = signal mean</text><text class="s" x="648" y="91">− all-days mean (bp)</text>
+      <line x1="176" y1="65" x2="214" y2="65" marker-end="url(#ar5)"/><line x1="386" y1="65" x2="424" y2="65" marker-end="url(#ar5)"/><line x1="596" y1="65" x2="634" y2="65" marker-end="url(#ar5)"/>
+      <path class="a" d="M725,100 L725,140 L430,140" marker-end="url(#ar5)"/>
+      <rect class="n" x="170" y="122" width="256" height="60" rx="5"/><text x="182" y="146">5 · significance (* 0.05, ** 0.01)</text><text class="s" x="182" y="166">buys should be +, sells should be −</text>
+    </svg>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is an event study (Grimes' Pythia procedure, described in Ch.12). It separates the <em>entry</em> from the exit: instead of a P&amp;L that mixes both, you see the average path of price after the signal, day by day, compared to the market's normal drift. If a signal has no edge, its average path looks like the baseline and the excess hovers around zero.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Ch.12 Test Universe and Methodology, the Pythia section (pdf p468–472): baseline stats, symmetric buy/sell rules, entry on the signal bar's close without slippage, 20 bars after the signal.</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · MOVING AVERAGE TOUCH AND HOLD ON CLOSE</div><h2>Price touches the line and the line holds: does it bounce?</h2></div><span class="chip">pdf p496–501 · Fig 14.3 · Table 14.1</span></div>
+  <p>When price meets an average there are only two outcomes: the level <b>holds on the close</b> (price traded down to the average but the bar closed above it) or it <b>fails</b> (the bar closes below). This test covers the first case. (His Figure 14.3 shows valid examples on a 20-period EMA: buys where an uptrend dips into the line and closes back above it, sells where a downtrend pokes up into it and closes back below.)</p>
+  <div class="formula">Criteria (buy), as Grimes defines them
+AVG = Average(close, N)
+IF   low of previous bar  &gt; AVG on previous bar
+AND  low of current bar   ≤ AVG          (average touched on this bar)
+AND  close of current bar ≥ AVG          (market can't close below it)
+THEN buy this bar on the close.        Sell = the mirror image.</div>
+  <p>The test runs in the Pythia framework: take the rule, flag every bar that fits, then build a composite return for each day after the signal. Grimes stresses this is not a tradable signal; it's a clean test of tendencies. It's even possible he has buy and sell backwards, and that's fine: a backwards rule simply shows buys with negative excess returns and sells with positive ones.</p>
+  <p>Many traders watch the 50-day average "because hedge funds watch it" or because many traders like to buy there. If people really used this level, there should be non-random price behaviour around it. <b>How to read his tables</b> (used all chapter):</p>
+  <ul class="plain">
+    <li>Rows are days after the signal: days 1 to 5, then weekly steps (10, 15, 20).</li>
+    <li><b>µsig − µb</b> (excess mean) is probably the most useful number: the mean return of all signals minus the baseline mean (the normal drift of that asset class).</li>
+    <li><b>Diff. Med.</b> is the same for the median.</li>
+    <li>Numbers are in basis points (1 bp = 0.01% = 0.0001), because they are small.</li>
+    <li>* means significant at the 0.05 level, ** at the 0.01 level.</li>
+    <li><b>%Up</b> is how often price closed above the entry price; compare it to the baseline: 50.07% of days close up in the equity sample, 50.59% in futures, 51.0% in forex.</li>
+    <li>A signal that works as believed shows <b>positive</b> excess returns for buys and <b>negative</b> excess returns for sells. The tables summarise fuller data in the book's appendix (not part of this PDF).</li>
+  </ul>
+  <p><b>What Table 14.1 (50-period SMA) showed.</b> There is statistically significant activity, but not the expected kind. Futures and forex show slightly positive but insignificant numbers for buys. Equities show a consistently negative return after buying bounces off the 50-period average: −5.1 bp at day 1 rising to −62.9 bp by day 20, mostly at the 0.01 level. What looked like a buy is a significant <em>sell</em> in stocks; the rule was mis-specified. Forex shows a slight edge on the sell side (means and medians both consistently negative). Equity sells show no clear edge because means and medians point different ways. Whatever the details, it is not what we'd see if the story about the 50-day were true. Grimes adds that with enough extra conditions (patterns, distance from the average, market conditions) you could massage the data into a positive edge, but that isn't the point; and simple answers are rare in market data.</p>
+  <div class="box picture"><b>Picture it</b><p>A trampoline test: drop a ball onto the line a thousand times and measure how high it bounces on average, compared to balls dropped anywhere. If the line is a real trampoline, its balls bounce higher. In stocks, the 50-day's balls bounced <em>lower</em>.</p></div>
+  <div class="fig">
+    <h3>Try the rule on a simulated chart</h3>
+    <canvas id="c6" class="tall" aria-label="Simulated candles with a simple moving average and touch-and-hold signals"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls">
+      <label for="n6">SMA length <input id="n6" type="range" min="10" max="200" value="50"><output id="n6o">50</output></label>
+      <button id="nx6" type="button">Next signal ▶</button>
+    </div>
+    <div class="checks" id="r6"></div>
+  </div>
+  <div class="fig">
+    <h3>Run the event study yourself (pooled simulated markets)</h3>
+    <div class="controls">
+      <label for="sel6">Market <select id="sel6"><option value="rw">pure random walk</option><option value="rev">random walk + built-in short-term reversal</option></select></label>
+      <button id="p6" type="button">Run pooled test</button>
+    </div>
+    <div class="tablewrap" id="t6"></div>
+    <p>40 simulated markets × 1,200 bars, with the SMA length from the slider above. On the random walk, no edge exists, so any stars are false alarms (expect about 1 in 20 cells at the 0.05 level, more because the day-10 to day-20 windows overlap). The second market has a reversal effect built in by construction; it shows what a real edge looks like in this table, not that markets have one.</p>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers: Table 14.1, excess mean by day</h3>
+    <canvas id="c6b" class="short" aria-label="Bar chart of the book's Table 14.1 excess mean returns"></canvas>
+    <div class="legend" id="c6bL"></div>
+    <div class="controls"><label for="sel6b">Asset class <select id="sel6b"><option value="eq">Equities</option><option value="fu">Futures</option><option value="fx">Forex</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The excess return asks: "after this signal, did price do better than it does on an ordinary day?" Subtracting the baseline matters because stocks drift up; a raw +10 bp after a buy means nothing if every day averages +10 bp. %Up near 50% can hide a lot: a signal can win slightly more often yet lose more on average, which is why Grimes leads with the mean.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Two cautions for reading any table like this. First, the 10-, 15- and 20-day returns of nearby signals overlap, so they aren't independent; simple t-tests then overstate significance. Second, with 8 horizons × 6 columns = 48 cells per table, a few stars appear by chance alone. Grimes' answer is the next section: compare against other lengths and a random length.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your weekly pullback test (<code>backtest_results_summary.md</code>): it buys a dip to the 20-week EMA, but only after a weekly close above last week's high and inside a 50/200-week uptrend. That's a different, more conditioned rule than touch-and-hold, so this table neither confirms nor kills it.</li>
+    <li>Section 10: the reason this rule loses in stocks turns out to have nothing to do with the average.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · TOUCH AND HOLD, CONTINUED: 45-PERIOD AND RANDOM-PERIOD AVERAGES</div><h2>If the 50 is special, the 45 shouldn't look the same</h2></div><span class="chip">pdf p499–504 · Fig 14.4–14.5 · Tables 14.2–14.3</span></div>
+  <p>Two boxes in Table 14.1 looked unusual: equity buys and forex sells. Is that because the 50 is special? If institutions watch the 50-period average, they aren't watching the 45. (If that logic fails, it gets silly: eventually every average is significant, and every possible price is crossed by some average.) Figure 14.4 shows the 45 and 50 together: they are very similar, with the 45 hugging price a bit more closely because it responds faster.</p>
+  <p><b>Table 14.2 (45-period)</b> looks almost the same as Table 14.1, which strongly contradicts the idea that the 50 is special. A blunt test wouldn't be expected to find a dramatic edge, but a truly important average should at least be distinguishable from other lengths. Grimes says you get similar tables whatever length you test.</p>
+  <p>So he builds a strange average (Figure 14.5): its length random-walks between 30 and 70. On every bar the length goes up 1, down 1 or stays the same, chosen by a pseudo-random number generator, so the line is different every time the chart is recalculated. <b>Table 14.3</b> shows the touch-and-hold results for this random average. For equities, the 45 and 50 are literally indistinguishable from a random level: equity buys still show significant negatives (−7.2 bp day 1, −61.4 bp day 20), much like −62.9 for the 50 and −64.8 for the 45.</p>
+  <div class="box picture"><b>Picture it</b><p>If a famous restaurant is truly special, its reviews should differ from the place next door and from a random diner. If all three get the same scores, the fame is in the name, not the food.</p></div>
+  <div class="fig">
+    <canvas id="c7" class="tall" aria-label="Simulated price with 50-period, 45-period and random-length moving averages"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="controls"><button id="b7" type="button">Re-roll the random length</button></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers side by side: 50 vs 45 vs random length</h3>
+    <canvas id="c7b" class="short" aria-label="Bar chart comparing book Tables 14.1, 14.2 and 14.3"></canvas>
+    <div class="legend" id="c7bL"></div>
+    <div class="controls"><label for="sel7">Column <select id="sel7"><option value="eqB">Equities, buy</option><option value="eqS">Equities, sell</option><option value="fuB">Futures, buy</option><option value="fuS">Futures, sell</option><option value="fxB">Forex, buy</option><option value="fxS">Forex, sell</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>This is a placebo test. The random-length average has no meaning that anyone could watch, so whatever it shows is what "an average-like line near price" produces by itself. When the famous line matches the placebo, the effect comes from the shape of the test (price dipping to a nearby smoothed level), not from the specific number 50.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Murphy Ch.9's "summary of common settings": the popular lengths are conventions. This test is why Grimes treats them that way.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · TOUCH AND HOLD, CONTINUED: THE 200-DAY</div><h2>The "line in the sand" fails the same test</h2></div><span class="chip">pdf p505–506 · Table 14.4</span></div>
+  <p>What about the 200-day? It has been important in the investment literature for decades, at least since Joseph Granville wrote about it in the 1940s. For many casual chart readers it's the ultimate line in the sand. Supposedly many funds may only own stocks above their 200-day averages, and the media print stories whenever an index crosses it. Surely such a watched level is significant?</p>
+  <p><b>Table 14.4</b> says the numbers speak for themselves. Equity buys on a touch-and-hold of the 200-day show significant negative excess returns, larger than for the 50: −13.3 bp on day 1, −57.5 at day 10, −97.4 by day 20. Equity sells are also negative (−62.4 bp by day 20), so the "sell" side actually works as a sell while the "buy" side also behaves like a sell. Futures and forex show nothing consistent.</p>
+  <div class="box picture"><b>Picture it</b><p>A wall everyone talks about. When you test it, balls that hit it don't bounce back; they keep sinking a little faster than balls that never touched it.</p></div>
+  <div class="fig">
+    <canvas id="c8" class="tall" aria-label="Simulated three-year chart with a 200-period average and its touch-and-hold signals"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers: 50-period (Table 14.1) vs 200-day (Table 14.4)</h3>
+    <canvas id="c8b" class="short" aria-label="Bar chart comparing book Tables 14.1 and 14.4"></canvas>
+    <div class="legend" id="c8bL"></div>
+    <div class="controls"><label for="sel8">Column <select id="sel8"><option value="eqB">Equities, buy</option><option value="eqS">Equities, sell</option><option value="fuB">Futures, buy</option><option value="fuS">Futures, sell</option><option value="fxB">Forex, buy</option><option value="fxS">Forex, sell</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A 200-day average is far from price most of the time, so touches are rare (see the readout: far fewer signals per 1,000 bars than a 50). Fewer events means each number in the table is noisier. That the equity numbers are still large and significant tells you the effect is strong, but it's negative, the opposite of support.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 15: the 200-day does earn its keep, but as a volatility filter for long-term holding, not as a bounce level.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · PRICE CROSSING A MOVING AVERAGE</div><h2>When the line breaks, does anything happen?</h2></div><span class="chip">pdf p506–509 · Fig 14.6 · Tables 14.5–14.6</span></div>
+  <p>If averages were important levels and big traders made decisions on them, a break of the average should cause a reaction: traders exit or adjust positions, and that buying or selling should distort returns. Grimes calls this the <b>Moving Average Penetration</b> test.</p>
+  <div class="formula">Criteria (buy), as Grimes defines them
+AVG = Average(close, N)
+IF   low of previous bar &gt; AVG on previous bar
+AND  close of this bar   &lt; AVG           (market closes below the average)
+THEN buy this bar on the close.        Sell = the mirror image.</div>
+  <p>This rule always <b>fades</b> (trades against) a move through the average: price breaks below after being above, and the rule buys. It might be backwards (maybe these should be traded as breakouts, with the move), but again it doesn't matter: a backwards rule shows negative excess for buys and positive for sells. Figure 14.6 shows examples of both.</p>
+  <p><b>Tables 14.5 (50-period) and 14.6 (200-period).</b> Interesting, at least for equities. The sells (shorting the first bar that closes above the average) show a consistent, significant negative edge: for the 50, −12.6 bp at day 1 to −40.2 bp at day 20; for the 200, −16.2 bp to −91.7 bp. The buys (buying the first close below the average) show a small positive edge at first (for the 200: +9.4 bp on days 1 and 2) that decays into a significant negative edge somewhere between days 5 and 10. Could one outlier cause that decay? The data isn't shown, but when the equities are split into large-, mid- and small-cap groups, the same decay appears in every slice; a single odd stock would most likely affect only one. Futures and forex show no predictable pattern. This is the strongest clue so far that not all assets trade the same way, which challenges the claim that every technical tool works in any market and time frame without adaptation.</p>
+  <div class="box picture"><b>Picture it</b><p>A fence everyone says matters. When the cows push through it, you'd expect a stampede one way or the other. In stocks, they wander back a little. In futures and currencies, they don't care at all.</p></div>
+  <div class="fig">
+    <canvas id="c9" class="tall" aria-label="Simulated candles with a moving average and fade-break penetration signals"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls">
+      <label for="n9">SMA length <input id="n9" type="range" min="10" max="200" value="50"><output id="n9o">50</output></label>
+      <button id="nx9" type="button">Next signal ▶</button>
+    </div>
+    <div class="checks" id="r9"></div>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers: penetration (fade break) tests</h3>
+    <canvas id="c9b" class="short" aria-label="Bar chart of the book's Tables 14.5 and 14.6"></canvas>
+    <div class="legend" id="c9bL"></div>
+    <div class="controls"><label for="sel9">Asset class <select id="sel9"><option value="eq">Equities</option><option value="fu">Futures</option><option value="fx">Forex</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>For the sell rule, the bar must close above the average after the previous bar's high was below it: the bar is a strong up day. Selling it and seeing price fall afterwards is a bet that strong up days partly give back their gains. Hold that thought: it's the clue that unlocks the next section.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Ch.16 Quantitative Evidence of the Two Forces: Grimes' wider study of mean reversion and momentum across asset classes.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · PRICE CROSSING A MOVING AVERAGE, CONTINUED: THE TEST WITHOUT THE AVERAGE</div><h2>Take the moving average out. The edge stays.</h2></div><span class="chip">pdf p511–515 · Fig 14.7–14.8 · Table 14.7</span></div>
+  <p>Grimes ran the penetration test on many other versions (lengths from 10 to 200, simple and exponential, and the random-length average) and they all look similar: the odd distortion in equity returns persists. There's no evidence that averages are important levels; 20, 45, 50, 65, 150, 185, 200, 233 and any others all look basically the same. Yet the penetration test does show a significant edge in equities: buy closes below and short closes above the average. His radical thought: repeat the test <b>without the moving average</b>.</p>
+  <p>Why that makes sense: for a buy, the bar must close below the average while the previous bar's low was above it. In almost every case that means today's close is below yesterday's low. In rare cases the average could rise above yesterday's low, but that's unlikely. So he tests the simpler rule directly: <b>fade a close outside the previous day's range</b> (buy a close below yesterday's low, Fig 14.7; short a close above yesterday's high, Fig 14.8).</p>
+  <p><b>Table 14.7.</b> For the first five days the results look remarkably like the moving-average breaks. Equities: a fairly large, significant negative return after the sell condition (−8.9 bp day 1 to −48.0 bp day 20), and a smaller but still significant positive return after the buy condition (+9.1 bp day 1, +20.7 bp day 5, still +12.4 bp at day 20, every horizon at the 0.01 level). Not conclusive, but it strongly suggests the "moving average edge" is simply stocks' tendency to reverse after a close outside the previous day's range. That's <b>mean reversion</b>, one of the verifiable, fundamental features of price movement.</p>
+  <p>It matters on another level too: equities don't follow a random walk. Random-walk markets wouldn't show this; when he reran the test on random-walk data, deviations from the baseline were generally under 2 bp. One simple rule, on his sample of 600 stocks over the past 10 years, gives enough evidence to reject the random walk hypothesis for equities.</p>
+  <p>Futures and forex are more complicated. There is a measurable difference in the share of up closes on day 1: futures close up 50.6% of the time at baseline vs 52.6% after buys and 47.9% after sells; forex 51.0% vs 54.2% and 47.5%. These differences are significant and might give a head start combined with other factors, but the size of the move is far too small to matter economically on its own. A pattern repeats through his tests: futures and forex look more like random walks than equities do.</p>
+  <p>Why not rewrite the academic books? Three answers. One: the effect is small even in stocks; he puts it at 29 bp for buys and 24 bp for sells five days after the signal. Would you run a system that holds a $100 asset for a week to make $0.25? Some traders could capture an edge that small, but he doesn't plan to trade these ideas systematically; they are hints about where opportunities and hidden market structure might be. Two: you could say the sample isn't representative; he disagrees (stocks of all sizes and industries plus most major futures and currencies) but calls it a fair criticism. Three: this isn't a standard, accepted test for a random walk, even though the results strongly suggest a non-random process.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_dog_doorbell_not_uniform.svg" alt="A dog barks at a postman without a uniform just as loudly, revealing it was the doorbell all along." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>You thought the dog barked at the postman's uniform. Then you sent the postman without the uniform, and the dog barked just the same. It was the doorbell all along.</p></div>
+  <div class="fig">
+    <h3>How often is "close through the average" also "close outside yesterday's range"?</h3>
+    <div class="controls"><label for="n10">SMA length <input id="n10" type="range" min="5" max="200" value="50"><output id="n10o">50</output></label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="fig">
+    <h3>Sweep: the same test with every length, a random length, and no average at all</h3>
+    <canvas id="c10" aria-label="Day-5 excess returns of the fade test for many average lengths and with no average, on pooled simulated markets"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls">
+      <label for="sel10">Market <select id="sel10"><option value="rev">random walk + built-in short-term reversal</option><option value="rw">pure random walk</option></select></label>
+      <button id="p10" type="button">Re-run sweep</button>
+    </div>
+    <div class="readout" id="r10b"></div>
+    <p>Each bar is the day-5 excess return (bp) of the penetration rule on 30 pooled simulated markets; the thin line on each bar is ±2 standard errors. The reversal market has mean reversion built in by construction, so it shows the <em>pattern</em> of Grimes' result (every length gives the same answer, and the no-average rule gives it too). It is not evidence that real stocks revert; his table is.</p>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers: MA breaks (Tables 14.5, 14.6) vs no average (Table 14.7)</h3>
+    <canvas id="c10c" class="short" aria-label="Bar chart comparing book Tables 14.5, 14.6 and 14.7"></canvas>
+    <div class="legend" id="c10cL"></div>
+    <div class="controls"><label for="sel10b">Column <select id="sel10b"><option value="eqB">Equities, buy</option><option value="eqS">Equities, sell</option><option value="fuB">Futures, buy</option><option value="fuS">Futures, sell</option><option value="fxB">Forex, buy</option><option value="fxS">Forex, sell</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>When two signals fire on almost the same bars, they must have almost the same results. The readout shows that nearly every penetration signal is also a close outside yesterday's range, so the average adds almost nothing. The average is a costume; the real event is a strong close beyond the prior bar, and in stocks such closes tend to be partly given back over the next days.</p></div>
+  <div class="box work"><b>Worked example: is the edge worth trading?</b><p>Grimes' own example: 25 bp on a $100 stock is $0.25 per share for a week's hold. (Not in the book:) on NSE delivery trades, your <code>breakeven_move_fyers.md</code> note puts the round-trip break-even at about 0.27–0.33% (27–33 bp) for ₹1L–₹10L trades, before tax. So a 20–29 bp gross edge is about the size of the costs; it's only usable as a nudge inside a bigger idea, which is exactly how Grimes frames it.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.10 Academic Theories of Market Behavior: the random walk hypothesis this result challenges.</li>
+    <li>Ch.16 Quantitative Evidence of the Two Forces: more tests of mean reversion vs momentum.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · MOVING AVERAGE CROSSOVERS</div><h2>Always catches the big trend, always pays for it in the range</h2></div><span class="chip">pdf p515–517 · Fig 14.9–14.10</span></div>
+  <p>A crossover happens when a short average (which tracks price closely) crosses above or below a longer one. These events are widely seen as trading signals or trend indicators, because they are supposed to mark turning points. In their purest form they are traded <b>always-in</b>: long on a buy signal, and on a sell signal immediately reverse to short, with no flat period. The idea is that being always in lets you catch a big trend when it comes.</p>
+  <p>Figure 14.9 (EURUSD, 10/50-day) shows an excellent trade caught almost in full. Crossovers will always capture most of a large trend. There's lag that depends on the lengths, so they never sell the exact high or buy the exact low, but in backtests they always take a big chunk out of a large trend.</p>
+  <p>That's half the story. Crossover systems always do well in trending markets and just as surely get destroyed in ranges: with no clear trend, the market chops back and forth and forces the system to buy highs and sell lows. These whipsaws usually give back all the profit from the trends, and sometimes more. Contrary to what some books say, basic moving average systems are not economically viable on their own; whipsaws and trading frictions make them breakeven at best. Figure 14.10 (USDJPY, 10/50-day) shows a range where the system repeatedly buys the high and sells the low, with significant losses.</p>
+  <div class="box picture"><b>Picture it</b><p>A smoke detector that never misses a real fire but also goes off every time you make toast. In a burning building it's a hero. In a kitchen it costs you a fortune in false alarms.</p></div>
+  <div class="fig">
+    <canvas id="c11" class="tall" aria-label="Always-in moving average crossover system on a simulated trending or ranging market with its equity curve"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls">
+      <label for="sel11">Market <select id="sel11"><option value="trend">trending</option><option value="range">range-bound</option><option value="mixed">trend → range → trend</option></select></label>
+      <label for="f11">Fast <input id="f11" type="range" min="2" max="40" value="10"><output id="f11o">10</output></label>
+      <label for="l11">Slow <input id="l11" type="range" min="20" max="200" value="50"><output id="l11o">50</output></label>
+      <label for="k11">Cost per trade, bp <input id="k11" type="range" min="0" max="60" value="10"><output id="k11o">10</output></label>
+    </div>
+    <div class="readout" id="r11"></div>
+    <div class="controls"><button id="p11" type="button">Pool 120 markets of each kind</button></div>
+    <div class="readout" id="r11b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A crossover only fires after price has already moved far enough to drag the fast average across the slow one. In a trend the move keeps going, so being late costs little. In a range the move reverses about when the signal fires, so every signal enters near the edge of the range and exits near the other edge: a loss plus costs, every time. The system's result is the battle between a few big trend wins and many small range losses, and the cost slider tips that battle.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your MACD crossover tests (<code>backtest_results_summary.md</code>): "not worth trading anywhere"; fast timeframes lost to costs, and weekly results were below just holding the stocks. MACD is the gap between two EMAs, so it's the same family.</li>
+    <li>Murphy Ch.9 sections on double and triple crossovers, and his note that markets spend long stretches going sideways.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · ACADEMIC RESEARCH</div><h2>The famous 1992 result, and what happened next</h2></div><span class="chip">pdf p517–521 · Fig 14.11–14.12 · Tables 14.8–14.9</span></div>
+  <p>There's a large body of academic work on crossover rules. Brock, Lakonishok and LeBaron's landmark paper, "Simple Technical Trading Rules and the Stochastic Properties of Stock Returns" (1992), was one of the first to show that technical rules could make statistically significant profits on stock market averages. They tested moving-average crossovers and channel breakouts on the Dow Jones Industrial Average from its first day of records in 1897 to the last trading day of 1986, and found significant profits on both the long and short side for every average combination they tried.</p>
+  <p>Their lengths may surprise modern traders: short averages of 1, 2 or 5 periods and long ones of 50, 150 or 200. A 1-period average is just the price, so many of their "crossovers" were really price crossing an average. Most system builders today use lengths much closer together, like 10/50 or 50/200. Grimes calls the paper accessible to lay readers and required reading for anyone who trades technical signals.</p>
+  <p>Their most profitable rules weren't stop-and-reverse; they entered on a crossover and exited 10 days later. Some tests also put a band around the averages and ignored signals inside it, to cut noise and whipsaws. Grimes re-creates the simplest one, the 1/50 crossover with no band, trading $100,000 on each signal (or shorting the same dollar amount), every day from 1920 to 1986 (Figure 14.11). The equity curve rises steadily through the 1929 crash, both World Wars and several recessions with no significant drawdowns, and stays stable for most of a century while the world changed. That stability is exactly what systematic traders want.</p>
+  <p><b>Table 14.8 (1920–1986, no costs or financing):</b> 911 trades, total net profit $743,794, 28.0% profitable, mean trade 84 bp, mean winner 589 bp, mean loser −112 bp. Win rates well under 40% are normal for long-term trend following; it works as long as winners are much bigger than losers. But is 84 bp enough after frictions? This is a backtest on the cash DJIA, an average of 30 stocks; for most of this history you'd have had to buy each stock and rebalance the basket yourself. Financing costs, dividends and taxes also matter. Financing alone: earning 4% risk-free for 66 years (the rate varied, but this is roughly right; he cites Dimson, Marsh and Staunton 2002) turns $100,000 into over $1.3 million. And the DJIA itself rose 2,403% over the period; per Grimes, buy-and-hold would have returned over $2.3 million, though with large swings and drawdowns.</p>
+  <p>The stronger blow is an out-of-sample check. The published results end in 1986, so walk forward from 1 Jan 1987 to 31 Dec 2010, as if you'd started trading it after publication. (Not a true out-of-sample test, since the authors probably looked at some later data even if they didn't publish it.) <b>Table 14.9 (1987–2010):</b> 449 trades, total net profit $19,830, 20.9% profitable, mean trade 7 bp, mean winner 477 bp, mean loser −117 bp. Buy-and-hold made over $550,000 in the same period.</p>
+  <p>Is this just normal variation? The equity curve has no other flat, choppy 15-year stretch, but that's not a test. A <b>Kolmogorov-Smirnov test</b> (a non-parametric test of whether two samples come from the same distribution) on the in-sample vs out-of-sample returns gives p = 0.007: enough evidence to reject "same distribution". Something changed, and it may be unwise to trade the system after such a shift. Nothing was wrong with the research; market history is full of ideas that stopped working, especially after they were published in academic or practitioner literature.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_fishing_spot_book.svg" alt="A fishing spot fed a village for decades until a book about it drew crowds and the nets came up nearly empty." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A fishing spot that fed a village for 66 years. Then a book is written about it. The next 24 years, the nets come up nearly empty, and a statistician confirms the catch now looks like it comes from a different lake.</p></div>
+  <div class="box work"><b>Worked example: where 84 bp and 7 bp come from</b>
+    <p>Expectancy per trade = win rate × average win + loss rate × average loss.</p>
+    <div class="formula">1920–1986: 0.280 × 589 + 0.720 × (−112) = 164.9 − 80.6 = +84.3 bp  ✓ (book: 84)
+1987–2010: 0.209 × 477 + 0.791 × (−117) =  99.7 − 92.5 =  +7.1 bp  ✓ (book: 7)
+Cash at 4%: 100,000 × 1.04^66 = 100,000 × 13.3 ≈ $1.33 million ✓ (book: over $1.3M)</div>
+    <p>The win rate fell from 28.0% to 20.9% and the average winner shrank from 589 to 477 bp, while losers stayed about the same size. That is enough to take expectancy from 84 bp to almost nothing. Slide the cost below: even 10 bp per round trip makes the later period lose money.</p></div>
+  <div class="fig">
+    <canvas id="c12" class="short" aria-label="Expectancy breakdown bar chart"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls">
+      <label for="w12">Win % <input id="w12" type="range" min="5" max="70" step="0.1" value="28"><output id="w12o">28</output></label>
+      <label for="a12">Avg win bp <input id="a12" type="range" min="50" max="1000" value="589"><output id="a12o">589</output></label>
+      <label for="b12">Avg loss bp <input id="b12" type="range" min="20" max="300" value="112"><output id="b12o">112</output></label>
+      <label for="k12">Cost per trade bp <input id="k12" type="range" min="0" max="60" value="0"><output id="k12o">0</output></label>
+    </div>
+    <div class="controls"><button id="pre12a" type="button">1920–1986 (Table 14.8)</button><button id="pre12b" type="button">1987–2010 (Table 14.9)</button></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="fig">
+    <h3>How a Kolmogorov-Smirnov test sees a change</h3>
+    <canvas id="c12b" aria-label="Two cumulative distribution curves of simulated trade returns and their largest gap"></canvas>
+    <div class="legend" id="c12bL"></div>
+    <div class="controls"><label for="d12">How far the edge decayed % <input id="d12" type="range" min="0" max="100" value="100"><output id="d12o">100</output></label></div>
+    <div class="readout" id="r12b"></div>
+    <p>Two simulated trade lists (911 and 449 trades), drawn from simple distributions matched to the book's summary numbers. They are not the real trades, so the p-value here won't equal 0.007. At 0% decay both lists come from the same distribution; at 100% the second matches the 1987–2010 stats.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>(KS mechanics are not in the book.) Sort each sample and draw its cumulative curve: the share of trades at or below each return. The KS statistic D is the biggest vertical gap between the two curves. Bigger samples make a given gap less likely by chance, so the p-value depends on D and both sample sizes. It needs no assumption about the shape of the distribution, which suits fat-tailed trade returns.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>The usual explanations for edges that fade after publication are crowding (more people trade the rule, so prices adjust earlier), changing market structure (index futures and ETFs made the "basket" tradeable and arbitraged), and plain data-mining in the original sample. Grimes doesn't pick one; he just shows the distribution changed.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>breakeven_move_fyers.md</code>: delivery break-even of roughly 27–33 bp per round trip is several times the 7 bp mean trade of 1987–2010.</li>
+    <li>Murphy Ch.15 (Computers and Trading Systems) on testing and optimizing systems.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · OPTIMIZATION</div><h2>Searching for the best settings finds the best luck</h2></div><span class="chip">pdf p521–524</span></div>
+  <p>Optimization (sometimes wrongly called "curve fitting") means changing a system's inputs until you find settings that would have done well on past data. For the crossover above, a 65-period short and 170-period long average would have made the system profitable over 1986–2010: $169,209 from just 35 trades, with a 40% win rate. Those numbers came from an exhaustive search over many pairs. Had he also searched the inverse system (shorting when the faster average crosses above the slower, and vice versa), he could have found pairs that made well over $1 million in the same period. The danger: the best historical settings are rarely the best in walk-forward testing or live trading. At worst, an optimized system looks incredible on history and is worthless in real trading.</p>
+  <p>Over-optimization can be accidental or deliberate. Some system designers lack the training to avoid the trap and are honestly surprised when live results don't match. More often, Grimes says, it's a deliberate way to take money from the public: build and optimize a system in a weekend, show dramatic results on a handful of markets, sell a few copies at $2,000–$3,000.</p>
+  <p>It can also be subtle; you can over-optimize your own simple market study without noticing. But the word "over" implies a right amount, and some optimization is necessary and part of learning. Example: studying gap openings, what gap size? Start at 400% and you may find no gap that big in your whole universe. Try 0.25% and gaps are so common they mean nothing. Eventually you might settle on 5–20%. Each step risks over-specifying the question, but that's also how you learn how the market moves.</p>
+  <p>His guidelines against over-optimization:</p>
+  <ul class="plain">
+    <li><b>Understand the process.</b> In your own work, think critically about every step. If you only see someone else's results, you can't trust them unless you understand their process. Knowing and trusting the person is a good start, but anyone can make mistakes. In general, don't pay for systems built by unknown third parties.</li>
+    <li><b>Good systems and research questions have few conditions.</b> "Buy when RSI is below X and price is above Y" beats a rule with several indicators, rising and falling averages, specific weekdays and month-end exclusions. The first might be over-optimized; the second almost certainly is.</li>
+    <li><b>Guard against small samples.</b> Most tests with few events prove nothing, and a study built on six occurrences was probably pared down from a much bigger starting set. Large samples can mislead too, but tiny ones are a huge red flag.</li>
+    <li><b>Be suspicious of incredible results.</b> No system crushes the market for a long time, returns 100% a year unlevered, or has both a very high win rate and a very high reward/risk ratio. Markets are too competitive for those to exist, but optimization can produce them on historical data.</li>
+  </ul>
+  <p>It's a deep subject. For automated system designers, walk-forward re-optimization, optimizing for goals other than maximum net profit, and viewing optimization results as multi-dimensional surfaces are all important. Most discretionary traders use studies only as a starting point, so knowing the main dangers is enough. When in doubt, ignore a study you suspect is over-optimized: better to know you don't know than to be misled.</p>
+  <div class="box picture"><b>Picture it</b><p>Shoot an arrow into a barn wall, then paint the bullseye around it. Every arrow is a perfect hit. The test is whether the next arrow, shot before the painting, hits the same spot.</p></div>
+  <div class="fig">
+    <canvas id="c13" class="tall" aria-label="Heat map of in-sample returns for many fast and slow moving average pairs on a simulated random walk"></canvas>
+    <div class="legend" id="c13L"></div>
+    <div class="controls">
+      <label><input id="chk13" type="checkbox"> also search the inverse system</label>
+      <button id="p13" type="button">Repeat on 40 random markets</button>
+    </div>
+    <div class="readout" id="r13"></div>
+    <div class="readout" id="r13b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The market here is a pure random walk with no drift, so every crossover pair has a true expected return of zero. Searching 56 pairs (112 with the inverse) and keeping the best is picking the maximum of many noisy numbers, which is always well above zero. The second half of the data, which the search never saw, shows the true value: on average about zero (minus costs). Allowing the inverse system doubles the search and pushes the in-sample best higher still, just as Grimes' $1 million inverse result suggests.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your backtests (<code>backtest_results_summary.md</code>) already pick parameters on earlier data and judge them on later data, and prefer setups where all settings were profitable out-of-sample (weekly pullback: "all 8 parameter settings profitable"). That's Grimes' guideline in action.</li>
+    <li>Murphy Ch.9's "to optimise or not" section.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · TESTING MOVING AVERAGE CROSSES</div><h2>Do moving-average trend indicators put you on the right side?</h2></div><span class="chip">pdf p524–530 · Fig 14.13 · Tables 14.10–14.11</span></div>
+  <p>It's well established that crossovers can't be traded as stand-alone systems, so Grimes doesn't pile up more studies confirming it. A more common use is as a <b>trend indicator</b>: many methods say that in an uptrend the up swings are bigger than the down swings, so identify the trend with an average and trade only in its direction. A useful trend indicator should make long trades work better when it says "up" and short trades work better when it says "down".</p>
+  <p><b>The method.</b> Label every day up, down or neutral by the indicator, then compare the mean return, volatility and chance of an up close in each group. One small but critical adjustment: each day's return must be assigned to the <em>previous</em> day's label. If a big up day turns the indicator up and you count that day as an "uptrend" day, you're assuming you were already long from yesterday's close, which needs knowledge of the future.</p>
+  <p><b>Indicator 1: slope of a 50-period average.</b> Any length could flip the trend on almost any bar, so the choice is arbitrary; he sticks to the common 50. Measuring "slope" by eye is easy; to make it exact he fits a linear regression line through the last five points of the average (equal weights) and uses its slope. <b>Table 14.10</b> reports excess return (raw return of the group minus the raw return of all bars; "All" excludes neutral days), the standard deviation of raw returns, the mean 20-day historical volatility, and %Up.</p>
+  <ul class="plain">
+    <li><b>Random data (the baseline check):</b> downtrend −85.2, uptrend +72.0, and 51.7% up closes in uptrends vs 51.4% for all days, which is not significant. Volatility is a bit higher in downtrends, roughly the same across groups.</li>
+    <li><b>Equities:</b> the opposite of what a trend tool should show. Downtrend days have a large positive excess (+177.2 in the table) and uptrend days a large negative one (−129.6). Long trades in the "downtrend" would have had the statistical tailwind.</li>
+    <li><b>Futures:</b> closer to expectation: −94.1 for downtrend, +81.1 for uptrend.</li>
+    <li><b>Forex:</b> looks more like equities (+15.5 / −11.1), but tiny and not significant.</li>
+  </ul>
+  <p>Why? Put a 50-period average on a chart and it seems to catch every big trend and keep you in for the whole move, and then some. That's the catch: lag. Any derived indicator (averages, trendlines, regression lines, extrapolations) can only react to changes in momentum after they happen. A slope indicator also gets whipsawed when the market is flat and the slope flips back and forth. A band around the average filters some noise, but makes good signals even later. Figure 14.13 (US Dollar Index, 50-period) shows it: trading it would have been slightly profitable on that chart, but nearly a third of the chart had to be retraced before the slope turned down, and after the November bottom a large rally came before it turned up. Lag plus the market's habit of sharp reversals at tops and bottoms greatly reduces its value.</p>
+  <p><b>Indicator 2: stacked averages.</b> Use three averages; uptrend when shortest &gt; medium &gt; longest, downtrend when reversed, undefined otherwise (for example when the medium is above the long but the short sits between them). Like all crossovers it looks great because the eye goes to the big winners, but whipsaws erase the profits in most markets, leaving no measurable edge; and more averages usually add more lag with no improvement over a simple crossover. A popular version uses 10-, 20- and 50-period simple averages, mostly by stock traders. <b>Table 14.11</b>: in equities the tool flags the wrong side: downtrend +166.9, uptrend −157.9, so stocks tended to go down when it said up and up when it said down. Futures may have an edge, especially on the short side (downtrend −203.0, uptrend +80.7). Forex (+43.6 and +43.9) looks more random than the random data (−74.9 / +98.6). Traders relying on this tool, or ones derived from it, face a headwind.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_rear_view_mirror_driving.svg" alt="A driver steers looking only at the rear-view mirror, fine on a straight road but turning late on a twisting mountain road." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Steering a car by looking only in the rear-view mirror. On a long straight motorway it works fine. At every bend you turn late, and on a twisting road the mirror tells you to turn left just as the road goes right.</p></div>
+  <div class="fig">
+    <canvas id="c14" class="tall" aria-label="Simulated price with a 50-period average, days shaded by the slope label, and the slope in a lower panel"></canvas>
+    <div class="legend" id="c14L"></div>
+    <div class="controls">
+      <label for="sel14">Market <select id="sel14"><option value="rw">pure random walk</option><option value="rev">built-in short-term reversal</option><option value="mom">built-in trends (momentum)</option></select></label>
+      <label for="n14">Average length <input id="n14" type="range" min="5" max="100" value="50"><output id="n14o">50</output></label>
+      <label><input id="chk14" type="checkbox"> make the look-ahead mistake</label>
+    </div>
+    <div class="readout" id="r14"></div>
+    <div class="controls"><button id="p14" type="button">Pool 150 random-walk markets: right vs mistaken labelling</button></div>
+    <div class="readout" id="r14b"></div>
+  </div>
+  <div class="fig">
+    <h3>Stacked 10 / 20 / 50 averages</h3>
+    <canvas id="c14b" aria-label="Simulated price with 10, 20 and 50 period averages and shading for up, down and undefined states"></canvas>
+    <div class="legend" id="c14bL"></div>
+    <div class="readout" id="r14c"></div>
+  </div>
+  <div class="fig">
+    <h3>The book's numbers: excess return by trend label</h3>
+    <canvas id="c14c" class="short" aria-label="Bar chart of the book's Tables 14.10 and 14.11"></canvas>
+    <div class="legend" id="c14cL"></div>
+    <div class="controls"><label for="sel14c">Table <select id="sel14c"><option value="t10">14.10 · slope of 50-period MA</option><option value="t11">14.11 · 10/20/50 stack</option></select></label></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The slope of a five-point regression line is (−2y₀ − y₁ + y₃ + 2y₄) ÷ 10 on the last five values of the average (that formula is not in the book; it's what an equal-weight five-point regression reduces to). Because the average is smoothed and the slope uses five of its points, it turns several days after price does. In a market that reverts in the short term, "uptrend" days are often days after a strong run, which is just when reversion pushes prices down. So lag plus mean reversion puts the indicator on the wrong side, as Grimes found in stocks. Tick the look-ahead box to see the other trap: counting the day's own return under the label that day created makes even a random walk look like it has a trend edge.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>Two things in the source to read carefully. The text describes the equity numbers as "over 3 percent" positive and "well over 1%" negative, while the table prints 177.2 and (129.6) labelled bp; the table's time horizon for "excess return" isn't stated. And the Random column shows a trend-like split (−85.2 / +72.0 and −74.9 / +98.6) that Grimes reports but doesn't explain. This page quotes the table values as printed.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your weekly pullback test uses a trend filter (close &gt; 50-week &gt; 200-week average) on weekly bars and passed out-of-sample (<code>backtest_results_summary.md</code>). That's longer-term and combined with an entry rule, not the daily 50-slope label Grimes tested; still, it's worth checking whether the filter or the entry carries the edge.</li>
+    <li>Ch.03 Market Structure and Price Action: the Two Forces model (trend vs mean reversion) and reading trend from swings and trendlines, the context Grimes uses instead of a lagging line.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · EQUITY VOLATILITY IN RELATION TO MOVING AVERAGES</div><h2>The one use that held up: step aside below the 200-day</h2></div><span class="chip">pdf p530–531 · Table 14.12</span></div>
+  <p>One use of averages does look good for long-term investors. Grimes compares two simple approaches on the daily Dow Jones Industrial Average from 1 Jan 1960 to 31 Dec 2010:</p>
+  <ul class="plain">
+    <li><b>Buy and hold:</b> total return 1,504%, daily mean return 2.2 bp, daily standard deviation 101.5 bp, 12,842 days invested.</li>
+    <li><b>Long only above the 200-day:</b> on the day the DJIA closes below its 200-day average, move fully to cash on that close; re-enter on the close of the first day back above it. Total return 1,408%, mean 3.3 bp, standard deviation 79.8 bp, 8,450 days invested (about two-thirds of the time). No interest on cash, no financing costs or frictions.</li>
+  </ul>
+  <p>The filter earns almost as much while invested only two-thirds of the time, with a higher mean and lower daily volatility. Coefficient of variation: 46.0 for buy-and-hold vs 24.3 for the filter, a clear case of better risk-adjusted performance from a simple technical rule. Grimes asks how many money managers realise they could beat the market this simply, and how much in fees investors could have saved in the often futile chase for higher returns with lower risk.</p>
+  <div class="box work"><b>Worked example: reading Table 14.12</b>
+    <div class="formula">Coefficient of variation = standard deviation ÷ mean
+Buy and hold : 101.5 ÷ 2.2 = 46.1   (book: 46.0)
+Above 200-day:  79.8 ÷ 3.3 = 24.2   (book: 24.3)
+Time invested: 8,450 ÷ 12,842 = 65.8%  ("approximately two-thirds")</div>
+    <p>Lower is better: the filter delivers each basis point of average return with about half as much daily wobble.</p></div>
+  <div class="box picture"><b>Picture it</b><p>Swimming only when the sea is calm. You miss a few good swims, but you also miss nearly every storm, and the storms come mostly when the tide is going out.</p></div>
+  <div class="fig">
+    <canvas id="c15" class="tall" aria-label="Simulated buy and hold versus long only above the 200-day average, with growth curves"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls">
+      <label for="g15">Extra volatility after down days <input id="g15" type="range" min="0" max="14" value="10"><output id="g15o">10</output></label>
+      <label for="n15">Average length <input id="n15" type="range" min="20" max="250" value="200"><output id="n15o">200</output></label>
+      <button id="p15" type="button">Pool 60 markets</button>
+    </div>
+    <div class="readout" id="r15"></div>
+    <div class="readout" id="r15b"></div>
+    <p>Simulated markets with a small upward drift. The slider adds a "leverage effect" (volatility jumps more after down days than after up days; it's a GJR-GARCH model, not in the book). Set it to 0 and the filter loses its volatility advantage; that is the mechanism Grimes names.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Grimes' explanation: declining markets are more volatile than rising ones. The power isn't in the 200-day; the system works with nearly any length. Being below a long average is just a cheap sign that the market is in a decline, and declines come with the wildest days. Stepping aside removes many of the biggest daily swings, so the standard deviation drops a lot while the return drops only a little.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your own results (<code>backtest_results_summary.md</code>): the 200-day market filter was "the one consistent winner" (+0.26 Sharpe, −8 points drawdown out-of-sample on average), and your plan keeps it on every long strategy. Grimes' result is the same effect on the DJIA.</li>
+    <li>Your <code>murphy_moving_averages.md</code> claim-vs-test table already links the 40-week/200-day line to that filter.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · CONCLUSIONS</div><h2>Know your tools</h2></div><span class="chip">pdf p531–532</span></div>
+  <p>The answers weren't crystal clear: some tests showed interesting, significant tendencies. But the same tendencies appear whatever length you test, even when the length changes randomly each bar, and often even with no average at all. That strongly contradicts the claim that any one average is significant or special. Traders rely on averages because they are lines on the chart that sometimes seem to hold price, but that's a trick of the eye. Treating the 50-, 10- or 100-day as support or resistance is trading a concept with no statistical validity.</p>
+  <p>The chapter also taught useful things about markets:</p>
+  <ul class="plain">
+    <li>Equities, futures and forex sometimes trade very differently, so it probably doesn't make sense to trade them all with the same systems and methods.</li>
+    <li>Some tendencies that seem to live around averages are deeper, more universal parts of price action: a bounce after trading down to an average may just be prices' tendency to bounce after trading down.</li>
+    <li>Trend indicators built from averages suffer enough lag and mean reversion that they often put you on the wrong side.</li>
+    <li>There is truth in the claim that falling markets are more volatile than rising ones; a simple 200-period filter gave better risk-adjusted returns over the past 50 years, and it works with almost any length because it captures that volatility, not a magic line.</li>
+  </ul>
+  <p>The message: know your tools. Understand the statistical tendencies around them and how they work in the market. There is no substitute for careful thought and analysis.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Claim</th><th>Test</th><th>Verdict in Grimes' data</th></tr></thead>
+    <tbody>
+      <tr><td>MAs are support/resistance</td><td>Touch &amp; hold: 50, 45, random, 200</td><td>No; equity "buys" were significant sells, every length alike</td></tr>
+      <tr><td>The 50 or 200 is special</td><td>Compare lengths + random length</td><td>No; indistinguishable</td></tr>
+      <tr><td>Breaking an MA matters</td><td>Penetration, then the no-MA version</td><td>Edge in stocks, but it's mean reversion after a close outside yesterday's range</td></tr>
+      <tr><td>Crossovers make money</td><td>Brock et al. 1/50, walked forward</td><td>Worked to 1986, near zero 1987–2010 (KS p = 0.007)</td></tr>
+      <tr><td>MAs define the trend</td><td>50-slope and 10/20/50 labels</td><td>Wrong side in stocks; maybe some use in futures</td></tr>
+      <tr><td>The 200-day protects investors</td><td>Long only above it, DJIA 1960–2010</td><td>Yes for risk: CV 24.3 vs 46.0, via volatility, not the line</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>The moving average is a useful ruler for measuring where price has been. This chapter shows it is not a wall, not a crystal ball and not a compass, but it can be a storm warning.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.15 The Opening Range Phenomenon: the next piece of popular lore Grimes puts to the same kind of test.</li>
+    <li>Ch.16 Quantitative Evidence of the Two Forces: mean reversion and momentum, the "deeper elements" this chapter keeps bumping into.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. On Grimes' SPY example, price "touched" the 20-period average at the day's low. Why couldn't anyone have bought there?</summary><p>The average for the current bar includes the current price, so it rose as the market rallied. When the low (108.94) printed, the live average was below it; only the strong close dragged it up into the low, hours later. In real time the level price had to reach was the average of the previous 19 closes, which was below the low. A trader could only have bought the close. (Section 03)</p></details>
+  <details><summary>2. A buy signal shows +10 bp average return after 5 days. Why isn't that enough to call it an edge?</summary><p>You must subtract the baseline: what an average 5-day period returns anyway. Stocks drift upward, so +10 bp might be exactly normal. The excess (µsig − µb) and its significance are what count; %Up must also be compared with the baseline (50.07% for equities). (Sections 05–06)</p></details>
+  <details><summary>3. What did buying "successful tests" of the 50-day average do in equities?</summary><p>It lost relative to baseline: significantly negative excess returns, about −5 bp on day 1 and −63 bp by day 20. The supposed buy behaved like a sell. (Section 06, Table 14.1)</p></details>
+  <details><summary>4. Why test a 45-period and a random-length average at all?</summary><p>If the 50 were special because people watch it, it should look different from a 45 that nobody watches and from a placebo whose length random-walks between 30 and 70. All three gave nearly the same results, so the 50 isn't special. (Section 07)</p></details>
+  <details><summary>5. Why is "close below the MA after yesterday's low was above it" almost the same event as "close below yesterday's low"?</summary><p>If yesterday's low was above the average and today closes below the average, today's close is almost always below yesterday's low too; the only exception is when the average itself jumps above yesterday's low in one bar, which is rare. So the two rules fire on nearly the same bars and must show nearly the same results. (Section 10)</p></details>
+  <details><summary>6. What does Table 14.7 say about the random walk hypothesis, and why doesn't Grimes expect the textbooks to change?</summary><p>Fading closes outside the prior day's range gives significant excess returns in 600 stocks over 10 years, while random-walk data shows deviations under about 2 bp, so he rejects the random walk for equities. But the effect is small (around 24–29 bp at 5 days, $0.25 on a $100 stock), the sample might be challenged as unrepresentative, and it's not a standard random-walk test. (Section 10)</p></details>
+  <details><summary>7. Why do always-in crossover systems look great on some charts and lose on others?</summary><p>They always catch most of a big trend, but in ranges they buy highs and sell lows. The whipsaw losses plus costs usually give back the trend profits, leaving them breakeven at best as stand-alone systems. (Section 11)</p></details>
+  <details><summary>8. Check the 1987–2010 expectancy of the 1/50 crossover from the win rate and average win/loss. What does a 10 bp cost do to it?</summary><p>0.209 × 477 − 0.791 × 117 ≈ 99.7 − 92.5 ≈ +7 bp per trade. Subtract 10 bp of round-trip cost and it's about −3 bp: a losing system. (Section 12)</p></details>
+  <details><summary>9. The KS test comparing 1920–1986 and 1987–2010 returns gave p = 0.007. What exactly does that tell you?</summary><p>If both periods' trade returns came from the same distribution, a difference this large would happen only about 0.7% of the time. So reject "same distribution": the system's behaviour changed. It doesn't say why (publication, market structure, or luck in the original sample). (Section 12)</p></details>
+  <details><summary>10. An exhaustive search finds that a 65/170 crossover made $169,209 in 35 trades from 1986 to 2010. Name three reasons to distrust it.</summary><p>It's the best of many tries on the same data (selection of a lucky maximum); 35 trades is a small sample; the best historical settings are rarely best going forward; and searching the inverse system too could "find" over $1M, which shows how much the search itself can produce. (Section 13)</p></details>
+  <details><summary>11. When labelling days as uptrend or downtrend, why must each day's return go with the previous day's label?</summary><p>You can only act on a label after it's known, at the close. If a big up day flips the indicator to "up" and that same day counts as an uptrend day, the test assumes you were long before the move, which is look-ahead. It makes even random data look trend-predictive. (Section 14)</p></details>
+  <details><summary>12. Why did the 50-period slope and the 10/20/50 stack put equity traders on the wrong side?</summary><p>Both lag: they flip only after a move has happened, and stocks tend to mean-revert after strong moves. So "uptrend" labels often come right before pullbacks and "downtrend" labels right before bounces. Grimes' tables show positive excess in equity downtrends and negative in uptrends. (Section 14)</p></details>
+  <details><summary>13. Where does the 200-day filter's better risk-adjusted performance actually come from?</summary><p>From the fact that declining markets are more volatile. Being below a long average flags declines, so stepping aside removes many of the most volatile days. Grimes notes it works with nearly any length; the 200 isn't magic. (Section 15)</p></details>
+</section>
+
+<footer>Built from Adam Grimes, <i>The Art and Science of Trading: Course Workbook</i> (2017), Chapter 14 "Moving Averages" (PDF pages 492–532), summarised in my own words. The only direct quote is the chapter's Vin Scully epigraph. Numbers attributed to Grimes (Tables 14.1–14.12, the SPY and DJIA examples) are as printed in the book; charts of those numbers show only the excess-mean column. All price charts and pooled tests use simulated data, not real market data, and are never evidence about real markets. Links to Dhanesh's notes refer to files in <code>Notes/trading/</code>. Education, not investment advice.</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 14;
+  function buildData() { $('seedOut').textContent = seed; }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  // pooled simulations are slow-ish: draw the light charts first, then fill the pooled results one by one
+  const heavy = new Set(); const regH = (f) => { heavy.add(f); return reg(f); };
+  let hq = [];
+  function refreshAll() {
+    draws.forEach((f) => { if (heavy.has(f)) return; try { f(); } catch (e) { console.error(e); } });
+    const fresh = hq.length === 0; hq = [...heavy];
+    const next = () => { const f = hq.shift(); if (!f) return; try { f(); } catch (e) { console.error(e); } setTimeout(next, 20); };
+    if (fresh) setTimeout(next, 40);
+  }
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ---------- ch14 helpers ----------
+  const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
+  const cls = (v) => (v >= 0 ? 'good' : 'bad');
+  const mean = (a) => { let s = 0; for (const x of a) s += x; return a.length ? s / a.length : 0; };
+  const sdev = (a) => { const m = mean(a); let v = 0; for (const x of a) v += (x - m) * (x - m); return a.length > 1 ? Math.sqrt(v / (a.length - 1)) : 0; };
+  const median = (a) => { if (!a.length) return 0; const s = Float64Array.from(a).sort(); const k = s.length >> 1; return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
+
+  // OHLC bars: daily return = mu + sd*z - rev*previous return; optional GJR-GARCH volatility (gjr = extra reaction to down days)
+  // segs: [{n, mu, sig, rev, kind}] lets a market change character.
+  function genBars(sd0, n, opt) {
+    const o = Object.assign({ mu: 0.0002, sig: 0.012, rev: 0, garch: false, gjr: 0, start: 100, segs: null }, opt || {});
+    const r = rng(sd0); const O = [], H = [], L = [], C = [], kind = [];
+    const segs = o.segs || [{ n: n, mu: o.mu, sig: o.sig, rev: o.rev }];
+    let p = o.start, prevR = 0, s2 = o.sig * o.sig;
+    const a = 0.04, b = 0.88, g = o.gjr;
+    for (const sg of segs) {
+      const mu = sg.mu != null ? sg.mu : o.mu, sig = sg.sig != null ? sg.sig : o.sig, rev = sg.rev != null ? sg.rev : o.rev;
+      const w = sig * sig * Math.max(0.01, 1 - a - b - g / 2);
+      if (!o.garch) s2 = sig * sig;
+      for (let i = 0; i < sg.n; i++) {
+        const sd = Math.sqrt(s2);
+        const e = sd * gauss(r);
+        const ret = mu + e - rev * prevR; prevR = ret - mu;
+        const cl = Math.max(0.5, p * (1 + ret));
+        if (o.lite) { C.push(cl); } else {
+          // open near the prior close; high/low stretch beyond the body by a random amount
+          const op = p * (1 + 0.25 * sd * gauss(r));
+          const hi = Math.max(op, cl) + p * sd * 0.45 * Math.abs(gauss(r)), lo = Math.min(op, cl) - p * sd * 0.45 * Math.abs(gauss(r));
+          O.push(op); H.push(hi); L.push(lo); C.push(cl); kind.push(sg.kind || 'x');
+        }
+        if (o.garch) s2 = w + (a + (e < 0 ? g : 0)) * e * e + b * s2;
+        p = cl;
+      }
+    }
+    return { o: O, h: H, l: L, c: C, kind };
+  }
+  const MK = {
+    rw: { mu: 0.0002, sig: 0.013 },
+    rev: { mu: 0.0002, sig: 0.013, rev: 0.12 },
+    mom: { mu: 0.0002, sig: 0.013, rev: -0.12 }
+  };
+  const poolCache = {};
+  const memo = {};
+  const once = (k, f) => (memo[k + '|' + seed] !== undefined ? memo[k + '|' + seed] : (memo[k + '|' + seed] = f()));
+  function pool(kind, count, n) {
+    const key = kind + ':' + count + ':' + n + ':' + seed;
+    if (!poolCache[key]) { const out = []; for (let s = 0; s < count; s++) out.push(genBars(seed * 1000 + s * 17 + 5, n, MK[kind])); poolCache[key] = out; }
+    return poolCache[key];
+  }
+
+  // candlestick plot (hollow = up, filled = down), same axis style as plot()
+  function cplot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const b = sp.b; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : b.c.length - 1;
+    const padL = 6, padR = 54, padT = 10, padB = 8; const mainH = H - padT - padB;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = x0; i <= x1; i++) { if (b.l[i] == null) continue; lo = Math.min(lo, b.l[i]); hi = Math.max(hi, b.h[i]); }
+    (sp.lines || []).forEach((l) => { if (l.noScale) return; for (let i = x0; i <= x1; i++) { const v = l.d[i]; if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } });
+    (sp.hlines || []).forEach((h) => { lo = Math.min(lo, h.v); hi = Math.max(hi, h.v); });
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    const pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+    const slot = (W - padL - padR) / (x1 - x0 + 1);
+    const X = (i) => padL + (i - x0 + 0.5) * slot;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    const font = '11px ' + css('mono');
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - slot / 2, padT, (s.b - s.a + 1) * slot, mainH); });
+    g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); if (y < padT - 1 || y > padT + mainH + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(sp.dec ? t.toFixed(sp.dec) : fmt(t), W - padR + 5, y + 4); });
+    (sp.hilite || []).forEach((i) => { if (i < x0 || i > x1) return; g.fillStyle = colorOf('c3', 0.16); g.fillRect(X(i) - slot / 2, padT, slot, mainH); });
+    const bw = Math.max(1, Math.min(12, slot * 0.62)); const pc = colorOf('price');
+    for (let i = x0; i <= x1; i++) {
+      if (b.c[i] == null) continue; const x = X(i);
+      g.strokeStyle = pc; g.lineWidth = 1; g.beginPath(); g.moveTo(x, Y(b.h[i])); g.lineTo(x, Y(b.l[i])); g.stroke();
+      const yo = Y(b.o[i]), yc = Y(b.c[i]); const top = Math.min(yo, yc), hgt = Math.max(1, Math.abs(yo - yc));
+      if (b.c[i] >= b.o[i]) { g.fillStyle = colorOf('plate'); g.fillRect(x - bw / 2, top, bw, hgt); g.strokeRect(x - bw / 2, top, bw, hgt); }
+      else { g.fillStyle = pc; g.fillRect(x - bw / 2, top, bw, hgt); }
+    }
+    (sp.lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.8, l.dash, l.step));
+    (sp.hlines || []).forEach((h) => { g.strokeStyle = colorOf(h.col || 'muted'); g.setLineDash([5, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(padL, Y(h.v)); g.lineTo(W - padR, Y(h.v)); g.stroke(); g.setLineDash([]); if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); g.font = font; g.fillText(h.label, padL + 4, Y(h.v) + (h.below ? 13 : -4)); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 5;
+      if (m.kind === 'buy') { g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); g.fill(); }
+      else if (m.kind === 'sell') { g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'sell'); g.beginPath(); g.arc(x, y, m.r || 3.5, 0, Math.PI * 2); g.fill(); }
+    });
+    const Lg = $(id + 'L');
+    if (Lg) { const items = []; (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col])); (sp.legend || []).forEach((x) => items.push(x)); Lg.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join(''); }
+  }
+
+  // grouped bar chart: cats (x labels), series [{label,col,vals,stars,err}]
+  function barChart(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 6, padR = 48, padT = 14, padB = 22; const ph = H - padT - padB;
+    let lo = 0, hi = 0;
+    sp.series.forEach((s) => s.vals.forEach((v, k) => { if (v == null) return; const e = s.err ? s.err[k] : 0; lo = Math.min(lo, v - e); hi = Math.max(hi, v + e); }));
+    const pad = (hi - lo) * 0.12 || 1; lo -= pad; hi += pad;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * ph;
+    const font = '11px ' + css('mono'); g.font = font;
+    g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    g.strokeStyle = colorOf('muted'); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke();
+    const nC = sp.cats.length, slot = (W - padL - padR) / nC, ns = sp.series.length, bw = slot * 0.78 / ns;
+    sp.cats.forEach((c, k) => { g.fillStyle = colorOf('muted'); const tw = g.measureText(c).width; g.fillText(c, padL + slot * k + slot / 2 - tw / 2, H - 6); });
+    sp.series.forEach((s, j) => s.vals.forEach((v, k) => {
+      if (v == null) return; const x = padL + slot * k + slot * 0.11 + bw * j;
+      g.fillStyle = colorOf(s.col, 0.8); const y0 = Y(0), yv = Y(v); g.fillRect(x, Math.min(y0, yv), Math.max(1, bw - 1), Math.max(1, Math.abs(y0 - yv)));
+      if (s.err) { const e = s.err[k]; g.strokeStyle = colorOf('ink', 0.7); g.beginPath(); g.moveTo(x + bw / 2, Y(v - e)); g.lineTo(x + bw / 2, Y(v + e)); g.stroke(); }
+      if (s.stars && s.stars[k]) { g.fillStyle = colorOf('ink'); const t = s.stars[k]; const tw = g.measureText(t).width; g.fillText(t, x + bw / 2 - tw / 2, v >= 0 ? yv - 3 : yv + 11); }
+    }));
+    if (sp.label) { g.fillStyle = colorOf('muted'); g.fillText(sp.label, padL + 4, padT - 2); }
+    const Lg = $(id + 'L'); if (Lg) Lg.innerHTML = sp.series.map((s) => `<span style="--sw:${colorOf(s.col)}">${s.label}</span>`).join('') + (sp.note ? `<span style="--sw:transparent">${sp.note}</span>` : '');
+  }
+
+  // ---------- event study (Pythia-style) ----------
+  const HZ = [1, 2, 3, 4, 5, 10, 15, 20];
+  function sigStats(sig, base) {
+    if (!sig.length) return { n: 0, ex: 0, exMed: 0, up: 0, t: 0 };
+    const m = mean(sig), mb = mean(base), sd = sdev(sig);
+    let up = 0; for (const x of sig) if (x > 0) up++;
+    return { n: sig.length, ex: (m - mb) * 1e4, exMed: (median(sig) - median(base)) * 1e4, up: up / sig.length, t: sd > 0 ? (m - mb) / (sd / Math.sqrt(sig.length)) : 0 };
+  }
+  function eventStudy(list, sigFn, hz) {
+    hz = hz || HZ;
+    const base = hz.map(() => []), buy = hz.map(() => []), sell = hz.map(() => []);
+    for (const b of list) {
+      const s = sigFn(b); const c = b.c, n = c.length;
+      for (let i = 0; i < n; i++) for (let j = 0; j < hz.length; j++) {
+        const k = hz[j]; if (i + k >= n) continue; const r = c[i + k] / c[i] - 1;
+        base[j].push(r); if (s[i] > 0) buy[j].push(r); else if (s[i] < 0) sell[j].push(r);
+      }
+    }
+    return hz.map((k, j) => { let up = 0; for (const x of base[j]) if (x > 0) up++; return { k, buy: sigStats(buy[j], base[j]), sell: sigStats(sell[j], base[j]), baseUp: up / Math.max(1, base[j].length) }; });
+  }
+  const star = (t) => Math.abs(t) > 2.576 ? '**' : Math.abs(t) > 1.96 ? '*' : '';
+  function esTable(rows) {
+    const cell = (s) => `<td class="num">${sgn(s.ex)}<span class="sig2">${star(s.t)}</span></td><td class="num">${sgn(s.exMed)}</td><td class="num">${(s.up * 100).toFixed(1)}%</td>`;
+    return `<table class="es"><thead><tr><th></th><th colspan="3">Buy signals (n=${rows[0].buy.n})</th><th colspan="3">Sell signals (n=${rows[0].sell.n})</th></tr><tr><th>Day</th><th>µsig−µb</th><th>Diff med</th><th>%Up</th><th>µsig−µb</th><th>Diff med</th><th>%Up</th></tr></thead><tbody>` +
+      rows.map((r) => `<tr><td class="num">${r.k}</td>${cell(r.buy)}${cell(r.sell)}</tr>`).join('') +
+      `</tbody></table><div class="readout">baseline %Up on day 1: <b>${(rows[0].baseUp * 100).toFixed(1)}%</b> · values in bp · * |t|&gt;1.96, ** |t|&gt;2.58 (simple t-test, simulated data)</div>`;
+  }
+
+  // signal rules exactly as the book states them
+  function touchHold(b, avg) { const s = new Array(b.c.length).fill(0); for (let i = 1; i < b.c.length; i++) { const a = avg[i], ap = avg[i - 1]; if (a == null || ap == null) continue; if (b.l[i - 1] > ap && b.l[i] <= a && b.c[i] >= a) s[i] = 1; else if (b.h[i - 1] < ap && b.h[i] >= a && b.c[i] <= a) s[i] = -1; } return s; }
+  function penetration(b, avg) { const s = new Array(b.c.length).fill(0); for (let i = 1; i < b.c.length; i++) { const a = avg[i], ap = avg[i - 1]; if (a == null || ap == null) continue; if (b.l[i - 1] > ap && b.c[i] < a) s[i] = 1; else if (b.h[i - 1] < ap && b.c[i] > a) s[i] = -1; } return s; }
+  function fadeOutside(b) { const s = new Array(b.c.length).fill(0); for (let i = 1; i < b.c.length; i++) { if (b.c[i] < b.l[i - 1]) s[i] = 1; else if (b.c[i] > b.h[i - 1]) s[i] = -1; } return s; }
+  function randLenMA(c, sd0) { const r = rng(sd0); const o = nulls(c.length); let per = 50; for (let i = 0; i < c.length; i++) { const u = r(); per += u < 1 / 3 ? -1 : u < 2 / 3 ? 0 : 1; per = Math.max(30, Math.min(70, per)); if (i >= per - 1) { let s = 0; for (let k = 0; k < per; k++) s += c[i - k]; o[i] = s / per; } } return o; }
+
+  // ---------- the book's tables: excess mean (bp) by day, as printed; stars as printed ----------
+  const P = (s) => s.split(' ').map((x) => ({ v: parseFloat(x), s: (x.match(/\*+/) || [''])[0] }));
+  const BK = {
+    '14.1': { name: 'Table 14.1 · touch & hold, 50 SMA',
+      eqB: P('-5.1** -6.3** -8.8** -10.5** -4.9 -24.9** -41.0** -62.9**'), fuB: P('0.2 6.7 6.3 9.4 15.2 18.5 23.7 41.0'), fxB: P('0.7 0.7 3.3 9.1 12.4 3.5 -6.3 -7.0'),
+      eqS: P('3.7 4.7 -2.5 -3.1 -9.1* -13.1* -22.4** -27.0**'), fuS: P('-4.9 2.0 0.8 3.6 4.1 18.1 2.8 -10.5'), fxS: P('-8.5 -16.6* -15.6 -16.5 -15.9 -29.5* -36.0* -30.5') },
+    '14.2': { name: 'Table 14.2 · touch & hold, 45 SMA',
+      eqB: P('-4.1* -7.3** -7.2** -9.3** -3.8 -23.5** -45.7** -64.8**'), fuB: P('-3.0 -6.2 2.7 6.2 -2.7 2.6 7.1 17.0'), fxB: P('-0.8 -4.1 4.7 1.5 8.0 0.7 -6.9 -6.9'),
+      eqS: P('2.6 5.2 -1.5 -4.0 -13.8** -21.2** -25.4** -29.6**'), fuS: P('-2.3 -0.2 10.2 12.7 1.9 5.1 -1.9 3.4'), fxS: P('-12.9** -16.7* -23.5** -25.4** -31.0** -39.2** -32.1 -40.5*') },
+    '14.3': { name: 'Table 14.3 · touch & hold, random-length SMA',
+      eqB: P('-7.2** -5.7** -4.1 -6.6* -2.5 -25.0** -39.2** -61.4**'), fuB: P('1.3 -4.7 -7.1 -5.9 -6.1 -8.0 -20.1 -16.7'), fxB: P('-0.3 -2.6 -4.5 -4.1 -7.5 -10.0 -7.7 -13.4'),
+      eqS: P('2.7 2.7 -3.7 -4.2 -9.6* -18.7** -17.5* -18.9*'), fuS: P('1.6 -1.3 2.7 5.4 4.8 -0.5 0.5 -1.9'), fxS: P('-1.6 -0.9 3.5 6.3 -1.8 3.4 -0.5 -4.4') },
+    '14.4': { name: 'Table 14.4 · touch & hold, 200-day SMA',
+      eqB: P('-13.3** -10.6** -13.2** -16.6** -11.0* -57.5** -78.6** -97.4**'), fuB: P('-5.7 0.8 -12.3 -6.3 -12.1 9.2 31.2 23.5'), fxB: P('-3.1 -0.0 9.5 4.3 -0.6 12.9 11.6 5.5'),
+      eqS: P('-3.6 -8.5* -15.0** -6.3 -11.3 -28.0** -49.4** -62.4**'), fuS: P('-4.0 -11.3 -15.6 -10.9 -11.0 -9.0 -26.4 -14.0'), fxS: P('0.1 3.2 -1.0 9.5 11.3 13.9 5.1 -1.3') },
+    '14.5': { name: 'Table 14.5 · penetration (fade), 50 SMA',
+      eqB: P('2.8 1.5 1.7 -2.0 -1.9 -15.2** -32.7** -35.6**'), fuB: P('3.3 -5.6 -10.8 -3.8 -1.7 -6.4 -8.5 -4.1'), fxB: P('-4.7 -10.3 -4.8 0.2 -6.0 -2.9 -3.2 18.6'),
+      eqS: P('-12.6** -14.6** -16.8** -19.8** -22.6** -32.7** -43.4** -40.2**'), fuS: P('0.4 9.5 14.1 12.8 12.8 9.4 9.1 20.6'), fxS: P('0.2 -7.4 -6.7 -1.9 -5.6 8.3 20.2 17.8') },
+    '14.6': { name: 'Table 14.6 · penetration (fade), 200 SMA',
+      eqB: P('9.4** 9.4* 5.1 -3.8 1.4 -25.1** -44.8** -57.2**'), fuB: P('5.7 -0.4 -3.2 -4.9 -7.9 2.4 29.3 -0.8'), fxB: P('-2.1 10.2 9.5 8.3 14.5 27.1 52.4* 37.5'),
+      eqS: P('-16.2** -28.1** -31.6** -31.9** -35.5** -55.5** -83.9** -91.7**'), fuS: P('-3.6 -3.2 1.3 1.1 15.2 10.9 11.0 -12.7'), fxS: P('-4.7 -2.3 -6.7 -1.7 7.1 19.0 20.1 9.0') },
+    '14.7': { name: 'Table 14.7 · fade close outside prior range (no MA)',
+      eqB: P('9.1** 12.1** 12.7** 14.6** 20.7** 17.9** 16.2** 12.4**'), fuB: P('1.6 1.9 1.0 0.4 0.7 0.1 1.0 -3.6'), fxB: P('1.8 2.1 2.1 -0.4 -2.7 -5.3 -5.6 -11.8*'),
+      eqS: P('-8.9** -14.6** -15.3** -19.4** -23.5** -35.1** -43.8** -48.0**'), fuS: P('-3.3* -2.9 -0.9 -1.3 -2.1 -4.4 -1.9 3.8'), fxS: P('-2.8* -2.1 -1.9 0.0 -0.0 0.9 1.2 3.1') }
+  };
+  const HZL = HZ.map((k) => 'd' + k);
+  const COLNAME = { eqB: 'Equities, buy', eqS: 'Equities, sell', fuB: 'Futures, buy', fuS: 'Futures, sell', fxB: 'Forex, buy', fxS: 'Forex, sell' };
+  function bookBuySell(id, key, asset) {
+    const t = BK[key];
+    barChart(id, { cats: HZL, series: [
+      { label: 'buy signals', col: 'buy', vals: t[asset + 'B'].map((x) => x.v), stars: t[asset + 'B'].map((x) => x.s) },
+      { label: 'sell signals', col: 'sell', vals: t[asset + 'S'].map((x) => x.v), stars: t[asset + 'S'].map((x) => x.s) }
+    ], label: t.name + ' · excess mean, bp (book)', note: 'buys should be +, sells −' });
+  }
+  function bookCompare(id, keys, col) {
+    const cols = ['c1', 'c2', 'c3'];
+    barChart(id, { cats: HZL, series: keys.map((k, j) => ({ label: BK[k].name, col: cols[j], vals: BK[k][col].map((x) => x.v), stars: BK[k][col].map((x) => x.s) })), label: COLNAME[col] + ' · excess mean, bp (book)' });
+  }
+
+  // ---------- section 1: coin-flip traders ----------
+  let coinSeed = 1;
+  function coinTrader(sd0, trades) {
+    // a 5-day random-walk return is normal with sd = daily sd × √5; the coin picks the side
+    const r = rng(sd0); const eq = [0]; let tot = 0; const s5 = MK.rw.sig * Math.sqrt(5);
+    for (let t = 0; t < trades; t++) { const dir = r() < 0.5 ? 1 : -1; tot += dir * s5 * gauss(r) * 100; eq.push(tot); }
+    return eq;
+  }
+  const d1 = reg(() => {
+    const curves = []; for (let k = 0; k < 12; k++) curves.push(coinTrader(seed * 31 + coinSeed * 977 + k, 100));
+    let best = 0; curves.forEach((c, k) => { if (c[c.length - 1] > curves[best][curves[best].length - 1]) best = k; });
+    const lines = curves.map((c, k) => ({ d: c, col: k === best ? 'c1' : 'muted', w: k === best ? 2.6 : 1, alpha: k === best ? 1 : 0.45 }));
+    lines.push({ d: curves[0].map(() => 0), col: 'ink', w: 1, dash: [3, 3], alpha: 0.6 });
+    plot('c1', { n: 101, lines, legend: [['luckiest of 12 coin traders', 'c1'], ['other coin traders', 'muted']] });
+    const finals = []; for (let k = 0; k < 400; k++) { const c = coinTrader(seed * 7919 + coinSeed * 131 + k * 3, 100); finals.push(c[c.length - 1]); }
+    finals.sort((a, b) => a - b); const prof = finals.filter((x) => x > 0).length;
+    $('r1').innerHTML = `400 coin traders × 100 trades: profitable <b>${(prof / 4).toFixed(0)}%</b> · median <b>${sgn(median(finals))}%</b> · best <b class="good">${sgn(finals[finals.length - 1])}%</b> · worst <b class="bad">${sgn(finals[0])}%</b> · average <b>${sgn(mean(finals))}%</b>`;
+  });
+  $('b1').addEventListener('click', () => { coinSeed++; d1(); });
+
+  // ---------- section 2: the live bar moves the average ----------
+  const d2 = reg(() => {
+    const N = val('n2'), mv = val('m2') / 1000; const b0 = genBars(seed * 13 + 2, 260, MK.rw);
+    const n = b0.c.length; const b = { o: b0.o.slice(), h: b0.h.slice(), l: b0.l.slice(), c: b0.c.slice() };
+    const pc = b.c[n - 2]; b.o[n - 1] = pc; b.c[n - 1] = pc * (1 + mv); b.h[n - 1] = Math.max(pc, b.c[n - 1]) * 1.002; b.l[n - 1] = Math.min(pc, b.c[n - 1]) * 0.998;
+    const avg = sma(b.c, N); const flat = b.c.slice(); flat[n - 1] = pc; const avg0 = sma(flat, N);
+    const x0 = n - 60; const ghost = nulls(n); ghost[n - 2] = avg[n - 2]; ghost[n - 1] = avg0[n - 1];
+    cplot('c2', { b, x0, lines: [{ d: avg, col: 'c1', w: 2.2, label: N + '-bar SMA (today uses the live price)' }, { d: ghost, col: 'muted', dash: [4, 4], w: 1.4, label: 'where it would be if today were flat' }], hilite: [n - 1] });
+    const dMA = avg[n - 1] - avg0[n - 1];
+    $('r2').innerHTML = `today's move <b>${sgn(mv * 100)}%</b> = <b>${(pc * mv).toFixed(2)}</b> · average moves <b>${dMA.toFixed(3)}</b> = move ÷ ${N} · that's <b>${(dMA / pc * 100).toFixed(3)}%</b> of price`;
+  });
+  bindRange('n2', d2); bindRange('m2', d2);
+
+  // ---------- section 3: the forming bar (deterministic, shaped like Fig 14.2) ----------
+  const D3 = (function () {
+    const kp = [[0, 106], [24, 112.5], [34, 106.2], [44, 109.8]];
+    const interp = (i) => { for (let k = 1; k < kp.length; k++) { if (i <= kp[k][0]) { const [a, va] = kp[k - 1], [bb, vb] = kp[k]; return va + (vb - va) * (i - a) / (bb - a); } } return kp[kp.length - 1][1]; };
+    let c = []; for (let i = 0; i < 45; i++) c.push(interp(i) + 0.35 * Math.sin(i * 1.7) + 0.2 * Math.sin(i * 0.9));
+    let s = 0; for (let i = 26; i < 45; i++) s += c[i]; const d = (2068.35 - s) / 19; c = c.map((x) => x + d);
+    const o = c.map((x, i) => i ? c[i - 1] + 0.12 * Math.sin(i * 2.3) : x - 0.2);
+    const h = c.map((x, i) => Math.max(x, o[i]) + 0.22 + 0.12 * Math.abs(Math.sin(i * 1.3)));
+    const l = c.map((x, i) => Math.min(x, o[i]) - 0.22 - 0.12 * Math.abs(Math.cos(i * 1.1)));
+    const tk = [[0, 109.35], [5, 109.22], [9, 109.05], [14, 108.94], [18, 109.25], [23, 109.08], [27, 109.42], [31, 109.85], [35, 110.4], [38, 110.9], [40, 110.85]];
+    const ticks = []; for (let t = 0; t <= 40; t++) { let v = 0; for (let k = 1; k < tk.length; k++) if (t <= tk[k][0]) { const [a, va] = tk[k - 1], [bb, vb] = tk[k]; v = va + (vb - va) * (t - a) / (bb - a); break; } const wig = (t === 14 || t === 0 || t >= 38) ? 0 : 0.05 * Math.sin(t * 2.1); ticks.push(Math.max(108.94, v + wig)); }
+    let S = 0; for (let i = 26; i < 45; i++) S += c[i];
+    return { o, h, l, c, ticks, S };
+  })();
+  const t3state = { timer: null };
+  const d3 = reg(() => {
+    const t = val('t3'); const T = D3.ticks.slice(0, t + 1);
+    const p = T[T.length - 1], hi = Math.max(...T), lo = Math.min(...T); const n = 46;
+    const b = { o: D3.o.concat([D3.ticks[0]]), h: D3.h.concat([hi]), l: D3.l.concat([lo]), c: D3.c.concat([p]) };
+    const avg = sma(b.c, 20); const A = D3.S / 19;
+    cplot('c3', { b, x0: 20, x1: n - 1, lines: [{ d: avg, col: 'c1', w: 2.2, label: '20-period SMA as it looks right now' }], hlines: [{ v: A, col: 'c2', label: 'level price must reach live: avg of previous 19 closes = ' + A.toFixed(2), below: true }], hilite: [n - 1], dec: 1 });
+    const live = D3.ticks.map((x) => (D3.S + x) / 20); const lowSoFar = []; let m = Infinity; D3.ticks.forEach((x) => { m = Math.min(m, x); lowSoFar.push(m); });
+    const cut = (arr) => arr.map((v, i) => i <= t ? v : null);
+    plot('c3b', { n: 41, lines: [{ d: cut(D3.ticks), col: 'price', w: 1.6, label: 'price during the day' }, { d: cut(live), col: 'c1', w: 2.2, label: 'live 20-SMA' }, { d: cut(lowSoFar), col: 'sell', w: 1.4, dash: [4, 3], label: 'low of the day so far' }], ymin: 108.75, ymax: 111.0 });
+    const ma = live[t], gap = lo - ma;
+    $('r3').innerHTML = `moment <b>${t}</b>/40 · price <b>${p.toFixed(2)}</b> · live SMA <b>${ma.toFixed(2)}</b> · day's low so far <b>${lo.toFixed(2)}</b> · ` + (gap > 0 ? `SMA is <b class="bad">${gap.toFixed(2)} below the low</b>: no touch possible yet` : `SMA has reached the low <b class="good">only now</b>, at the close; the low was set at moment 14`);
+  });
+  bindRange('t3', d3);
+  function stop3() { if (t3state.timer) { clearInterval(t3state.timer); t3state.timer = null; } $('play3').textContent = 'Play the day'; }
+  $('play3').addEventListener('click', () => {
+    if (t3state.timer) { stop3(); return; }
+    if (val('t3') >= 40) $('t3').value = 0;
+    $('play3').textContent = 'Pause';
+    t3state.timer = setInterval(() => { const v = val('t3'); if (v >= 40) { stop3(); return; } $('t3').value = v + 1; $('t3o').textContent = v + 1; d3(); }, 160);
+  });
+  $('reset3').addEventListener('click', () => { stop3(); $('t3').value = 0; $('t3o').textContent = 0; d3(); });
+
+  // ---------- section 4: offset averages and phantom touches ----------
+  const d4 = reg(() => {
+    const N = val('n4'), k = val('k4'); const b = genBars(seed * 17 + 4, 220, MK.rw); const n = b.c.length;
+    const avg = sma(b.c, N); const off = nulls(n); for (let i = k; i < n; i++) off[i] = avg[i - k];
+    let chart = 0, phantom = 0; const marks = []; const x0 = n - 90;
+    for (let i = N; i < n; i++) {
+      if (!(b.l[i] <= avg[i] && avg[i] <= b.h[i])) continue; chart++;
+      let S = 0; for (let j = i - N + 1; j < i; j++) S += b.c[j]; const A = S / (N - 1);
+      if (!(b.l[i] <= A && A <= b.h[i])) { phantom++; if (i >= x0) marks.push({ i, v: avg[i], kind: 'dot', col: 'sell', r: 4 }); }
+    }
+    let offT = 0; for (let i = N + k; i < n; i++) if (b.l[i] <= off[i] && off[i] <= b.h[i]) offT++;
+    const lines = [{ d: avg, col: 'c1', w: 2, label: N + '-bar SMA (live, as plotted)' }, { d: off, col: 'c2', w: 1.8, dash: [5, 3], label: 'same SMA offset ' + k + ' bar' + (k > 1 ? 's' : '') }];
+    if ($('chk4').checked) lines.push({ d: ema(b.c, N), col: 'c3', w: 1.6, label: N + '-bar EMA' });
+    cplot('c4', { b, x0, lines, marks, legend: [['phantom touch (on chart, impossible live)', 'sell']] });
+    $('r4').innerHTML = `whole sample (${n} bars): chart shows <b>${chart}</b> touches of the live SMA · <b class="bad">${phantom}</b> (${chart ? (phantom / chart * 100).toFixed(0) : 0}%) could not have happened in real time · offset SMA touches <b>${offT}</b>, all of them real`;
+  });
+  bindRange('n4', d4); bindRange('k4', d4); $('chk4').addEventListener('change', d4);
+
+  // ---------- section 6: touch and hold ----------
+  let sig6 = 0;
+  const d6 = reg(() => {
+    const N = val('n6'); const b = genBars(seed * 19 + 6, 420, MK.rw); const avg = sma(b.c, N); const s = touchHold(b, avg); const n = b.c.length;
+    const idx = []; for (let i = 0; i < n; i++) if (s[i]) idx.push(i);
+    const x0 = n - 160; const vis = idx.filter((i) => i >= x0);
+    const marks = vis.map((i) => ({ i, v: s[i] > 0 ? b.l[i] : b.h[i], kind: s[i] > 0 ? 'buy' : 'sell' }));
+    let cur = vis.length ? vis[sig6 % vis.length] : null;
+    cplot('c6', { b, x0, lines: [{ d: avg, col: 'c1', w: 2, label: N + '-period SMA' }], marks, hilite: cur != null ? [cur, cur - 1] : [] });
+    if (cur == null) { $('r6').innerHTML = `<div>No touch-and-hold signals in the visible window for N = ${N}. Try another length or roll a new market.</div>`; return; }
+    const i = cur, a = avg[i], ap = avg[i - 1], f = (v) => v.toFixed(2), ok = (c) => c ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+    const fwd = i + 5 < n ? ((b.c[i + 5] / b.c[i] - 1) * 1e4) : null;
+    const rows = s[i] > 0 ? [
+      `${ok(b.l[i - 1] > ap)} previous low ${f(b.l[i - 1])} &gt; previous SMA ${f(ap)}`,
+      `${ok(b.l[i] <= a)} this low ${f(b.l[i])} ≤ SMA ${f(a)} (touched)`,
+      `${ok(b.c[i] >= a)} this close ${f(b.c[i])} ≥ SMA ${f(a)} (held)`,
+      `→ <b>BUY</b> on the close at ${f(b.c[i])}`] : [
+      `${ok(b.h[i - 1] < ap)} previous high ${f(b.h[i - 1])} &lt; previous SMA ${f(ap)}`,
+      `${ok(b.h[i] >= a)} this high ${f(b.h[i])} ≥ SMA ${f(a)} (touched)`,
+      `${ok(b.c[i] <= a)} this close ${f(b.c[i])} ≤ SMA ${f(a)} (held)`,
+      `→ <b>SELL</b> on the close at ${f(b.c[i])}`];
+    rows.push(`signal ${(sig6 % vis.length) + 1} of ${vis.length} visible · price 5 days later: ${fwd == null ? 'n/a' : sgn(fwd) + ' bp from entry'} (one event proves nothing; see the pooled table)`);
+    $('r6').innerHTML = rows.map((x) => `<div>${x}</div>`).join('');
+  });
+  bindRange('n6', () => { sig6 = 0; d6(); });
+  $('nx6').addEventListener('click', () => { sig6++; d6(); });
+  const d6t = regH(() => {
+    const N = val('n6'), kind = $('sel6').value; const list = memo['t6' + N + kind + '|' + seed] ? null : pool(kind, 40, 1200);
+    const rows = once('t6' + N + kind, () => eventStudy(list, (b) => touchHold(b, sma(b.c, N))));
+    $('t6').innerHTML = `<div class="readout">touch &amp; hold, ${N}-period SMA, ${kind === 'rw' ? 'pure random walk' : 'random walk + built-in reversal'} (simulated)</div>` + esTable(rows);
+  });
+  $('p6').addEventListener('click', d6t); $('sel6').addEventListener('change', d6t);
+  const d6b = reg(() => bookBuySell('c6b', '14.1', $('sel6b').value));
+  $('sel6b').addEventListener('change', d6b);
+
+  // ---------- section 7: 50 vs 45 vs random length ----------
+  let rl7 = 1;
+  const d7 = reg(() => {
+    const b = genBars(seed * 23 + 7, 360, MK.rw); const n = b.c.length;
+    const a50 = sma(b.c, 50), a45 = sma(b.c, 45), ar = randLenMA(b.c, seed * 101 + rl7 * 7);
+    plot('c7', { n, x0: 70, lines: [{ d: b.c, col: 'price', w: 1.1, label: 'close (simulated)' }, { d: a50, col: 'c1', w: 2.2, label: '50-period SMA' }, { d: a45, col: 'c2', w: 1.8, dash: [5, 3], label: '45-period SMA' }, { d: ar, col: 'c3', w: 1.4, label: 'random-length SMA (30–70)' }] });
+    let g = 0, gr = 0, m = 0; for (let i = 70; i < n; i++) { g += Math.abs(a50[i] - a45[i]) / b.c[i]; gr += Math.abs(a50[i] - ar[i]) / b.c[i]; m++; }
+    let dd = 0; for (let i = 71; i < n; i++) dd += Math.abs(b.c[i] / b.c[i - 1] - 1);
+    $('r7').innerHTML = `average gap 50 vs 45: <b>${(g / m * 100).toFixed(2)}%</b> of price · 50 vs random length: <b>${(gr / m * 100).toFixed(2)}%</b> · a typical day's move: <b>${(dd / (n - 71) * 100).toFixed(2)}%</b>`;
+  });
+  $('b7').addEventListener('click', () => { rl7++; d7(); });
+  const d7b = reg(() => bookCompare('c7b', ['14.1', '14.2', '14.3'], $('sel7').value));
+  $('sel7').addEventListener('change', d7b);
+
+  // ---------- section 8: the 200-day ----------
+  const d8 = reg(() => {
+    const b = genBars(seed * 29 + 8, 760, MK.rw); const n = b.c.length; const a200 = sma(b.c, 200), a50 = sma(b.c, 50);
+    const s200 = touchHold(b, a200), s50 = touchHold(b, a50);
+    const marks = []; let c200 = 0, c50 = 0; for (let i = 0; i < n; i++) { if (s200[i]) { c200++; marks.push({ i, v: s200[i] > 0 ? b.l[i] : b.h[i], kind: s200[i] > 0 ? 'buy' : 'sell' }); } if (s50[i]) c50++; }
+    cplot('c8', { b, x0: 199, lines: [{ d: a200, col: 'c1', w: 2.2, label: '200-period SMA' }, { d: a50, col: 'c2', w: 1.2, alpha: 0.6, label: '50-period SMA (for scale)' }], marks });
+    const per = (x) => (x / (n - 200) * 1000).toFixed(1);
+    $('r8').innerHTML = `touch-and-hold signals per 1,000 bars on this market: 200-day <b>${per(c200)}</b> · 50-day <b>${per(c50)}</b> (from bar 200 on)`;
+  });
+  const d8b = reg(() => bookCompare('c8b', ['14.1', '14.4'], $('sel8').value));
+  $('sel8').addEventListener('change', d8b);
+
+  // ---------- section 9: penetration ----------
+  let sig9 = 0;
+  const d9 = reg(() => {
+    const N = val('n9'); const b = genBars(seed * 37 + 9, 420, MK.rw); const avg = sma(b.c, N); const s = penetration(b, avg); const n = b.c.length;
+    const x0 = n - 160; const vis = []; for (let i = x0; i < n; i++) if (s[i]) vis.push(i);
+    const marks = vis.map((i) => ({ i, v: s[i] > 0 ? b.l[i] : b.h[i], kind: s[i] > 0 ? 'buy' : 'sell' }));
+    const cur = vis.length ? vis[sig9 % vis.length] : null;
+    cplot('c9', { b, x0, lines: [{ d: avg, col: 'c1', w: 2, label: N + '-period SMA' }], marks, hilite: cur != null ? [cur, cur - 1] : [] });
+    if (cur == null) { $('r9').innerHTML = `<div>No penetration signals in view for N = ${N}.</div>`; return; }
+    const i = cur, a = avg[i], ap = avg[i - 1], f = (v) => v.toFixed(2), ok = (c) => c ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+    const rows = s[i] > 0 ? [
+      `${ok(b.l[i - 1] > ap)} previous low ${f(b.l[i - 1])} &gt; previous SMA ${f(ap)} (was above)`,
+      `${ok(b.c[i] < a)} this close ${f(b.c[i])} &lt; SMA ${f(a)} (closed through it)`,
+      `→ <b>BUY</b> (fade the break) at ${f(b.c[i])}`,
+      `also a close below yesterday's low ${f(b.l[i - 1])}? ${ok(b.c[i] < b.l[i - 1])}`] : [
+      `${ok(b.h[i - 1] < ap)} previous high ${f(b.h[i - 1])} &lt; previous SMA ${f(ap)} (was below)`,
+      `${ok(b.c[i] > a)} this close ${f(b.c[i])} &gt; SMA ${f(a)} (closed through it)`,
+      `→ <b>SELL</b> (fade the break) at ${f(b.c[i])}`,
+      `also a close above yesterday's high ${f(b.h[i - 1])}? ${ok(b.c[i] > b.h[i - 1])}`];
+    rows.push(`signal ${(sig9 % vis.length) + 1} of ${vis.length} visible`);
+    $('r9').innerHTML = rows.map((x) => `<div>${x}</div>`).join('');
+  });
+  bindRange('n9', () => { sig9 = 0; d9(); });
+  $('nx9').addEventListener('click', () => { sig9++; d9(); });
+  const d9b = reg(() => { const a = $('sel9').value; const t5 = BK['14.5'], t6 = BK['14.6'];
+    barChart('c9b', { cats: HZL, series: [
+      { label: '50 SMA buys', col: 'buy', vals: t5[a + 'B'].map((x) => x.v), stars: t5[a + 'B'].map((x) => x.s) },
+      { label: '50 SMA sells', col: 'sell', vals: t5[a + 'S'].map((x) => x.v), stars: t5[a + 'S'].map((x) => x.s) },
+      { label: '200 SMA buys', col: 'c2', vals: t6[a + 'B'].map((x) => x.v), stars: t6[a + 'B'].map((x) => x.s) },
+      { label: '200 SMA sells', col: 'c1', vals: t6[a + 'S'].map((x) => x.v), stars: t6[a + 'S'].map((x) => x.s) }
+    ], label: 'Tables 14.5 / 14.6 · excess mean, bp (book)' }); });
+  $('sel9').addEventListener('change', d9b);
+
+  // ---------- section 10: without the average ----------
+  const d10 = regH(() => {
+    const N = val('n10'); const R = once('ov' + N, () => { const list = pool('rw', 30, 1200); let pb = 0, pbx = 0, ps = 0, psx = 0;
+    for (const b of list) { const s = penetration(b, sma(b.c, N)); for (let i = 1; i < s.length; i++) { if (s[i] > 0) { pb++; if (b.c[i] < b.l[i - 1]) pbx++; } else if (s[i] < 0) { ps++; if (b.c[i] > b.h[i - 1]) psx++; } } }
+    return { pb, pbx, ps, psx }; }); const { pb, pbx, ps, psx } = R;
+    $('r10').innerHTML = `${N}-period SMA, 30 simulated markets: <b>${pb}</b> penetration buys, of which <b>${pb ? (pbx / pb * 100).toFixed(1) : 0}%</b> also closed below the previous low · <b>${ps}</b> sells, <b>${ps ? (psx / ps * 100).toFixed(1) : 0}%</b> also closed above the previous high`;
+  });
+  bindRange('n10', d10);
+  const d10s = regH(() => {
+    const kind = $('sel10').value; const lens = [10, 20, 45, 50, 65, 150, 200, 233];
+    const { cats, bv, be, sv, se } = once('sw' + kind, () => { const list = pool(kind, 30, 1200);
+    const cats = [], bv = [], be = [], sv = [], se = [];
+    const add = (lab, fn) => { const r = eventStudy(list, fn, [5])[0]; cats.push(lab); bv.push(r.buy.ex); be.push(r.buy.t ? 2 * Math.abs(r.buy.ex / r.buy.t) : 0); sv.push(r.sell.ex); se.push(r.sell.t ? 2 * Math.abs(r.sell.ex / r.sell.t) : 0); };
+    lens.forEach((L) => add(String(L), (b) => penetration(b, sma(b.c, L))));
+    add('rand', (b) => penetration(b, randLenMA(b.c, 4242)));
+    add('no MA', (b) => fadeOutside(b));
+    return { cats, bv, be, sv, se }; });
+    barChart('c10', { cats, series: [{ label: 'fade-break buys (day 5)', col: 'buy', vals: bv, err: be }, { label: 'fade-break sells (day 5)', col: 'sell', vals: sv, err: se }], label: 'excess mean at day 5, bp (simulated)' });
+    $('r10b').innerHTML = kind === 'rev' ? `built-in reversal market: every length, the random length and the no-average rule give about the same answer: buys <b>${sgn(mean(bv))}</b> bp, sells <b>${sgn(mean(sv))}</b> bp on average` : `pure random walk: all bars sit within noise of zero (average buys <b>${sgn(mean(bv))}</b>, sells <b>${sgn(mean(sv))}</b> bp); no edge exists to find`;
+  });
+  $('p10').addEventListener('click', d10s); $('sel10').addEventListener('change', d10s);
+  const d10c = reg(() => bookCompare('c10c', ['14.5', '14.6', '14.7'], $('sel10b').value));
+  $('sel10b').addEventListener('change', d10c);
+
+  // ---------- section 11: crossovers ----------
+  function xMarket(kind, sd0) {
+    const r = rng(sd0); const up = r() < 0.5 ? 1 : -1;
+    const segs = kind === 'trend' ? [{ n: 160, drift: 0.0035 * up, vol: 0.011, kind: 'trend' }, { n: 160, drift: -0.0035 * up, vol: 0.011, kind: 'trend' }]
+      : kind === 'range' ? [{ n: 320, drift: 0, vol: 0.012, revert: 0.08, kind: 'range' }]
+        : [{ n: 120, drift: 0.0035 * up, vol: 0.011, kind: 'trend' }, { n: 140, drift: 0, vol: 0.012, revert: 0.08, kind: 'range' }, { n: 120, drift: -0.0035 * up, vol: 0.011, kind: 'trend' }];
+    return genMarket(segs, sd0, 100);
+  }
+  function xPos(c, f, s) { const a = sma(c, f), b = sma(c, s); return c.map((_, i) => (a[i] == null || b[i] == null) ? null : (a[i] > b[i] ? 1 : -1)); }
+  const d11 = reg(() => {
+    const kind = $('sel11').value, f = val('f11'), s = Math.max(val('l11'), f + 1), cost = val('k11') / 100;
+    const M = xMarket(kind, seed * 41 + 11); const pos = xPos(M.c, f, s); const bt = backtest(M.c, pos, cost);
+    const shade = []; let a = 0; for (let i = 1; i <= M.kind.length; i++) if (i === M.kind.length || M.kind[i] !== M.kind[a]) { if (M.kind[a] === 'range') shade.push({ a, b: i - 1, col: 'c3', alpha: 0.1 }); a = i; }
+    plot('c11', { n: M.c.length, shade, lines: [{ d: M.c, col: 'price', w: 1.2, label: 'close (simulated)' }, { d: sma(M.c, f), col: 'c1', w: 1.8, label: f + '-bar SMA' }, { d: sma(M.c, s), col: 'c2', w: 2, label: s + '-bar SMA' }], marks: crossMarks(M.c, pos), sub: { lines: [{ d: bt.eq, col: 'c3', w: 1.6, label: 'system equity, % (after costs)' }], zero: true }, legend: [['range-bound stretch', 'c3']] });
+    $('r11').innerHTML = statLine(bt, bhLine(M.c));
+  });
+  bindRange('f11', d11); bindRange('l11', d11); bindRange('k11', d11); $('sel11').addEventListener('change', d11);
+  const d11b = regH(() => {
+    const f = val('f11'), s = Math.max(val('l11'), f + 1), cost = val('k11') / 100;
+    const out = once('x' + f + '/' + s + '/' + cost, () => { const out = {};
+    ['trend', 'range'].forEach((k) => { const nets = []; for (let j = 0; j < 120; j++) { const M = xMarket(k, seed * 503 + j * 11 + (k === 'range' ? 7 : 0)); nets.push(backtest(M.c, xPos(M.c, f, s), cost).net); } out[k] = nets; }); return out; });
+    const line = (k, lab) => `${lab}: mean net <b class="${cls(mean(out[k]))}">${sgn(mean(out[k]))}%</b>, profitable in <b>${(out[k].filter((x) => x > 0).length / 1.2).toFixed(0)}%</b> of markets`;
+    $('r11b').innerHTML = `${f}/${s} always-in, ${val('k11')} bp per trade, 120 simulated markets each · ` + line('trend', 'trending') + ' · ' + line('range', 'range-bound');
+  });
+  $('p11').addEventListener('click', d11b);
+
+  // ---------- section 12: expectancy and KS ----------
+  const d12 = reg(() => {
+    const w = val('w12') / 100, aw = val('a12'), al = val('b12'), k = val('k12');
+    const winPart = w * aw, lossPart = -(1 - w) * al, net = winPart + lossPart - k;
+    barChart('c12', { cats: ['winners', 'losers', 'costs', 'net'], series: [{ label: 'contribution per average trade, bp', col: 'c2', vals: [winPart, lossPart, -k, net] }] });
+    const pBE = (al + k) / (aw + al);
+    $('r12').innerHTML = `expectancy <b class="${cls(net)}">${sgn(net)} bp</b> per trade = <b>$${(net * 10).toFixed(0)}</b> on a $100,000 position · break-even win rate (avg loss + cost) ÷ (avg win + avg loss) = <b>${(pBE * 100).toFixed(1)}%</b>`;
+  });
+  ['w12', 'a12', 'b12', 'k12'].forEach((id) => bindRange(id, d12));
+  function setVals(v) { Object.keys(v).forEach((id) => { $(id).value = v[id]; $(id + 'o').textContent = v[id]; }); d12(); }
+  $('pre12a').addEventListener('click', () => setVals({ w12: 28, a12: 589, b12: 112 }));
+  $('pre12b').addEventListener('click', () => setVals({ w12: 20.9, a12: 477, b12: 117 }));
+  function tradeList(n, w, aw, al, sd0) { const r = rng(sd0); const out = []; for (let i = 0; i < n; i++) { let u = r(); while (!u) u = r(); out.push(r() < w ? -aw * Math.log(u) : al * Math.log(u)); } return out.sort((a, b) => a - b); }
+  function ksP(D, n1, n2) { const ne = n1 * n2 / (n1 + n2); const lam = (Math.sqrt(ne) + 0.12 + 0.11 / Math.sqrt(ne)) * D; if (lam < 0.3) return 1; let s = 0; for (let k = 1; k <= 100; k++) s += 2 * (k % 2 ? 1 : -1) * Math.exp(-2 * k * k * lam * lam); return Math.max(0, Math.min(1, s)); }
+  const d12b = reg(() => {
+    const q = val('d12') / 100; const A = tradeList(911, 0.28, 589, 112, seed * 61 + 12);
+    const B = tradeList(449, 0.28 + (0.209 - 0.28) * q, 589 + (477 - 589) * q, 112 + (117 - 112) * q, seed * 67 + 13);
+    const grid = []; for (let x = -600; x <= 1500; x += 15) grid.push(x);
+    const cdf = (S, x) => { let lo = 0, hi = S.length; while (lo < hi) { const m = (lo + hi) >> 1; if (S[m] <= x) lo = m + 1; else hi = m; } return lo / S.length; };
+    const ca = grid.map((x) => cdf(A, x)), cb = grid.map((x) => cdf(B, x));
+    let D = 0, at = 0; A.concat(B).forEach((x) => { const d = Math.abs(cdf(A, x) - cdf(B, x)); if (d > D) { D = d; at = x; } });
+    let gi = 0; grid.forEach((x, i) => { if (Math.abs(x - at) < Math.abs(grid[gi] - at)) gi = i; });
+    plot('c12b', { n: grid.length, lines: [{ d: ca, col: 'c1', w: 2, label: 'sample 1: 911 trades (1920–1986 shape)' }, { d: cb, col: 'c2', w: 2, label: 'sample 2: 449 trades' }], vlines: [{ i: gi, col: 'sell', label: 'largest gap D' }], ymin: 0, ymax: 1 });
+    const p = ksP(D, 911, 449);
+    $('r12b').innerHTML = `x-axis: trade return from −600 to +1,500 bp · y: share of trades at or below · D = <b>${D.toFixed(3)}</b> at ${at.toFixed(0)} bp · p ≈ <b>${p < 0.0001 ? '&lt;0.0001' : p.toFixed(4)}</b> · means: <b>${sgn(mean(A))}</b> vs <b>${sgn(mean(B))}</b> bp (simulated)`;
+  });
+  bindRange('d12', d12b);
+
+  // ---------- section 13: optimization ----------
+  const FAST = [2, 5, 10, 15, 20, 30, 40, 50], SLOW = [30, 50, 75, 100, 125, 150, 175, 200];
+  function segRet(c, pos, a, b, costBp) { let r = 0, sw = 0; for (let i = a + 1; i < b; i++) { const p = pos[i - 1]; if (p == null) continue; r += p * (c[i] / c[i - 1] - 1); if (i > a + 1 && pos[i - 1] !== pos[i - 2]) sw++; } return r * 100 - sw * costBp / 100; }
+  function optimize(c, inverse) {
+    const half = c.length >> 1; const res = []; let best = null;
+    FAST.forEach((f, fi) => SLOW.forEach((s, si) => {
+      if (f >= s) { res.push({ fi, si, v: null }); return; }
+      const pos = xPos(c, f, s); const is = segRet(c, pos, 200, half, 10); const oos = segRet(c, pos, half, c.length, 10);
+      res.push({ fi, si, v: is });
+      const cands = inverse ? [[is, oos, 1], [-is, -oos, -1]] : [[is, oos, 1]];
+      cands.forEach(([a, b2, d]) => { if (!best || a > best.is) best = { f, s, is: a, oos: b2, dir: d }; });
+    }));
+    return { res, best };
+  }
+  function heat(id, res, best) {
+    const cv = $(id); if (!cv) return; const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 40, padB = 34, padT = 8, padR = 8; const cw = (W - padL - padR) / SLOW.length, ch = (H - padT - padB) / FAST.length;
+    let mx = 1; res.forEach((r) => { if (r.v != null) mx = Math.max(mx, Math.abs(r.v)); });
+    g.font = '11px ' + css('mono');
+    res.forEach((r) => { const x = padL + r.si * cw, y = padT + r.fi * ch; if (r.v == null) { g.fillStyle = colorOf('grid'); g.fillRect(x + 1, y + 1, cw - 2, ch - 2); return; }
+      g.fillStyle = colorOf(r.v >= 0 ? 'buy' : 'sell', 0.12 + 0.75 * Math.abs(r.v) / mx); g.fillRect(x + 1, y + 1, cw - 2, ch - 2);
+      if (cw > 38) { g.fillStyle = colorOf('ink'); const t = r.v.toFixed(0); g.fillText(t, x + cw / 2 - g.measureText(t).width / 2, y + ch / 2 + 4); } });
+    if (best) { const x = padL + SLOW.indexOf(best.s) * cw, y = padT + FAST.indexOf(best.f) * ch; g.strokeStyle = colorOf('c1'); g.lineWidth = 3; g.strokeRect(x + 1.5, y + 1.5, cw - 3, ch - 3); g.lineWidth = 1; }
+    g.fillStyle = colorOf('muted'); SLOW.forEach((s, i) => { const t = String(s); g.fillText(t, padL + i * cw + cw / 2 - g.measureText(t).width / 2, H - padB + 14); });
+    g.fillText('slow average →', padL, H - 4); FAST.forEach((f, i) => g.fillText(String(f), 6, padT + i * ch + ch / 2 + 4)); g.fillText('fast ↓', 2, H - padB + 14);
+    const Lg = $(id + 'L'); if (Lg) Lg.innerHTML = `<span style="--sw:${colorOf('buy')}">in-sample gain %</span><span style="--sw:${colorOf('sell')}">in-sample loss %</span><span style="--sw:${colorOf('c1')}">best pick</span>`;
+  }
+  const d13 = reg(() => {
+    const inv0 = $('chk13').checked;
+    const { res, best } = once('opt' + inv0, () => optimize(genMarket([{ n: 1800, drift: 0, vol: 0.012 }], seed * 71 + 13, 100).c, inv0)); heat('c13', res, best);
+    $('r13').innerHTML = `simulated random walk, 1,800 bars: optimize on bars 200–899, then trade 900–1,799 unseen · 10 bp per switch · best: <b>${best.dir < 0 ? 'inverse ' : ''}${best.f}/${best.s}</b> · in-sample <b class="${cls(best.is)}">${sgn(best.is)}%</b> · out-of-sample <b class="${cls(best.oos)}">${sgn(best.oos)}%</b>`;
+  });
+  $('chk13').addEventListener('change', d13);
+  const d13b = regH(() => {
+    const inv = $('chk13').checked;
+    const { isA, oosA } = once('optp' + inv, () => { const isA = [], oosA = [];
+    for (let j = 0; j < 40; j++) { const M = genMarket([{ n: 1800, drift: 0, vol: 0.012 }], seed * 911 + j * 13 + 1, 100); const { best } = optimize(M.c, inv); isA.push(best.is); oosA.push(best.oos); } return { isA, oosA }; });
+    $('r13b').innerHTML = `40 random markets${inv ? ' (inverse allowed)' : ''}: best in-sample pick averaged <b class="good">${sgn(mean(isA))}%</b> in-sample and <b class="${cls(mean(oosA))}">${sgn(mean(oosA))}%</b> out-of-sample · out-of-sample profitable in <b>${(oosA.filter((x) => x > 0).length / 0.4).toFixed(0)}%</b> of markets`;
+  });
+  $('p13').addEventListener('click', d13b);
+
+  // ---------- section 14: trend indicators ----------
+  function slope5(a, i) { if (i < 4 || a[i - 4] == null) return null; return (-2 * a[i - 4] - a[i - 3] + a[i - 1] + 2 * a[i]) / 10; }
+  function slopeStates(c, N) { const a = sma(c, N); return { a, st: c.map((_, i) => { const s = slope5(a, i); return s == null ? null : s > 0 ? 1 : s < 0 ? -1 : 0; }), sl: c.map((x, i) => { const s = slope5(a, i); return s == null ? null : s / x * 1e4; }) }; }
+  function catReturns(c, st, bug) {
+    const g = { 1: [], '-1': [] }, all = [];
+    for (let i = 1; i < c.length; i++) { const lab = bug ? st[i] : st[i - 1]; if (lab == null || lab === 0) continue; const r = c[i] / c[i - 1] - 1; all.push(r); g[lab].push(r); }
+    const ma = mean(all); const f = (arr) => ({ n: arr.length, ex: (mean(arr) - ma) * 1e4, up: arr.filter((x) => x > 0).length / Math.max(1, arr.length), sd: sdev(arr) * 1e4 });
+    return { up: f(g[1]), dn: f(g['-1']) };
+  }
+  const d14 = reg(() => {
+    const N = val('n14'), kind = $('sel14').value, bug = $('chk14').checked; const b = genBars(seed * 43 + 14, 700, MK[kind]); const c = b.c;
+    const { a, st, sl } = slopeStates(c, N); const shade = []; let s0 = 0;
+    for (let i = 1; i <= c.length; i++) if (i === c.length || st[i] !== st[s0]) { if (st[s0] === 1) shade.push({ a: s0, b: i - 1, col: 'buy', alpha: 0.1 }); else if (st[s0] === -1) shade.push({ a: s0, b: i - 1, col: 'sell', alpha: 0.1 }); s0 = i; }
+    plot('c14', { n: c.length, x0: 300, shade, lines: [{ d: c, col: 'price', w: 1.1, label: 'close (simulated)' }, { d: a, col: 'c1', w: 2.2, label: N + '-period SMA' }], sub: { lines: [{ d: sl, col: 'c2', w: 1.4, label: '5-point regression slope of the SMA (bp/day)' }], zero: true }, legend: [['slope up', 'buy'], ['slope down', 'sell']] });
+    const r = catReturns(c, st, bug);
+    $('r14').innerHTML = `${bug ? '<b class="bad">look-ahead ON</b> (today\'s return counted under today\'s label)' : 'correct labelling (today\'s return under yesterday\'s label)'} · uptrend days <b>${r.up.n}</b>: excess <b class="${cls(r.up.ex)}">${sgn(r.up.ex)} bp/day</b>, up <b>${(r.up.up * 100).toFixed(1)}%</b> · downtrend days <b>${r.dn.n}</b>: excess <b class="${cls(-r.dn.ex)}">${sgn(r.dn.ex)} bp/day</b>, up <b>${(r.dn.up * 100).toFixed(1)}%</b> · one market, noisy`;
+  });
+  bindRange('n14', d14); $('sel14').addEventListener('change', d14); $('chk14').addEventListener('change', d14);
+  const d14p = regH(() => {
+    const N = val('n14');
+    const res = once('lk' + N, () => { const list = pool('rw', 150, 800); const res = { 0: { u: [], d: [] }, 1: { u: [], d: [] } };
+    list.forEach((b) => { const { st } = slopeStates(b.c, N); [0, 1].forEach((bug) => { const r = catReturns(b.c, st, !!bug); res[bug].u.push(r.up.ex); res[bug].d.push(r.dn.ex); }); }); return res; });
+    const L = (k) => `uptrend <b class="${cls(mean(res[k].u))}">${sgn(mean(res[k].u))}</b> · downtrend <b class="${cls(-mean(res[k].d))}">${sgn(mean(res[k].d))}</b> bp/day`;
+    $('r14b').innerHTML = `${N}-period slope, 150 random walks (no trend edge exists): correct labelling → ${L(0)} · with the look-ahead mistake → ${L(1)}`;
+  });
+  $('p14').addEventListener('click', d14p);
+  const d14b = reg(() => {
+    const kind = $('sel14').value; const b = genBars(seed * 43 + 14, 700, MK[kind]); const c = b.c; const a10 = sma(c, 10), a20 = sma(c, 20), a50 = sma(c, 50);
+    const st = c.map((_, i) => a50[i] == null ? null : (a10[i] > a20[i] && a20[i] > a50[i]) ? 1 : (a10[i] < a20[i] && a20[i] < a50[i]) ? -1 : 0);
+    const shade = []; let s0 = 0; for (let i = 1; i <= c.length; i++) if (i === c.length || st[i] !== st[s0]) { if (st[s0] === 1) shade.push({ a: s0, b: i - 1, col: 'buy', alpha: 0.1 }); else if (st[s0] === -1) shade.push({ a: s0, b: i - 1, col: 'sell', alpha: 0.1 }); s0 = i; }
+    plot('c14b', { n: c.length, x0: 300, shade, lines: [{ d: c, col: 'price', w: 1, label: 'close' }, { d: a10, col: 'c1', w: 1.4, label: '10' }, { d: a20, col: 'c2', w: 1.6, label: '20' }, { d: a50, col: 'c3', w: 2, label: '50' }], legend: [['10 > 20 > 50', 'buy'], ['10 < 20 < 50', 'sell']] });
+    let u = 0, d = 0, z = 0; st.forEach((x) => { if (x === 1) u++; else if (x === -1) d++; else if (x === 0) z++; }); const T = u + d + z;
+    const r = catReturns(c, st, false);
+    $('r14c').innerHTML = `time labelled up <b>${(u / T * 100).toFixed(0)}%</b> · down <b>${(d / T * 100).toFixed(0)}%</b> · undefined <b>${(z / T * 100).toFixed(0)}%</b> · next-day excess: up <b>${sgn(r.up.ex)}</b>, down <b>${sgn(r.dn.ex)}</b> bp (market type from the selector above)`;
+  });
+  const d14c = reg(() => {
+    const t = $('sel14c').value; const D = t === 't10' ? { dn: [177.2, -94.1, 15.5, -85.2], up: [-129.6, 81.1, -11.1, 72.0] } : { dn: [166.9, -203.0, 43.6, -74.9], up: [-157.9, 80.7, 43.9, 98.6] };
+    barChart('c14c', { cats: ['Equities', 'Futures', 'Forex', 'Random'], series: [{ label: 'labelled downtrend', col: 'sell', vals: D.dn }, { label: 'labelled uptrend', col: 'buy', vals: D.up }], label: (t === 't10' ? 'Table 14.10' : 'Table 14.11') + ' · mean excess return as printed (bp)', note: 'a working tool: green +, red −' });
+  });
+  $('sel14c').addEventListener('change', d14c);
+
+  // ---------- section 15: the 200-day filter and volatility ----------
+  function filterStats(c, N) {
+    const a = sma(c, N); const bh = [], fl = []; let eqB = 1, eqF = 1; const gB = nulls(c.length), gF = nulls(c.length);
+    for (let i = N; i < c.length; i++) { const r = c[i] / c[i - 1] - 1; bh.push(r); eqB *= 1 + r; if (c[i - 1] > a[i - 1]) { fl.push(r); eqF *= 1 + r; } gB[i] = (eqB - 1) * 100; gF[i] = (eqF - 1) * 100; }
+    const st = (arr, eq) => { const m = mean(arr) * 1e4, s = sdev(arr) * 1e4; return { roi: (eq - 1) * 100, m, s, cv: s / m, days: arr.length }; };
+    return { B: st(bh, eqB), F: st(fl, eqF), gB, gF };
+  }
+  const d15 = reg(() => {
+    const gj = val('g15') / 100, N = val('n15'); const b = genBars(seed * 47 + 15, 2600, { mu: 0.0004, sig: 0.01, garch: true, gjr: gj, lite: true });
+    const R = filterStats(b.c, N);
+    plot('c15', { n: b.c.length, x0: N, lines: [{ d: R.gB, col: 'muted', w: 1.4, label: 'buy and hold, total %' }, { d: R.gF, col: 'c1', w: 2, label: 'long only above ' + N + '-day, total %' }], zero: true });
+    const row = (lab, s) => `${lab}: ROI <b>${sgn(s.roi)}%</b> · mean <b>${s.m.toFixed(1)}</b> bp · SD <b>${s.s.toFixed(1)}</b> bp · CV <b>${s.cv > 0 && s.cv < 1000 ? s.cv.toFixed(1) : 'n/a'}</b> · days <b>${s.days}</b>`;
+    $('r15').innerHTML = row('buy and hold', R.B) + '<br>' + row('above ' + N + '-day', R.F);
+  });
+  bindRange('g15', d15); bindRange('n15', d15);
+  const d15b = regH(() => {
+    const N = val('n15'); const g0 = val('g15');
+    const out = once('vf' + N + '/' + g0, () => { const out = {};
+    [g0 / 100, 0].forEach((gj) => { const sr = [], cvB = [], cvF = []; for (let j = 0; j < 60; j++) { const b = genBars(seed * 977 + j * 7 + 3, 2600, { mu: 0.0004, sig: 0.01, garch: true, gjr: gj, lite: true }); const R = filterStats(b.c, N); sr.push(R.F.s / R.B.s); cvB.push(R.B.s / R.B.m); cvF.push(R.F.s / R.F.m); } out[gj] = { sr: mean(sr), cvB: median(cvB), cvF: median(cvF) }; }); return out; });
+    const ks = Object.keys(out).map(Number).sort((x, y) => y - x);
+    $('r15b').innerHTML = ks.map((k) => `extra down-day volatility ${Math.round(k * 100)}: filter's daily SD = <b>${(out[k].sr * 100).toFixed(0)}%</b> of buy-and-hold's · median CV <b>${out[k].cvB.toFixed(1)}</b> (hold) vs <b>${out[k].cvF.toFixed(1)}</b> (filter)`).join('<br>') + ' · 60 simulated markets each';
+  });
+  $('p15').addEventListener('click', d15b);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); refreshAll(); });
+  buildData(); refreshAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

@@ -1,0 +1,1502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.3 Chart Construction</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* additions for chapters 1–3 (template rules above are unchanged) */
+.flow { display: grid; gap: 6px; }
+.flow .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.flow .node { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; background: var(--paper); font-family: var(--mono); font-size: 13px; line-height: 1.45; flex: 1 1 150px; min-width: 0; }
+.flow .node b { color: var(--c1); }
+.flow .node.key { border-color: var(--c1); }
+.flow .arrow { font-family: var(--mono); color: var(--muted); font-size: 13px; padding-left: 4px; }
+.svgfig { display: grid; gap: 8px; min-width: 0; }
+.svgfig svg { width: 100%; max-width: 560px; height: auto; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; }
+.svgfig svg text { font-size: 10px; }
+#svg7 svg { max-width: 440px; }
+.caption { font-family: var(--mono); font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; min-height: 3.2em; }
+.note { font-size: 15px; color: var(--muted); }
+.tag { font-family: var(--mono); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--c3); border: 1px solid var(--c3); border-radius: 3px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+.obar { display: grid; grid-template-columns: 7ch 1fr 9ch; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.obar i { display: block; height: 14px; background: var(--c2); border-radius: 2px; min-width: 1px; }
+.obar.top i { background: var(--c1); }
+.obar.top { font-weight: 600; }
+/* candle body colours: white = close above open, black = close below open, in both themes */
+:root { --cup: #ffffff; --cdn: #1f2b38; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --cup: #f2f5f8; --cdn: #000000; } }
+:root[data-theme="dark"] { --cup: #f2f5f8; --cdn: #000000; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.controls select { max-width: 100%; }
+/* pass-2 additions: number inputs, step-through tables */
+.controls input[type=number] { width: 8ch; font-family: var(--mono); font-size: 13px; padding: 3px 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+tr.dim td { opacity: .35; }
+tr.cur td { background: var(--tint); }
+.worked { border: 1px dashed var(--c1); border-radius: 4px; padding: 12px 14px; display: grid; gap: 8px; }
+.worked > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--c1); }
+.worked p, .worked li { font-size: 16px; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch02_dow_theory.html">← Ch.2 Dow Theory</a><a href="ch04_trend.html">Ch.4 Trend →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John J. Murphy · Technical Analysis of the Financial Markets · Chapter 3 · pdf p72–84</div>
+  <h1>Chart Construction: how the <em>picture</em> is drawn</h1>
+  <p class="lede">Before you can read a chart you need to know how it's made: which four prices go into each bar, why the close tick sits on the right, why a log scale can change what a trendline says, and what volume and open interest are. Every chart on this page is drawn from the same kind of simulated market, so you can flip between views and see that only the picture changes, not the data. Charts use simulated prices, not real market data.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b></span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>A chart is three choices stacked on top of the raw numbers: what kind of picture, what kind of price scale, and how much time each bar covers. Murphy also adds the two extra data series that sit under the price.</p>
+  <div class="flow" aria-label="Concept map of Chapter 3">
+    <div class="row"><div class="node key"><b>Raw data for each day</b><br>open · high · low · close · volume · (futures) open interest</div></div>
+    <div class="arrow">↓ choice 1: what picture?</div>
+    <div class="row">
+      <div class="node"><b>Bar</b> all four prices (the standard)</div>
+      <div class="node"><b>Line</b> closes only</div>
+      <div class="node"><b>Point &amp; figure</b> compressed: columns of x's and o's</div>
+      <div class="node"><b>Candlestick</b> open–close body</div>
+    </div>
+    <div class="arrow">↓ choice 2: what price scale?</div>
+    <div class="row"><div class="node"><b>Arithmetic</b> equal distance = equal price change</div><div class="node"><b>Logarithmic</b> equal distance = equal % change</div></div>
+    <div class="arrow">↓ add the activity data</div>
+    <div class="row"><div class="node"><b>Volume</b> bars under price</div><div class="node"><b>Open interest</b> line (futures only), total vs single month, a day late</div></div>
+    <div class="arrow">↓ choice 3: how much time per bar?</div>
+    <div class="row"><div class="node">intraday (down to 5 minutes)</div><div class="node">daily: 6–9 months</div><div class="node">weekly: ~5 years</div><div class="node">monthly: ~20 years</div></div>
+    <div class="arrow">↓ the chart only records; the rules come next (Chapter 4)</div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Who this chapter is for</a>
+    <a href="#s2"><span>02</span>Types of charts: bar, line, P&amp;F</a>
+    <a href="#s3"><span>03</span>Candlesticks</a>
+    <a href="#s4"><span>04</span>Arithmetic vs logarithmic scale</a>
+    <a href="#s5"><span>05</span>Building a daily bar chart</a>
+    <a href="#s6"><span>06</span>Volume</a>
+    <a href="#s7"><span>07</span>Futures open interest</a>
+    <a href="#s8"><span>08</span>Total vs single-month figures</a>
+    <a href="#s9"><span>09</span>Reported a day late</a>
+    <a href="#s10"><span>10</span>Why single-month OI still matters</a>
+    <a href="#s11"><span>11</span>Weekly and monthly charts</a>
+    <a href="#s12"><span>12</span>Conclusion: brush, canvas, scalpel</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · INTRODUCTION</div><h2>Who this chapter is for</h2></div><span class="chip">pdf p72</span></div>
+  <p>Murphy wrote this chapter for readers who have never built a bar chart. It covers, in order: the different types of chart, then the most common one, the <b>daily bar chart</b>; how price data is read and plotted; <b>volume and open interest</b>; and longer-range <b>weekly and monthly</b> charts. With that done, the next chapter starts on the analysis tools. He says readers who already know charts may find this too basic and can skip ahead.</p>
+  <div class="box picture"><b>Picture it</b><p>Learning to read a map starts with the legend: what a blue line means, what one centimetre stands for. This chapter is the chart's legend.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 1 (<a href="ch01_philosophy.html">philosophy</a>): price, volume and open interest are the three sources of "market action" that the whole approach studies. This chapter shows how each one is drawn.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · TYPES OF CHARTS AVAILABLE</div><h2>Bar, line and point &amp; figure: one market, three pictures</h2></div><span class="chip">pdf p73–75 · Fig 3.1, 3.2, 3.3</span></div>
+  <p>The <b>daily bar chart</b> is the most widely used chart in technical analysis. Technicians also use <b>line charts</b>, <b>point and figure charts</b> and, more recently, <b>candlesticks</b>.</p>
+  <ul class="plain">
+    <li><b>Bar chart (Fig 3.1):</b> each day's range is one vertical bar, so it shows the open, high, low and close. The tick to the <b>right</b> of the bar is the close; the tick to the <b>left</b> is the open.</li>
+    <li><b>Line chart (Fig 3.2):</b> only the close is plotted each day, and the closes are joined into a line. Many chartists think the close is the most important price of the day, so they see a close-only chart as a more valid measure of price activity.</li>
+    <li><b>Point and figure chart (Fig 3.3):</b> the same price action in a more compressed form, as alternating columns of x's (rising prices) and o's (falling prices). Murphy says buy and sell signals are more precise and easier to spot than on a bar chart, and the chart is much more flexible. Chapter 11 covers it.</li>
+  </ul>
+  <p>Murphy makes the point by drawing <b>one market four ways</b>: Figures 3.1 to 3.4 are all Intel (INTC), roughly July 1997 to February 1998, as a daily bar chart, a line chart, a point and figure chart and a candlestick chart. The interactive chart below does the same with one simulated market.</p>
+  <div class="two">
+    <div class="svgfig">
+      <svg viewBox="0 0 220 170" role="img" aria-label="Anatomy of one price bar">
+        <line x1="110" y1="20" x2="110" y2="150" stroke="var(--price)" stroke-width="3"/>
+        <line x1="90" y1="110" x2="110" y2="110" stroke="var(--price)" stroke-width="3"/>
+        <line x1="110" y1="50" x2="130" y2="50" stroke="var(--price)" stroke-width="3"/>
+        <text x="118" y="18">High</text><text x="118" y="164">Low</text>
+        <text x="30" y="114">Open →</text><text x="136" y="54">← Close</text>
+      </svg>
+      <div class="note">One bar = one day. Left tick open, right tick close.</div>
+    </div>
+    <div class="svgfig">
+      <svg viewBox="0 0 220 170" role="img" aria-label="Point and figure columns">
+        <g stroke="var(--buy)" stroke-width="2">
+          <path d="M30,130 l12,12 M42,130 l-12,12 M30,114 l12,12 M42,114 l-12,12 M30,98 l12,12 M42,98 l-12,12 M30,82 l12,12 M42,82 l-12,12"/>
+          <path d="M110,114 l12,12 M122,114 l-12,12 M110,98 l12,12 M122,98 l-12,12 M110,82 l12,12 M122,82 l-12,12 M110,66 l12,12 M122,66 l-12,12 M110,50 l12,12 M122,50 l-12,12"/>
+        </g>
+        <g stroke="var(--sell)" stroke-width="2" fill="none">
+          <circle cx="76" cy="104" r="6"/><circle cx="76" cy="120" r="6"/><circle cx="76" cy="136" r="6"/>
+          <circle cx="156" cy="72" r="6"/><circle cx="156" cy="88" r="6"/><circle cx="156" cy="104" r="6"/>
+        </g>
+        <text x="20" y="40">x = rising</text><text x="120" y="160">o = falling</text>
+      </svg>
+      <div class="note">P&amp;F: no regular time axis (Fig 3.3 has dates only at uneven points along the bottom), just columns that switch when price reverses.</div>
+    </div>
+  </div>
+  <div class="fig">
+    <canvas id="c2" class="tall" aria-label="The same simulated market as a bar, line, candlestick or point and figure chart"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="sel2">View <select id="sel2"><option value="bar">bar chart</option><option value="line">line chart (closes only)</option><option value="candle">candlestick</option><option value="pf">point &amp; figure</option></select></label>
+      <label for="bx2">P&amp;F box size <input id="bx2" type="range" min="0.5" max="4" step="0.5" value="1"><output id="bx2o">1</output></label>
+      <label for="z2">Days shown <input id="z2" type="range" min="40" max="210" step="10" value="120"><output id="z2o">120</output></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Chart</th><th>Prices it keeps</th><th>Time axis</th><th>What Murphy says it's good for</th></tr></thead>
+    <tbody>
+      <tr><td>Bar</td><td>open, high, low, close</td><td>one bar per day, evenly spaced</td><td>the standard: the most widely used chart</td></tr>
+      <tr><td>Line</td><td>close only</td><td>one point per day</td><td>many chartists see it as a more valid measure of price activity, because the close is the most important price of the day</td></tr>
+      <tr><td>Candlestick</td><td>open, high, low, close</td><td>one candle per day</td><td>everything a bar chart can do; the key is the relation between open and close</td></tr>
+      <tr><td>Point &amp; figure</td><td>only moves of at least one box (on this page: closes only)</td><td>none regular: a new column starts only when price reverses</td><td>a compressed picture; buy and sell signals more precise and easier to spot</td></tr>
+    </tbody>
+  </table></div>
+  <div class="worked"><b>Worked example: build a point &amp; figure chart by hand</b>
+    <p>Seventeen closes, box size 1, 3-box reversal, using this page's simplified closes-only method (Chapter 11 gives the full rules). Two rounding rules do all the work: a rising close counts only the boxes it fully reached (103.6 reaches box 103, not 104), and a falling close likewise (101.7 reaches box 102, not 101). Step through and notice how many closes change nothing at all.</p>
+    <div class="fig">
+      <canvas id="pf2c" class="short" aria-label="Point and figure columns built one close at a time"></canvas>
+      <div class="controls">
+        <button id="pf2b" type="button">◀ Back</button>
+        <button id="pf2n" type="button">Next close ▶</button>
+        <label for="pf2k">Close # <input id="pf2k" type="range" min="1" max="17" step="1" value="1"><output id="pf2ko">1</output></label>
+      </div>
+      <div class="caption" id="pf2r"></div>
+      <div class="tablewrap"><table><thead><tr><th>#</th><th>Close</th><th>What happens</th></tr></thead><tbody id="pf2t"></tbody></table></div>
+    </div>
+    <p>Result: 17 days become 3 columns (x's 100–105, o's 104–102, x's 103–107). Eight of the sixteen moves after the start drew nothing: the 3-box reversal rule is a noise filter. That's the "compressed format" in action.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Three ways to describe the same journey. The bar chart is a full diary (where you started each day, the furthest you went each way, where you stopped). The line chart is just the list of hotels you slept in. Point &amp; figure is a list of the turns you made, ignoring the days you went nowhere.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The bar, line and candle views draw exactly the same days, so their shapes match. P&amp;F is built only from closes here: a new x is added each time price rises a full box above the top of the current column, a new o each time it falls a full box, and the column switches only after a 3-box move the other way (the "3-box reversal" that Chapter 11 explains). Small moves add nothing, so many days collapse into a few columns. That's the compressed format Murphy mentions. A bigger box means fewer, cleaner columns.</p>
+    <p><b>Failure modes (my note, not in this chapter):</b> set the box too small (0.5 above) and almost every wiggle becomes a 3-box reversal, so the chart is as noisy as the daily bars and its "signals" fire constantly. Set it too big (4) and months of action fold into one or two columns, so a turn shows up only after a large move has already happened. Watch the column count in the readout as you drag the box size: that count is the compression ratio.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 11 (<a href="ch11_point_and_figure.html">point &amp; figure</a>) for the exact construction rules and signals.</li>
+    <li>Chapter 2 (<a href="ch02_dow_theory.html">Dow Theory</a>): Dow used closing prices only, so his charts are closest to the line chart.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · CANDLESTICKS</div><h2>Candlesticks: same four prices, the open–close made bold</h2></div><span class="chip">pdf p74–76 · Fig 3.4</span></div>
+  <p>Candlesticks are the Japanese version of bar charting and had become very popular with Western chartists. A candle records the same four prices as a bar (open, high, low, close), but draws them differently:</p>
+  <ul class="plain">
+    <li>The <b>shadow</b> is a thin line from the day's high to its low.</li>
+    <li>The <b>real body</b> is the wider part, from the open to the close.</li>
+    <li>If the close is above the open, the body is <b>white</b> (positive). If the close is below the open, it's <b>black</b> (negative).</li>
+  </ul>
+  <p>The key to candlesticks is the relationship between the open and the close. Murphy notes that, possibly because candles became popular, Western chartists started paying much more attention to the opening tick on their bar charts. Anything you can do with a bar chart you can do with candles: all the tools and indicators in the book work on them, and you can build weekly and monthly candles the same way as weekly and monthly bars. Chapter 12 explains candlestick charting in depth.</p>
+  <div class="two">
+    <div class="svgfig">
+      <svg viewBox="0 0 240 200" role="img" aria-label="Anatomy of a white and a black candlestick">
+        <line x1="70" y1="15" x2="70" y2="165" stroke="var(--price)" stroke-width="2"/>
+        <rect x="55" y="50" width="30" height="80" fill="var(--cup)" stroke="var(--price)" stroke-width="2"/>
+        <line x1="170" y1="15" x2="170" y2="165" stroke="var(--price)" stroke-width="2"/>
+        <rect x="155" y="40" width="30" height="90" fill="var(--cdn)" stroke="var(--price)" stroke-width="2"/>
+        <text x="16" y="54">close</text><text x="20" y="134">open</text>
+        <text x="190" y="44">open</text><text x="190" y="134">close</text>
+        <text x="76" y="14">high</text><text x="76" y="164">low</text>
+        <text x="92" y="88">← real</text><text x="104" y="101">body</text>
+        <text x="96" y="30">← shadow</text>
+        <text x="36" y="188" style="fill: var(--buy)">white = up</text><text x="132" y="188" style="fill: var(--sell)">black = down</text>
+      </svg>
+      <div class="note">Left: close above open (white). Right: close below open (black).</div>
+    </div>
+    <div class="fig">
+      <canvas id="c3" aria-label="Simulated candlestick chart with bar ticks overlaid"></canvas>
+      <div class="legend" id="c3L"></div>
+      <div class="controls"><label><input id="chk3" type="checkbox"> overlay the bar-chart ticks</label></div>
+      <div class="readout" id="r3"></div>
+    </div>
+  </div>
+  <div class="worked"><b>Worked example: one day, two drawings</b>
+    <p>Say a stock opens at <b>101.20</b>, trades up to <b>103.80</b> and down to <b>100.40</b>, and closes at <b>103.10</b>. The range is 103.80 − 100.40 = <b>3.40</b>. The real body runs from the open to the close: 103.10 − 101.20 = <b>1.90</b>, and it is <b>white</b> because the close is above the open. The upper shadow is 103.80 − 103.10 = <b>0.70</b> and the lower shadow is 101.20 − 100.40 = <b>0.80</b>. The bar chart draws the same four numbers as a line from 100.40 to 103.80 with a left tick at 101.20 and a right tick at 103.10. Type your own prices below; a set of prices that can't happen (a high below the close, say) is refused, just as no real day could produce it.</p>
+    <div class="fig">
+      <canvas id="ohlc3" class="short" aria-label="One day's prices drawn as a bar and as a candlestick"></canvas>
+      <div class="controls">
+        <label for="op3">open <input id="op3" type="number" step="0.1" value="101.2"></label>
+        <label for="hi3">high <input id="hi3" type="number" step="0.1" value="103.8"></label>
+        <label for="lo3">low <input id="lo3" type="number" step="0.1" value="100.4"></label>
+        <label for="cl3">close <input id="cl3" type="number" step="0.1" value="103.1"></label>
+      </div>
+      <div class="controls">
+        <button id="pa3" type="button">the example</button>
+        <button id="pb3" type="button">black day</button>
+        <button id="pc3" type="button">open = close</button>
+        <button id="pd3" type="button">long lower shadow</button>
+      </div>
+      <div class="readout" id="rb3"></div>
+    </div>
+    <p class="note">Chapter 12 gives these shapes names and meanings. Here the point is only mechanical: a candle and a bar are two encodings of one 4-number record.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>The body is the day's result (did buyers or sellers win between the opening bell and the closing bell?), and the shadows are the arguments along the way. You see who won before you see how far they wandered.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Tick the overlay: every candle sits exactly on top of its bar. The left tick lines up with one end of the body (the open), the right tick with the other end (the close), and the shadow is the bar's high–low line. Same data; the candle just paints the open–close part so you can't miss it.</p>
+    <p><b>Why a rising market can still print so many black candles (beyond the book):</b> in the drift-plus-noise model of your <code>price_physics_basics.md</code>, one day's drift is tiny next to one day's noise. If each candle opens at the previous close, the share of white candles is about Φ(drift ÷ noise) for that bar length: roughly 52% white for daily candles of a market rising 12% a year with 15% volatility, about 58% for monthly candles. So a chart that is mostly black-and-white noise day to day can still be a clear uptrend. Section 11 has a calculator for this. (The simulated candles here also open with a random gap from the previous close, so their split is noisier still.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 12 (<a href="ch12_candlesticks.html">candlesticks</a>).</li>
+    <li>Nison, <i>Japanese Candlestick Charting Techniques</i>, ch.3 "Constructing candle lines" (pdf p34) in your library (not cited by Murphy here).</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · ARITHMETIC VERSUS LOGARITHMIC SCALE</div><h2>Equal steps of price, or equal steps of percentage?</h2></div><span class="chip">pdf p76–78 · Fig 3.5, 3.6</span></div>
+  <p>Charts can use an arithmetic or a logarithmic price scale. For some kinds of analysis, especially <b>very long-range trend analysis</b>, a log scale may have an advantage.</p>
+  <ul class="plain">
+    <li><b>Arithmetic:</b> each price unit gets the same distance; every point on the scale is equally spaced. A move from <b>5 to 10</b> covers the same distance as a move from <b>50 to 55</b>, even though the first doubles the price and the second is a rise of only 10%.</li>
+    <li><b>Logarithmic (ratio):</b> equal distances mean equal <em>percentage</em> moves. Each one-point step is a smaller percentage the higher the price goes, so the gap between one price unit and the next shrinks as price rises. <b>1 to 2</b> is the same distance as <b>5 to 10</b> (both doublings), and <b>10 to 20</b> (+100%) is the same distance as <b>20 to 40</b> or <b>40 to 80</b>.</li>
+    <li>Many stock market chart services use log charts, whereas futures chart services use arithmetic (as of the late 1990s). Charting software allows both. Figure 3.6 shows a longer view of Intel (about 1993 to 1997) side by side, one panel labelled arithmetic scaling and the other semi-log scaling (semi-log means only the price axis is logarithmic while time stays evenly spaced; that gloss is mine). Murphy notes that the three-year up trendline worked better on the log chart.</li>
+  </ul>
+  <div class="svgfig">
+    <svg viewBox="0 0 300 230" role="img" aria-label="Arithmetic scale with equal spacing next to a logarithmic scale with shrinking spacing">
+      <text x="40" y="16">arithmetic</text><text x="190" y="16">logarithmic</text>
+      <line x1="70" y1="25" x2="70" y2="215" stroke="var(--price)" stroke-width="1.5"/>
+
+      <line x1="220" y1="25" x2="220" y2="215" stroke="var(--price)" stroke-width="1.5"/>
+      <g stroke="var(--price)">
+        <line x1="70" y1="215" x2="80" y2="215"/><line x1="70" y1="196" x2="80" y2="196"/><line x1="70" y1="177" x2="80" y2="177"/><line x1="70" y1="158" x2="80" y2="158"/><line x1="70" y1="139" x2="80" y2="139"/><line x1="70" y1="120" x2="80" y2="120"/><line x1="70" y1="101" x2="80" y2="101"/><line x1="70" y1="82" x2="80" y2="82"/><line x1="70" y1="63" x2="80" y2="63"/><line x1="70" y1="44" x2="80" y2="44"/><line x1="70" y1="25" x2="80" y2="25"/>
+        <line x1="220" y1="215" x2="230" y2="215"/><line x1="220" y1="157.8" x2="230" y2="157.8"/><line x1="220" y1="124.3" x2="230" y2="124.3"/><line x1="220" y1="100.6" x2="230" y2="100.6"/><line x1="220" y1="82.2" x2="230" y2="82.2"/><line x1="220" y1="67.1" x2="230" y2="67.1"/><line x1="220" y1="54.4" x2="230" y2="54.4"/><line x1="220" y1="43.4" x2="230" y2="43.4"/><line x1="220" y1="33.7" x2="230" y2="33.7"/><line x1="220" y1="25" x2="230" y2="25"/>
+      </g>
+      <g>
+        <text x="52" y="219">0</text><text x="52" y="200">1</text><text x="52" y="181">2</text><text x="52" y="162">3</text><text x="52" y="143">4</text><text x="52" y="124">5</text><text x="52" y="105">6</text><text x="52" y="86">7</text><text x="52" y="67">8</text><text x="52" y="48">9</text><text x="46" y="29">10</text>
+        <text x="202" y="219">1</text><text x="202" y="161.8">2</text><text x="202" y="128.3">3</text><text x="202" y="104.6">4</text><text x="202" y="86.2">5</text><text x="202" y="71.1">6</text><text x="202" y="58.4">7</text><text x="202" y="47.4">8</text><text x="196" y="29">10</text>
+      </g>
+      <path d="M236,215 L236,157.8" stroke="var(--c1)" stroke-width="3"/><path d="M244,86.2 L244,25" stroke="var(--c1)" stroke-width="3"/>
+      <text x="248" y="190" style="fill: var(--c1)">1→2</text><text x="252" y="60" style="fill: var(--c1)">5→10</text>
+      <path d="M86,120 L86,25" stroke="var(--c2)" stroke-width="3"/><text x="92" y="76" style="fill: var(--c2)">5→10</text>
+    </svg>
+    <div class="note">My redraw of the idea in Figure 3.5. On the log scale, 1→2 and 5→10 are the same length (both doublings).</div>
+  </div>
+  <div class="worked"><b>Worked example: where each price lands (the formulas are mine, not printed in the book)</b>
+    <p>A chart maps a price to a height. With the bottom of the axis at price <i>lo</i> and the top at <i>hi</i>, the height as a fraction of the axis is:</p>
+    <div class="formula">arithmetic:  y = (P − lo) / (hi − lo)
+logarithmic: y = ln(P / lo) / ln(hi / lo)      // any log base gives the same y</div>
+    <p>Use the 1-to-10 axis from Figure 3.5. Arithmetic (0 to 10): every 1-point step takes 10% of the height, so 1→2 and 9→10 look the same. Log (1 to 10): 1→2 takes ln 2 / ln 10 = <b>30.1%</b> of the height, 5→10 also takes ln 2 / ln 10 = <b>30.1%</b>, but 9→10 takes only ln(10/9) / ln 10 = <b>4.6%</b>. That's Murphy's point that each one-point step is a smaller percentage as price rises, put in numbers: 9→10 is +11%, 1→2 is +100%.</p>
+    <p>Your turn: compare any two moves.</p>
+    <div class="controls">
+      <label for="a4f">move A from <input id="a4f" type="number" step="1" min="1" value="5"></label><label for="a4t">to <input id="a4t" type="number" step="1" min="1" value="10"></label>
+      <label for="b4f">move B from <input id="b4f" type="number" step="1" min="1" value="50"></label><label for="b4t">to <input id="b4t" type="number" step="1" min="1" value="55"></label>
+    </div>
+    <div class="readout" id="rm4"></div>
+  </div>
+  <div class="worked"><b>When does the choice of scale matter? (my calculation)</b>
+    <p>Take a chart whose top price is R times its bottom price. For every price in between, compare its height on the arithmetic scale with its height on the log scale. The largest difference, as a share of the chart's height, says how different the two pictures can look. Drag R.</p>
+    <div class="fig">
+      <canvas id="mm4" class="short" aria-label="Height of each price on an arithmetic and a log axis for a chosen top-to-bottom ratio"></canvas>
+      <div class="legend" id="mm4L"></div>
+      <div class="controls"><label for="R4">top ÷ bottom <input id="R4" type="range" min="0" max="8" step="1" value="4"><output id="R4o">2</output></label></div>
+      <div class="readout" id="rR4"></div>
+    </div>
+    <p>Results: a chart spanning ×1.1 (a 10% range) differs by at most <b>1.2%</b> of its height between the scales: invisible. ×1.5: <b>5.1%</b>. ×2: <b>8.6%</b>. ×5: <b>19%</b>. ×10: <b>27%</b>. ×20: <b>34%</b>. So on a daily chart covering a few months, the scale barely matters; on a five- or twenty-year chart of a stock that multiplied, it changes the picture a lot. That is why Murphy ties the log scale to very long-range trend analysis.</p>
+  </div>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Simulated five-year weekly chart on arithmetic or log scale with a trendline"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <label><input id="chk4" type="checkbox" checked> logarithmic scale</label>
+      <label for="g4">Growth per year (%) <input id="g4" type="range" min="10" max="80" step="5" value="60"><output id="g4o">60</output></label>
+    </div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch03_salary_jump_feels.svg" alt="Two salary hikes of the same rupee amount: a young worker overjoyed at doubling his pay, and a senior manager barely noticing a ten percent rise." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Your salary going from ₹10,000 to ₹20,000 changes your life far more than going from ₹1,00,000 to ₹1,10,000, even though the second jump is the same ₹10,000. The log scale draws money the way it feels: by how much it multiplied.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>This simulated stock grows by a steady percentage each year with random noise. On the arithmetic scale the curve bends upward, because the same percentage gain adds more rupees each year, and the early years squash into a flat strip at the bottom. On the log scale a steady percentage climb is a straight line. The orange line is drawn straight in whichever scale you're viewing, through the lowest weekly close of year 1 and of year 3 (a three-year line, like Murphy's Intel example). The readout measures, for <em>both</em> scales, how far the lows of years 4 and 5 sit above that line. A straight line on the log chart rises at a steady percentage, like the simulated growth, so later lows usually stay near it and it keeps acting as support. A straight line on the arithmetic chart rises by the same rupee amount each week, so a percentage-growing price usually pulls far away from it, and the line stops saying anything useful. Slide the growth rate down to 10–20% and the two lines almost agree; push it up and the arithmetic line falls far behind. That's why the log scale matters most for long, large moves. Roll a few markets too: noise sometimes breaks the pattern, which is why Murphy says "may be some advantage", not "always".</p>
+    <p><b>Pooled check (my simulation, not Murphy's evidence):</b> I ran this exact setup on 300 simulated markets per growth rate and counted how often the log line was the one closer to the year 4–5 lows. At 10% a year: about 48% of markets (a coin flip). At 20%: about 54%. At 40%: about 67%. At 60%: about 84%. At 80%: about 95%. So the log scale's advantage for trendlines grows with the size of the move; on small moves the choice of scale barely matters.</p>
+    <p><b>Where the log scale breaks (beyond the book):</b> ln(P) needs P &gt; 0. A series that can touch zero or go negative can't be drawn on a log axis at all: spread charts (one contract minus another), P&amp;L curves, and in April 2020 the expiring WTI crude oil futures contract, which settled at about −$37 a barrel. For those, arithmetic is the only choice. Near zero the log scale also blows small moves up: 0.10 → 0.20 takes as much height as 100 → 200.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>price_physics_basics.md</code> writes returns as r = ΔP / P and models price as P(t + Δt) = P·(1 + μ·Δt + σ·√Δt·Z): moves come in percentages. A log chart is the picture that matches that model.</li>
+    <li>Chapter 4 (<a href="ch04_trend.html">trend</a>): trendlines. Which scale you draw them on decides where the line falls, and so where it "breaks".</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · CONSTRUCTION OF THE DAILY BAR CHART</div><h2>Building a daily bar chart, one day at a time</h2></div><span class="chip">pdf p77–79 · Fig 3.7</span></div>
+  <p>Murphy calls it extremely simple. A bar chart is both a <b>price</b> chart and a <b>time</b> chart: the vertical (y) axis is price, the horizontal (x) axis is time, with dates along the bottom.</p>
+  <ul class="plain">
+    <li>For each day, draw a vertical bar from the day's <b>high</b> to its <b>low</b> (the <b>range</b>).</li>
+    <li>Put a small horizontal tick on the <b>right</b> for the <b>close</b>. It goes on the right so it can't be confused with the <b>open</b>, which chartists mark on the <b>left</b>.</li>
+    <li>Move one day to the right and plot the next day.</li>
+    <li>Most chart services use <b>five-day weeks</b>: weekends aren't shown. If an exchange is closed on a weekday, that day's space is left <b>blank</b>.</li>
+    <li>The bars along the bottom measure <b>volume</b> (next section).</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Daily bar chart being built day by day with a holiday gap"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls">
+      <label for="k5">Trading day <input id="k5" type="range" min="1" max="30" step="1" value="12"><output id="k5o">12</output></label>
+      <button id="b5" type="button">Plot next day ▶</button>
+      <label for="hol5">Holiday <select id="hol5"><option value="blank">leave its slot blank (Murphy)</option><option value="skip">skip it like a weekend (modern software; not in the book)</option></select></label>
+    </div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A school attendance register: one column per school day, weekends simply aren't in the book, and a holiday column is left empty rather than removed, so the dates stay lined up.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The dates are simulated weekdays starting on Monday 5 January. Monday 26 January is shown as an exchange holiday (Republic Day, when NSE is closed; that example is mine, not Murphy's), so its slot stays empty while Saturdays and Sundays don't get a slot at all. The readout gives the four prices of the latest bar. Step through and check that the right tick always matches the close.</p>
+    <p>Under the hood the x-axis is not a calendar, it's a list of slots. The 30 weekdays from Mon 5 Jan to Fri 13 Feb become 30 slots in Murphy's convention (29 bars plus one blank), while the 10 weekend days in between get no slot at all. Switch the Holiday option to "skip" and the axis becomes 29 slots: every bar after 26 January shifts one slot left and the blank disappears.</p>
+    <p><b>Beyond the book:</b> most modern charting platforms (TradingView, for example) skip holidays the same way they skip weekends, so you won't see blank slots. Either way, indicators count <em>bars</em>, not calendar days: a "20-day" average is 20 trading sessions, which is about four calendar weeks, and longer when there are holidays.</p>
+    <p><b>The core of it in code (mine, not in the book):</b> a chart's x-axis is an index into a list of slots, not a date. Murphy's convention keeps a blank slot for an exchange holiday; most software drops it.</p>
+    <div class="formula">const slots = weekdays(from, to)                  // Sat and Sun never get a slot
+  .filter(d =&gt; keepHolidaySlots || !isHoliday(d)); // Murphy: keep it (blank)
+const x = (date) =&gt; slots.indexOf(date);          // bar position = slot number
+// 20-bar average on day t = mean of the 20 bars before and including t,
+// however many calendar days those 20 bars happen to span</div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 11: a weekly or monthly bar is built from these daily slots, so how the slots are counted decides which days land in which bar.</li>
+    <li>Chapter 9 (<a href="ch09_moving_averages.html">moving averages</a>): every "n-day" average counts bars (slots with a price), never calendar days.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · VOLUME</div><h2>Volume: how much trading happened</h2></div><span class="chip">pdf p78–79 · Fig 3.7</span></div>
+  <p><b>Volume</b> is the total trading activity in a market for the day: the total number of futures contracts traded, or the number of shares that change hands in the stock market. It's drawn as a vertical bar at the bottom of the chart, under that day's price bar. A taller bar means heavier volume; a shorter bar, lighter volume. A vertical scale along the bottom helps you read the numbers (Fig 3.7).</p>
+  <div class="fig">
+    <canvas id="c6" class="tall" aria-label="Simulated bar chart with daily volume bars"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls"><label><input id="chk6" type="checkbox"> highlight days with volume above 1.5× the 20-day average</label></div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch03_packed_vs_empty_stadium.svg" alt="The same cricket shot hit for six in a packed stadium roaring with fans and in an almost empty stadium with a few scattered spectators." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Price tells you the score; volume tells you how many people were in the stadium. The same goal in a packed stadium and in an empty one doesn't carry the same weight.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In this simulation volume is random but grows on days with big price moves (a common pattern in real markets too; not in the book). The highlighted days are mostly the large-range bars. This chapter only shows how volume is drawn; Murphy explains how to <em>interpret</em> it in Chapter 7.</p>
+    <p><b>How the highlight rule is computed (my note):</b> for day <i>t</i>, average the volume of the 20 days <em>before</em> it, then flag day <i>t</i> if its volume beats 1.5 × that average. Using the days before matters: if today were inside its own average, a spike would lift the bar it's compared against. With 19 days of 1.0M and a 2.0M day, the average of the 20 days before is 1.0M (ratio 2.0×), but an average that includes today is 1.05M (ratio 1.9×). The readout shows the numbers for the latest flagged day.</p>
+    <div class="formula">const avg20 = sma(vol, 20);                 // avg20[i] = mean of vol[i-19 .. i]
+const flagged = vol[t] &gt; 1.5 * avg20[t - 1];  // compare with the 20 days before t</div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 2 (<a href="ch02_dow_theory.html">Dow Theory</a>), tenet 5: volume should expand in the direction of the trend.</li>
+    <li>Your <code>intraday_swing_playbook.md</code> setup S-1 uses exactly this highlight rule: a daily close above the 50-day high on volume above 1.5× the 20-day average.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · FUTURES OPEN INTEREST</div><h2>Open interest: how many contracts are still open</h2></div><span class="chip">pdf p79–80 · Fig 3.8</span></div>
+  <p><b>Open interest</b> is the total number of futures contracts still outstanding (held by market participants) at the end of the day. It counts the contracts held by the longs <b>or</b> by the shorts, <b>not both added together</b>: in futures every long has a matching short, so you only need one side's total. It's drawn as a <b>solid line</b> near the bottom of the chart, usually just above the volume bars and below the price (Fig 3.8, a Treasury Bond futures line chart).</p>
+  <div class="two">
+    <div class="svgfig">
+      <svg viewBox="0 0 240 150" role="img" aria-label="Three longs matched with three shorts give open interest of three">
+        <text x="20" y="18">longs</text><text x="170" y="18">shorts</text>
+        <g fill="var(--buy)"><circle cx="40" cy="40" r="10"/><circle cx="40" cy="75" r="10"/><circle cx="40" cy="110" r="10"/></g>
+        <g fill="var(--sell)"><circle cx="190" cy="40" r="10"/><circle cx="190" cy="75" r="10"/><circle cx="190" cy="110" r="10"/></g>
+        <g stroke="var(--muted)" stroke-dasharray="4 3"><line x1="52" y1="40" x2="178" y2="40"/><line x1="52" y1="75" x2="178" y2="75"/><line x1="52" y1="110" x2="178" y2="110"/></g>
+        <text x="70" y="36">1 contract</text><text x="70" y="71">1 contract</text><text x="70" y="106">1 contract</text>
+        <text x="40" y="142" style="fill: var(--c3)">open interest = 3 (not 6)</text>
+      </svg>
+      <div class="note">Every futures contract has a buyer (long) and a seller (short). Count one side.</div>
+    </div>
+    <div class="box picture" style="align-self: start;"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch03_betting_slips_open_interest.svg" alt="At a small betting counter, a clerk counts paper slips each shared by two people on opposite sides, rather than counting every person." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Count the bets still open at a betting counter. Each bet has two people on it, one on each side. If you counted every person you'd double the number; count the betting slips instead.</p></div>
+  </div>
+  <div class="fig">
+    <canvas id="c7" class="tall" aria-label="Simulated futures line chart with open interest line and volume bars"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="worked"><b>Worked example: five trades, counted two ways</b>
+    <p>A newly listed contract, six traders (A to F), one contract per trade. Whether a trade adds to open interest depends on whether each side is <b>opening</b> a position or <b>closing</b> one. Murphy lays out the four combinations in Chapter 7 (<a href="ch07_volume_open_interest.html">pdf p196–197</a>); this replay uses all four. Volume adds one for every trade. Open interest is the number of contracts still held at the end: count the longs (which always equals the shorts).</p>
+    <div class="controls">
+      <button id="oi7b" type="button">◀ Back</button>
+      <button id="oi7n" type="button">Next trade ▶</button>
+      <label for="oi7k">Trade <input id="oi7k" type="range" min="0" max="5" step="1" value="0"><output id="oi7ko">0</output></label>
+    </div>
+    <div class="caption" id="oi7r"></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Buyer</th><th>Seller</th><th>Effect on OI</th><th>Volume so far</th><th>Open interest</th></tr></thead><tbody id="oi7t"></tbody></table></div>
+    <p>End of the day: volume <b>5</b>, open interest <b>1</b> (E is long one contract, F is short it). Ten "sides" traded, five trades printed, one contract left open. Volume measures how busy the day was; open interest measures how much is still committed overnight. They can move in opposite directions.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The layout copies Figure 3.8: price on top (as a line here), the open interest line in the middle, volume bars at the bottom. Murphy's figure shows the <em>total</em> volume and open interest for the whole Treasury Bond futures market, which is the subject of the next section. The flow/stock framing that follows is mine (not in the book): volume is a <em>flow</em> (contracts traded during the day, starting from zero again each day). Open interest is a <em>stock</em> (how many contracts are still open at the close, carried over from day to day). That's why OI is a smooth line and volume is a row of separate bars. In the chart above, the simulated OI line drifts up slowly and moves partly with price; that is my modelling choice so the line looks alive, not a rule from the book. What rising or falling OI means for the trend is covered in Chapter 7.</p>
+    <p><b>The bookkeeping rule in code (mine):</b> each trade adds 1 to volume. It changes open interest by +1 if both sides open, −1 if both sides close, and 0 if one side opens while the other closes (a position just changes hands).</p>
+    <div class="formula">volume += 1;
+oi += (buyerOpens &amp;&amp; sellerOpens) ? +1
+    : (!buyerOpens &amp;&amp; !sellerOpens) ? -1
+    : 0;</div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 7 (<a href="ch07_volume_open_interest.html">volume and open interest</a>) for interpretation.</li>
+    <li>Your <code>order_flow.md</code> already has the modern NSE version: price ↑ + OI ↑ = long build-up, price ↓ + OI ↑ = short build-up, price ↑ + OI ↓ = short covering, price ↓ + OI ↓ = long unwinding.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · TOTAL VERSUS INDIVIDUAL VOLUME AND OPEN INTEREST NUMBERS IN FUTURES</div><h2>Why chartists use the total, not each delivery month</h2></div><span class="chip">pdf p80–81</span></div>
+  <p>Futures chart services and most futures technicians use only the <b>total</b> volume and open interest figures for a market. Figures exist for each delivery month, but the totals are the ones used for forecasting, for a good reason:</p>
+  <ul class="plain">
+    <li>Early in a contract's life, its volume and open interest are usually small.</li>
+    <li>They build up as the contract approaches maturity.</li>
+    <li>In the last couple of months before expiration they drop again, because traders have to close their positions.</li>
+  </ul>
+  <p>So the rise in a single contract's numbers in its first months, and the fall near the end, have <b>nothing to do with market direction</b>; they come from the contract's limited life. Totals give the continuity needed for forecasting. (Stock charts plot total volume but have no open interest.)</p>
+  <div class="fig">
+    <canvas id="c8" class="tall" aria-label="Open interest of several simulated delivery months and their total"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls"><label for="d8">Day <input id="d8" type="range" min="0" max="499" step="1" value="260"><output id="d8o">260</output></label><label><input id="chk8" type="checkbox"> new money: total demand grows 40% over the 500 days</label></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A hotel where every guest stays exactly one year. Any one guest's luggage pile grows as they settle in and shrinks as they pack to leave, whatever the economy is doing. The hotel's total occupancy, summed over all guests, is the number that tells you whether business is good.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each simulated delivery month lives about 250 trading days: its open interest grows slowly, peaks, then falls to zero over the last ~2 months before expiry. A new month is listed every quarter, so the humps overlap. In this simulation total demand is held constant (each month gets its life-cycle share of a fixed total, plus a little noise), so the bottom panel stays nearly flat: the big swings in each single month were caused only by the calendar. A trader reading one contract alone would see "rising OI" and "falling OI" that mean nothing.</p>
+    <p><b>Worked example (simulated numbers):</b> the second line of the readout compares the last 20 trading days for the front month (the one expiring next) and for the total. At day 260 the front month (Mar 28) has lost roughly a fifth of its open interest in 20 days (15–22% across the markets I rolled) while the total has moved under 4%. At day 100, three trading days before the June contract expires, the front month is down about 85% in 20 days while the total has moved no more than about 6% either way. Read alone, the front month screams "money leaving"; the total says nothing much happened.</p>
+    <p>Now tick <b>new money</b>: total demand rises steadily by 40% over the 500 days (real buying and selling interest coming in). The single-month lines still rise and fall to zero on the calendar, so they hide the inflow, while the total panel climbs from about 145–150k to about 210–215k. The signal lives only in the sum. This is the same idea as summing a metric across all the shards of a database instead of watching one shard that is being drained for migration.</p>
+    <div class="formula">// the readout's numbers
+const front = live.filter(c =&gt; c.exp &gt;= t).sort((a, b) =&gt; a.exp - b.exp)[0];
+const chg20 = (x) =&gt; (x[t] / x[t - 20] - 1) * 100;   // % change over 20 trading days
+chg20(front.d);   // single month: dominated by the calendar
+chg20(total);     // sum of all months: the part that carries information</div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 10: the same single-month numbers, used for the one job they are good at (finding the liquid month).</li>
+    <li>Chapter 7 (<a href="ch07_volume_open_interest.html">volume and open interest</a>): the rules for reading rising and falling open interest assume you are reading the total.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · VOLUME AND OPEN INTEREST REPORTED A DAY LATE IN FUTURES</div><h2>Futures numbers arrive a day late</h2></div><span class="chip">pdf p81</span></div>
+  <p>Futures volume and open interest are reported a day late, so the futures chartist has to accept a one-day lag. The official numbers usually come out during the next day's trading hours, too late for that day's newspapers. <b>Estimated</b> volume is available after the close and goes into the next morning's paper; it at least tells you whether trading was heavier or lighter. So the morning paper gives the last day's futures prices with an estimated volume, while the <b>official</b> volume and open interest are for the day before that. Stock chartists don't have this problem: stock volume totals are available immediately.</p>
+  <p class="note">The table is my illustration of Murphy's timing rule, using example weekdays.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>What you read in the paper on the morning of…</th><th>Prices for</th><th>Volume</th><th>Open interest</th></tr></thead>
+    <tbody>
+      <tr><td>Wednesday</td><td>Tuesday</td><td>Tuesday (estimated) · Monday (official)</td><td>Monday (official)</td></tr>
+      <tr><td>Thursday</td><td>Wednesday</td><td>Wednesday (estimated) · Tuesday (official)</td><td>Tuesday (official)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="worked"><b>Step through: what can you know, and when?</b>
+    <p>Follow one trading day, Tuesday, from its close to the moment its official open interest finally reaches you. The timing follows Murphy's description; the five moments are my illustration.</p>
+    <div class="controls">
+      <button id="tl9b" type="button">◀ Back</button>
+      <button id="tl9n" type="button">Next moment ▶</button>
+      <label for="tl9k">Moment <input id="tl9k" type="range" min="1" max="5" step="1" value="1"><output id="tl9ko">1</output></label>
+    </div>
+    <div class="caption" id="tl9r"></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Moment</th><th>Tuesday prices</th><th>Tuesday volume</th><th>Tuesday open interest</th><th>Latest official OI you hold</th></tr></thead><tbody id="tl9t"></tbody></table></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Prices are printed as trades happen, so they are known at the close. Volume and open interest have to be counted and reconciled across every trade and every account after the session ends, so the official count comes later (my explanation of the cause; Murphy only states the lag). A number has two dates: the day it <em>describes</em> and the day it becomes <em>available</em>. Charts are stamped with the first date; your decisions can only use the second.</p>
+    <p><b>The rule in code (mine, not in the book):</b> when you join futures OI to prices for a test, shift it by the reporting lag.</p>
+    <div class="formula">// oiOfficial[t] describes the close of day t but is published during day t+1
+const oiKnownAtClose = (t) =&gt; oiOfficial[t - 1];       // newest figure you really had
+const oiRose = (t) =&gt; oiKnownAtClose(t) &gt; oiKnownAtClose(t - 1);
+// wrong: oiOfficial[t] &gt; oiOfficial[t-1] at day t's close (uses a number not yet published)</div>
+  </div>
+  <div class="worked"><b>Failure mode: how a one-day lag can create a fake edge <span class="tag">beyond the book</span></b>
+    <p>A toy model, built by me to show the mechanism, not a claim about real markets. Each day some informed traders open new positions. That shows up in that day's change in open interest (with noise), and it pushes price the <em>next</em> day by an amount set by the slider. The rule: be long for one day whenever open interest rose. Version A (wrong) uses day t's official OI at day t's close, before it was published. Version B (honest) uses the newest figure actually available, day t−1's. Both are pooled over 200 simulated markets of 250 days each.</p>
+    <div class="controls">
+      <label for="rho9">How much new positions predict tomorrow (correlation) <input id="rho9" type="range" min="0" max="0.3" step="0.05" value="0.15"><output id="rho9o">0.15</output></label>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Version</th><th>Days in the market</th><th>Average return per day held</th><th>Up days</th><th>≈ per year (125 days held)</th></tr></thead><tbody id="la9t"></tbody></table></div>
+    <div class="readout" id="la9r"></div>
+    <p>In the model the honest version earns nothing at any setting, because by the time the OI figure is published the move it predicted has already happened. Set the slider to 0 and both versions earn nothing: then OI simply has no information. The lesson for any backtest: a result that only exists when you ignore the reporting lag is not an edge you can trade.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Exam results: the teacher tells you that evening roughly how you did (the estimate), but the official marksheet arrives the day after.</p></div>
+  <div class="box connect"><b>Connects to <span class="tag">beyond the book</span></b><ul>
+    <li>This was the late-1990s newspaper world. Your <code>order_flow.md</code> lists NSE "Futures OI + price" under its "slower order flow" data, useful for swing and delivery trades rather than intraday ones. The habit to keep is Murphy's: know when each number you use was actually available, or a backtest can peek at data you wouldn't have had.</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · THE VALUE OF INDIVIDUAL VOLUME AND OPEN INTEREST NUMBERS IN FUTURES</div><h2>Trade the month with the most open interest</h2></div><span class="chip">pdf p81</span></div>
+  <p>Single-month open interest still has a use: it shows which contracts are the most <b>liquid</b>. Murphy's general rule: <b>limit trading to the delivery months with the highest open interest, and avoid months with low open interest.</b> Higher open interest means more interest in that month.</p>
+  <div class="fig">
+    <div id="bars10" class="flow" aria-label="Open interest by delivery month on the chosen day"></div>
+    <div class="controls"><label for="d10">Day <input id="d10" type="range" min="0" max="499" step="1" value="120"><output id="d10o">120</output></label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="worked"><b>Worked example: when does the "most open interest" month change? (simulated)</b>
+    <p>Apply Murphy's rule mechanically: on each day, trade the month with the largest open interest. The table finds, for every expiry in the simulation, the first day the next month's open interest overtakes the expiring one, and how many trading days before expiry that happens.</p>
+    <div class="tablewrap"><table><thead><tr><th>Expiring month</th><th>Expiry day</th><th>Next month takes the lead on day</th><th>Trading days before expiry</th></tr></thead><tbody id="rl10t"></tbody></table></div>
+    <div class="formula">// Murphy's rule as code: the liquid month on day t
+const tradeable = (t) =&gt; live(t).reduce((a, c) =&gt; (c.oi[t] &gt; a.oi[t] ? c : a));</div>
+    <p>In these simulated markets the lead changes roughly 22–25 trading days (about a month) before each expiry, inside the "last couple of months" when Murphy says open interest drains away. Near the crossover the two months are almost equal, so day-to-day noise can flip the label back and forth for a day or two. In practice traders pick one switch date and stick to it rather than flipping daily (my note, not in the book).</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>These are the same simulated contracts as section 08. Slide through the days and watch the "most open interest" label jump to the next month as the front month nears expiry: that's when traders close out the expiring month (Murphy's point) and, today, typically reopen in the next one ("rolling", not in the book). A month with little open interest has few traders on the other side, so getting in and out costs more (my explanation of why liquidity matters).</p></div>
+  <div class="box connect"><b>Connects to <span class="tag">beyond the book</span></b><ul>
+    <li>On NSE, index and stock futures usually have most of their open interest in the near (current-month) contract until close to expiry, when it rolls to the next month. Same rule, same reason.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · WEEKLY AND MONTHLY BAR CHARTS</div><h2>Zoom out: weekly and monthly bars</h2></div><span class="chip">pdf p82–83 · Fig 3.9, 3.10</span></div>
+  <p>A bar chart can be built for <b>any time period</b>. Intraday bar charts show the high, low and last prices for periods as short as <b>five minutes</b>. An average daily bar chart covers <b>six to nine months</b>. For longer-range trend analysis you must use <b>weekly and monthly</b> charts; they're built and updated the same way. On a weekly chart one bar is a whole week; on a monthly chart one bar is a whole month. By <b>compressing</b> the price action this way, they make much longer-range trend analysis possible: weekly charts can go back about <b>five years</b> and monthly charts up to <b>20 years</b> (Figures 3.9 and 3.10 show the U.S. Dollar Index). Murphy calls this a simple technique that gives a valuable long-range view, one that's often lost by relying only on daily charts. Chapter 8 covers why these charts matter.</p>
+  <div class="fig">
+    <canvas id="c11" class="tall" aria-label="The same simulated 20-year market as daily, weekly or monthly bars"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls"><label for="sel11">Bar size <select id="sel11"><option value="d">daily (last ~7 months)</option><option value="w">weekly (last 5 years)</option><option value="m">monthly (all 20 years)</option></select></label></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="worked"><b>Worked example: five daily bars become one weekly bar</b>
+    <p>One week of made-up prices. The weekly bar keeps only four numbers: the <b>first open</b> (Monday's), the <b>highest high</b> of any day, the <b>lowest low</b> of any day, and the <b>last close</b> (Friday's). Volume is the sum of the five days. Step through the days and watch the weekly bar on the right grow.</p>
+    <div class="fig">
+      <canvas id="wk11" class="short" aria-label="Five daily bars and the weekly bar built from them"></canvas>
+      <div class="controls">
+        <button id="wk11b" type="button">◀ Back</button>
+        <button id="wk11n" type="button">Add next day ▶</button>
+        <label for="wk11k">Days in the week so far <input id="wk11k" type="range" min="1" max="5" step="1" value="5"><output id="wk11ko">5</output></label>
+      </div>
+      <div class="tablewrap"><table><thead><tr><th>Day</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead><tbody id="wk11t"></tbody></table></div>
+    </div>
+    <p>Result: open <b>100.0</b> (Monday), high <b>102.5</b> (Tuesday), low <b>99.2</b> (Thursday), close <b>101.3</b> (Friday), volume <b>5.6M</b>. Wednesday's drop from 102.0 to 100.5 and Thursday's dip are inside the weekly bar but no longer visible as separate moves: that is Murphy's "compressing" in numbers. A monthly bar does the same over about 21 trading days.</p>
+    <div class="formula">// resample daily bars into weekly (or monthly) bars by calendar key
+function resample(days, keyOf) {             // keyOf(d) = ISO week or "YYYY-MM"
+  const out = new Map();
+  for (const d of days) {                     // days sorted by date
+    const k = keyOf(d.date), b = out.get(k);
+    if (!b) out.set(k, { o: d.o, h: d.h, l: d.l, c: d.c, v: d.v });
+    else { b.h = Math.max(b.h, d.h); b.l = Math.min(b.l, d.l); b.c = d.c; b.v += d.v; }
+  }
+  return [...out.values()];
+}</div>
+    <p class="note">The chart above this box takes a shortcut (mine): it groups every 5 simulated days into a week and every 21 into a month. Real software groups by calendar, so a holiday week makes a weekly bar from 4 days.</p>
+  </div>
+  <div class="worked"><b>Why zooming out reveals the trend: a calculator <span class="tag">beyond the book</span></b>
+    <p>Murphy says weekly and monthly charts give the long-range view that daily charts lose. Here is the arithmetic behind that (mine, not in the book). Model price as a steady drift plus random noise, as in your <code>price_physics_basics.md</code>. Over a bar of length Δt (in years), the drift adds about μ·Δt while the noise is about σ·√Δt. Drift grows with time; noise grows only with the square root of time. So the longer the bar, the more the trend outweighs the noise, and the more bars close up. For prices that compound, the share of up bars is about Φ((μ − σ²/2)·√Δt / σ), where Φ is the normal distribution's cumulative probability.</p>
+    <div class="controls">
+      <label for="mu11">Drift μ per year (%) <input id="mu11" type="range" min="-20" max="40" step="1" value="12"><output id="mu11o">12</output></label>
+      <label for="sg11">Volatility σ per year (%) <input id="sg11" type="range" min="5" max="60" step="1" value="15"><output id="sg11o">15</output></label>
+      <button id="run11" type="button">Check with 100 simulated 20-year markets</button>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Bar length</th><th>Drift per bar</th><th>Noise per bar</th><th>z = (μ − σ²/2)·√Δt ÷ σ</th><th>Up bars (formula)</th><th>Up bars (simulated)</th></tr></thead><tbody id="ub11t"></tbody></table></div>
+    <div id="ub11" class="flow" aria-label="Share of up bars by bar length"></div>
+    <div class="readout" id="ub11r"></div>
+    <p>With the defaults (12% drift, 15% volatility): 5-minute bars close up about <b>50.2%</b> of the time, daily bars about <b>52%</b>, weekly about <b>54%</b>, monthly about <b>58%</b>, yearly about <b>77%</b>. The 5-minute row assumes the NSE cash session of 9:15 to 15:30, which is 75 five-minute bars a day. At that bar length the trend is invisible: each bar is a near coin flip. Your <code>backtest_results_summary.md</code> verdict is that no intraday strategy passed, with charges and slippage eating the small edges that did appear. Tiny drift per bar is one reason those edges are small, though this calculator doesn't prove it. The simulation compounds daily steps, so it can only check the daily, weekly, monthly and yearly rows.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Google Maps. Street view (daily) shows every pothole but not where the road goes. Zoom out to the city (weekly) and then the country (monthly) and you see the highway, even though no single pothole is visible any more.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>All three views come from one 20-year simulated daily series. A weekly bar takes the first open, the highest high, the lowest low and the last close of 5 trading days; a monthly bar does the same for about 21 days. The daily view's swings, which look huge, become a few small bars on the monthly view, and the long trend that was invisible becomes obvious.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 8 (<a href="ch08_long_term_charts.html">long-term charts</a>).</li>
+    <li>Your <code>backtest_results_summary.md</code> verdict: "Delivery on weekly/monthly signals is where the edge is"; no intraday strategy passed. Your <code>price_physics_basics.md</code> explains why: over weeks and months the drift starts to show through the noise.</li>
+    <li>Your <code>tori_trendlines_explained.md</code>: Tori's process starts top-down, monthly → weekly → daily.</li>
+    <li>Murphy's five-minute intraday bars are the timeframe of your 5-minute ORB test, which the backtest summary rates only "a lead to paper trade, not proven".</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · CONCLUSION</div><h2>The chart is a tool, not the answer</h2></div><span class="chip">pdf p83–84</span></div>
+  <p>You now know how to plot a bar chart and have met the three basic sources of information: <b>price, volume and open interest</b>. Murphy stresses that the chart only <em>records</em> the data; by itself it has little value. He compares it to a paint brush and canvas, which are worthless until a talented artist uses them. An even better comparison is a <b>scalpel</b>: in a skilled surgeon's hands it saves lives, but in most people's hands it's useless and might even be dangerous. A chart becomes an extremely useful forecasting tool once you understand the rules. The next chapter starts with the basic concepts of trend, which Murphy calls the building blocks of chart analysis.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch03_stethoscope_and_doctor.svg" alt="A stethoscope on a clinic table records a heartbeat, while an experienced doctor beside it does the actual listening and interpreting." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A stethoscope records a heartbeat. It doesn't diagnose anything; the doctor who knows what a healthy beat sounds like does. Chapter 3 built the stethoscope; Chapters 4 onward teach what to listen for.</p></div>
+  <div class="worked"><b>In practice: six questions to ask before reading any chart <span class="tag">my checklist, beyond the book</span></b>
+    <p>Each choice in this chapter changes the picture without changing the data. Before you trust a pattern, check how the picture was made.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Ask</th><th>From section</th><th>What goes wrong if you don't</th></tr></thead>
+      <tbody>
+        <tr><td>Bars, candles, line or P&amp;F? If P&amp;F, what box size?</td><td>02, 03</td><td>A line chart hides the day's range; a P&amp;F box that is too small or too big turns noise into signals, or hides turns until late.</td></tr>
+        <tr><td>Arithmetic or log scale?</td><td>04</td><td>On a chart spanning ×5 or more, a trendline drawn on one scale lands in a different place on the other, so "the break" happens on a different day.</td></tr>
+        <tr><td>How are holidays and missing days handled?</td><td>05</td><td>Two platforms can show different bars at the same position, and an "n-day" count can cover different calendar spans.</td></tr>
+        <tr><td>Futures: total or single-month volume and open interest?</td><td>08, 10</td><td>Reading one contract's life cycle as money flowing in or out.</td></tr>
+        <tr><td>When was each number actually available?</td><td>09</td><td>Backtests that use figures published after the decision they drive.</td></tr>
+        <tr><td>Daily, weekly or monthly bars?</td><td>11</td><td>Calling a trend from bars too short for the drift to show through the noise, or missing the long-range trend entirely.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 4 (<a href="ch04_trend.html">basic concepts of trend</a>): support, resistance, trendlines, channels, retracements and gaps, all drawn on the charts built here.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. On a bar chart, which side of the bar is the close tick on, and why?</summary><p>The right. It's put on the right so it can't be confused with the open, which is marked on the left (sections 02 and 05).</p></details>
+  <details><summary>2. Why do some chartists prefer a line chart?</summary><p>It plots only closes, and many chartists see the close as the most important price of the day, so a close-only chart is seen as a more valid measure of price activity (section 02).</p></details>
+  <details><summary>3. In a point &amp; figure chart, what do the x and o columns mean?</summary><p>x columns show rising prices, o columns falling prices. It's the same price action in a compressed format (section 02).</p></details>
+  <details><summary>4. A candle has a black real body. What does that tell you?</summary><p>The close was below the open, a negative day. The shadow still shows the full high–low range (section 03).</p></details>
+  <details><summary>5. On an arithmetic scale, which move covers the same distance as 5→10? On a log scale?</summary><p>Arithmetic: 50→55 (same five points). Log: 10→20, 20→40, 40→80, or any other doubling (section 04).</p></details>
+  <details><summary>6. An exchange is closed on a Wednesday. What happens on the chart? And on Saturday?</summary><p>Wednesday's slot is left blank. Weekends aren't shown at all on a five-day-week chart (section 05).</p></details>
+  <details><summary>7. 500 traders are long and 500 are short a futures contract, one contract each. What is the open interest?</summary><p>500. Count the contracts held by one side, not the total of both (section 07).</p></details>
+  <details><summary>8. A single delivery month's open interest is falling sharply a few weeks before expiry. Is that bearish?</summary><p>Not by itself. Open interest always drops near expiry as traders close positions; that's why chartists use total figures for forecasting (section 08).</p></details>
+  <details><summary>9. Which delivery month should you trade, by Murphy's rule?</summary><p>One with the highest open interest; avoid months with low open interest (section 10).</p></details>
+  <details><summary>10. Roughly how much history does a daily, a weekly and a monthly chart show?</summary><p>Daily: about six to nine months. Weekly: as much as five years. Monthly: up to 20 years (section 11).</p></details>
+  <details><summary>11. A stock goes 20 → 40, then 40 → 60. Which leg looks longer on an arithmetic chart, and which on a log chart?</summary><p>Arithmetic: the same length (20 points each). Log: the first leg is longer, because it is +100% while the second is only +50%. This is why a straight trendline on one scale is a curve on the other, and why Murphy found the long Intel trendline worked better on the log chart (section 04).</p></details>
+  <details><summary>12. Why can't a single delivery month's open interest tell you whether money is flowing into or out of a futures market?</summary><p>Because each contract's open interest rises after it is listed and falls before it expires whatever the market does. Those changes come from the contract's limited life, not from traders' views. Only the total across all months gives the continuity needed for forecasting (section 08).</p></details>
+  <details><summary>13. In Murphy's day, could you use a futures market's official open interest at that day's close to make a decision that same evening? What does this mean for a backtest? <span class="tag">beyond the book</span></summary><p>No. The official volume and open interest came out a day late (during the next day's trading hours), so on the evening of day T you only had an estimated volume and the official figures for day T−1 (section 09). A backtest that trades on day T's official open interest at day T's close is using data nobody had yet (look-ahead bias). The backtest point is mine, not Murphy's.</p></details>
+  <details><summary>14. Five daily bars: Mon O 50 H 52 L 49 C 51, Tue O 51 H 54 L 50 C 53, Wed O 53 H 53.5 L 48 C 49, Thu O 49 H 50 L 47.5 C 48, Fri O 48 H 51 L 47.8 C 50.5. What is the weekly bar?</summary><p>Open 50 (Monday's open), high 54 (Tuesday), low 47.5 (Thursday), close 50.5 (Friday's close). The weekly bar keeps the first open, the highest high, the lowest low and the last close; everything in between is compressed away (section 11).</p></details>
+  <details><summary>15. Why does the same market look like noise on 5-minute bars and like a clear trend on monthly bars? <span class="tag">beyond the book</span></summary><p>Over a bar of length Δt the drift adds about μ·Δt, while the noise is about σ·√Δt. Drift grows in proportion to time and noise only with its square root, so the ratio drift ÷ noise grows with √Δt. With 12% drift and 15% volatility a year, about 50.2% of 5-minute bars close up, but about 58% of monthly bars do (section 11's calculator). The calculation is mine; Murphy's point is that longer bars give the long-range view.</p></details>
+</section>
+
+<footer>Built from Murphy, <i>Technical Analysis of the Financial Markets</i>, Chapter 3 "Chart Construction" (printed pp. 35–47, PDF pages 72–84), summarised in my own words. Charts use simulated prices, not real market data, and simulated results are not Murphy's findings. Education, not investment advice.</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+  // ---------- extra helpers for chapters 1–3 (added; template helpers above are unchanged) ----------
+  // derive an open for every bar of a genMarket() result, then widen high/low so every bar is a valid OHLC bar
+  function addOpens(M, sd) {
+    const r = rng(sd * 31 + 5); const n = M.c.length; M.o = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const prev = i ? M.c[i - 1] : M.c[0]; const rg = M.h[i] - M.l[i];
+      M.o[i] = prev + (r() - 0.5) * rg * 0.8;
+      M.h[i] = Math.max(M.h[i], M.o[i], M.c[i]); M.l[i] = Math.min(M.l[i], M.o[i], M.c[i]);
+    }
+    return M;
+  }
+  // simulated volume: noisy, larger on big-move days
+  function makeVolume(c, sd, base, factor) {
+    const r = rng(sd * 17 + 3); const v = [];
+    for (let i = 0; i < c.length; i++) { const ret = i ? Math.abs(c[i] / c[i - 1] - 1) : 0; v.push(base * (0.55 + 0.9 * r()) * (1 + ret * 35) * (factor ? factor(i) : 1)); }
+    return v;
+  }
+  const fmtBig = (v) => (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + 'k' : v.toFixed(0));
+  // swing points: i is a pivot high if it is above the w bars on each side (known only w bars later)
+  function pivots(a, w) {
+    const hi = [], lo = [];
+    for (let i = w; i < a.length - w; i++) {
+      let isH = true, isL = true;
+      for (let k = 1; k <= w; k++) {
+        if (a[i - k] >= a[i] || a[i + k] > a[i]) isH = false;
+        if (a[i - k] <= a[i] || a[i + k] < a[i]) isL = false;
+        if (!isH && !isL) break;
+      }
+      if (isH) hi.push(i); if (isL) lo.push(i);
+    }
+    return { hi, lo };
+  }
+  // Dow-style events on CLOSES: first close above the latest confirmed peak ('up') or below the latest confirmed trough ('down')
+  function breakEvents(c, w) {
+    const pv = pivots(c, w); const ev = []; let ph = null, pl = null, a = 0, b = 0;
+    for (let i = 1; i < c.length; i++) {
+      while (a < pv.hi.length && pv.hi[a] + w <= i) { ph = { i: pv.hi[a], v: c[pv.hi[a]], used: false }; a++; }
+      while (b < pv.lo.length && pv.lo[b] + w <= i) { pl = { i: pv.lo[b], v: c[pv.lo[b]], used: false }; b++; }
+      if (ph && !ph.used && c[i] > ph.v) { ev.push({ i, t: 'up', ref: ph }); ph.used = true; }
+      if (pl && !pl.used && c[i] < pl.v) { ev.push({ i, t: 'down', ref: pl }); pl.used = true; }
+    }
+    return { ev, hi: pv.hi, lo: pv.lo };
+  }
+  // collapse k consecutive bars into one (weekly ≈ 5 days, monthly ≈ 21 days)
+  function aggregate(M, k) {
+    const o = [], h = [], l = [], c = [], v = [];
+    for (let s = 0; s < M.c.length; s += k) {
+      const e = Math.min(M.c.length, s + k); let hh = -Infinity, ll = Infinity, vv = 0;
+      for (let i = s; i < e; i++) { hh = Math.max(hh, M.h[i]); ll = Math.min(ll, M.l[i]); vv += M.v ? M.v[i] : 0; }
+      o.push(M.o[s]); h.push(hh); l.push(ll); c.push(M.c[e - 1]); v.push(vv);
+    }
+    return { o, h, l, c, v };
+  }
+  function logTicks(lo, hi) {
+    const out = []; const e0 = Math.floor(Math.log10(lo)), e1 = Math.ceil(Math.log10(hi));
+    const sets = [[1, 2, 5], [1, 1.5, 2, 3, 5, 7], [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9]];
+    for (const ms of sets) {
+      out.length = 0;
+      for (let e = e0; e <= e1; e++) for (const m of ms) { const v = m * Math.pow(10, e); if (v >= lo && v <= hi) out.push(+v.toPrecision(6)); }
+      if (out.length >= 3) break;
+    }
+    return out;
+  }
+  // price chart drawer: bars / candles / line, arithmetic or log scale, optional open-interest and volume panels.
+  // spec: {o,h,l,c, mode:'bar'|'candle'|'line', log, x0, x1, lines:[{d,col,w,dash,label}], hlines:[{v,col,label,a,b,dash}],
+  //        marks:[{i,v,kind,label}], vlines:[{i,col,label,row}], shade:[{a,b,col,alpha,label}], vol, volCol(i), oi, legend:[[t,c]]}
+  function priceChart(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.c.length; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 52, padT = 10, padB = 8, gap = 14;
+    const subs = []; if (sp.oi) subs.push('oi'); if (sp.vol) subs.push('vol');
+    const avail = H - padT - padB - gap * subs.length;
+    const subH = subs.length ? Math.round(avail * (subs.length === 2 ? 0.2 : 0.25)) : 0;
+    const xl = sp.xlabels ? 16 : 0; const mainH = avail - subH * subs.length - xl;
+    const slot = (W - padL - padR) / (x1 - x0 + 1);
+    const X = (i) => padL + (i - x0 + 0.5) * slot;
+    const bw = Math.max(1, slot * 0.7);
+    const mode = sp.mode || 'bar';
+    let lo = Infinity, hi = -Infinity; const take = (v) => { if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } };
+    for (let i = x0; i <= x1; i++) { if (mode === 'line') take(sp.c[i]); else { take(sp.h[i]); take(sp.l[i]); } }
+    (sp.lines || []).forEach((l) => { if (!l.noScale) for (let i = x0; i <= x1; i++) take(l.d[i]); });
+    (sp.hlines || []).forEach((h) => { if (!h.noScale) take(h.v); });
+    if (sp.ymin != null) lo = sp.ymin; if (sp.ymax != null) hi = sp.ymax;
+    if (!isFinite(lo)) { lo = 1; hi = 2; }
+    const log = !!sp.log && lo > 0; const f = (v) => (log ? Math.log(v) : v);
+    let flo = f(lo), fhi = f(hi); const pad = (fhi - flo) * 0.06 || 1; flo -= pad; fhi += pad;
+    const Y = (v) => padT + (fhi - f(v)) / (fhi - flo) * mainH;
+    const font = '11px ' + css('mono'); g.font = font; g.lineWidth = 1;
+    const ticks = log ? logTicks(Math.exp(flo), Math.exp(fhi)) : niceTicks(flo, fhi, mainH > 160 ? 5 : 3);
+    ticks.forEach((t) => { const y = Y(t); if (y < padT - 1 || y > padT + mainH + 1) return; g.strokeStyle = colorOf('rule', 0.9); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    (sp.shade || []).forEach((s) => { const a = Math.max(s.a, x0), b = Math.min(s.b, x1); if (b < a) return; g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(a) - slot / 2, padT, (b - a + 1) * slot, mainH); if (s.label) { g.fillStyle = colorOf(s.col); g.font = font; g.fillText(s.label, X(a) - slot / 2 + 3, padT + 12 + (s.row || 0) * 13); } });
+    (sp.hlines || []).forEach((h) => { const y = Y(h.v); const xa = h.a != null ? X(Math.max(h.a, x0)) - slot / 2 : padL; const xb = h.b != null ? X(Math.min(h.b, x1)) + slot / 2 : W - padR; g.strokeStyle = colorOf(h.col || 'muted', 0.95); g.lineWidth = h.w || 1.3; g.setLineDash(h.dash || [5, 4]); g.beginPath(); g.moveTo(xa, y); g.lineTo(xb, y); g.stroke(); g.setLineDash([]); if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); g.font = font; g.fillText(h.label, xa + 3, h.below ? y + 13 : y - 4); } });
+    const ink = colorOf(sp.ink || 'price');
+    if (mode === 'line') strokeSeries(g, sp.c, X, Y, x0, x1, ink, sp.lw || 1.6);
+    else for (let i = x0; i <= x1; i++) {
+      const o = sp.o[i], h = sp.h[i], l = sp.l[i], c = sp.c[i]; if (c == null) continue; const x = X(i);
+      const col = sp.colorBars ? colorOf(c >= o ? 'buy' : 'sell') : ink;
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = Math.max(1, Math.min(2, slot * 0.2));
+      g.beginPath(); g.moveTo(x, Y(h)); g.lineTo(x, Y(l)); g.stroke();
+      if (mode === 'bar') { const t = Math.max(2, Math.min(8, slot * 0.45)); g.beginPath(); g.moveTo(x - t, Y(o)); g.lineTo(x, Y(o)); g.moveTo(x, Y(c)); g.lineTo(x + t, Y(c)); g.stroke(); }
+      else { const yt = Y(Math.max(o, c)), yb = Y(Math.min(o, c)); const hh = Math.max(1, yb - yt); g.fillStyle = colorOf(c >= o ? 'cup' : 'cdn'); g.fillRect(x - bw / 2, yt, bw, hh); g.lineWidth = 1; g.strokeStyle = colorOf('price'); g.strokeRect(x - bw / 2, yt, bw, hh); }
+    }
+    (sp.lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha || 1), l.w || 1.8, l.dash));
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy') { g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); g.fill(); }
+      else if (m.kind === 'sell') { g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); g.fill(); }
+      else { g.strokeStyle = colorOf(m.col || 'c1'); g.lineWidth = 2; g.beginPath(); g.arc(x, y, m.r || 5, 0, Math.PI * 2); g.stroke(); }
+      if (m.label) { g.fillStyle = colorOf(m.col || (m.kind === 'sell' ? 'sell' : m.kind === 'buy' ? 'buy' : 'c1')); g.font = font; const tw = g.measureText(m.label).width; let tx = x + 8; if (tx + tw > W - padR) tx = x - tw - 8; g.fillText(m.label, tx, m.kind === 'sell' ? y - 14 : m.kind === 'buy' ? y + 22 : y - 8); }
+    });
+    if (sp.xlabels) { g.font = font; g.fillStyle = colorOf('muted'); let lastX = -1e9; sp.xlabels.forEach((t) => { if (t.i < x0 || t.i > x1) return; const tw = g.measureText(t.t).width; const tx = Math.min(W - padR - tw, Math.max(padL, X(t.i) - tw / 2)); if (tx < lastX + 6) return; g.fillText(t.t, tx, padT + mainH + 12); lastX = tx + tw; }); }
+    let top = padT + mainH + xl + gap;
+    subs.forEach((kind) => {
+      g.strokeStyle = colorOf('rule'); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke();
+      const d = kind === 'vol' ? sp.vol : sp.oi; let a = Infinity, b = -Infinity;
+      for (let i = x0; i <= x1; i++) { const v = d[i]; if (v != null && isFinite(v)) { if (v < a) a = v; if (v > b) b = v; } }
+      if (!isFinite(a)) { a = 0; b = 1; }
+      if (kind === 'vol') a = 0; const p2 = kind === 'vol' ? 0 : (b - a) * 0.1 || 1; const lo2 = a - p2, hi2 = b + p2;
+      const Y2 = (v) => top + (hi2 - v) / ((hi2 - lo2) || 1) * subH;
+      g.font = font; g.fillStyle = colorOf('muted');
+      niceTicks(lo2, hi2, 2).forEach((t) => { const y = Y2(t); if (y < top - 1 || y > top + subH + 1) return; g.strokeStyle = colorOf('rule', 0.7); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmtBig(t), W - padR + 5, y + 4); });
+      if (kind === 'vol') { for (let i = x0; i <= x1; i++) { const v = d[i]; if (v == null) continue; g.fillStyle = sp.volCol ? sp.volCol(i) : colorOf('muted', 0.6); const yv = Y2(v); g.fillRect(X(i) - bw / 2, yv, bw, top + subH - yv); } }
+      else strokeSeries(g, d, X, Y2, x0, x1, colorOf('c3'), 1.8);
+      g.fillStyle = colorOf(kind === 'vol' ? 'muted' : 'c3'); g.fillText(kind === 'vol' ? (sp.volLabel || 'volume') : (sp.oiLabel || 'open interest'), padL + 3, top + 11);
+      top += subH + gap;
+    });
+    const Lg = $(id + 'L');
+    if (Lg) { const items = []; (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col])); (sp.legend || []).forEach((x) => items.push(x)); Lg.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join(''); }
+  }
+  // ---------- data ----------
+  let seed = 7;
+  let M, LT, K;
+  const MONTHS = ['Mar', 'Jun', 'Sep', 'Dec'];
+  function buildContracts(sd, grow) {
+    const r = rng(sd * 3 + 21); const life = 250, step = 63, roll = 42, N = 500, TOTAL = 150000; const list = [];
+    for (let k = 0; k < 12; k++) {
+      const exp = 40 + k * step; const lst = exp - life; if (exp < 0 || lst > N) continue;
+      const name = MONTHS[k % 4] + ' ' + String(27 + Math.floor(k / 4));
+      const d = new Array(N).fill(null);
+      for (let t = Math.max(0, lst); t < Math.min(N, exp + 1); t++) {
+        const age = t - lst; let f;
+        if (age <= life - roll) f = Math.pow(age / (life - roll), 2.2); else f = Math.max(0, (exp - t) / roll);
+        d[t] = f; // life-cycle shape only; scaled below
+      }
+      list.push({ name, d, exp });
+    }
+    // hold total demand fixed: each month gets its life-cycle share of a constant total, plus a little noise
+    for (let t = 0; t < N; t++) {
+      const raw = list.reduce((s, c) => s + (c.d[t] || 0), 0); const tt = TOTAL * (1 + (grow ? 0.4 * t / (N - 1) : 0)); // optional new money: +40% over 500 days
+      list.forEach((c) => { if (c.d[t] != null) c.d[t] = raw > 0 ? Math.max(0, tt * c.d[t] / raw * (1 + 0.03 * gauss(r))) : 0; });
+    }
+    const tot = new Array(N).fill(0).map((_, t) => list.reduce((s, c) => s + (c.d[t] || 0), 0));
+    return { list, tot, N };
+  }
+  function buildData() {
+    M = addOpens(genMarket([
+      { n: 70, drift: 0.0035, vol: 0.011, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.004, vol: 0.012, kind: 'trend' }
+    ], seed), seed);
+    M.v = makeVolume(M.c, seed, 1e6);
+    const segs = []; const r = rng(seed * 11 + 7);
+    for (let k = 0; k < 14; k++) segs.push({ n: 360, drift: (r() - 0.42) * 0.0022, vol: 0.011 });
+    LT = addOpens(genMarket(segs, seed + 500), seed + 500);
+    K = buildContracts(seed, $('chk8') && $('chk8').checked);
+    $('seedOut').textContent = seed;
+  }
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  const f2 = (v) => v.toFixed(2);
+
+  // ---------- point & figure on closes (box size b, 3-box reversal) ----------
+  function pfColumns(c, b, rev) {
+    const cols = []; let cur = null; const base = Math.floor(c[0] / b);
+    for (let i = 1; i < c.length; i++) {
+      const up = Math.floor(c[i] / b), dn = Math.ceil(c[i] / b);
+      if (!cur) { if (up >= base + 1) cur = { dir: 1, lo: base, hi: up }; else if (dn <= base - 1) cur = { dir: -1, hi: base, lo: dn }; continue; }
+      if (cur.dir === 1) { if (up > cur.hi) cur.hi = up; else if (dn <= cur.hi - rev) { cols.push(cur); cur = { dir: -1, hi: cur.hi - 1, lo: dn }; } }
+      else { if (dn < cur.lo) cur.lo = dn; else if (up >= cur.lo + rev) { cols.push(cur); cur = { dir: 1, lo: cur.lo + 1, hi: up }; } }
+    }
+    if (cur) cols.push(cur);
+    return cols;
+  }
+  function pfChart(id, cols, b) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    if (!cols.length) return;
+    let lo = Infinity, hi = -Infinity; cols.forEach((c) => { lo = Math.min(lo, c.lo); hi = Math.max(hi, c.hi); });
+    const padL = 6, padR = 52, padT = 10, padB = 10; const nb = hi - lo + 1;
+    const cell = Math.max(3, Math.min((W - padL - padR) / Math.max(cols.length, 1), (H - padT - padB) / nb));
+    const Y = (k) => padT + (hi - k) * cell; const X = (j) => padL + j * cell;
+    const font = '11px ' + css('mono'); g.font = font;
+    const every = Math.max(1, Math.ceil(16 / cell));
+    for (let k = lo; k <= hi; k++) { if ((k - lo) % every) continue; const y = Y(k) + cell / 2; g.strokeStyle = colorOf('rule', 0.6); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(k * b), W - padR + 5, y + 4); }
+    const m = cell * 0.18;
+    cols.forEach((c, j) => {
+      for (let k = c.lo; k <= c.hi; k++) {
+        const x = X(j), y = Y(k);
+        if (c.dir === 1) { g.strokeStyle = colorOf('buy'); g.lineWidth = Math.max(1, cell * 0.12); g.beginPath(); g.moveTo(x + m, y + m); g.lineTo(x + cell - m, y + cell - m); g.moveTo(x + cell - m, y + m); g.lineTo(x + m, y + cell - m); g.stroke(); }
+        else { g.strokeStyle = colorOf('sell'); g.lineWidth = Math.max(1, cell * 0.12); g.beginPath(); g.arc(x + cell / 2, y + cell / 2, cell / 2 - m, 0, Math.PI * 2); g.stroke(); }
+      }
+    });
+    const Lg = $(id + 'L'); if (Lg) Lg.innerHTML = `<span style="--sw:${colorOf('buy')}">x column: rising (box ${b})</span><span style="--sw:${colorOf('sell')}">o column: falling</span>`;
+  }
+
+  // ---------- 2 · types of charts ----------
+  const d2 = reg(() => {
+    const mode = $('sel2').value || 'bar'; const n = M.c.length; const days = val('z2'); const x0 = Math.max(0, n - days); const b = val('bx2');
+    const cols = pfColumns(M.c.slice(x0), b, 3);
+    if (mode === 'pf') pfChart('c2', cols, b);
+    else priceChart('c2', { o: M.o, h: M.h, l: M.l, c: M.c, mode, x0, colorBars: false, legend: [[mode === 'line' ? 'closes joined (simulated)' : mode === 'candle' ? 'candles: white up, black down (simulated)' : 'daily bars (simulated)', 'price']] });
+    $('r2').innerHTML = `${days} daily bars → <b>${cols.length}</b> P&amp;F columns at box size <b>${b}</b> with a 3-box reversal` + (mode === 'pf' ? '' : ' · switch View to see them');
+  });
+  $('sel2').addEventListener('change', d2); bindRange('bx2', d2); bindRange('z2', d2);
+
+  // ---------- 3 · candlesticks ----------
+  const d3 = reg(() => {
+    const n = M.c.length, x0 = n - 45; const over = $('chk3').checked;
+    priceChart('c3', { o: M.o, h: M.h, l: M.l, c: M.c, mode: 'candle', x0, legend: [['candles (simulated)', 'price']] });
+    if (over) {
+      const cv = $('c3'); const g = cv.getContext('2d'); const W = cv.clientWidth, H = cv.clientHeight; if (W && H) {
+        let lo = Infinity, hi = -Infinity; for (let i = x0; i < n; i++) { lo = Math.min(lo, M.l[i]); hi = Math.max(hi, M.h[i]); }
+        const pad = (hi - lo) * 0.06; const a = lo - pad, z = hi + pad; const mainH = H - 18; const slot = (W - 58) / (n - x0);
+        const Y = (v) => 10 + (z - v) / (z - a) * mainH; const X = (i) => 6 + (i - x0 + 0.5) * slot; const t = Math.max(3, slot * 0.55);
+        g.strokeStyle = colorOf('c1'); g.lineWidth = 2;
+        for (let i = x0; i < n; i++) { const x = X(i); g.beginPath(); g.moveTo(x - t, Y(M.o[i])); g.lineTo(x - slot * 0.36, Y(M.o[i])); g.moveTo(x + slot * 0.36, Y(M.c[i])); g.lineTo(x + t, Y(M.c[i])); g.stroke(); }
+      }
+    }
+    let w = 0; for (let i = x0; i < n; i++) if (M.c[i] >= M.o[i]) w++;
+    $('r3').innerHTML = `last 45 days: white (close ≥ open) <b class="good">${w}</b> · black (close &lt; open) <b class="bad">${45 - w}</b>` + (over ? ' · amber ticks = bar chart open (left) and close (right)' : '');
+  });
+  $('chk3').addEventListener('change', d3);
+
+  // ---------- 4 · arithmetic vs log ----------
+  const d4 = reg(() => {
+    const g = val('g4') / 100; const wk = Math.log(1 + g) / 52; const P = addOpens(genMarket([{ n: 260, drift: wk, vol: 0.018 }], seed + 40), seed + 40); const c = P.c, n = c.length;
+    const log = $('chk4').checked;
+    let i1 = 0, i2 = 104; for (let i = 0; i < 52; i++) if (c[i] < c[i1]) i1 = i; for (let i = 104; i < 156; i++) if (c[i] < c[i2]) i2 = i;
+    const lineOf = (lg) => c.map((_, i) => (lg ? Math.exp(Math.log(c[i1]) + (Math.log(c[i2]) - Math.log(c[i1])) * (i - i1) / (i2 - i1)) : c[i1] + (c[i2] - c[i1]) * (i - i1) / (i2 - i1)));
+    const gapOf = (line) => { let s = 0, k = 0; for (let y = 3; y < 5; y++) { let m = Infinity, mi = 0; for (let i = y * 52; i < (y + 1) * 52; i++) if (c[i] < m) { m = c[i]; mi = i; } if (line[mi] > 0) { s += (m / line[mi] - 1) * 100; k++; } } return k ? s / k : NaN; };
+    const lnLog = lineOf(true), lnAr = lineOf(false); const line = log ? lnLog : lnAr;
+    const ln = line.map((v, i) => (i >= i1 && v > 0 ? v : null));
+    priceChart('c4', { o: P.o, h: P.h, l: P.l, c: P.c, mode: 'bar', log, lines: [{ d: ln, col: 'c1', w: 1.8, label: 'straight line (on this scale) through the year-1 and year-3 lows' }], marks: [{ i: i1, v: c[i1], col: 'c2', r: 5 }, { i: i2, v: c[i2], col: 'c2', r: 5 }], legend: [['weekly bars, 5 years (simulated)', 'price']] });
+    const gl = gapOf(lnLog), ga = gapOf(lnAr);
+    $('r4').innerHTML = `viewing: <b>${log ? 'log' : 'arithmetic'}</b> scale · price ×<b>${(c[n - 1] / c[0]).toFixed(1)}</b> in 5 years · lows of years 4–5 sit above the line by: log line <b>${gl.toFixed(0)}%</b>, arithmetic line <b>${ga.toFixed(0)}%</b> (negative = price broke below it) · closer to its line: <b>${Math.abs(gl) <= Math.abs(ga) ? 'log' : 'arithmetic'}</b>`;
+  });
+  $('chk4').addEventListener('change', d4); bindRange('g4', d4);
+
+  // ---------- 5 · building the daily bar chart ----------
+  const DAYN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  function cal5() { const out = []; let d = 5, mon = 0; for (let k = 0; k < 30; k++) { const wd = k % 5; out.push({ wd, d, mon }); d += wd === 4 ? 3 : 1; const len = mon === 0 ? 31 : 28; if (d > len) { d -= len; mon++; } } return out; }
+  const d5 = reg(() => {
+    const cal = cal5(); const hol = 15; const K5 = Math.round(val('k5')); const skip = $('hol5').value === 'skip';
+    const idx = cal.map((_, i) => i).filter((i) => !(skip && i === hol)); // slot j shows calendar weekday idx[j]
+    const pick = (a) => idx.map((i) => (i < K5 && i !== hol ? a[i] : null));
+    const o = pick(M.o), h = pick(M.h), l = pick(M.l), c = pick(M.c), v = pick(M.v);
+    const xl = idx.map((ci, j) => ({ i: j, t: cal[ci].wd === 0 && ci !== hol ? `${cal[ci].d} ${cal[ci].mon ? 'Feb' : 'Jan'}` : (skip && ci === hol + 1 ? '27 Jan' : '') })).filter((q) => q.t);
+    const lastCal = K5 - 1 === hol ? K5 - 2 : K5 - 1; const lastSlot = idx.indexOf(lastCal); const q = cal[K5 - 1];
+    priceChart('c5', { o, h, l, c, mode: 'bar', x0: 0, x1: idx.length - 1, xlabels: xl, vol: v, volLabel: 'volume (shares)', shade: skip ? [] : [{ a: hol, b: hol, col: 'muted', alpha: 0.12 }],
+      marks: lastSlot >= 0 ? [{ i: lastSlot, v: M.h[lastCal] * 1.004, col: 'c1', r: 4 }] : [],
+      legend: [['bar: high–low, left tick open, right tick close', 'price'], skip ? ['holiday skipped: 29 slots, no gap (not Murphy\'s convention)', 'muted'] : ['grey slot = Mon 26 Jan, exchange holiday (left blank)', 'muted']] });
+    const dayTxt = `${DAYN[q.wd]} ${q.d} ${q.mon ? 'Feb' : 'Jan'}`;
+    $('r5').innerHTML = K5 - 1 === hol ? `${dayTxt}: <b>exchange closed</b>, the slot stays blank` : `${dayTxt} · open <b>${f2(M.o[K5 - 1])}</b> · high <b>${f2(M.h[K5 - 1])}</b> · low <b>${f2(M.l[K5 - 1])}</b> · close <b>${f2(M.c[K5 - 1])}</b> · range <b>${f2(M.h[K5 - 1] - M.l[K5 - 1])}</b> · volume <b>${fmtBig(M.v[K5 - 1])}</b>`;
+  });
+  bindRange('k5', d5); $('hol5').addEventListener('change', d5);
+  $('b5').addEventListener('click', () => { const el = $('k5'); const nx = (Math.round(+el.value) % 30) + 1; el.value = String(nx); const o = $('k5o'); if (o) o.textContent = String(nx); d5(); });
+
+  // ---------- 6 · volume ----------
+  const d6 = reg(() => {
+    const n = M.c.length, x0 = n - 90; const hi = $('chk6').checked; const avg = sma(M.v, 20);
+    const big = []; for (let i = x0; i < n; i++) if (avg[i - 1] != null && M.v[i] > 1.5 * avg[i - 1]) big.push(i);
+    const isBig = new Set(big);
+    priceChart('c6', { o: M.o, h: M.h, l: M.l, c: M.c, mode: 'bar', x0, vol: M.v, volLabel: 'volume (shares)', volCol: (i) => (hi && isBig.has(i) ? colorOf('c1', 0.9) : colorOf('muted', 0.55)),
+      shade: hi ? big.map((i) => ({ a: i, b: i, col: 'c1', alpha: 0.18 })) : [], legend: [['daily bars (simulated)', 'price']].concat(hi ? [['volume > 1.5 × 20-day average', 'c1']] : []) });
+    let rg = 0, rgB = 0; for (let i = x0; i < n; i++) { const r = (M.h[i] - M.l[i]) / M.c[i]; rg += r; if (isBig.has(i)) rgB += r; }
+    $('r6').innerHTML = `days highlighted <b>${big.length}</b> of 90 · average day's range <b>${(rg / 90 * 100).toFixed(2)}%</b> · on highlighted days <b>${(big.length ? rgB / big.length * 100 : 0).toFixed(2)}%</b>` +
+      (big.length ? (() => { const t = big[big.length - 1]; return `<span>latest flagged day (${n - 1 - t} days ago): volume <b>${fmtBig(M.v[t])}</b> vs average of the 20 days before <b>${fmtBig(avg[t - 1])}</b> = <b>${(M.v[t] / avg[t - 1]).toFixed(2)}×</b></span>`; })() : '');
+  });
+  $('chk6').addEventListener('change', d6);
+
+  // ---------- 7 · open interest ----------
+  const d7 = reg(() => {
+    const n = M.c.length; const r = rng(seed * 9 + 2); const oi = []; let x = 500000;
+    for (let i = 0; i < n; i++) { const ret = i ? M.c[i] / M.c[i - 1] - 1 : 0; x = Math.max(200000, x * (1 + 0.003 + ret * 0.6 + 0.008 * gauss(r))); oi.push(x); }
+    priceChart('c7', { o: M.o, h: M.h, l: M.l, c: M.c, mode: 'line', oi, vol: M.v, oiLabel: 'open interest (contracts, simulated)', volLabel: 'volume (contracts)', legend: [['futures closes (simulated)', 'price'], ['open interest', 'c3']] });
+    $('r7').innerHTML = `last day: volume <b>${fmtBig(M.v[n - 1])}</b> contracts traded that day · open interest <b>${fmtBig(oi[n - 1])}</b> contracts still open at the close`;
+  });
+
+  // ---------- 8 · total vs individual ----------
+  const PAL = ['c1', 'c2', 'c3', 'sell'];
+  const d8 = reg(() => {
+    const t = Math.round(val('d8')); const shown = K.list.filter((c) => c.d.some((v) => v != null && v > 0));
+    const seen = new Set();
+    plot('c8', { n: K.N, lines: shown.map((c) => { const mn = c.name.slice(0, 3); const lab = seen.has(mn) ? null : mn + ' contracts'; seen.add(mn); return { d: c.d, col: PAL[MONTHS.indexOf(mn)], w: 1.8, label: lab }; }), vlines: [{ i: t, col: 'muted', label: 'day ' + t }],
+      sub: { lines: [{ d: K.tot, col: 'price', w: 2, label: 'total open interest' }], ymin: 0, label: 'total (all months)' } });
+    const live = shown.filter((c) => c.d[t] > 0).sort((a, b) => b.d[t] - a.d[t]);
+    const fr = live.filter((c) => c.exp >= t).sort((a, b) => a.exp - b.exp)[0];
+    const pc = (x) => { const v = (x / 1 - 1) * 100; return `<b class="${v >= 0 ? 'good' : 'bad'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</b>`; };
+    const line2 = t >= 20 && fr && fr.d[t - 20] > 0 ? `<br>last 20 trading days: front month ${fr.name} (expires day ${fr.exp}) ${pc(fr.d[t] / fr.d[t - 20])} · total ${pc(K.tot[t] / K.tot[t - 20])}` : '';
+    $('r8').innerHTML = `<span>day ${t}: ` + live.map((c) => `${c.name} <b>${fmtBig(c.d[t])}</b>`).join(' · ') + ` · total <b>${fmtBig(K.tot[t])}</b>${line2}</span>`;
+  });
+  bindRange('d8', d8);
+  $('chk8').addEventListener('change', () => { K = buildContracts(seed, $('chk8').checked); d8(); d10(); d10roll(); });
+
+  // ---------- 10 · trade the highest open interest month ----------
+  const d10 = reg(() => {
+    const t = Math.round(val('d10')); const live = K.list.filter((c) => c.d[t] > 0); const mx = Math.max(1, ...live.map((c) => c.d[t]));
+    const top = live.reduce((a, c) => (!a || c.d[t] > a.d[t] ? c : a), null);
+    $('bars10').innerHTML = live.map((c) => `<div class="obar${c === top ? ' top' : ''}"><span>${c.name}</span><i style="width:${(c.d[t] / mx * 100).toFixed(1)}%"></i><span>${fmtBig(c.d[t])}</span></div>`).join('');
+    const days = top ? top.exp - t : 0;
+    $('r10').innerHTML = top ? `most open interest: <b>${top.name}</b> (expires in <b>${days}</b> trading days) → by Murphy's rule, trade this month` : '';
+  });
+  bindRange('d10', d10);
+
+  // ---------- 11 · weekly and monthly ----------
+  const d11 = reg(() => {
+    const k = $('sel11').value || 'd'; const n = LT.c.length;
+    let S, x0, txt;
+    if (k === 'w') { S = aggregate(LT, 5); x0 = S.c.length - 260; txt = '260 weekly bars = 5 years'; }
+    else if (k === 'm') { S = aggregate(LT, 21); x0 = 0; txt = `${S.c.length} monthly bars = 20 years`; }
+    else { S = LT; x0 = n - 150; txt = '150 daily bars ≈ 7 months'; }
+    priceChart('c11', { o: S.o, h: S.h, l: S.l, c: S.c, mode: 'bar', x0, log: k !== 'd', legend: [[(k === 'd' ? 'daily' : k === 'w' ? 'weekly' : 'monthly') + ' bars (simulated)' + (k !== 'd' ? ', log scale' : ''), 'price']] });
+    const a = S.c[x0], z = S.c[S.c.length - 1];
+    $('r11').innerHTML = `${txt} · change over the view <b>${((z / a - 1) * 100).toFixed(0)}%</b> · the same last price in every view: <b>${f2(z)}</b>`;
+  });
+  $('sel11').addEventListener('change', d11);
+
+  // ---------- worked-example widgets (pass 2) ----------
+  function cvSetup(id) {
+    const cv = $(id); if (!cv) return null; const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.font = '11px ' + css('mono'); return { g, W, H };
+  }
+  function stepper(prefix, max, draw) { // wires ◀ / ▶ buttons and a range slider called <prefix>k
+    const el = $(prefix + 'k'), out = $(prefix + 'ko');
+    const set = (v) => { const k = Math.max(+el.min, Math.min(max, v)); el.value = String(k); if (out) out.textContent = String(k); draw(); };
+    $(prefix + 'b').addEventListener('click', () => set(+el.value - 1));
+    $(prefix + 'n').addEventListener('click', () => set(+el.value >= max ? +el.min : +el.value + 1));
+    el.addEventListener('input', () => set(+el.value));
+  }
+  const kOf = (id, lo, hi) => { const v = Math.round(val(id)); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : hi; };
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  function erf(x) { const s = Math.sign(x); x = Math.abs(x); const t = 1 / (1 + 0.3275911 * x); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return s * y; }
+  const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+
+  // 2 · P&F by hand: the same rules as pfColumns, one close at a time
+  function pfTrace(c, b, rev) {
+    const P = (k) => +(k * b).toFixed(2); const ev = []; const cols = []; let cur = null; const base = Math.floor(c[0] / b);
+    const snap = () => cols.concat(cur ? [Object.assign({}, cur)] : []).map((x) => Object.assign({}, x));
+    ev.push({ c: c[0], act: 'start', txt: `start at ${P(base)}: nothing is drawn until price moves a full box`, cols: [] });
+    for (let i = 1; i < c.length; i++) {
+      const up = Math.floor(c[i] / b), dn = Math.ceil(c[i] / b); let txt, act = 'none';
+      if (!cur) {
+        if (up >= base + 1) { cur = { dir: 1, lo: base, hi: up }; act = 'x'; txt = `up a full box: first column of x's from ${P(base)} to ${P(up)}`; }
+        else if (dn <= base - 1) { cur = { dir: -1, hi: base, lo: dn }; act = 'o'; txt = `down a full box: first column of o's from ${P(base)} down to ${P(dn)}`; }
+        else txt = 'still inside the starting box: nothing drawn';
+      } else if (cur.dir === 1) {
+        if (up > cur.hi) { act = 'x'; txt = `new high box ${P(up)}: add ${up - cur.hi} x${up - cur.hi > 1 ? "'s" : ''} on top`; cur.hi = up; }
+        else if (dn <= cur.hi - rev) { act = 'rev'; txt = `fell to box ${P(dn)}, ${cur.hi - dn} boxes under the top (${P(cur.hi)}): reversal, new o column from ${P(cur.hi - 1)} down to ${P(dn)}`; cols.push(cur); cur = { dir: -1, hi: cur.hi - 1, lo: dn }; }
+        else txt = `no change: a new x needs a close of ${P(cur.hi + 1)} or more, a reversal needs ${P(cur.hi - rev)} or less`;
+      } else {
+        if (dn < cur.lo) { act = 'o'; txt = `new low box ${P(dn)}: add ${cur.lo - dn} o${cur.lo - dn > 1 ? "'s" : ''} below`; cur.lo = dn; }
+        else if (up >= cur.lo + rev) { act = 'rev'; txt = `rose to box ${P(up)}, ${up - cur.lo} boxes over the bottom (${P(cur.lo)}): reversal, new x column from ${P(cur.lo + 1)} up to ${P(up)}`; cols.push(cur); cur = { dir: 1, lo: cur.lo + 1, hi: up }; }
+        else txt = `no change: a new o needs a close of ${P(cur.lo - 1)} or less, a reversal needs ${P(cur.lo + rev)} or more`;
+      }
+      ev.push({ c: c[i], act, txt, cols: snap() });
+    }
+    return ev;
+  }
+  const PF2 = [100.0, 101.4, 102.2, 103.6, 103.1, 102.5, 104.3, 105.8, 104.9, 103.2, 102.6, 101.7, 102.4, 103.9, 104.6, 106.2, 107.5];
+  const PF2EV = pfTrace(PF2, 1, 3);
+  const dpf2 = reg(() => {
+    const k = kOf('pf2k', 1, 17); const e = PF2EV[k - 1]; const S = cvSetup('pf2c');
+    if (S) {
+      const { g, W, H } = S; const lo = 99, hi = 108, padL = 44, padT = 8; const cell = Math.min((H - 16) / (hi - lo + 1), (W - padL - 20) / 8);
+      const Y = (lev) => padT + (hi - lev) * cell; const X = (j) => padL + 10 + j * cell * 1.3;
+      for (let lev = lo; lev <= hi; lev++) { const y = Y(lev) + cell / 2; g.strokeStyle = colorOf('rule', 0.7); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - 8, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(String(lev), 8, y + 4); }
+      const m = cell * 0.2;
+      e.cols.forEach((col, j) => { for (let lev = col.lo; lev <= col.hi; lev++) { const x = X(j), y = Y(lev); g.lineWidth = 2;
+        if (col.dir === 1) { g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x + m, y + m); g.lineTo(x + cell - m, y + cell - m); g.moveTo(x + cell - m, y + m); g.lineTo(x + m, y + cell - m); g.stroke(); }
+        else { g.strokeStyle = colorOf('sell'); g.beginPath(); g.arc(x + cell / 2, y + cell / 2, cell / 2 - m, 0, Math.PI * 2); g.stroke(); } } });
+      const yc = Y(e.c) + cell / 2; g.strokeStyle = colorOf('c1'); g.setLineDash([5, 4]); g.lineWidth = 1.4; g.beginPath(); g.moveTo(padL, yc); g.lineTo(W - 8, yc); g.stroke(); g.setLineDash([]);
+      g.fillStyle = colorOf('c1'); const lab = `close ${e.c.toFixed(1)}`; g.fillText(lab, W - 12 - g.measureText(lab).width, yc - 4);
+    }
+    $('pf2r').innerHTML = `close #${k} = <b>${e.c.toFixed(1)}</b>: ${esc(e.txt)}`;
+    $('pf2t').innerHTML = PF2EV.map((x, i) => `<tr class="${i === k - 1 ? 'cur' : i > k - 1 ? 'dim' : ''}"><td class="num">${i + 1}</td><td class="num">${x.c.toFixed(1)}</td><td>${esc(x.txt)}</td></tr>`).join('');
+  });
+  stepper('pf2', 17, dpf2);
+
+  // 3 · one day as a bar and as a candle
+  const dohlc3 = reg(() => {
+    const o = +$('op3').value, h = +$('hi3').value, l = +$('lo3').value, c = +$('cl3').value; const S = cvSetup('ohlc3');
+    const ok = [o, h, l, c].every((x) => isFinite(x)) && h >= Math.max(o, c) && l <= Math.min(o, c) && h > l;
+    if (!ok) { if (S) { S.g.fillStyle = colorOf('sell'); S.g.fillText('impossible day: need low ≤ open, close ≤ high', 12, 24); } $('rb3').innerHTML = '<b class="bad">refused</b>: the high must be at or above the open and close, the low at or below both'; return; }
+    if (S) {
+      const { g, W, H } = S; const pad = (h - l) * 0.15; const a = l - pad, z = h + pad; const Y = (v) => 14 + (z - v) / (z - a) * (H - 28);
+      const xb = W * 0.3, xc = W * 0.66, t = 16, bw = 26; g.lineWidth = 2.5; g.strokeStyle = colorOf('price');
+      g.beginPath(); g.moveTo(xb, Y(h)); g.lineTo(xb, Y(l)); g.moveTo(xb - t, Y(o)); g.lineTo(xb, Y(o)); g.moveTo(xb, Y(c)); g.lineTo(xb + t, Y(c)); g.stroke();
+      g.lineWidth = 1.5; g.beginPath(); g.moveTo(xc, Y(h)); g.lineTo(xc, Y(l)); g.stroke();
+      const yt = Y(Math.max(o, c)), yb = Y(Math.min(o, c)); g.fillStyle = colorOf(c >= o ? 'cup' : 'cdn'); g.fillRect(xc - bw / 2, yt, bw, Math.max(1.5, yb - yt)); g.strokeRect(xc - bw / 2, yt, bw, Math.max(1.5, yb - yt));
+      g.fillStyle = colorOf('muted'); g.fillText('bar', xb - 10, H - 2); g.fillText('candle', xc - 20, H - 2);
+      g.fillStyle = colorOf('ink'); [[h, 'H'], [l, 'L'], [o, 'O'], [c, 'C']].forEach(([v, n], i) => { const lab = `${n} ${v.toFixed(2)}`; g.fillText(lab, n === 'O' ? xb - t - g.measureText(lab).width - 4 : n === 'C' ? xb + t + 4 : xb + 6, Y(v) + (n === 'H' ? -3 : n === 'L' ? 11 : 4)); });
+    }
+    const body = Math.abs(c - o), up = h - Math.max(o, c), dn = Math.min(o, c) - l;
+    $('rb3').innerHTML = `<span>range <b>${(h - l).toFixed(2)}</b></span><span>real body <b>${body.toFixed(2)}</b> (${body === 0 ? 'no body: open = close' : c > o ? '<b class="good">white</b>' : '<b class="bad">black</b>'})</span><span>upper shadow <b>${up.toFixed(2)}</b></span><span>lower shadow <b>${dn.toFixed(2)}</b></span><span>body is <b>${((body / (h - l)) * 100).toFixed(0)}%</b> of the range</span>`;
+  });
+  ['op3', 'hi3', 'lo3', 'cl3'].forEach((id) => $(id).addEventListener('input', dohlc3));
+  const preset3 = (v) => { ['op3', 'hi3', 'lo3', 'cl3'].forEach((id, i) => { $(id).value = String(v[i]); }); dohlc3(); };
+  $('pa3').addEventListener('click', () => preset3([101.2, 103.8, 100.4, 103.1]));
+  $('pb3').addEventListener('click', () => preset3([103.0, 103.6, 100.2, 100.8]));
+  $('pc3').addEventListener('click', () => preset3([102.0, 103.5, 100.5, 102.0]));
+  $('pd3').addEventListener('click', () => preset3([102.6, 103.0, 99.4, 102.8]));
+
+  // 4 · compare two moves on both scales
+  const drm4 = () => {
+    const a = +$('a4f').value, b = +$('a4t').value, p = +$('b4f').value, q = +$('b4t').value;
+    if (![a, b, p, q].every((x) => isFinite(x) && x > 0)) { $('rm4').innerHTML = '<b class="bad">prices must be above 0</b> (a log scale has no place for 0 or negatives)'; return; }
+    const la = Math.log(b / a), lb = Math.log(q / p), da = b - a, db = q - p; const pc = (x, y) => ((y / x - 1) * 100).toFixed(1);
+    const ratio = (x, y) => (Math.abs(y) < 1e-12 ? '∞' : (Math.abs(x) / Math.abs(y)).toFixed(2));
+    $('rm4').innerHTML = `<span>A: ${a} → ${b} = <b>${da >= 0 ? '+' : ''}${+da.toFixed(4)}</b> points, <b>${pc(a, b)}%</b>, log length ln(${b}/${a}) = <b>${la.toFixed(3)}</b></span>` +
+      `<span>B: ${p} → ${q} = <b>${db >= 0 ? '+' : ''}${+db.toFixed(4)}</b> points, <b>${pc(p, q)}%</b>, log length <b>${lb.toFixed(3)}</b></span>` +
+      `<span>A drawn ÷ B drawn: arithmetic <b>${ratio(da, db)}×</b> · log <b>${ratio(la, lb)}×</b></span>`;
+  };
+  ['a4f', 'a4t', 'b4f', 'b4t'].forEach((id) => $(id).addEventListener('input', drm4)); drm4();
+
+  // 4 · how different can the two scales look, for a chart spanning ×R
+  const R4S = [1.1, 1.2, 1.3, 1.5, 2, 3, 5, 10, 20];
+  const dmm4 = reg(() => {
+    const R = R4S[kOf('R4', 0, 8)]; $('R4o').textContent = String(R); const n = 201;
+    const P = Array.from({ length: n }, (_, k) => 1 + (R - 1) * k / (n - 1));
+    const ar = P.map((x) => (x - 1) / (R - 1)), lg = P.map((x) => Math.log(x) / Math.log(R)); let mi = 0;
+    for (let k = 0; k < n; k++) if (Math.abs(ar[k] - lg[k]) > Math.abs(ar[mi] - lg[mi])) mi = k;
+    plot('mm4', { n, ymin: 0, ymax: 1, lines: [{ d: ar, col: 'c2', label: 'height on the arithmetic axis' }, { d: lg, col: 'c1', label: 'height on the log axis' }], vlines: [{ i: mi, col: 'muted' }] });
+    $('rR4').innerHTML = `x-axis: price from <b>1</b> (left) to <b>${R}</b> (right) · biggest gap <b>${(Math.abs(ar[mi] - lg[mi]) * 100).toFixed(1)}%</b> of the chart height, at price <b>${P[mi].toFixed(2)}</b>`;
+  });
+  $('R4').addEventListener('input', dmm4);
+
+  // 7 · five trades, volume vs open interest
+  const OI7 = [
+    { b: 'A', s: 'B', bo: true, so: true, why: 'A opens a long, B opens a short: a new contract is created' },
+    { b: 'C', s: 'D', bo: true, so: true, why: 'C opens a long, D opens a short: another new contract' },
+    { b: 'E', s: 'A', bo: true, so: false, why: 'E opens a long, A sells to close his long: the contract changes hands' },
+    { b: 'B', s: 'F', bo: false, so: true, why: 'B buys to close her short, F opens a short: the contract changes hands' },
+    { b: 'D', s: 'C', bo: false, so: false, why: 'D buys to close his short, C sells to close her long: a contract disappears' }
+  ];
+  const doi7 = reg(() => {
+    const k = kOf('oi7k', 0, 5); const pos = { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0 }; let vol = 0, oi = 0; const rows = [];
+    OI7.forEach((t, i) => { const d = t.bo && t.so ? 1 : !t.bo && !t.so ? -1 : 0; if (i < k) { pos[t.b]++; pos[t.s]--; vol++; oi += d; }
+      rows.push(`<tr class="${i === k - 1 ? 'cur' : i >= k ? 'dim' : ''}"><td class="num">${i + 1}</td><td>${t.b} (${t.bo ? 'opens' : 'closes'})</td><td>${t.s} (${t.so ? 'opens' : 'closes'})</td><td>${d > 0 ? '+1' : d < 0 ? '−1' : '0'}</td><td class="num">${i < k ? vol : ''}</td><td class="num">${i < k ? oi : ''}</td></tr>`); });
+    const longs = Object.keys(pos).filter((x) => pos[x] > 0), shorts = Object.keys(pos).filter((x) => pos[x] < 0);
+    $('oi7r').innerHTML = (k ? `trade ${k}: ${OI7[k - 1].why}. ` : 'before any trade: nobody holds anything. ') + `Volume <b>${vol}</b> · open interest <b>${oi}</b> · long: <b>${longs.join(', ') || 'nobody'}</b> · short: <b>${shorts.join(', ') || 'nobody'}</b>`;
+    $('oi7t').innerHTML = rows.join('');
+  });
+  stepper('oi7', 5, doi7);
+
+  // 9 · what is known when
+  const TL9 = [
+    ['Tuesday, closing bell', 'known', 'not yet', 'not yet', 'Monday (released during Tuesday)', 'Prices are final the moment the market closes. Nothing official about Tuesday\'s volume or open interest exists yet.'],
+    ['Tuesday evening', 'known', 'estimate only', 'not yet', 'Monday', 'After the close an estimated volume comes out: enough to say whether trading was heavier or lighter, nothing more.'],
+    ['Wednesday morning paper', 'known', 'estimate (official: Monday)', 'not yet', 'Monday', 'The paper prints Tuesday\'s prices with Tuesday\'s estimated volume, but official volume and open interest for Monday, the day before.'],
+    ['Wednesday, during trading', 'known', 'official', 'official', 'Tuesday', 'The official Tuesday figures are released during the next day\'s trading hours, too late for that morning\'s paper.'],
+    ['Wednesday, closing bell', 'known', 'official', 'official', 'Tuesday', 'The first close at which a decision can use Tuesday\'s official open interest: one full trading day after the day it describes.']
+  ];
+  const dtl9 = reg(() => {
+    const k = kOf('tl9k', 1, 5); const r = TL9[k - 1];
+    $('tl9r').innerHTML = `<b>${r[0]}</b>: ${esc(r[5])}`;
+    $('tl9t').innerHTML = TL9.map((x, i) => `<tr class="${i === k - 1 ? 'cur' : i > k - 1 ? 'dim' : ''}"><td class="num">${i + 1}</td><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td><td>${x[3]}</td><td>${x[4]}</td></tr>`).join('');
+  });
+  stepper('tl9', 5, dtl9);
+
+  // 9 · toy model: same-day OI vs OI you could actually have had
+  function lookahead(rho, runs, days) {
+    const sig = 0.01; const A = [0, 0, 0], B = [0, 0, 0];
+    for (let s = 0; s < runs; s++) {
+      const r = rng(1000 + s * 7); const f = [], doi = [], ret = [0];
+      for (let t = 0; t < days; t++) { f.push(gauss(r)); doi.push(0.5 * f[t] + 0.866 * gauss(r)); }      // day t's new informed positions show up in day t's OI change
+      for (let t = 1; t <= days + 1; t++) ret.push(sig * (rho * (f[t - 1] || 0) + Math.sqrt(1 - rho * rho) * gauss(r))); // ...and move price on day t+1
+      for (let t = 1; t < days - 1; t++) {
+        if (doi[t] > 0) { A[0] += ret[t + 1]; A[1]++; if (ret[t + 1] > 0) A[2]++; }       // wrong: day t's OI at day t's close
+        if (doi[t - 1] > 0) { B[0] += ret[t + 1]; B[1]++; if (ret[t + 1] > 0) B[2]++; }   // honest: day t-1's OI, published during day t
+      }
+    }
+    return [A, B].map((x) => ({ n: x[1], avg: x[0] / x[1] * 100, up: x[2] / x[1] * 100 }));
+  }
+  const dla9 = reg(() => {
+    const rho = val('rho9'); const [A, B] = lookahead(rho, 200, 250);
+    const row = (nm, x) => `<tr><td>${nm}</td><td class="num">${x.n.toLocaleString('en-IN')}</td><td class="num"><b class="${x.avg > 0.005 ? 'good' : ''}">${x.avg >= 0 ? '+' : ''}${x.avg.toFixed(3)}%</b></td><td class="num">${x.up.toFixed(1)}%</td><td class="num">${(x.avg * 125) >= 0 ? '+' : ''}${(x.avg * 125).toFixed(1)}%</td></tr>`;
+    $('la9t').innerHTML = row('A · wrong: uses day t\'s OI at day t\'s close', A) + row('B · honest: uses day t−1\'s OI (the newest published)', B);
+    $('la9r').innerHTML = `pooled: <b>200</b> simulated markets × <b>250</b> days, fixed seeds (simulated, not market evidence) · daily noise 1% · correlation <b>${rho.toFixed(2)}</b>`;
+  });
+  bindRange('rho9', dla9);
+
+  // 10 · when the most-open-interest month changes
+  const d10roll = reg(() => {
+    const rows = [];
+    K.list.forEach((c) => {
+      const nx = K.list.find((x) => x.exp === c.exp + 63); if (!nx || c.exp >= K.N) return;
+      let t0 = -1; for (let t = Math.max(0, c.exp - 120); t <= c.exp; t++) if ((nx.d[t] || 0) > (c.d[t] || 0)) { t0 = t; break; }
+      if (t0 >= 0 && t0 > 0) rows.push(`<tr><td>${c.name}</td><td class="num">${c.exp}</td><td class="num">${t0} (${nx.name})</td><td class="num">${c.exp - t0}</td></tr>`);
+    });
+    $('rl10t').innerHTML = rows.join('');
+  });
+
+  // 11 · five daily bars into one weekly bar
+  const WK = [['Mon', 100.0, 101.2, 99.4, 100.8, 1.1e6], ['Tue', 100.9, 102.5, 100.6, 102.1, 1.4e6], ['Wed', 102.0, 102.4, 100.1, 100.5, 1.2e6], ['Thu', 100.4, 101.0, 99.2, 99.8, 1.0e6], ['Fri', 99.9, 101.6, 99.5, 101.3, 0.9e6]];
+  const dwk11 = reg(() => {
+    const k = kOf('wk11k', 1, 5); const D = WK.slice(0, k);
+    const wo = D[0][1], wh = Math.max(...D.map((d) => d[2])), wl = Math.min(...D.map((d) => d[3])), wc = D[k - 1][4], wv = D.reduce((s, d) => s + d[5], 0);
+    const ih = D.findIndex((d) => d[2] === wh), il = D.findIndex((d) => d[3] === wl);
+    const arr = (j, w) => Array.from({ length: 7 }, (_, i) => (i < k ? WK[i][j] : i === 6 ? w : null));
+    priceChart('wk11', { o: arr(1, wo), h: arr(2, wh), l: arr(3, wl), c: arr(4, wc), mode: 'bar', vol: arr(5, wv), volLabel: 'volume', ymin: 98.8, ymax: 102.9,
+      xlabels: WK.map((d, i) => ({ i, t: d[0] })).concat([{ i: 6, t: 'week' }]),
+      marks: [{ i: 0, v: wo, col: 'c1', r: 6 }, { i: ih, v: wh, col: 'c1', r: 6 }, { i: il, v: wl, col: 'c1', r: 6 }, { i: k - 1, v: wc, col: 'c1', r: 6 }],
+      volCol: (i) => (i === 6 ? colorOf('c1', 0.75) : colorOf('muted', 0.55)), legend: [['circles: the four daily prices the weekly bar keeps', 'c1']] });
+    $('wk11t').innerHTML = WK.map((d, i) => `<tr class="${i === k - 1 ? 'cur' : i >= k ? 'dim' : ''}"><td>${d[0]}</td><td class="num">${d[1].toFixed(1)}</td><td class="num">${d[2].toFixed(1)}</td><td class="num">${d[3].toFixed(1)}</td><td class="num">${d[4].toFixed(1)}</td><td class="num">${fmtBig(d[5])}</td></tr>`).join('') +
+      `<tr><td><b>week so far</b></td><td class="num"><b>${wo.toFixed(1)}</b></td><td class="num"><b>${wh.toFixed(1)}</b></td><td class="num"><b>${wl.toFixed(1)}</b></td><td class="num"><b>${wc.toFixed(1)}</b></td><td class="num"><b>${(wv / 1e6).toFixed(1)}M</b></td></tr>`;
+  });
+  stepper('wk11', 5, dwk11);
+
+  // 11 · share of up bars vs bar length (drift ∝ Δt, noise ∝ √Δt)
+  const UB = [['5-minute (NSE, 75 a day)', 1 / (252 * 75), 0, '5-min'], ['daily', 1 / 252, 1, 'daily'], ['weekly', 5 / 252, 5, 'weekly'], ['monthly', 21 / 252, 21, 'monthly'], ['yearly', 1, 252, 'yearly']];
+  let ubSim = null;
+  const dub11 = reg(() => {
+    const mu = val('mu11') / 100, sg = val('sg11') / 100; const pf = (x, d) => (x * 100).toFixed(d);
+    const rows = UB.map(([nm, dt, L, sh]) => { const p = Phi((mu - sg * sg / 2) * Math.sqrt(dt) / sg); return { nm, sh, dt, L, p, dr: mu * dt, nz: sg * Math.sqrt(dt) }; });
+    $('ub11t').innerHTML = rows.map((r) => `<tr><td>${r.nm}</td><td class="num">${r.dr >= 0 ? '+' : ''}${pf(r.dr, r.dt < 0.01 ? 4 : 2)}%</td><td class="num">±${pf(r.nz, r.dt < 0.01 ? 3 : 2)}%</td><td class="num">${((mu - sg * sg / 2) * Math.sqrt(r.dt) / sg).toFixed(3)}</td><td class="num"><b>${pf(r.p, 1)}%</b></td><td class="num">${ubSim && r.L ? pf(ubSim[r.L], 1) + '%' : r.L ? '(press the button)' : 'n/a'}</td></tr>`).join('');
+    $('ub11').innerHTML = rows.map((r) => `<div class="obar${r.p > 0.55 || r.p < 0.45 ? ' top' : ''}"><span>${r.sh}</span><i style="width:${(r.p * 100).toFixed(1)}%"></i><span>${pf(r.p, 1)}%</span></div>`).join('');
+    $('ub11r').innerHTML = `bars show the formula's share of up bars; 50% would be a pure coin flip · drift ÷ noise grows with √(bar length)`;
+  });
+  const resetSim = () => { ubSim = null; dub11(); };
+  bindRange('mu11', resetSim); bindRange('sg11', resetSim);
+  $('run11').addEventListener('click', () => {
+    const mu = val('mu11') / 100, sg = val('sg11') / 100; const cnt = { 1: [0, 0], 5: [0, 0], 21: [0, 0], 252: [0, 0] };
+    for (let run = 0; run < 100; run++) {
+      const r = rng(run * 13 + 5); let p = 100; const c = [p];
+      for (let i = 0; i < 5040; i++) { p = Math.max(1e-6, p * (1 + mu / 252 + sg / Math.sqrt(252) * gauss(r))); c.push(p); }
+      for (const L of [1, 5, 21, 252]) for (let i = L; i < c.length; i += L) { cnt[L][1]++; if (c[i] > c[i - L]) cnt[L][0]++; }
+    }
+    ubSim = {}; for (const L in cnt) ubSim[L] = cnt[L][0] / cnt[L][1]; dub11();
+  });
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

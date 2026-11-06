@@ -1,0 +1,1632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.7 Volume and Open Interest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* additions for chapters 7-8 (template rules above are unchanged) */
+.plate > *, .fig > * { min-width: 0; }
+.controls label { max-width: 100%; flex-wrap: wrap; }
+.controls select { max-width: 100%; min-width: 0; }
+canvas.xtall { height: 440px; }
+@media (max-width: 560px) { canvas.xtall { height: 380px; } }
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.grid2 { display: grid; grid-template-columns: minmax(90px, auto) 1fr 1fr; gap: 6px; max-width: 520px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.grid2 .gh { color: var(--muted); font-size: 12px; }
+.grid2 button { padding: 10px 8px; font-weight: 600; }
+.note { font-size: 15px; color: var(--muted); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 68ch; }
+ol.rules { margin: 0; padding-left: 26px; display: grid; gap: 6px; max-width: 68ch; }
+ol.rules li.fut i { color: var(--c1); font-style: normal; font-family: var(--mono); font-size: 13px; }
+ol.rules.dimfut li.fut { opacity: .32; }
+tr.hl td { background: var(--tint); }
+#log4 { white-space: pre-wrap; }
+.meter { display: grid; grid-template-columns: 7.5em 1fr 5em; gap: 6px 10px; align-items: center; font-family: var(--mono); font-size: 13px; max-width: 620px; }
+.meter .bar { height: 14px; border-radius: 3px; background: var(--c2); }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch06_continuation_patterns.html">← Ch.6</a><a href="ch08_long_term_charts.html">Ch.8 →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John J. Murphy · Technical Analysis of the Financial Markets · Chapter 7 · pdf p194–217</div>
+  <h1>Volume and open interest, <em>the pressure gauges</em> behind price</h1>
+  <p class="lede">Price tells you where the market went. Volume tells you how hard it was pushed. Open interest tells you whether new money is joining the fight or leaving it. This page walks through the whole chapter in the book's order, in plain words, with a live chart or a working model for each idea. Every chart uses a simulated market built to show one idea clearly, not real prices. Roll a new market to check which conclusions survive.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b></span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Murphy's chain of ideas. Price comes first; volume and open interest are there to confirm it or warn that it can't be trusted.</p>
+  <div class="flow" aria-label="Concept map of the chapter">
+    <div class="row"><span class="tag">raw data</span><span class="node key">price (most important)</span><span class="arr">+</span><span class="node">volume (all markets)</span><span class="arr">+</span><span class="node">open interest (futures, options)</span></div>
+    <div class="row"><span class="tag">volume</span><span class="node">heavier = more urgency</span><span class="arr">→</span><span class="node key">expands in the trend's direction</span><span class="arr">→</span><span class="node">confirms pattern breakouts</span><span class="arr">→</span><span class="node">volume precedes price</span><span class="arr">→</span><span class="node">OBV and its variants</span></div>
+    <div class="row"><span class="tag">open interest</span><span class="node">each trade: +1, 0 or −1</span><span class="arr">→</span><span class="node key">4 rules: new money in or out?</span><span class="arr">→</span><span class="node">special cases: late-trend levelling, high OI at tops, build-up in ranges</span></div>
+    <div class="row"><span class="tag">extremes</span><span class="node">blowoffs &amp; selling climaxes</span><span class="arr">→</span><span class="node">COT: follow the commercials</span><span class="arr">→</span><span class="node">put/call ratio as a contrary signal</span></div>
+    <div class="row"><span class="tag">next</span><span class="node">weekly &amp; monthly charts (Chapter 8)</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Three sets of figures</a>
+    <a href="#s2"><span>02</span>Volume: a secondary indicator</a>
+    <a href="#s3"><span>03</span>What open interest is</a>
+    <a href="#s4"><span>04</span>How each trade changes OI</a>
+    <a href="#s5"><span>05</span>The general rules grid</a>
+    <a href="#s6"><span>06</span>Volume follows the trend</a>
+    <a href="#s7"><span>07</span>Volume in price patterns</a>
+    <a href="#s8"><span>08</span>Volume precedes price</a>
+    <a href="#s9"><span>09</span>On balance volume</a>
+    <a href="#s10"><span>10</span>Alternatives to OBV</a>
+    <a href="#s11"><span>11</span>Volume limits in futures</a>
+    <a href="#s12"><span>12</span>The four OI rules</a>
+    <a href="#s13"><span>13</span>Other OI situations</a>
+    <a href="#s14"><span>14</span>Summary of the rules</a>
+    <a href="#s15"><span>15</span>Blowoffs and selling climaxes</a>
+    <a href="#s16"><span>16</span>Commitments of Traders</a>
+    <a href="#s17"><span>17</span>Options: OI and put/call</a>
+    <a href="#s18"><span>18</span>Conclusion</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · INTRODUCTION</div><h2>Three sets of figures: price, volume, open interest</h2></div><span class="chip">pdf p194</span></div>
+  <p>Most technicians look at a market through three sets of numbers: <b>price</b>, <b>volume</b> and <b>open interest</b>. Volume analysis works in every market. Open interest applies mainly to futures.</p>
+  <p>Chapter 3 showed how all three are drawn on a daily bar chart. It also made one point that matters here: in futures, volume and open interest exist for each delivery month, but forecasters use the <b>total</b> figures across all months. Stock chartists simply plot total volume under the price. Up to now the book has been almost all about price. This chapter fills in the other two dimensions.</p>
+  <div class="fig">
+    <svg viewBox="0 0 640 230" role="img" aria-label="A futures chart with three panels: price bars on top, open interest line in the middle, volume bars at the bottom">
+      <rect x="10" y="10" width="620" height="210" fill="none" stroke="var(--rule)"/>
+      <line x1="10" y1="120" x2="630" y2="120" stroke="var(--rule)"/><line x1="10" y1="165" x2="630" y2="165" stroke="var(--rule)"/>
+      <g stroke="var(--price)" stroke-width="2">
+        <line x1="60" y1="95" x2="60" y2="70"/><line x1="90" y1="90" x2="90" y2="62"/><line x1="120" y1="80" x2="120" y2="52"/><line x1="150" y1="85" x2="150" y2="58"/><line x1="180" y1="70" x2="180" y2="40"/><line x1="210" y1="62" x2="210" y2="34"/><line x1="240" y1="55" x2="240" y2="28"/>
+      </g>
+      <polyline points="60,150 90,147 120,143 150,144 180,138 210,134 240,130" fill="none" stroke="var(--c2)" stroke-width="2.5"/>
+      <g fill="var(--c1)" opacity=".75"><rect x="55" y="195" width="10" height="20"/><rect x="85" y="190" width="10" height="25"/><rect x="115" y="185" width="10" height="30"/><rect x="145" y="200" width="10" height="15"/><rect x="175" y="182" width="10" height="33"/><rect x="205" y="180" width="10" height="35"/><rect x="235" y="178" width="10" height="37"/></g>
+      <text x="280" y="50">PRICE: the most important figure</text>
+      <text x="280" y="70" fill="var(--muted)">daily high, low, close</text>
+      <text x="280" y="146">OPEN INTEREST: a line, futures and options</text>
+      <text x="280" y="196">VOLUME: bars, every market</text>
+      <text x="280" y="212" fill="var(--muted)">futures use the TOTAL of all delivery months</text>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_car_dashboard_three_gauges.svg" alt="A close-up of a car dashboard where the speedometer, rev counter and fuel gauge each stand for price, volume and open interest." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A car's dashboard. The speedometer (price) is what you steer by. The rev counter (volume) shows how hard the engine is working to hold that speed. The fuel gauge (open interest) shows how much is in the tank for the trip ahead. A car doing 100 at low revs on a full tank is in a different state from one doing 100 at the red line on fumes.</p></div>
+  <div class="fig">
+    <h3>Try it: why futures traders use the total, not one delivery month</h3>
+    <p class="note">Simulated, and the roll model is mine (not in the book). Each delivery month expires every 21 trading days. In the last 6 days before expiry, traders who want to stay in close the expiring month and open the next one. Underneath, total participation follows one smooth path that I set.</p>
+    <canvas id="c1m" class="xtall" aria-label="Simulated futures price with open interest of each delivery month and the total"></canvas>
+    <div class="legend" id="c1mL"></div>
+    <div class="controls"><span>show</span><button id="v1t" type="button" class="on">total of all months</button><button id="v1f" type="button">nearest month only</button><button id="v1a" type="button">each month + total</button></div>
+    <div class="readout" id="r1m"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A single delivery month has a life cycle: its open interest builds while it is the main contract, then drains to zero as it nears expiry, because every holder must close or roll. Rolling is one closing trade in the old month and one opening trade in the new month, so the total barely moves. If you read the OI rules (section 12) off one month, every expiry looks like "open interest collapsing", a warning that has nothing to do with the market. Adding all months cancels the roll and leaves only real arrivals and departures. That's the reason behind summary rule 2 (section 14). The same goes for volume: in the roll window much of the trading is the roll itself.</p></div>
+  <div class="box behind"><b>Beyond the book: on your NSE futures</b><p>Index and stock futures on NSE have several live expiries at once, and positions roll at every monthly expiry. Before you apply section 12's classifier, add open interest across all live expiries (your data vendor may already offer a combined or "continuous" OI figure; check how it is built). A continuous front-month price chart is fine for price; a front-month-only OI series is the trap shown above.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 3 (<a href="ch03_chart_construction.html">chart construction</a>), where the daily bar chart with volume and open interest was first built. Its section 08 (<a href="ch03_chart_construction.html#s8">total versus single-month figures</a>) shows why the totals are used: each delivery month's own numbers rise and fall with the contract's life, whatever the market is doing.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · VOLUME AND OPEN INTEREST AS SECONDARY INDICATORS · VOLUME</div><h2>Price first, volume second</h2></div><span class="chip">pdf p195–196 · Fig 7.1</span></div>
+  <p>Get the order right: <b>price matters most</b>. Volume and open interest come second and are used mainly to <b>confirm</b> what price is doing. Of those two, <b>volume is the more important</b>.</p>
+  <p><b>Volume</b> is how many units (shares, contracts) changed hands in the period. On a daily chart, each day's volume is a vertical bar under that day's price bar. On a <b>weekly</b> chart you plot the week's total volume under the weekly bar. Volume is usually <b>not used on monthly</b> charts.</p>
+  <div class="box picture"><b>Picture it</b><p>Volume is the noise of the crowd at a cricket match. The scoreboard (price) is what counts, but a roar when the ball goes for six tells you how many people believe in the shot. A big score in an empty stadium is less convincing.</p></div>
+  <div class="fig">
+    <canvas id="c2" class="tall" aria-label="Simulated price bars with volume bars underneath"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls"><span>bars</span><button id="tf2d" type="button" class="on">daily</button><button id="tf2w" type="button">weekly (5 days summed)</button></div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>This market was built so the rallies (shaded) trade more heavily than the pauses, like Murphy's Figure 7.1 (Black &amp; Decker), where the volume bars grew noticeably as prices rallied: volume confirming the rise, which is bullish. Switch to weekly: each bar is five days, and its volume bar is the sum of those five days, so the weekly chart keeps the same message with less clutter.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your swing setup S-1 in <code>intraday_swing_playbook.md</code> enters a 50-day-high breakout only on volume above 1.5 × the 20-day average. That's this idea turned into a rule; section 06 runs it on the page, trade by trade, with a pooled simulation.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · OPEN INTEREST IN FUTURES</div><h2>Open interest: contracts still open</h2></div><span class="chip">pdf p196 · Fig 7.2 (p198)</span></div>
+  <p><b>Open interest</b> is the total number of contracts still outstanding (not yet closed out) at the end of the day. On Murphy's charts it's a solid line under the price bars and above the volume bars (Figure 7.2).</p>
+  <ul class="plain">
+    <li><b>One-day lag.</b> Official futures volume and open interest are reported a day late. So the chartist plots today's high, low and close, but yesterday's official volume and open interest. Only an estimate of volume exists for the latest day.</li>
+    <li><b>Longs or shorts, not both.</b> Open interest equals the number of open longs, which is also the number of open shorts. It is not the two added together. Every contract needs a buyer and a seller, so the two of them create just <b>one</b> contract.</li>
+    <li><b>The change is the signal.</b> Each day's figure comes with a plus or minus showing the change from the day before. Those changes reveal how participation in the market is shifting, and that's where open interest gets its forecasting value.</li>
+  </ul>
+  <div class="fig">
+    <svg viewBox="0 0 640 170" role="img" aria-label="Three long traders each linked to one short trader: three contracts, so open interest is 3, not 6">
+      <g font-size="12">
+        <text x="20" y="22" fill="var(--buy)">LONGS (buyers)</text><text x="430" y="22" fill="var(--sell)">SHORTS (sellers)</text>
+        <circle cx="60" cy="50" r="13" fill="var(--buy)"/><circle cx="60" cy="90" r="13" fill="var(--buy)"/><circle cx="60" cy="130" r="13" fill="var(--buy)"/>
+        <circle cx="470" cy="50" r="13" fill="var(--sell)"/><circle cx="470" cy="90" r="13" fill="var(--sell)"/><circle cx="470" cy="130" r="13" fill="var(--sell)"/>
+        <line x1="75" y1="50" x2="455" y2="50" stroke="var(--muted)" stroke-dasharray="4 4"/><line x1="75" y1="90" x2="455" y2="90" stroke="var(--muted)" stroke-dasharray="4 4"/><line x1="75" y1="130" x2="455" y2="130" stroke="var(--muted)" stroke-dasharray="4 4"/>
+        <text x="200" y="45">contract 1</text><text x="200" y="85">contract 2</text><text x="200" y="125">contract 3</text>
+        <text x="520" y="80">open interest = 3</text><text x="520" y="100" fill="var(--muted)">(not 6)</text>
+      </g>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_dance_couples_open_interest.svg" alt="A wedding dance floor where every dancer must be in a pair, with a counter tallying couples rather than people and a second tally counting partner changes." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A dance floor where everyone must dance in pairs, one long and one short. Open interest counts the <em>couples</em> on the floor, not the people. Volume counts how many times a dance changed hands today.</p></div>
+  <div class="fig">
+    <h3>Worked example: reading the reported figures, with the lag</h3>
+    <p class="note">My numbers. A futures market in a steady rise. Each evening you update the chart with that day's price, but the official volume and open interest you can add are the previous day's.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Evening of</th><th>Price you plot</th><th>Official OI you can plot</th><th>Reported change</th><th>What the change says</th></tr></thead>
+      <tbody>
+        <tr><td>Mon</td><td class="num">1,012 (Mon)</td><td class="num">48,200 (Fri)</td><td class="num">+0</td><td>no net new positions on Friday</td></tr>
+        <tr><td>Tue</td><td class="num">1,019 (Tue)</td><td class="num">49,050 (Mon)</td><td class="num">+850</td><td>850 more contracts opened than closed on Monday: new longs <em>and</em> new shorts</td></tr>
+        <tr><td>Wed</td><td class="num">1,027 (Wed)</td><td class="num">50,300 (Tue)</td><td class="num">+1,250</td><td>more fresh money on Tuesday while price rose: section 12's rule 1</td></tr>
+        <tr class="hl"><td>Thu</td><td class="num">1,031 (Thu)</td><td class="num">49,900 (Wed)</td><td class="num">−400</td><td>a single small dip on Wednesday: don't over-read one day (section 13, point 4)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Two things to notice. On Thursday evening the newest open interest you have is Wednesday's, so any OI signal reaches you a day after the price action it explains. And the useful part is the <b>change</b> column, not the level: 49,900 by itself says nothing, while +850, +1,250, −400 tells you who was arriving and leaving. Over the three reported days OI is up 1,700 (+3.5%) with price up, which is the picture to trust.</p>
+  </div>
+  <div class="box behind"><b>Beyond the book</b><p>Murphy wrote about US futures in the late 1990s. Your <code>order_flow.md</code> lists NSE F&amp;O open interest as a data source. Before you apply the one-day-lag remark, check whether your own feed shows OI live, end-of-day, or with a delay.</p></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · HOW CHANGES IN OPEN INTEREST OCCUR</div><h2>Every trade adds one, removes one, or changes nothing</h2></div><span class="chip">pdf p196–197</span></div>
+  <p>Every completed trade changes open interest in one of three ways: up, down, or not at all. It depends on whether each side is <b>opening</b> a new position or <b>closing</b> an old one. Murphy lists the four combinations:</p>
+  <ul class="plain">
+    <li><b>Both open</b> (a new long buys from a new short): a new contract is born, so <b>OI rises by one</b>.</li>
+    <li><b>Buyer opens, seller closes</b> (a new long buys from an old long who is getting out): the position just changes hands, so <b>OI is unchanged</b>.</li>
+    <li><b>Seller opens, buyer closes</b> (a new short sells to an old short who is covering): again a hand-off, so <b>OI is unchanged</b>.</li>
+    <li><b>Both close</b> (an old short buys back from an old long who is selling out): a contract dies, so <b>OI falls by one</b>.</li>
+  </ul>
+  <p>The short version: both opening = up; both closing = down; one in and one out = no change. By watching the net change in total open interest at the end of each day, the chartist can tell whether money is <b>flowing into or out of</b> the market. That says something about how strong or weak the current trend is.</p>
+  <div class="fig">
+    <h3>Try it: run the trading floor</h3>
+    <div class="controls">
+      <button id="t4a" type="button">new long + new short</button>
+      <button id="t4b" type="button">new long + old long sells out</button>
+      <button id="t4c" type="button">old short covers + new short</button>
+      <button id="t4d" type="button">old short covers + old long sells out</button>
+      <button id="reset4" type="button">Reset</button>
+    </div>
+    <div class="readout" id="r4"></div>
+    <div class="win" id="pairs4" aria-label="Open contracts, each a long-short pair"></div>
+    <div class="formula" id="log4"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Volume goes up by one on <em>every</em> button press, because every trade is volume. Open interest only moves when a couple joins or leaves the floor. That's why the two numbers tell different stories: heavy volume with flat open interest is mostly people swapping seats; rising open interest is new commitment from both sides.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>order_flow.md</code> (section 4) reads NSE futures with the same logic: price ↑ OI ↑ long build-up, price ↓ OI ↑ short build-up, price ↑ OI ↓ short covering, price ↓ OI ↓ long unwinding. Section 12 below shows these are Murphy's four OI rules.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · GENERAL RULES FOR INTERPRETING VOLUME AND OPEN INTEREST</div><h2>The general rules, as a grid you can click</h2></div><span class="chip">pdf p197–198 · Fig 7.2</span></div>
+  <p>Futures technicians usually combine the volume and open interest rules because they're so alike. Murphy states the shared rules first, then treats each one separately, then combines them again at the end (section 14). His general table pairs the price direction with volume and open interest moving <b>together</b>. Pick a cell:</p>
+  <div class="grid2" role="group" aria-label="Price direction by volume and open interest direction">
+    <span></span><span class="gh">volume &amp; OI rising</span><span class="gh">volume &amp; OI falling</span>
+    <span class="gh">price rising</span><button id="g5a" type="button" class="on">Strong</button><button id="g5b" type="button">Weak</button>
+    <span class="gh">price falling</span><button id="g5c" type="button">Weak</button><button id="g5d" type="button">Strong</button>
+  </div>
+  <div class="fig">
+    <canvas id="c5" class="xtall" aria-label="Simulated futures price with open interest and volume for the chosen case"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <p>Read "Strong" and "Weak" as describing the <b>market</b> (bullish or bearish), not how forceful the current move is. Murphy's own wording is the clearest way to remember it: if volume and open interest are both <b>rising</b>, the current trend will probably <b>continue</b>, up or down. If both are <b>falling</b>, treat it as a <b>warning</b> that the trend may be nearing its end. So a falling market with rising volume and OI is a confident downtrend (bearish, "Weak"), and a falling market with shrinking volume and OI is a downtrend running out of fuel ("Strong").</p>
+  <div class="box picture"><b>Picture it</b><p>A procession walking up a hill. If more people keep joining (rising volume and OI), it keeps going. If people keep dropping out (falling volume and OI), it will stop soon, whichever way it's walking.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Rising open interest means both sides are opening new positions: fresh money is fighting over the move, and the side the trend favours keeps winning. Falling open interest means people are closing positions. In an uptrend, that's shorts covering; in a downtrend, it's longs giving up. Either way, the move is being powered by exits, and exits run out. Murphy's Figure 7.2 (crude oil) shows the bearish case: open interest climbing while prices fell.</p></div>
+  <p class="note">The book's table only covers volume and OI moving the same way. It doesn't give a verdict when they disagree, so neither does this page.</p>
+  <div class="fig">
+    <h3>Worked example: four weeks, four cells</h3>
+    <p class="note">My numbers, not the book's. Each row compares one week with the week before: price change, average daily volume, and total open interest at the week's end.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Week</th><th>Price</th><th>Avg volume</th><th>Total OI</th><th>Cell</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="num">+3.1%</td><td class="num">42k → 51k (+21%)</td><td class="num">80,000 → 84,500 (+5.6%)</td><td>price up, both rising</td><td><b class="good">Strong</b>: new buyers and sellers keep arriving, and the buyers keep winning</td></tr>
+        <tr><td>2</td><td class="num">+1.4%</td><td class="num">51k → 38k (−25%)</td><td class="num">84,500 → 81,200 (−3.9%)</td><td>price up, both falling</td><td><b class="bad">Weak</b>: the rise is being made by people leaving; a warning, not yet a reversal</td></tr>
+        <tr><td>3</td><td class="num">−2.6%</td><td class="num">38k → 49k (+29%)</td><td class="num">81,200 → 86,000 (+5.9%)</td><td>price down, both rising</td><td><b class="bad">Weak</b> (bearish): new shorts are pressing the fall</td></tr>
+        <tr><td>4</td><td class="num">−1.1%</td><td class="num">49k → 35k (−29%)</td><td class="num">86,000 → 82,300 (−4.3%)</td><td>price down, both falling</td><td><b class="good">Strong</b> (bullish): the fall is running on exits, and exits run out</td></tr>
+      </tbody>
+    </table></div>
+    <p>Two habits make this usable. First, compare against a recent average or a week ago, never a single day: one quiet day doesn't change a cell. Second, the cell is a <b>context</b> for a price signal, not a signal on its own: week 2 says "don't trust this rally as much", it doesn't say "sell".</p>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · INTERPRETATION OF VOLUME FOR ALL MARKETS</div><h2>Volume should grow in the direction of the trend</h2></div><span class="chip">pdf p199–200 · Fig 7.3, 7.4</span></div>
+  <p>The level of volume measures the <b>intensity or urgency</b> behind a price move. Heavier volume means more pressure. Watching volume with price lets you judge the buying or selling pressure, and so either confirm a move or be warned that it can't be trusted.</p>
+  <p>Murphy's rule: <b>volume should expand in the direction of the existing trend.</b> In an uptrend, volume should be heavier on the rallies and lighter on the dips. While that pattern holds, volume is <b>confirming</b> the trend. Figure 7.3: McDonald's broke above its November 1997 peak on a noticeable burst of volume (bullish). Figure 7.4: Intel's volume was heavier on the rises, dropped off as prices weakened, and burst higher during a final three-day jump.</p>
+  <p>Watch for <b>divergence</b>: if price breaks above a previous high on <b>declining</b> volume, buying pressure is fading. If volume also starts to <b>pick up on the dips</b>, the uptrend may be in trouble.</p>
+  <div class="fig">
+    <canvas id="c6" class="tall" aria-label="Simulated uptrend: volume confirming first, then diverging"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Pushing a car uphill. When the pushers shove hardest on the way up and rest on the flat bits, the car keeps climbing. When the car crawls to a new high with fewer people pushing, and more people tug it backwards on every dip, it's about to roll back.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Green bars are up days, red bars are down days. In the left shaded zone, up days average much more volume than down days: the readout ratio is well above 1. In the right zone, price still makes a new high, but the ratio drops below 1: down days now carry more volume. That flip is the divergence Murphy describes. The simulation is built to show it, so this is a picture of the rule, not proof that it works.</p></div>
+  <div class="box picture"><b>Worked example: relative volume</b><p>(My numbers.) The last 20 days traded 1,10,000 shares a day on average. Today the stock closes above its earlier high on 2,05,000 shares: 2,05,000 ÷ 1,10,000 = <b>1.86×</b> its average. That's the "noticeable burst" of Figure 7.3 written as a number. A close above the high on 80,000 shares (0.73×) is the "new high on declining volume" warning. Dividing by a recent average is what lets one threshold work across quiet and busy stocks.</p></div>
+  <div class="fig">
+    <h3>Make it testable: Murphy's breakout rule as your S-1 setup</h3>
+    <p>Your swing setup S-1 in <code>intraday_swing_playbook.md</code> turns "a breakout should come on heavier volume" into exact rules. Here they are as code runs them on this page (beyond the book). I dropped S-1's two market filters (stock within ~5% of its 52-week high, Nifty above its 200-day average) because a single simulated market has neither.</p>
+    <div class="formula">signal   first close above the highest high of the previous 50 days
+filter   that day's volume &gt; 1.5 × average volume of the previous 20 days
+entry    at that close
+stop     entry − k × ATR(14)         (S-1 says k = 2 to 3; slider below)
+exit     the day's low touches the stop → out at the stop (or at the open if it gapped below)
+         or a close below the lowest low of the previous 20 days → out at that close
+result   (exit − entry) ÷ (entry − stop), in R, before costs</div>
+    <canvas id="c6b" class="xtall" aria-label="Simulated breakout trade with entry, stop, trailing exit and the volume filter drawn"></canvas>
+    <div class="legend" id="c6bL"></div>
+    <div class="controls">
+      <span>world</span><button id="w6bn" type="button" class="on">volume says nothing</button><button id="w6bi" type="button">heavy volume starts real moves</button>
+    </div>
+    <div class="controls">
+      <button id="p6b" type="button">◀ Previous breakout</button><button id="n6b" type="button">Next breakout ▶</button>
+      <label><input id="chk6b" type="checkbox"> skip breakouts S-1 rejects</label>
+      <label><input id="z6b" type="checkbox"> whole market</label>
+      <label for="k6b">stop k × ATR <input id="k6b" type="range" min="2" max="3" step="0.25" value="2.5"><output id="k6bo">2.5</output></label>
+    </div>
+    <div class="readout" id="r6b"></div>
+    <div class="readout" id="r6bm"></div>
+    <h3>Pooled over 200 simulated markets per world</h3>
+    <div class="tablewrap"><table id="tab6b"></table></div>
+    <div class="readout" id="r6bp"></div>
+  </div>
+  <div class="box behind"><b>Beyond the book: what this test can and can't tell you</b><ul>
+    <li><b>Two worlds, same prices.</b> Both worlds share exactly the same simulated prices, with trending spells built in, so the "all breakouts" rows are identical. Only volume differs. In the first world, volume bursts come at random times and say nothing about what price does next. In the second, I built in informed buying: a real up-move starts with heavy volume on its up days for about ten days. So the second world's improvement is there <b>by construction</b>. It shows what a working filter looks like in the numbers, not that volume works in real markets.</li>
+    <li><b>What a useless filter looks like.</b> In the first world the filter throws away nearly 9 breakouts in 10 (it keeps about 12%), and the ones it keeps do about as well as the rest. Any gap is noise: check the ± column. When I re-ran the whole pool from 300 different starting seeds (k = 2.5, in node, with this page's code), the volume-confirmed trades beat all breakouts in 149 of 300 pools in the first world, a coin flip, and in 300 of 300 in the second.</li>
+    <li><b>Why plain breakouts make money here.</b> I gave the prices trending spells, so buying new 50-day highs and trailing a 20-day low catches some of them. That's also by construction. Your real test of daily breakouts (<code>backtest_results_summary.md</code>) made 13–18%/yr but no better than holding the same stocks; the note doesn't say whether the volume filter was on.</li>
+    <li><b>Failure modes to step through.</b> Volume-confirmed breakouts that still hit the stop within days (a burst of volume can be sellers meeting eager buyers, too), and breakouts S-1 rejected that went on to run. A filter changes the odds; it doesn't make each trade right.</li>
+    <li><b>Costs.</b> Results are before costs. Your summary puts delivery costs at about 0.28% a trade; with the stop about 4.5% below entry (typical in this simulation; the readout shows 1R as a % of price), that's 0.28 ÷ 4.5 ≈ 0.06R off every trade.</li>
+    <li><b>Your real volume evidence.</b> The one place your backtests leaned on relative volume, the opening-range breakout, was mixed: the 15-minute version made money on Nifty 50 but lost in all 43 settings on Nifty 200; the 5-minute version with relative volume ≥ 2 held up on Nifty 200, but over only 3.5 months and ~170 trades, so it's a lead to paper trade, not proof.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · VOLUME AS CONFIRMATION IN PRICE PATTERNS</div><h2>What volume should do inside each pattern</h2></div><span class="chip">pdf p200–201 · Fig 7.5</span></div>
+  <p>Chapters 5 and 6 kept using volume to confirm price patterns. Murphy collects those points here:</p>
+  <ul class="plain">
+    <li><b>Head and shoulders top:</b> one of the first warnings is that the <b>head</b> makes new highs on <b>light</b> volume, and the fall back to the neckline comes on <b>heavier</b> volume.</li>
+    <li><b>Double and triple tops:</b> volume gets <b>lighter at each successive peak</b>, and heavier on the declines.</li>
+    <li><b>Continuation patterns</b> such as the triangle: volume should <b>taper off gradually</b> while the pattern forms.</li>
+    <li><b>Every pattern:</b> the breakout point (the "resolution") should come with <b>heavier volume</b> if the signal is real.</li>
+    <li><b>Downtrend:</b> volume should be heavier on the falls and lighter on the bounces. While that lasts, sellers are stronger than buyers and the downtrend should continue. Only when that pattern changes does the chartist start looking for a bottom.</li>
+  </ul>
+  <p>Figure 7.5 (Compaq): the first half shows an uptrend with heavier volume on up days; a boxed area shows a sudden drop on heavy volume (a bad sign); and trading picks up as a continuation triangle breaks to the downside.</p>
+  <div class="fig">
+    <canvas id="c7" class="tall" aria-label="Simulated price pattern with the volume Murphy expects"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="controls"><label for="sel7">Pattern <select id="sel7"><option value="hs">head and shoulders top</option><option value="dt">double top</option><option value="tt">triple top</option><option value="tri">triangle (continuation)</option><option value="dn">downtrend</option></select></label></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each pattern here is drawn through fixed turning points, and its volume follows Murphy's description by construction. The readout prints the average volume on each leg, so you can check the textbook signature: for example, the head leg is lighter than the left-shoulder leg, and the breakout leg is the heaviest.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 5 (<a href="ch05_reversal_patterns.html">reversal patterns</a>) and Chapter 6 (<a href="ch06_continuation_patterns.html">continuation patterns</a>), where each of these volume notes first appeared.</li>
+    <li>Your <code>order_flow.md</code> says the same about breakouts: take one only if relative volume is high and delta agrees, otherwise suspect a fake.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · VOLUME PRECEDES PRICE</div><h2>The push fades before the price turns</h2></div><span class="chip">pdf p201–202</span></div>
+  <p>Price and volume are two different gauges of the <b>same thing: pressure</b>. If prices are trending higher, there's more buying pressure than selling pressure, so the heavier volume should be on the side of the trend. Technicians say <b>volume precedes price</b>: a loss of upside pressure in an uptrend (or downside pressure in a downtrend) shows up in the volume figures <b>before</b> the price trend reverses.</p>
+  <div class="fig">
+    <canvas id="c8" class="tall" aria-label="Simulated price and a 20-day net volume pressure line that peaks first"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Throw a ball upward. It's still rising after your hand lets go, but the force behind it is already gone. The bottom line in this chart is the hand; the price is the ball.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The bottom line (not in the book; my illustration) is the last 20 days' up-day volume minus down-day volume, a simple "net pressure" gauge. It peaks during the first rally, long before price makes its final high. The next section's OBV measures the same thing as a running total instead of a 20-day window.</p></div>
+  <div class="fig">
+    <h3>Worked example: pressure fading while price rises</h3>
+    <p class="note">My numbers, and a 5-day window instead of 20 so the arithmetic fits on one line. Net pressure = volume on up days − volume on down days.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Window</th><th>Close at end</th><th>Up-day volumes</th><th>Down-day volumes</th><th>Net pressure</th></tr></thead>
+      <tbody>
+        <tr><td>early rally</td><td class="num">118</td><td class="num">120k + 140k + 130k = 390k</td><td class="num">70k + 60k = 130k</td><td class="num good">+260k</td></tr>
+        <tr class="hl"><td>later rally</td><td class="num">124</td><td class="num">80k + 75k + 90k = 245k</td><td class="num">110k + 95k = 205k</td><td class="num">+40k</td></tr>
+      </tbody>
+    </table></div>
+    <p>Price is higher in the second window (124 against 118) and up days still outnumber down days three to two, so a price-only reader sees a healthy uptrend. The volume says the push behind it has fallen from +260k to +40k: buyers still win, but by much less, and the down days now carry heavy volume. That is "volume precedes price": the change shows up here first, and price follows if it continues. It is a warning, not a timing signal; the pressure can recover.</p>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · ON BALANCE VOLUME</div><h2>OBV: volume turned into one line</h2></div><span class="chip">pdf p202–203 · Fig 7.6</span></div>
+  <p>Eyeballing volume bars isn't always precise enough to catch a real shift in volume flow, so technicians built volume indicators. The simplest and best known is <b>on balance volume (OBV)</b>, developed and popularised by <b>Joseph Granville</b> in his <b>1963</b> book <i>Granville's New Key to Stock Market Profits</i>. OBV draws a curving line that either confirms the quality of the price trend or warns of a reversal by <b>diverging</b> from price.</p>
+  <p>Construction is simple. Each day's total volume gets a plus sign if the close was higher than the day before, and a minus sign if it was lower. Keep a running total.</p>
+  <div class="formula">close above yesterday's close  →  OBV = previous OBV + today's volume
+close below yesterday's close  →  OBV = previous OBV − today's volume
+close unchanged                →  OBV unchanged      (standard convention; the book only covers higher and lower closes)</div>
+  <div class="fig">
+    <h3>Build it one day at a time</h3>
+    <div class="tablewrap"><table id="tab9"></table></div>
+    <div class="controls"><button id="step9" type="button">Next day ▶</button><button id="reset9" type="button">Reset</button></div>
+  </div>
+  <p>The <b>direction</b> of the OBV line is what matters, not its value. The number depends on how far back you started counting, so let the computer do the arithmetic and watch the trend. OBV should move with price: higher peaks and higher troughs in price should be matched by OBV, and a falling price by a falling OBV. When OBV <b>fails</b> to follow price, there's a divergence, a warning of a possible reversal. In Figure 7.6 (Compaq), OBV replaced the volume bars and made the October 1997 downturn much easier to see.</p>
+  <div class="fig">
+    <canvas id="c9" class="tall" aria-label="Simulated price and OBV showing a bearish divergence"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls"><label><input id="chk9" type="checkbox" checked> draw the peak-to-peak lines</label></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>OBV is a bank balance. Every up day deposits that day's volume; every down day withdraws it. If the price keeps making new highs but the balance is lower than it was at the last high, the rally is being bought on credit.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The second price peak is higher than the first, but OBV at the second peak is lower: the climb was made on light up-day volume while the dips were heavy. That's a <b>bearish divergence</b>, the same picture as Murphy's Intel chart in the next section (Figure 7.7).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>order_flow.md</code> describes cumulative delta (CVD) and the "price makes a new high, CVD doesn't" divergence. CVD is a running total of aggressive buy minus sell volume, so it's OBV's idea with a finer split of each day's volume.</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · ALTERNATIVES TO OBV</div><h2>Fixing OBV's all-or-nothing count</h2></div><span class="chip">pdf p203–206 · Fig 7.7, 7.8</span></div>
+  <p>OBV works reasonably well, but it has a flaw: it gives a whole day's volume a plus or a minus. If the market closes up by just one or two ticks, should all that volume count as buying? If the market spends most of the day higher but closes slightly lower, should all the volume count as selling? Technicians have tried many variations to find the "true" upside and downside volume:</p>
+  <ul class="plain">
+    <li><b>Weight by the size of the move:</b> on an up day, multiply volume by the price gain. Days with big moves count more; days with tiny changes count less.</li>
+    <li><b>Blends of price, volume and open interest:</b> James Sibbet's <b>Demand Index</b> combines price and volume into a leading indicator. The <b>Herrick Payoff Index</b> uses open interest to measure money flow. Both are explained in Appendix A (pdf p516).</li>
+    <li><b>Stocks have better volume data than futures.</b> Stock volume is reported immediately, futures volume a day late. Upside and downside volume figures exist for stocks, not futures. Volume on every price change during the day made possible <b>Money Flow</b>, developed by <b>Laszlo Birinyi, Jr.</b>, a real-time OBV that tracks volume on each price change to see if money is flowing into or out of a stock. It needs a lot of computing power and wasn't readily available to most traders.</li>
+  </ul>
+  <p>All of these have the same goal: is the heavier volume on the upside (bullish) or the downside (bearish)? Despite its simplicity, OBV still does a pretty good job in futures and stocks, it's on most charting software, and many packages let you draw it right over the price bars for easier comparison. Figure 7.7: a bearish divergence between OBV and Intel's price correctly warned of a major fall. Figure 7.8: OBV overlaid on McDonald's price led prices higher and warned in advance of a bullish breakout.</p>
+  <div class="fig">
+    <canvas id="c10" class="tall" aria-label="OBV and two variations on the same simulated market"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls">
+      <label for="sel10">Volume line <select id="sel10"><option value="obv">OBV (Granville)</option><option value="pw">volume × price change (variation in the book)</option><option value="cl">close-location volume (beyond the book)</option></select></label>
+      <label><input id="chk10" type="checkbox"> overlay on the price, like Fig 7.8</label>
+    </div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>An example (mine, not the book's): a stock closes up ₹0.05 on 50 lakh shares. OBV adds the full 50 lakh. The price-weighted version adds 50 lakh × 0.05 = 2.5 lakh "rupee-shares", almost nothing next to a day that moved ₹5. In the chart the three lines usually agree on the big swings and disagree on the quiet days.</p></div>
+  <div class="box connect"><b>Beyond the book · connects to your notes</b><ul>
+    <li>The third line uses the free-data delta proxy from your <code>order_flow.md</code>: volume × ((C − L) − (H − C)) ÷ (H − L). A close near the day's high counts mostly as buying, a close near the low mostly as selling. It answers Murphy's "up most of the day but closed slightly lower" question.</li>
+    <li>The Demand Index and Herrick Payoff Index are explained in the book's Appendix A (pdf p516), which was prepared by Thomas E. Aspray rather than Murphy. The appendix spells the Demand Index's creator "Sibbett" and dates it to the 1970s; this chapter spells it "Sibbet".</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · OTHER VOLUME LIMITATIONS IN FUTURES</div><h2>Why futures volume is harder to read</h2></div><span class="chip">pdf p205–206</span></div>
+  <ul class="plain">
+    <li><b>The one-day reporting lag</b> (section 03).</li>
+    <li><b>Total volume for single contracts.</b> Using total volume to analyse one contract month is awkward, though there are good reasons for it. And what do you do on a day when some delivery months close higher and others lower?</li>
+    <li><b>Limit days.</b> When a market is locked <b>limit up</b>, volume is usually very light. That's a sign of <b>strength</b>: buyers so outnumber sellers that price hits the maximum allowed move and trading stops. But the traditional rule says light volume on a rally is bearish. Limit days break that rule and can distort OBV.</li>
+  </ul>
+  <p>Even with these limits, Murphy says volume analysis still works in futures, and a futures trader should keep a close eye on it.</p>
+  <div class="fig">
+    <svg viewBox="0 0 640 200" role="img" aria-label="A limit-up day: the price bar is stuck at the limit line and its volume bar is tiny">
+      <line x1="20" y1="40" x2="620" y2="40" stroke="var(--sell)" stroke-dasharray="6 4"/><text x="24" y="33" fill="var(--sell)">daily limit</text>
+      <g stroke="var(--price)" stroke-width="2.5">
+        <line x1="100" y1="120" x2="100" y2="95"/><line x1="160" y1="110" x2="160" y2="80"/><line x1="220" y1="100" x2="220" y2="70"/><line x1="300" y1="44" x2="300" y2="38"/>
+      </g>
+      <g fill="var(--c1)" opacity=".75"><rect x="94" y="165" width="12" height="25"/><rect x="154" y="155" width="12" height="35"/><rect x="214" y="150" width="12" height="40"/><rect x="294" y="184" width="12" height="6"/></g>
+      <text x="325" y="50">locked limit up: price can't go higher today</text>
+      <text x="325" y="70" fill="var(--muted)">buyers waiting, almost no sellers</text>
+      <text x="325" y="182">tiny volume = strength here, not weakness</text>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_sold_out_box_office.svg" alt="A box office with its shutter down and a sold-out sign, an idle ticket clerk with a nearly empty sales book, and a huge crowd still waiting outside." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A concert sells out and the box office shuts. Ticket sales that day were low, not because nobody wanted to go but because there was nothing left to sell. Low volume at a locked limit is the same: the queue outside is the real signal, and the volume number can't see it.</p></div>
+  <div class="fig">
+    <h3>Try it: why a locked limit-up day trades so little</h3>
+    <p class="note">A simple model of my own (not in the book): once price hits the limit it can't go higher, so the only trades are buyers matched with whoever is willing to sell at the limit price. Volume is the smaller of the two queues.</p>
+    <div class="controls">
+      <label for="b11q">buy orders waiting at the limit <input id="b11q" type="range" min="0" max="40000" step="1000" value="25000"><output id="b11qo">25000</output></label>
+      <label for="s11q">sellers willing at the limit <input id="s11q" type="range" min="0" max="40000" step="500" value="2000"><output id="s11qo">2000</output></label>
+    </div>
+    <div class="meter" id="m11" aria-label="Bars comparing buy orders, sell orders, the day's volume and a normal day's volume"></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Volume only counts trades that happened. At a locked limit, the buyers who couldn't get filled leave no trace in volume. So the traditional reading (light volume on an up day = weak) gets the sign wrong: the lighter the volume while buy orders pile up, the stronger the market. OBV makes the same mistake in a quieter way: it adds only the small matched volume, so a very strong day moves the line less than an ordinary up day. Push the sellers slider above the buyers: now everyone who wants to buy gets filled, the limit is no longer "locked", and normal volume reading works again.</p></div>
+  <div class="box behind"><b>Beyond the book</b><p>Many Indian cash-market stocks have daily price bands (circuit limits); the exact rules differ by stock and change over time, so check the exchange's current rules. A stock stuck at its upper circuit can show the same effect: trades happen only at the limit price with buy orders queued up, so volume may look small on a very strong day. Read low volume at a price limit as "few sellers", not necessarily "no interest".</p></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · INTERPRETATION OF OPEN INTEREST IN FUTURES</div><h2>The four open interest rules</h2></div><span class="chip">pdf p206–209 · Fig 7.9, 7.10, 7.11</span></div>
+  <p>Open interest rules are like the volume rules, but they need more explanation, because they tell you <b>who</b> is driving the move:</p>
+  <ol class="plain">
+    <li><b>Uptrend + total OI rising:</b> new money is flowing in, which reflects aggressive new buying. <b>Bullish.</b> (Figure 7.9: silver's uptrend was confirmed by rising open interest; boxes on the right show normal liquidation as prices corrected.)</li>
+    <li><b>Uptrend + OI falling:</b> the rally is mainly <b>short covering</b> (holders of losing shorts forced to buy back). Money is leaving the market, not entering it. <b>Bearish</b>, because the rally will probably run out of steam once the covering is done. (Figure 7.10: a weak rebound in gold, with price rising on falling OI and falling on rising OI. In a strong trend, OI moves with price, not against it.)</li>
+    <li><b>Downtrend + OI rising:</b> new money is flowing in, which reflects aggressive new <b>short selling</b>. That raises the odds the downtrend continues. <b>Bearish.</b> (Figure 7.11: copper's fall in summer 1997 and after came with rising open interest.)</li>
+    <li><b>Downtrend + OI falling:</b> discouraged or losing longs are being forced to sell out. That's a <b>strengthening</b> technical picture, because the decline will probably end once OI has fallen enough to show most losing longs are done. <b>Bullish.</b></li>
+  </ol>
+  <p>Compressed: in an uptrend, OI up → bullish and OI down → bearish; in a downtrend it's the reverse.</p>
+  <div class="fig">
+    <canvas id="c12" class="xtall" aria-label="Simulated futures market moving through the four open interest cases"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls"><span>highlight</span><button id="b12a" type="button">rule 1</button><button id="b12b" type="button">rule 2</button><button id="b12c" type="button">rule 3</button><button id="b12d" type="button">rule 4</button><button id="b12e" type="button" class="on">all</button></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Rising OI is new players walking onto the field. Falling OI is players walking off. A move made by people walking <em>on</em> (new positions) has fuel left; a move made by people walking <em>off</em> (covering or liquidating) ends when the last of them has left.</p></div>
+  <div class="fig">
+    <h3>Worked example: five weeks on one futures market, step by step</h3>
+    <p class="note">My numbers, not the book's. Each row is a week's trading split into section 04's four kinds of trade. Weeks rather than days, because Murphy warns against reading too much into very short-term open interest changes.</p>
+    <div class="tablewrap"><table id="tab12"></table></div>
+    <div class="controls"><button id="step12" type="button">Next week ▶</button><button id="reset12" type="button">Reset</button></div>
+    <div class="formula" id="log12"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every trade has one buyer and one seller, and section 04 says who they are. The <b>buyers</b> are either new longs (in "both open" and "long hand-off" trades) or old shorts buying back (in "short hand-off" and "both close" trades). The <b>sellers</b> are either new shorts or old longs getting out. Count contracts and two identities fall out:</p>
+    <div class="formula">change in OI = both-open trades − both-close trades
+            = new shorts opened − old shorts bought back
+            = new longs opened  − old longs sold out</div>
+    <p>So "price up, OI down" means that, over the period, more shorts bought back than new shorts sold, and more old longs left than new longs came in. The rise happened while the total number of positions shrank, so it was paid for by people leaving. That's rule 2's "short covering": once the losing shorts are out, that source of buying is gone. Rule 4 is the mirror image: in a fall with OI dropping, old longs are selling out faster than new shorts arrive, and that selling also runs out. Rules 1 and 3 are the opposite case: both sides are adding positions, so the side that's winning has fresh money behind it.</p></div>
+  <div class="fig">
+    <h3>Use it: a four-state classifier for your NSE futures (beyond the book)</h3>
+    <div class="formula">// Murphy: don't over-read very short-term OI changes, so compare over n days, not one.
+// On NSE, add up OI across all live expiries: OI falls in the expiring month at every expiry
+// and reappears in the next month (rollover). That's chapter 3's "use the total" rule.
+function oiState(close, oi, n = 5, minOiPct = 2) {
+  const t = close.length - 1;
+  const dp = close[t] / close[t - n] - 1;
+  const doi = (oi[t] / oi[t - n] - 1) * 100;
+  if (dp === 0) return 'price flat: no read';
+  if (Math.abs(doi) &lt; minOiPct) return 'OI roughly flat: no read';
+  if (dp &gt; 0) return doi &gt; 0 ? 'long build-up · rule 1 · bullish' : 'short covering · rule 2 · bearish';
+  return doi &gt; 0 ? 'short build-up · rule 3 · bearish' : 'long unwinding · rule 4 · bullish';
+}</div>
+    <div class="controls">
+      <label for="pc12">price change over 5 days % <input id="pc12" type="range" min="-6" max="6" step="0.5" value="2"><output id="pc12o">2</output></label>
+      <label for="oi12">total OI change % <input id="oi12" type="range" min="-10" max="10" step="0.5" value="-4"><output id="oi12o">-4</output></label>
+    </div>
+    <div class="readout" id="r12c"></div>
+    <p class="note">The 5-day window and the 2% "flat" band are my choices, not Murphy's. The state names are the ones in your <code>order_flow.md</code>; the verdicts are Murphy's. A state describes who is trading, not when to enter: use it as a filter on a setup that already has an edge.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>order_flow.md</code> names these exact four states for NSE futures: <b>long build-up</b> = rule 1, <b>short covering</b> = rule 2, <b>short build-up</b> = rule 3, <b>long unwinding</b> = rule 4. The note only names the states; the bullish/bearish verdicts are Murphy's. His rules are phrased in terms of the trend, and he warns against reading too much into very short-term OI changes (pdf p211). Note that he reads short covering in a rally as bearish and long unwinding in a decline as bullish.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · OTHER SITUATIONS WHERE OPEN INTEREST IS IMPORTANT</div><h2>Trapped traders: why OI builds fuel</h2></div><span class="chip">pdf p209–211</span></div>
+  <ol class="plain">
+    <li><b>Late in a big move:</b> if OI has risen throughout the trend, a <b>levelling off or decline</b> in OI is often an early warning that the trend is about to change.</li>
+    <li><b>High OI at a top is dangerous if the drop is sudden.</b> Say an uptrend has run for a while and OI rose noticeably over the past month. Every new contract has one new long and one new short. If prices suddenly fall below the lowest price of that month, every new long from that month is losing. Their forced selling keeps prices under pressure until they've all been liquidated; it often feeds on itself and triggers margin selling by other longs, which deepens the fall. Corollary: <b>unusually high open interest in a bull market is a danger signal.</b> <i>Worked example (my numbers):</i> over the past month OI rose from 40,000 to 52,000 while prices traded between 100 and 110. That's 12,000 new longs (and 12,000 new shorts) who opened somewhere in that band. If prices drop to 98, below the month's low, every one of those 12,000 longs is losing, from 2 points (bought at 100) to 12 points (bought at 110). Each one who sells to get out adds a seller, which pushes the price lower and puts the next one deeper underwater.</li>
+    <li><b>OI building in a sideways range makes the breakout stronger.</b> Nobody knows which way the range will break, but rising OI shows many traders taking positions early, and many will end up on the wrong side. Murphy's example: a three-month range in which OI rises by <b>10,000 contracts</b>, meaning 10,000 new longs and 10,000 new shorts. Prices then break out upward to new three-month highs. Every one of those 10,000 shorts is now losing. Their scramble to buy back adds more upward pressure and more panic, and prices stay strong until most of them have covered. A downside break would have the longs scrambling instead. The early stage of a new trend right after a breakout is usually fuelled by this forced liquidation, and the more traders caught on the wrong side (shown by high OI), the more violent the reaction to a sudden adverse move. On the positive side, traders on the right side use their paper profits to add positions, which helps the new trend. So <b>the bigger the OI build-up during a range (or any price pattern), the bigger the potential move afterwards.</b></li>
+    <li><b>Rising OI at the end of a pattern adds confirmation.</b> A head and shoulders bottom's neckline break is more convincing on rising OI plus heavier volume. But be careful: the first push of a new trend is often driven by traders on the wrong side closing out, so <b>OI sometimes dips slightly at the start of a new trend</b>. Don't focus too much on very short-term OI changes.</li>
+  </ol>
+  <div class="fig">
+    <h3>Murphy's 10,000-contract example, step by step</h3>
+    <canvas id="c13" class="tall" aria-label="Simulated three-month range with open interest build-up and breakout"></canvas>
+    <div class="legend" id="c13L"></div>
+    <div class="controls">
+      <span>breakout</span><button id="up13" type="button" class="on">upward</button><button id="dn13" type="button">downward</button>
+      <label for="n13">days after breakout <input id="n13" type="range" min="0" max="25" value="0"><output id="n13o">0</output></label>
+    </div>
+    <div class="readout" id="r13"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The bars underneath are the contracts opened on each range day; together they add up to exactly 10,000. Each day's new shorts sold at that day's price. Bars turn red once their price is below today's price (their shorts are losing). Drag the slider: by the time price clears the top of the range, every short opened inside it is underwater. That's pure arithmetic, not a forecast. Murphy's point is what those losing traders then have to do: buy back, which pushes the price further.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The same "trapped traders" logic is in your <code>order_flow.md</code> footprint puzzle: buyers absorbed near a high are now losing, and their stop-losses add selling if the low breaks.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SUMMARY OF VOLUME AND OPEN INTEREST RULES</div><h2>The ten rules on one card</h2></div><span class="chip">pdf p211–212</span></div>
+  <div class="controls"><label><input id="chk14" type="checkbox"> I'm looking at an NSE cash stock: dim the futures-only rules</label></div>
+  <ol class="rules" id="list14">
+    <li>Volume is used in every market; open interest mainly in futures.</li>
+    <li>For futures, use only the <b>total</b> volume and open interest.</li>
+    <li>Rising volume (and OI) means the current trend will probably continue.</li>
+    <li>Falling volume (and OI) suggests the trend may be changing.</li>
+    <li>Volume precedes price: shifts in buying or selling pressure often show up in volume before price.</li>
+    <li>OBV, or a variation of it, measures the direction of volume pressure more accurately.</li>
+    <li class="fut">Within an uptrend, a sudden levelling off or fall in OI warns of a trend change. <i>(futures only)</i></li>
+    <li class="fut">Very high OI at market tops is dangerous and can intensify a fall. <i>(futures only)</i></li>
+    <li class="fut">An OI build-up during a consolidation intensifies the breakout that follows. <i>(futures only)</i></li>
+    <li>Rising volume (and OI) helps confirm the completion of price patterns and other chart signals that start a new trend.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><p>Treat the ten rules as tests run against a price signal. Price is the code you're shipping; volume and open interest are the test suite. Passing tests (rules 3, 9, 10) let you ship with more confidence. Failing ones (rules 4, 7, 8) don't rewrite the code; they tell you not to trust it as much. And rules 1–2 are the test setup: run the right tests (OI only where it exists) on the right data (totals, not single months).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Rules 1–2 are section 01; 3–4 are section 05's grid (and section 06 for volume); 5 is section 08; 6 is sections 09–10; 7–9 are section 13, points 1–3; 10 is section 07 for volume and section 13, point 4 for open interest.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · BLOWOFFS AND SELLING CLIMAXES</div><h2>Dramatic endings: blowoffs and selling climaxes</h2></div><span class="chip">pdf p212–213 · Fig 7.12</span></div>
+  <p>One last situation: the dramatic action that often marks tops and bottoms. <b>Blowoffs</b> happen at major tops; <b>selling climaxes</b> at bottoms.</p>
+  <ul class="plain">
+    <li><b>Blowoff top:</b> after a long advance, prices suddenly rally sharply on a big jump in trading activity, then peak abruptly. In futures, blowoffs are often accompanied by a <b>drop in open interest during the final rally</b>. Figure 7.12 shows two blowoff tops in coffee futures: both rallied sharply on heavy volume, and the warnings came from open interest falling during both rallies.</li>
+    <li><b>Selling climax bottom:</b> prices suddenly drop sharply on heavy trading, then rebound just as quickly. Murphy refers back to Figure 4.22c (pdf p130), the Dow's upside reversal day of October 28, 1997, with an unusually heavy volume bar.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c15" class="xtall" aria-label="Simulated blowoff top or selling climax with volume and open interest"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls"><button id="bo15" type="button" class="on">blowoff top</button><button id="sc15" type="button">selling climax</button></div>
+    <div class="readout" id="r15"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_blowoff_and_stampede.svg" alt="Two scenes of a party house: latecomers rushing in the front while earlier guests slip out the back, and a stampede where everyone leaves at once leaving the hall empty." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A blowoff is the last guests rushing into a party just as it ends: the crowd surges, but the people already inside are slipping out the back (falling OI). A selling climax is a stampede for the exit: everyone who wanted out gets out in one burst, and then there's no one left to sell.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>During the blowoff rally, volume jumps but OI falls. Murphy only states that fact; the reading that follows is mine. Falling OI means positions are being closed, so the rise is fuelled by shorts covering and longs taking profits rather than by new commitments, which looks like rule 2 in section 12 in an extreme form. In the climax, the volume spike can be read as the last forced sellers being cleared out.</p></div>
+  <div class="fig">
+    <h3>Worked example: reading a blowoff's three numbers</h3>
+    <p class="note">My numbers, not the book's. Two strong rallies in the same futures market, each measured over its last 15 days against the 90 days before it.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Rally</th><th>Price</th><th>Volume vs earlier average</th><th>Open interest</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>A: mid-trend breakout</td><td class="num">131 → 147 (+12%)</td><td class="num">1.6×</td><td class="num">58,000 → 61,500 (+6%)</td><td>volume and OI both rising with price: rule 1, new money joining</td></tr>
+        <tr class="hl"><td>B: after a long advance</td><td class="num">147 → 185 (+26%)</td><td class="num">2.7×</td><td class="num">61,500 → 53,800 (−12.5%)</td><td>steep rise, volume surge, OI falling: Murphy's blowoff signature</td></tr>
+      </tbody>
+    </table></div>
+    <p>In rally B, 7,700 more contracts were closed than opened, while volume nearly tripled. So the record activity was mostly people <em>leaving</em>: shorts buying back and longs selling into the strength. The price can keep rising while that lasts, which is why a blowoff looks strongest just before it peaks.</p>
+  </div>
+  <div class="box behind"><b>Failure modes (my reading, built from the book's own cautions)</b><ul>
+    <li><b>Context is part of the rule.</b> Murphy's blowoff comes after a long advance with a sudden sharp rally. The same "volume up, OI down" mix right after a range breakout is different: section 13, point 4 says OI often dips at the start of a new trend as wrong-side traders close out.</li>
+    <li><b>A few days of OI prove little.</b> Murphy warns against reading very short-term OI changes. Measure the whole final rally, as in the table, not one day.</li>
+    <li><b>Timing.</b> The signature shows while the rally is still running, so it says "this rise is being made by exits", not "the top is today". A trader still needs a price signal (a reversal day, a broken trendline) to act.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 4 (<a href="ch04_trend.html">trend</a>), Figure 4.22c, pdf p130: the reversal day and the selling climax.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · COMMITMENTS OF TRADERS REPORT · WATCH THE COMMERCIALS · NET TRADER POSITIONS</div><h2>Who holds the contracts: follow the commercials</h2></div><span class="chip">pdf p212–216 · Fig 7.13, 7.14</span></div>
+  <p>Futures technicians also use the <b>Commitments of Traders (COT) report</b> to forecast. At the time of the book, the Commodity Futures Trading Commission (CFTC) released it <b>twice a month</b>: mid-month and month-end. It splits open interest into three groups:</p>
+  <ul class="plain">
+    <li><b>Large hedgers</b>, also called <b>commercials</b>: they use futures mainly to hedge.</li>
+    <li><b>Large speculators</b>: including the big commodity funds, which rely mostly on mechanical trend-following systems.</li>
+    <li><b>Small traders</b>: the general public, trading much smaller amounts.</li>
+  </ul>
+  <p><b>Watch the commercials.</b> The guiding idea: the large commercial hedgers are usually right, and the two trader groups are usually wrong. So put yourself on the hedgers' side and against the two trader groups. A <b>bullish signal at a bottom</b>: commercials heavily net long while large and small traders are heavily net short. A <b>warning of a top</b> in a rising market: large and small traders become heavily net long while commercials become heavily net short.</p>
+  <p><b>Net trader positions.</b> You can chart each group's position trend to spot extremes. Murphy points to <i>Futures Charts</i> (Commodity Trend Service), which drew the three groups' net positions under a weekly price chart going back four years, making historical comparisons easy. Its publisher, Nick Van Nice, looked for the commercials at one extreme and the two trader groups at the other. Figure 7.13: three buy signals in weekly S&amp;P 500 futures, each with commercials heavily net long and large speculators heavily net short. Figure 7.14: three sell signals in weekly copper, each with both speculator groups net long and commercials net short; the commercials were right. Even if COT isn't a main input for you, it's worth knowing what the three groups are doing.</p>
+  <div class="fig">
+    <canvas id="c16" class="xtall" aria-label="Simulated weekly price with net positions of commercials, large speculators and small traders"></canvas>
+    <div class="legend" id="c16L"></div>
+    <div class="controls"><label for="n16">"extreme" = within <input id="n16" type="range" min="5" max="30" value="15"><output id="n16o">15</output>% of the 4-year range</label></div>
+    <div class="readout" id="r16"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The three net positions always add up to zero (beyond the book: every long has a short, so if commercials are net long, someone else must be net short). This simulation is <em>built</em> with hedgers leaning against price swings and trend-following funds chasing them. It shows how to read the chart, not that the commercials are right; that claim is Murphy's, from Figures 7.13 and 7.14. The "within X% of the 4-year range" test is my way to define "heavily".</p></div>
+  <div class="fig">
+    <h3>Worked example: is that "heavily" net long?</h3>
+    <p class="note">My numbers, not the book's. One week's report, net positions in contracts (long minus short), with each group's lowest and highest net position over the past four years.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Group</th><th>Net this week</th><th>4-year low</th><th>4-year high</th><th>Where it sits</th></tr></thead>
+      <tbody>
+        <tr><td>commercials</td><td class="num">+48,000</td><td class="num">−35,000</td><td class="num">+52,000</td><td class="num">(48 + 35) ÷ (52 + 35) = <b class="good">95%</b></td></tr>
+        <tr><td>large speculators</td><td class="num">−30,000</td><td class="num">−34,000</td><td class="num">+40,000</td><td class="num">(−30 + 34) ÷ (40 + 34) = <b class="bad">5%</b></td></tr>
+        <tr><td>small traders</td><td class="num">−18,000</td><td class="num">−25,000</td><td class="num">+20,000</td><td class="num">(−18 + 25) ÷ (20 + 25) = 16%</td></tr>
+        <tr class="hl"><td>sum</td><td class="num">0</td><td colspan="3">every long has a short, so the three nets must add to zero</td></tr>
+      </tbody>
+    </table></div>
+    <p>Commercials sit near the top of their four-year range and large speculators near the bottom: with the slider at 15%, that's the "commercials heavily long, traders heavily short" pattern Murphy calls bullish at a bottom (Figure 7.13's setup). Dividing by each group's own range is what makes "heavily" comparable: a +48,000 net for a group that ranges to +52,000 is extreme; the same number for a group that ranges to +200,000 is not.</p>
+  </div>
+  <div class="box behind"><b>Beyond the book: failure modes and timing</b><ul>
+    <li><b>Commercials are hedging, not timing.</b> A producer sells futures as prices rise because it wants to lock in those prices, so commercials get "more short" all the way up a bull market. Their extreme can come weeks or months before the turn. Treat it as a backdrop, then wait for price to turn, as Murphy does for options sentiment (section 17).</li>
+    <li><b>The data is old when you get it.</b> Today's weekly CFTC report reflects positions as of Tuesday and is released at the end of the week, so it describes the market a few days ago.</li>
+    <li><b>Four years is one choice.</b> It's the window of the chart service Murphy mentions. A market whose hedging pattern has changed (new participants, a contract-size change) can make the old range misleading.</li>
+  </ul></div>
+  <div class="box behind"><b>Beyond the book</b><p>Today the CFTC publishes COT weekly, with more detailed trader categories. As far as I know there is no exact Indian equivalent of the CFTC report, but NSE has published daily open interest split by participant type (such as clients, DIIs, FIIs and proprietary traders), which some traders read in a similar way. Check NSE's site for what is currently published and in what format.</p></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · OPEN INTEREST IN OPTIONS · PUT/CALL RATIOS · COMBINE OPTION SENTIMENT WITH TECHNICALS</div><h2>Options: crowd mood as a contrary signal</h2></div><span class="chip">pdf p214–216</span></div>
+  <p><b>Open interest in options.</b> Options have open interest too, published daily for puts and calls on futures, stock averages, industry indexes and individual stocks. It isn't read exactly the same way as in futures, but it tells you the same basic thing: where the interest is and how liquid the market is. Some option traders compare <b>call OI (bulls)</b> with <b>put OI (bears)</b> to measure sentiment. Others use option volume.</p>
+  <p><b>Put/call ratios.</b> Option volume is used like volume anywhere: it shows buying or selling pressure. It splits into <b>call volume (bullish)</b> and <b>put volume (bearish)</b>. When option traders are bullish, call volume beats put volume and the <b>put/call ratio falls</b>. When they're bearish, put volume is heavier and the <b>ratio rises</b>. The ratio is usually read as a <b>contrary indicator</b>: a <b>very high</b> ratio signals an <b>oversold</b> market; a <b>very low</b> ratio is a warning of an <b>overbought</b> market.</p>
+  <p><b>Combine option sentiment with technicals.</b> Put/call figures from OI and volume help find extremes of bullish or bearish sentiment. They work best together with technical tools such as <b>support, resistance and the trend</b> of the underlying market. Because timing is so important in options, most option traders are technically oriented.</p>
+  <div class="fig">
+    <canvas id="c17" class="tall" aria-label="Simulated price with a put/call ratio and contrary extreme zones"></canvas>
+    <div class="legend" id="c17L"></div>
+    <div class="controls">
+      <label for="hi17">"very high" above <input id="hi17" type="range" min="1.0" max="1.6" step="0.05" value="1.25"><output id="hi17o">1.25</output></label>
+      <label for="lo17">"very low" below <input id="lo17" type="range" min="0.4" max="0.8" step="0.05" value="0.6"><output id="lo17o">0.6</output></label>
+      <label><input id="chk17" type="checkbox"> wait for price to confirm (my example rule)</label>
+    </div>
+    <div class="readout" id="r17"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>When nearly everyone at the bus stop has bought an umbrella (puts), the rain is already priced in. Extreme fear means most of the people who wanted to sell have sold.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In this simulation the ratio is built from recent price moves: it spikes after sharp falls (fear) and sinks after sharp rises (complacency). Triangles mark where it enters an extreme zone. With "wait for price to confirm" ticked, a signal is only marked once price breaks its last 5-day high (after a very high ratio) or low (after a very low one), within 10 days. That's one simple way to follow Murphy's advice to combine sentiment with trend; the exact rule is mine.</p></div>
+  <div class="fig">
+    <h3>Worked example: computing the ratio</h3>
+    <p class="note">My numbers, not the book's. Murphy gives no numeric levels for "very high" or "very low"; traders judge them against the market's own history, which is what the sliders above stand in for.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Day</th><th>Put volume</th><th>Call volume</th><th>Put/call</th><th>Reading (contrary)</th></tr></thead>
+      <tbody>
+        <tr><td>after a sharp fall</td><td class="num">1,32,000</td><td class="num">1,00,000</td><td class="num">1.32</td><td>above 1.25 here: heavy fear, a possible <b class="good">oversold</b> market</td></tr>
+        <tr><td>an ordinary day</td><td class="num">88,000</td><td class="num">1,00,000</td><td class="num">0.88</td><td>inside the usual range: no message</td></tr>
+        <tr><td>after a sharp rise</td><td class="num">55,000</td><td class="num">1,00,000</td><td class="num">0.55</td><td>below 0.60 here: complacency, a warning of an <b class="bad">overbought</b> market</td></tr>
+      </tbody>
+    </table></div>
+    <p>The same arithmetic works on open interest instead of volume: put OI 4.8 lakh against call OI 4.0 lakh gives 1.20. OI moves more slowly than volume, so an OI ratio describes how the crowd is <em>positioned</em>, while a volume ratio describes what it did today. Murphy says both are used.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 10 (<a href="ch10_oscillators.html">oscillators and contrary opinion</a>) develops contrary opinion in full.</li>
+    <li>Your <code>order_flow.md</code> reads option OI <em>by strike</em> a different way: big put OI as support and big call OI as resistance, because option writers defend those strikes. That's a level map, not Murphy's whole-market sentiment ratio. Keep the two readings separate.</li>
+  </ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · CONCLUSION</div><h2>Where this leaves you</h2></div><span class="chip">pdf p216–217</span></div>
+  <p>Volume analysis is used in all financial markets: futures, options and stocks. Open interest applies only to futures and options. But because futures and options trade on so many stock-market instruments, understanding open interest is useful in all three areas. So far the book has mostly used daily bar charts. Next, Murphy widens the time horizon and applies the same tools to <b>weekly and monthly charts</b> for long-range trend analysis.</p>
+  <div class="box picture"><b>Picture it</b><p>Same microscope, lower magnification. The tools stay the same (trend, patterns, volume); next you step back from the daily chart to weekly and monthly ones to see the whole landscape the daily wiggles sit in.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 8 (<a href="ch08_long_term_charts.html">long term charts</a>). Note that volume is usually left off monthly charts (section 02).</li>
+    <li>Beyond the book (my suggestion, not Murphy's): for your NSE futures, a practical version of this chapter is a daily check of price direction plus OI change (section 12) and volume against its average (section 06), used as a filter on a setup that already has an edge, as your <code>order_flow.md</code> recommends.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. In section 06's "volume says nothing" world, the volume-confirmed breakouts sometimes average a bit more R than all breakouts. Is that an edge? And what would convince you the S-1 filter has one on real NSE stocks?</summary><p>No. In that world volume is unrelated to future prices by construction, so any gap is noise; the ± column shows it's inside the range you'd expect, and across 300 pools the filter won only 149 times, a coin flip. Convincing evidence would be the same comparison on real data: filtered vs unfiltered breakouts on the same stocks and dates, a gap bigger than its noise, holding up in both halves of the period and after costs, and beating simply holding the stocks (section 06). Murphy only says the breakout "should" come on heavier volume; he gives no statistics.</p></details>
+  <details><summary>2. 300 traders are long one contract each, and 300 traders are short one contract each. What is the open interest?</summary><p>300, not 600. Open interest counts contracts, and each contract has one long and one short. It equals the longs (or the shorts), never the two sides added (section 03).</p></details>
+  <details><summary>3. A new buyer buys from a trader who is closing an old long. What happens to volume and to open interest?</summary><p>Volume rises by one; open interest doesn't change, because the position only changed hands (section 04).</p></details>
+  <details><summary>4. Prices are falling, and volume and open interest are both rising. What does Murphy's table say?</summary><p>"Weak", i.e. bearish: new money is going short and the downtrend will probably continue (sections 05 and 12, rule 3).</p></details>
+  <details><summary>5. Price breaks above its previous high, but on lighter volume than the last rally, and the dips now trade heavily. What should you think?</summary><p>That's divergence: buying pressure is fading and the uptrend may be in trouble (section 06).</p></details>
+  <details><summary>6. What should volume do while a triangle forms, and at its breakout?</summary><p>Taper off gradually while it forms, then expand on the breakout if the signal is real (section 07).</p></details>
+  <details><summary>7. How is OBV built, and why don't its actual numbers matter?</summary><p>Add the day's volume on an up close, subtract it on a down close, and keep a running total. The value depends on the start date; only its direction and its agreement with price matter (section 09).</p></details>
+  <details><summary>8. A futures market is locked limit up on tiny volume. Bearish (light volume on a rally)?</summary><p>No. Limit-up days are a sign of strength: buyers overwhelm sellers and trading stops at the limit. It's one of the cases where the traditional rule breaks and OBV gets distorted (section 11).</p></details>
+  <details><summary>9. Prices rally while open interest falls. Who is buying, and why is that bearish?</summary><p>Mostly shorts covering losing positions. Money is leaving, and the rally will probably fade once the covering is done (section 12, rule 2).</p></details>
+  <details><summary>10. OI rose by 10,000 contracts during a three-month range, then prices broke to new three-month highs. Why can the move accelerate?</summary><p>All 10,000 shorts opened during the range are now losing. Their buying-back adds upside pressure until most have covered (section 13).</p></details>
+  <details><summary>11. COT shows commercials heavily net short and both speculator groups heavily net long in a rising market. What's the signal?</summary><p>A warning of a possible top: Murphy says follow the commercials, who are usually right (section 16).</p></details>
+  <details><summary>12. The put/call ratio hits an unusually high reading. Bullish or bearish, and what else should you check?</summary><p>As a contrary indicator, very high means oversold, which is potentially bullish. Combine it with support, resistance and the trend before acting (section 17).</p></details>
+  <details><summary>13. A head and shoulders bottom breaks its neckline on heavy volume, but open interest dips slightly over the next few days. Does that cancel the signal?</summary><p>Not by itself. Rising OI plus heavier volume at the breakout would add confirmation, but Murphy warns that the first push of a new trend is often powered by traders on the wrong side closing out (here, shorts covering), which shrinks OI. A small early dip can mislead, so don't put much weight on very short-term OI changes (section 13, point 4).</p></details>
+  <details><summary>14. Your NSE futures screen shows "long unwinding" (price down, OI down) in a downtrend. Is that a buy signal?</summary><p>Not on its own. Murphy calls falling OI in a downtrend bullish in the sense of a <em>strengthening</em> technical picture: losing longs are being forced out, and the decline will probably end once OI has fallen enough to show most of them are done. That's a reason to start watching for a bottom, not a timing signal (section 12, rule 4).</p></details>
+  <details><summary>15. In a futures blowoff, volume jumps during the final rally while open interest falls. Why is the falling OI the warning?</summary><p>Murphy states that blowoffs are often accompanied by a drop in OI during the final rally, and in Figure 7.12 that drop was the warning. Linking it to the rules (my reading, not Murphy's wording): price up with OI down is rule 2, a rise fuelled by positions being closed, mostly shorts covering, rather than by new buying, so it runs out once the covering is done (sections 12 and 15).</p></details>
+</section>
+
+<footer>Built from Murphy, <i>Technical Analysis of the Financial Markets</i>, Chapter 7 "Volume and Open Interest" (printed pp. 157–180, PDF pages 194–217), summarised in my own words. Charts use simulated prices, volume, open interest and positions, not real market data. Notes marked "beyond the book" are not from Murphy. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  let M;
+  function buildData() {
+    M = genMarket([
+      { n: 70, drift: 0.0042, vol: 0.010, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.0046, vol: 0.011, kind: 'trend' }
+    ], seed);
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ---------- extra helpers for chapters 7 and 8 (added; template helpers above are unchanged) ----------
+  // Big-number tick labels: 12,500 -> 12.5k, 2,300,000 -> 2.3M
+  function fmtK(v) { if (Math.abs(v) < 1e-9) return '0'; const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + 'M'; if (a >= 1e4) return (v / 1e3).toFixed(0) + 'k'; if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k'; return fmt(v); }
+
+  // Brownian bridge through waypoints [[day, price, opts]] -> daily OHLC + volume.
+  // opts on a waypoint apply to the leg that ENDS at it: {v: volume multiplier, up: extra mult on up days, dn: extra mult on down days, noise}
+  function bridge(points, sd, noise, base) {
+    const r = rng(sd); noise = noise || 0.008; base = base || 100000;
+    const c = [], o = [], h = [], l = [], v = [], leg = [];
+    c.push(points[0][1]); o.push(points[0][1]); h.push(points[0][1] * 1.004); l.push(points[0][1] * 0.996); v.push(base); leg.push(0);
+    for (let k = 1; k < points.length; k++) {
+      const [d0, p0] = points[k - 1]; const [d1, p1, op] = points[k]; const opt = op || {}; const L = d1 - d0; const nz = opt.noise || noise;
+      const w = [0]; for (let j = 1; j <= L; j++) w.push(w[j - 1] + nz * gauss(r));
+      for (let j = 1; j <= L; j++) {
+        const t = j / L; const lp = Math.log(p0) + (Math.log(p1) - Math.log(p0)) * t + (w[j] - t * w[L]);
+        const cl = Math.exp(lp); const prev = c[c.length - 1];
+        const op2 = prev * (1 + nz * 0.35 * gauss(r));
+        const hi = Math.max(op2, cl) * (1 + nz * 0.6 * r()); const lo = Math.min(op2, cl) * (1 - nz * 0.6 * r());
+        const up = cl >= prev; const vm = (opt.v || 1) * (up ? (opt.up || 1) : (opt.dn || 1)) * Math.exp(0.2 * gauss(r));
+        c.push(cl); o.push(op2); h.push(hi); l.push(lo); v.push(base * vm); leg.push(k);
+      }
+    }
+    return { c, o, h, l, v, leg };
+  }
+
+  // Aggregate daily bars into k-day bars (weekly = 5, monthly = 21)
+  function agg(D, k) {
+    const out = { o: [], h: [], l: [], c: [], v: [] };
+    for (let i = 0; i < D.c.length; i += k) {
+      const j = Math.min(D.c.length, i + k); let hi = -Infinity, lo = Infinity, vs = 0;
+      for (let q = i; q < j; q++) { hi = Math.max(hi, D.h[q]); lo = Math.min(lo, D.l[q]); vs += D.v ? D.v[q] : 0; }
+      out.o.push(D.o[i]); out.h.push(hi); out.l.push(lo); out.c.push(D.c[j - 1]); out.v.push(vs);
+    }
+    return out;
+  }
+
+  function obvOf(c, v) { const o = [0]; for (let i = 1; i < c.length; i++) o.push(o[i - 1] + (c[i] > c[i - 1] ? v[i] : c[i] < c[i - 1] ? -v[i] : 0)); return o; }
+  function argMax(a, i0, i1) { let b = i0; for (let i = i0; i <= i1; i++) if (a[i] > a[b]) b = i; return b; }
+  function argMin(a, i0, i1) { let b = i0; for (let i = i0; i <= i1; i++) if (a[i] < a[b]) b = i; return b; }
+  const upDown = (c) => (i) => colorOf(i > 0 && c[i] < c[i - 1] ? 'sell' : 'buy', 0.6);
+
+  // Multi-panel chart. sp = {n, x0, x1, panels:[{h, lines, bars, ohlc:{o,h,l,c,col}, hlines:[{v,col,label,dash}],
+  //   segs:[{i0,v0,i1,v1,col,w,dash,ext,label}], marks:[{i,v,kind,col,t,below}], texts:[{i,v,t,col}], label, log, ymin, ymax, zero, fmt}],
+  //   shade:[{a,b,col,alpha,label}], vlines:[{i,col,label}], legend:[[text,col]]}
+  function stack(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 52, padT = sp.shade && sp.shade.some((s) => s.label) ? 22 : 10, padB = 8, gap = 14;
+    const P = sp.panels; const tot = P.reduce((s, p) => s + (p.h || 1), 0);
+    const avail = H - padT - padB - gap * (P.length - 1);
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    const step = (W - padL - padR) / Math.max(1, x1 - x0 + 1); const bw = Math.max(1, step * 0.7);
+    const font = '11px ' + css('mono');
+    const geo = []; let top = padT;
+    P.forEach((p) => { const hh = Math.round(avail * (p.h || 1) / tot); geo.push([top, hh]); top += hh + gap; });
+    (sp.shade || []).forEach((s) => {
+      g.fillStyle = colorOf(s.col || 'c1', s.alpha != null ? s.alpha : 0.1);
+      const xa = Math.max(padL, X(s.a) - step / 2), xb = Math.min(W - padR, X(s.b) + step / 2);
+      g.fillRect(xa, padT, xb - xa, H - padT - padB);
+      if (s.label) { g.fillStyle = colorOf(s.col === 'muted' || !s.col ? 'muted' : s.col); g.font = font; const tw = g.measureText(s.label).width; let tx = (xa + xb) / 2 - tw / 2; tx = Math.max(padL, Math.min(W - padR - tw, tx)); g.fillText(s.label, tx, padT - 7); }
+    });
+    const Ys = [];
+    P.forEach((p, k) => {
+      const [t, hh] = geo[k];
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { if (!arr) return; for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (p.lines || []).forEach((q) => { if (!q.noScale) take(q.d); }); (p.bars || []).forEach((b) => take(b.d));
+      if (p.ohlc) { take(p.ohlc.h); take(p.ohlc.l); }
+      (p.hlines || []).forEach((q) => { if (!q.noScale) { lo = Math.min(lo, q.v); hi = Math.max(hi, q.v); } });
+      if (p.ymin != null) lo = p.ymin; if (p.ymax != null) hi = p.ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const hasBars = p.bars && p.bars.length;
+      if (hasBars && p.ymin == null && lo > 0) lo = 0;
+      const f = p.log ? (v) => Math.log(Math.max(v, 1e-9)) : (v) => v;
+      let flo = f(lo), fhi = f(hi); const pad = (fhi - flo) * 0.07 || 1;
+      if (p.ymin == null && !(hasBars && lo === 0)) flo -= pad; if (p.ymax == null) fhi += pad;
+      const Y = (v) => t + (fhi - f(v)) / (fhi - flo) * hh; Ys.push(Y);
+      g.font = font; g.lineWidth = 1;
+      let ticks;
+      if (p.log) {
+        ticks = []; const vlo = Math.exp(flo), vhi = Math.exp(fhi);
+        for (let e = Math.floor(Math.log10(vlo)) - 1; e <= Math.ceil(Math.log10(vhi)); e++) [1, 2, 5].forEach((m) => { const x = m * Math.pow(10, e); if (x >= vlo && x <= vhi) ticks.push(x); });
+        if (ticks.length < 3) { ticks = []; for (let e = Math.floor(Math.log10(vlo)) - 1; e <= Math.ceil(Math.log10(vhi)); e++) for (let m = 1; m <= 9; m++) { const x = m * Math.pow(10, e); if (x >= vlo && x <= vhi) ticks.push(x); } }
+      } else ticks = niceTicks(flo, fhi, hh > 120 ? 4 : 2);
+      const tf = p.fmt || fmtK;
+      ticks.forEach((tv) => { const y = Y(tv); if (y < t - 1 || y > t + hh + 1) return; g.strokeStyle = colorOf('rule', 0.9); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(tf(tv), W - padR + 5, y + 4); });
+      if (p.zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (p.bars || []).forEach((b) => {
+        const base = Y(lo < 0 && hi > 0 ? 0 : lo);
+        for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col || 'muted', b.alpha || 0.55); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.max(1, Math.abs(base - yv))); }
+      });
+      (p.lines || []).forEach((q) => {
+        g.strokeStyle = colorOf(q.col, q.alpha != null ? q.alpha : 1); g.lineWidth = q.w || 1.7; g.setLineDash(q.dash || []); g.beginPath(); let pen = false;
+        for (let i = x0; i <= x1; i++) { const v = q.d[i]; if (v == null || !isFinite(v)) { pen = false; continue; } const x = X(i), y = Y(v); if (!pen) { g.moveTo(x, y); pen = true; } else g.lineTo(x, y); }
+        g.stroke(); g.setLineDash([]);
+      });
+      if (p.ohlc) {
+        const O = p.ohlc; const tw = Math.max(1, Math.min(5, step * 0.35));
+        for (let i = x0; i <= x1; i++) {
+          if (O.c[i] == null) continue; const x = X(i);
+          g.strokeStyle = O.col ? colorOf(O.col) : colorOf(i > 0 && O.c[i - 1] != null && O.c[i] < O.c[i - 1] ? 'sell' : 'price', 0.95); g.lineWidth = step > 6 ? 1.6 : 1.1;
+          g.beginPath(); g.moveTo(x, Y(O.h[i])); g.lineTo(x, Y(O.l[i])); g.moveTo(x - tw, Y(O.o[i])); g.lineTo(x, Y(O.o[i])); g.moveTo(x, Y(O.c[i])); g.lineTo(x + tw, Y(O.c[i])); g.stroke();
+        }
+      }
+      (p.hlines || []).forEach((q) => { const y = Y(q.v); g.strokeStyle = colorOf(q.col || 'muted', 0.9); g.lineWidth = q.w || 1.3; g.setLineDash(q.dash || [5, 4]); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.setLineDash([]); if (q.label) { g.fillStyle = colorOf(q.col || 'muted'); g.font = font; const tw = g.measureText(q.label).width; g.fillText(q.label, q.right ? W - padR - tw - 4 : padL + 4, q.below ? y + 13 : y - 4); } });
+      (p.segs || []).forEach((s) => {
+        const xa = X(s.i0), ya = Y(s.v0), xb = X(s.i1), yb = Y(s.v1); let xe = xb, ye = yb;
+        if (s.ext != null) { const ie = Math.min(x1, s.ext); xe = X(ie); ye = ya + (yb - ya) * (xe - xa) / ((xb - xa) || 1); }
+        g.strokeStyle = colorOf(s.col || 'c3'); g.lineWidth = s.w || 1.8; g.setLineDash(s.dash || []); g.beginPath(); g.moveTo(xa, ya); g.lineTo(xe, ye); g.stroke(); g.setLineDash([]);
+        if (s.label) { g.fillStyle = colorOf(s.col || 'c3'); g.font = font; const tw = g.measureText(s.label).width; g.fillText(s.label, Math.max(padL, Math.min(xe - tw, W - padR - tw)), ye - 6); }
+      });
+      (p.marks || []).forEach((m) => {
+        if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 5;
+        if (m.kind === 'buy') { g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); g.fill(); }
+        else if (m.kind === 'sell') { g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); g.fill(); }
+        else if (m.kind === 'ring') { g.strokeStyle = colorOf(m.col || 'c3'); g.lineWidth = 2; g.beginPath(); g.arc(x, y, m.r || 8, 0, Math.PI * 2); g.stroke(); }
+        else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3.5, 0, Math.PI * 2); g.fill(); }
+        if (m.t) { g.fillStyle = colorOf(m.col || (m.kind === 'sell' ? 'sell' : m.kind === 'buy' ? 'buy' : 'ink')); g.font = font; const tw = g.measureText(m.t).width; let tx = x - tw / 2; tx = Math.max(padL, Math.min(W - padR - tw, tx)); const ty = m.below ? y + 22 : y - 12; g.fillText(m.t, tx, Math.max(t + 10, Math.min(t + hh - 2, ty))); }
+      });
+      (p.texts || []).forEach((q) => { g.fillStyle = colorOf(q.col || 'muted'); g.font = font; const tw = g.measureText(q.t).width; let tx = X(q.i); tx = Math.max(padL, Math.min(W - padR - tw, tx)); g.fillText(q.t, tx, Y(q.v)); });
+      if (p.label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(p.label, padL + 4, t + 12); }
+      if (k > 0) { g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, t - gap / 2); g.lineTo(W - padR, t - gap / 2); g.stroke(); }
+    });
+    (sp.vlines || []).forEach((q) => { if (q.i < x0 || q.i > x1) return; g.strokeStyle = colorOf(q.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(q.i), padT); g.lineTo(X(q.i), H - padB); g.stroke(); g.setLineDash([]); if (q.label) { g.fillStyle = colorOf(q.col || 'muted'); g.font = font; const tw = g.measureText(q.label).width; let tx = X(q.i) + 4; if (tx + tw > W - padR) tx = X(q.i) - tw - 4; g.fillText(q.label, tx, padT + 12 + (q.row || 0) * 14); } });
+    const Lg = $(id + 'L');
+    if (Lg) {
+      const items = [];
+      P.forEach((p) => (p.lines || []).forEach((q) => q.label && items.push([q.label, q.col])));
+      (sp.legend || []).forEach((x) => items.push(x));
+      Lg.innerHTML = items.map(([t2, c2]) => `<span style="--sw:${colorOf(c2)}">${t2}</span>`).join('');
+    }
+    return { X, Ys };
+  }
+
+  // ================= Chapter 7 plates =================
+  const avg = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+  const pct = (x) => (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
+  function setOn(ids, onId) { ids.forEach((i) => { const el = $(i); if (el) el.classList.toggle('on', i === onId); }); }
+
+  // ---- s1: single delivery months vs the total (my roll model, beyond the book)
+  let v1 = 't';
+  const d1m = reg(() => {
+    const n = 168, E = 21, RW = 6; const r = rng(seed * 89 + 7);
+    const D = bridge([[0, 100], [60, 108], [110, 104], [167, 116]], seed * 97 + 3, 0.008);
+    const tot = []; let t0 = 40000; for (let i = 0; i < n; i++) { t0 *= Math.exp(0.0016 + 0.006 * gauss(r)); tot.push(t0); }
+    const M = Math.ceil(n / E) + 2; const mon = []; for (let m = 0; m < M; m++) mon.push(nulls(n));
+    const front = nulls(n);
+    for (let i = 0; i < n; i++) {
+      const f = Math.floor(i / E), d = (f + 1) * E - 1 - i; const q = d >= RW ? 0 : (RW - d) / RW;
+      const sh = [0.9 * (1 - q), 0.1 * (1 - q) + 0.9 * q, 0.1 * q];
+      sh.forEach((s, k) => { if (s > 0) mon[f + k][i] = tot[i] * s; });
+      front[i] = mon[f][i] != null ? mon[f][i] : 0;
+    }
+    const exp = []; for (let e = E - 1; e < n; e += E) exp.push(e);
+    const lines = [];
+    if (v1 === 't' || v1 === 'a') lines.push({ d: tot, col: 'c2', w: 2.6, label: 'total open interest' });
+    if (v1 === 'f') lines.push({ d: front, col: 'sell', w: 2, label: 'nearest month only' });
+    if (v1 === 'a') mon.forEach((m, k) => lines.push({ d: m, col: k % 2 ? 'c3' : 'c1', w: 1.4, dash: k % 2 ? [5, 4] : [], label: k === 0 ? 'single months (alternating colours)' : '' }));
+    stack('c1m', { n, vlines: exp.map((e, k) => ({ i: e, col: 'muted', label: k === 0 ? 'expiry' : '' })), panels: [{ h: 1.4, ohlc: D, label: 'price (simulated futures, nearest month)' }, { h: 1.6, lines, label: 'open interest' }] });
+    // a roll window: last RW days into the 3rd expiry
+    const e3 = exp[2] - 1, a3 = exp[2] - RW; const ch = (s) => pct((s[e3] / s[a3] - 1) * 100);
+    const frontMin = Math.min(...exp.map((e) => (front[e - 1] / front[e - RW] - 1) * 100));
+    $('r1m').innerHTML = `<span>from ${RW} days to 1 day before the 3rd expiry: nearest month <b class="bad">${ch(front)}</b> · total <b>${ch(tot)}</b></span><span>the same happens at every expiry: nearest month about <b class="bad">${frontMin.toFixed(0)}%</b>, then zero on expiry day · total OI over the whole chart <b class="good">${pct((tot[n - 1] / tot[0] - 1) * 100)}</b> (price ${pct((D.c[n - 1] / D.c[0] - 1) * 100)})</span><span>${v1 === 'f' ? 'read off this line, section 12 would flag "OI falling" at every expiry: a false alarm' : 'the total keeps only real arrivals and departures; the roll cancels out'}</span>`;
+  });
+  [['v1t', 't'], ['v1f', 'f'], ['v1a', 'a']].forEach(([id, k]) => $(id).addEventListener('click', () => { v1 = k; setOn(['v1t', 'v1f', 'v1a'], id); d1m(); }));
+
+  // ---- s2: volume under price, daily vs weekly
+  let tf2 = 'd';
+  const d2 = reg(() => {
+    const D = bridge([[0, 100], [20, 99, { v: 0.85 }], [45, 124, { up: 1.8, dn: 0.9 }], [60, 118, { v: 0.8 }], [85, 141, { up: 1.8, dn: 0.9 }], [100, 136, { v: 0.8 }], [120, 139, { v: 0.8 }]], seed * 13 + 2, 0.009);
+    const rally = (i) => (i > 20 && i <= 45) || (i > 60 && i <= 85);
+    const rv = [], ov = []; for (let i = 1; i < D.c.length; i++) (rally(i) ? rv : ov).push(D.v[i]);
+    const k = tf2 === 'w' ? 5 : 1; const S = k === 1 ? D : agg(D, k); const n = S.c.length;
+    stack('c2', {
+      n, shade: [{ a: Math.floor(21 / k), b: Math.floor(45 / k), col: 'buy', alpha: 0.08, label: 'rally' }, { a: Math.floor(61 / k), b: Math.floor(85 / k), col: 'buy', alpha: 0.08, label: 'rally' }],
+      panels: [{ h: 2.3, ohlc: S, label: (k === 1 ? 'daily' : 'weekly') + ' bars (simulated)' }, { h: 1, bars: [{ d: S.v, col: upDown(S.c) }], label: k === 1 ? 'daily volume' : 'weekly volume (5 days summed)' }],
+      legend: [['volume on an up bar', 'buy'], ['volume on a down bar', 'sell']]
+    });
+    $('r2').innerHTML = `average daily volume in rallies <b>${fmtK(avg(rv))}</b> · in pauses <b>${fmtK(avg(ov))}</b> · rallies trade <b class="good">${(avg(rv) / avg(ov)).toFixed(1)}×</b> as much · ${n} bars on screen`;
+  });
+  $('tf2d').addEventListener('click', () => { tf2 = 'd'; setOn(['tf2d', 'tf2w'], 'tf2d'); d2(); });
+  $('tf2w').addEventListener('click', () => { tf2 = 'w'; setOn(['tf2d', 'tf2w'], 'tf2w'); d2(); });
+
+  // ---- s4: open interest ledger
+  const L4 = { oi: 4, vol: 0, log: [] };
+  function draw4(msg) {
+    if (msg) L4.log.unshift(msg); L4.log = L4.log.slice(0, 6);
+    const chips = []; for (let i = 0; i < Math.min(L4.oi, 40); i++) chips.push('<div class="in">L⇄S<small>#' + (i + 1) + '</small></div>');
+    if (L4.oi > 40) chips.push('<div>+' + (L4.oi - 40) + '</div>'); if (!L4.oi) chips.push('<div>no open contracts</div>');
+    $('pairs4').innerHTML = chips.join('');
+    $('r4').innerHTML = `open interest <b>${L4.oi}</b> · volume (trades so far) <b>${L4.vol}</b>`;
+    $('log4').textContent = L4.log.length ? L4.log.join('\n') : 'Press a button to make a trade. Each chip below is one open contract (one long + one short).';
+  }
+  function trade4(kind) {
+    if (kind !== 'a' && L4.oi === 0) { draw4('✗ nobody holds an old position to close: open some contracts first'); return; }
+    L4.vol += 1;
+    if (kind === 'a') { L4.oi += 1; draw4('trade ' + L4.vol + ': new long buys from new short → both opening → OI +1'); }
+    if (kind === 'b') draw4('trade ' + L4.vol + ': new long buys from old long → a long changes hands → OI unchanged');
+    if (kind === 'c') draw4('trade ' + L4.vol + ': old short buys back from new short → a short changes hands → OI unchanged');
+    if (kind === 'd') { L4.oi -= 1; draw4('trade ' + L4.vol + ': old short buys back from old long → both closing → OI −1'); }
+  }
+  ['a', 'b', 'c', 'd'].forEach((k) => $('t4' + k).addEventListener('click', () => trade4(k)));
+  $('reset4').addEventListener('click', () => { L4.oi = 4; L4.vol = 0; L4.log = []; draw4(); });
+  draw4();
+
+  // ---- s5: general rules grid
+  let g5 = 'a';
+  const G5 = {
+    a: { up: true, flow: 1, v: 'Strong (bullish)', who: 'new longs and new shorts keep arriving and the buyers keep winning: the uptrend will probably continue' },
+    b: { up: true, flow: -1, v: 'Weak (bearish)', who: 'positions are being closed: the rise is fuelled by shorts covering, and will likely fade once they are done' },
+    c: { up: false, flow: 1, v: 'Weak (bearish)', who: 'fresh short selling keeps arriving: the downtrend will probably continue' },
+    d: { up: false, flow: -1, v: 'Strong (bullish)', who: 'losing longs are liquidating: the fall should end once most of them have sold' }
+  };
+  const d5 = reg(() => {
+    const G = G5[g5]; const r = rng(seed * 19 + 7);
+    const D = bridge([[0, 100], [30, G.up ? 107 : 93], [60, G.up ? 116 : 85]], seed * 17 + 3, 0.009);
+    const n = D.c.length; const oi = [], vol = []; let x = 0;
+    for (let i = 0; i < n; i++) { x += 0.004 * gauss(r); oi.push(60000 * Math.exp(G.flow * 0.3 * i / n + x)); vol.push(80000 * Math.exp(G.flow * 0.7 * i / n + 0.22 * gauss(r))); }
+    stack('c5', {
+      n, panels: [
+        { h: 2, ohlc: D, label: 'price (simulated futures)' },
+        { h: 1, lines: [{ d: oi, col: 'c2', w: 2.2, label: 'open interest' }], label: 'open interest' },
+        { h: 1, bars: [{ d: vol, col: 'c1', alpha: 0.6 }], lines: [{ d: sma(vol, 10), col: 'c3', w: 1.6, label: '10-day avg volume' }], label: 'volume' }
+      ]
+    });
+    const pc = (D.c[n - 1] / D.c[0] - 1) * 100, oc = (oi[n - 1] / oi[0] - 1) * 100, vc = (avg(vol.slice(-10)) / avg(vol.slice(0, 10)) - 1) * 100;
+    $('r5').innerHTML = `price <b>${pct(pc)}</b> · open interest <b>${pct(oc)}</b> · volume (last 10 vs first 10 days) <b>${pct(vc)}</b> · Murphy's verdict <b class="${G.v.startsWith('Strong') ? 'good' : 'bad'}">${G.v}</b> · ${G.who}`;
+  });
+  ['a', 'b', 'c', 'd'].forEach((k) => $('g5' + k).addEventListener('click', () => { g5 = k; setOn(['g5a', 'g5b', 'g5c', 'g5d'], 'g5' + k); d5(); }));
+
+  // ---- s6: volume confirming, then diverging
+  const d6 = reg(() => {
+    const C = { up: 1.6, dn: 0.8 }, Dv = { v: 0.8, up: 0.75, dn: 1.25 };
+    const D = bridge([[0, 100], [18, 112, C], [26, 107, { v: 0.7 }], [44, 121, C], [52, 116, { v: 0.7 }], [70, 130, C], [78, 125, { v: 0.75 }],
+      [96, 133, Dv], [104, 127, { v: 1.45 }], [118, 135, Dv], [126, 127, { v: 1.5 }]], seed * 23 + 4, 0.008);
+    const n = D.c.length; const zone = (a, b) => { const u = [], d = []; for (let i = Math.max(1, a); i <= b; i++) (D.c[i] >= D.c[i - 1] ? u : d).push(D.v[i]); return avg(u) / avg(d); };
+    const z1 = zone(1, 78), z2 = zone(79, n - 1);
+    stack('c6', {
+      n, shade: [{ a: 1, b: 78, col: 'buy', alpha: 0.07, label: 'volume confirming' }, { a: 79, b: n - 1, col: 'sell', alpha: 0.07, label: 'volume diverging' }],
+      panels: [{ h: 2.2, ohlc: D, hlines: [{ v: D.c[70], col: 'muted', label: 'earlier high' }], label: 'price (simulated)' },
+        { h: 1, bars: [{ d: D.v, col: upDown(D.c) }], lines: [{ d: sma(D.v, 20), col: 'c3', w: 1.6, label: '20-day average volume' }], label: 'volume' }],
+      legend: [['up-day volume', 'buy'], ['down-day volume', 'sell']]
+    });
+    $('r6').innerHTML = `up-day ÷ down-day volume: confirming zone <b class="good">${z1.toFixed(2)}</b> · diverging zone <b class="bad">${z2.toFixed(2)}</b> · new high in the diverging zone: <b>${Math.max(...D.c.slice(79)) > D.c[70] ? 'yes' : 'no'}</b>`;
+  });
+
+  // ---- s6b: S-1 breakout-on-volume rule, testable (beyond the book)
+  // world 'null': volume bursts are unrelated to what price does next; 'info': a real up-move starts with heavy up-day volume (built in).
+  // The price path depends only on the seed, so both worlds have identical prices.
+  function genS1(sd, world, n) {
+    n = n || 500; const r = rng(sd); const o = [], h = [], l = [], c = [], v = [];
+    const ep = new Array(n).fill(0), fake = new Array(n).fill(0);
+    const sched = (arr) => { let i = 0; while (i < n) { const u = r(); if (u < 0.01 || u > 0.99) { const d = u < 0.01 ? 1 : -1; const L = 15 + Math.floor(r() * 21); for (let k = 0; k < L && i + k < n; k++) arr[i + k] = d * (k < 10 ? 2 : 1); i += L; } else i++; } };
+    sched(ep); sched(fake);
+    const vlink = world === 'info' ? ep : fake; let p = 100;
+    for (let i = 0; i < n; i++) {
+      const mu = ep[i] ? 0.0035 * Math.sign(ep[i]) : 0; const ret = mu + 0.012 * gauss(r);
+      const op = p * (1 + 0.003 * gauss(r)); p = Math.max(1, p * (1 + ret));
+      const rg = p * 0.008; o.push(op); c.push(p); h.push(Math.max(op, p) + rg * r()); l.push(Math.min(op, p) - rg * r());
+      const up = p >= op; const lk = vlink[i]; const push = Math.abs(lk) === 2 && ((lk > 0) === up) ? 1.9 : 1;
+      const news = r() < 0.03 ? 2.5 : 1;
+      v.push(100000 * push * news * Math.exp(0.35 * gauss(r)));
+    }
+    return { o, h, l, c, v, n };
+  }
+  // Each breakout is evaluated as its own trade (overlaps allowed), so the volume-confirmed trades are an exact subset of all breakouts.
+  function s1Trades(D, k) {
+    const { o, h, l, c, v, n } = D; const T = [];
+    const hh = (i, m) => { let x = -Infinity; for (let q = i - m; q < i; q++) x = Math.max(x, h[q]); return x; };
+    const ll = (i, m) => { let x = Infinity; for (let q = i - m; q < i; q++) x = Math.min(x, l[q]); return x; };
+    for (let i = 51; i < n - 1; i++) {
+      const lvl = hh(i, 50); if (!(c[i] > lvl && c[i - 1] <= hh(i - 1, 50))) continue;
+      let av = 0; for (let q = i - 20; q < i; q++) av += v[q]; av /= 20;
+      let atr = 0; for (let q = i - 13; q <= i; q++) atr += Math.max(h[q] - l[q], Math.abs(h[q] - c[q - 1]), Math.abs(l[q] - c[q - 1])); atr /= 14;
+      const entry = c[i], stop = entry - k * atr, R = entry - stop; let x = n - 1, px = c[n - 1], why = 'still open at the end (marked at the last close)';
+      for (let j = i + 1; j < n; j++) {
+        if (l[j] <= stop) { x = j; px = Math.min(o[j], stop); why = o[j] < stop ? 'gapped below the stop (out at the open)' : 'stop hit'; break; }
+        if (c[j] < ll(j, 20)) { x = j; px = c[j]; why = 'close below the 20-day low'; break; }
+      }
+      T.push({ i, x, lvl, entry, stop, R, atr, px, why, av, vr: v[i] / av, ok: v[i] > 1.5 * av, r: (px - entry) / R });
+    }
+    return T;
+  }
+  function statsR(T) { const m = T.length; if (!m) return { m: 0, win: 0, mean: 0, se: 0 }; const mean = T.reduce((s, t) => s + t.r, 0) / m; const sd = Math.sqrt(T.reduce((s, t) => s + (t.r - mean) ** 2, 0) / Math.max(1, m - 1)); return { m, win: T.filter((t) => t.r > 0).length / m, mean, se: sd / Math.sqrt(m) }; }
+  function pooledS1(base, k, K) {
+    const out = {};
+    ['null', 'info'].forEach((w) => { let all = []; for (let s = 0; s < K; s++) all = all.concat(s1Trades(genS1(base * 1000 + s * 7 + 1, w), k)); out[w] = { all: statsR(all), ok: statsR(all.filter((t) => t.ok)), no: statsR(all.filter((t) => !t.ok)) }; });
+    return out;
+  }
+  let w6b = 'null', i6b = 0, pool6b = null, pool6bKey = '';
+  const d6b = reg(() => {
+    const k = val('k6b'); const D = genS1(seed * 83 + 11, w6b, 1000); const n = D.n; const all = s1Trades(D, k);
+    const skip = $('chk6b').checked; const T = skip ? all.filter((t) => t.ok) : all; const whole = $('z6b').checked;
+    const avL = nulls(n); for (let i = 20; i < n; i++) { let s = 0; for (let q = i - 20; q < i; q++) s += D.v[q]; avL[i] = 1.5 * s / 20; }
+    const fmtP = (x) => x.toFixed(2); const fR = (x) => (x >= 0 ? '+' : '') + x.toFixed(2) + 'R';
+    if (!T.length) { stack('c6b', { n, panels: [{ h: 2, ohlc: D, label: 'price (simulated)' }, { h: 1, bars: [{ d: D.v, col: upDown(D.c) }], label: 'volume' }] }); $('r6b').innerHTML = '<b>No breakouts of this kind on this roll.</b> Untick the box or roll a new market.'; $('r6bm').innerHTML = ''; }
+    else {
+      if (i6b >= T.length) i6b = T.length - 1; if (i6b < 0) i6b = 0; const t = T[i6b];
+      const trail = nulls(n); for (let j = t.i + 1; j <= t.x; j++) { let m = Infinity; for (let q = j - 20; q < j; q++) m = Math.min(m, D.l[q]); trail[j] = m; }
+      const marks = whole ? all.map((q) => q.ok ? { i: q.i, v: D.l[q.i], kind: 'buy' } : { i: q.i, v: D.h[q.i] * 1.01, col: 'muted', r: 3 }) : [{ i: t.i, v: D.l[t.i], kind: 'buy' }];
+      marks.push({ i: t.x, v: t.px, kind: 'ring', col: t.r >= 0 ? 'buy' : 'sell', t: 'exit ' + fR(t.r) });
+      const x0 = whole ? 0 : Math.max(0, t.i - 70), x1 = whole ? n - 1 : Math.min(n - 1, t.x + 15); const xe = whole ? t.x : x1; const sc2R = nulls(n); if (!whole) sc2R[t.i] = t.entry + 2 * t.R;
+      const segs = [{ i0: Math.max(0, t.i - 50), v0: t.lvl, i1: t.i, v1: t.lvl, col: 'muted', dash: [4, 3], w: 1.4 },
+        { i0: t.i, v0: t.entry, i1: xe, v1: t.entry, col: 'c1', w: 1.6 },
+        { i0: t.i, v0: t.stop, i1: xe, v1: t.stop, col: 'sell', w: 1.6, dash: [6, 3] },
+        { i0: t.i, v0: t.entry + 2 * t.R, i1: xe, v1: t.entry + 2 * t.R, col: 'muted', w: 1.2, dash: [2, 3], label: whole ? '' : '+2R (scale only)' }];
+      stack('c6b', {
+        n, x0, x1, shade: [{ a: t.i, b: t.x, col: t.r >= 0 ? 'buy' : 'sell', alpha: 0.07 }],
+        panels: [{ h: 2.2, ohlc: D, segs, marks, lines: [{ d: trail, col: 'c3', w: 1.6, label: '20-day low (trailing exit)' }, { d: sc2R, col: 'muted', w: 0 }], label: whole ? 'whole market: ▲ taken, dot = rejected' : 'price (simulated): one breakout trade' },
+          { h: 1, bars: [{ d: D.v, col: (i) => i === t.i ? colorOf(t.ok ? 'buy' : 'sell', 0.95) : colorOf('muted', 0.4) }], lines: [{ d: avL, col: 'c2', w: 1.4, dash: [5, 3], label: '1.5 × previous 20-day average volume' }], label: 'volume (breakout day coloured)' }],
+        legend: [['entry (▲ = breakout close)', 'c1'], ['stop', 'sell'], ['50-day high before the breakout', 'muted']]
+      });
+      $('r6b').innerHTML = `<span>breakout <b>${i6b + 1} of ${T.length}</b> · day ${t.i}</span><span>close <b>${fmtP(t.entry)}</b> vs 50-day high <b>${fmtP(t.lvl)}</b></span><span>volume <b>${fmtK(D.v[t.i])}</b> ÷ 20-day avg <b>${fmtK(t.av)}</b> = <b class="${t.ok ? 'good' : 'bad'}">${t.vr.toFixed(2)}×</b> → ${t.ok ? '<b class="good">S-1 takes it</b>' : '<b class="bad">S-1 skips it (under 1.5×)</b>'}</span><span>ATR(14) <b>${fmtP(t.atr)}</b> · stop = ${fmtP(t.entry)} − ${k} × ${fmtP(t.atr)} = <b>${fmtP(t.stop)}</b> · 1R = <b>${fmtP(t.R)}</b> (${(t.R / t.entry * 100).toFixed(1)}% of price)</span><span>exit day ${t.x}: ${t.why} at <b>${fmtP(t.px)}</b> → (${fmtP(t.px)} − ${fmtP(t.entry)}) ÷ ${fmtP(t.R)} = <b class="${t.r >= 0 ? 'good' : 'bad'}">${fR(t.r)}</b></span>`;
+      const sa = statsR(all), so = statsR(all.filter((q) => q.ok));
+      $('r6bm').innerHTML = `this one market: <b>${sa.m}</b> breakouts, mean <b>${fR(sa.mean)}</b> · volume-confirmed <b>${so.m}</b>, mean <b>${so.m ? fR(so.mean) : 'none'}</b> · far too few trades to judge anything: use the pooled table`;
+    }
+    const key = seed + '|' + k; if (pool6bKey !== key) { pool6b = pooledS1(seed, k, 200); pool6bKey = key; }
+    const P = pool6b; const row = (wn, lab, s) => `<tr><td>${wn}</td><td>${lab}</td><td class="num">${s.m.toLocaleString('en-IN')}</td><td class="num">${(s.win * 100).toFixed(1)}%</td><td class="num">${fR(s.mean)}</td><td class="num">± ${(1.96 * s.se).toFixed(2)}R</td></tr>`;
+    $('tab6b').innerHTML = '<thead><tr><th>World</th><th>Trades</th><th>Count</th><th>Win rate</th><th>Mean result</th><th>95% range of the mean</th></tr></thead><tbody>' +
+      row('volume says nothing', 'all breakouts', P.null.all) + row('', 'volume-confirmed (S-1)', P.null.ok) + row('', 'rejected by the filter', P.null.no) +
+      row('heavy volume starts moves', 'all breakouts', P.info.all) + row('', 'volume-confirmed (S-1)', P.info.ok) + row('', 'rejected by the filter', P.info.no) + '</tbody>';
+    const gN = P.null.ok.mean - P.null.all.mean, gI = P.info.ok.mean - P.info.all.mean;
+    $('r6bp').innerHTML = `simulated, k = ${k}, before costs · filter keeps <b>${(P.null.ok.m / P.null.all.m * 100).toFixed(0)}%</b> / <b>${(P.info.ok.m / P.info.all.m * 100).toFixed(0)}%</b> of breakouts · gain from filtering: first world <b>${fR(gN)}</b> (inside the noise of ± ${(1.96 * P.null.ok.se).toFixed(2)}R: ${Math.abs(gN) < 1.96 * P.null.ok.se ? 'no evidence of an edge' : 'outside the noise on this pool, a fluke of this roll'}) · second world <b class="good">${fR(gI)}</b> (built in)`;
+  });
+  $('w6bn').addEventListener('click', () => { w6b = 'null'; i6b = 0; setOn(['w6bn', 'w6bi'], 'w6bn'); d6b(); });
+  $('w6bi').addEventListener('click', () => { w6b = 'info'; i6b = 0; setOn(['w6bn', 'w6bi'], 'w6bi'); d6b(); });
+  $('p6b').addEventListener('click', () => { i6b = Math.max(0, i6b - 1); d6b(); });
+  $('n6b').addEventListener('click', () => { i6b += 1; d6b(); });
+  $('chk6b').addEventListener('change', () => { i6b = 0; d6b(); }); $('z6b').addEventListener('change', d6b);
+  bindRange('k6b', d6b);
+
+  // ---- s7: volume inside patterns
+  const P7 = {
+    hs: { pts: [[0, 100], [14, 116, { v: 1.5, lab: 'left shoulder rally' }], [22, 108, { v: 0.9, lab: 'dip' }], [36, 124, { v: 0.75, lab: 'head rally (light)' }], [46, 108, { v: 1.35, lab: 'fall to neckline' }], [56, 115, { v: 0.65, lab: 'right shoulder rally' }], [64, 108, { v: 1.1, lab: 'back to neckline' }], [72, 97, { v: 2.3, lab: 'neckline break' }]], segs: [{ i0: 22, v0: 108, i1: 46, v1: 108, ext: 72, col: 'c3', label: 'neckline' }] },
+    dt: { pts: [[0, 100], [18, 120, { v: 1.5, lab: 'rally to peak 1' }], [30, 108, { v: 1.0, lab: 'decline' }], [46, 120, { v: 0.85, lab: 'rally to peak 2 (lighter)' }], [58, 108, { v: 1.3, lab: 'decline (heavier)' }], [66, 98, { v: 2.3, lab: 'break of middle low' }]], segs: [{ i0: 30, v0: 108, i1: 58, v1: 108, ext: 66, col: 'c3', label: 'middle low' }] },
+    tt: { pts: [[0, 100], [14, 118, { v: 1.5, lab: 'rally to peak 1' }], [22, 108, { v: 1.0, lab: 'decline' }], [34, 118, { v: 1.1, lab: 'rally to peak 2 (lighter)' }], [42, 108, { v: 1.15, lab: 'decline' }], [54, 118, { v: 0.75, lab: 'rally to peak 3 (lightest)' }], [62, 108, { v: 1.4, lab: 'decline (heavier)' }], [70, 98, { v: 2.3, lab: 'break of the lows' }]], segs: [{ i0: 22, v0: 108, i1: 62, v1: 108, ext: 70, col: 'c3', label: 'support' }] },
+    tri: { pts: [[0, 90], [18, 110, { v: 1.4, lab: 'trend into the pattern' }], [26, 100, { v: 1.0, lab: 'swing 1' }], [33, 108, { v: 0.9, lab: 'swing 2' }], [39, 102, { v: 0.7, lab: 'swing 3' }], [44, 106, { v: 0.5, lab: 'swing 4' }], [48, 103.6, { v: 0.45, lab: 'swing 5' }], [60, 118, { v: 2.3, lab: 'breakout' }]], segs: [{ i0: 18, v0: 110, i1: 33, v1: 108, ext: 50, col: 'c3' }, { i0: 26, v0: 100, i1: 39, v1: 102, ext: 50, col: 'c3' }] },
+    dn: { pts: [[0, 120], [10, 110, { v: 1.5, lab: 'fall' }], [16, 114, { v: 0.7, lab: 'bounce' }], [26, 103, { v: 1.5, lab: 'fall' }], [32, 107, { v: 0.7, lab: 'bounce' }], [42, 96, { v: 1.5, lab: 'fall' }], [48, 100, { v: 0.7, lab: 'bounce' }], [58, 90, { v: 1.5, lab: 'fall' }]], segs: [] }
+  };
+  const d7 = reg(() => {
+    const P = P7[$('sel7').value] || P7.hs; const D = bridge(P.pts, seed * 29 + 6, 0.006); const n = D.c.length; const all = avg(D.v.slice(1));
+    stack('c7', { n, panels: [{ h: 2.2, ohlc: D, segs: P.segs, label: 'price (simulated, drawn through fixed turning points)' }, { h: 1, bars: [{ d: D.v, col: upDown(D.c) }], label: 'volume' }], legend: [['up-day volume', 'buy'], ['down-day volume', 'sell']] });
+    const parts = []; for (let k = 1; k < P.pts.length; k++) { const vs = []; for (let i = 1; i < n; i++) if (D.leg[i] === k) vs.push(D.v[i]); parts.push(`${P.pts[k][2].lab} <b>${(avg(vs) / all).toFixed(2)}×</b>`); }
+    $('r7').innerHTML = 'average volume per leg (1.00 = whole chart): ' + parts.join(' · ');
+  });
+  $('sel7').addEventListener('change', d7);
+
+  // ---- shared data for s8, s9, s10: two rallies, the second on weaker volume
+  function data9() {
+    const D = bridge([[0, 100], [40, 120, { up: 1.5, dn: 0.8 }], [54, 110, { v: 1.5 }], [92, 128, { up: 0.5, dn: 1.5 }], [130, 104, { v: 1.3, up: 0.9, dn: 1.5 }]], seed * 31 + 5, 0.008);
+    D.obv = obvOf(D.c, D.v); D.pA = argMax(D.c, 0, 54); D.pC = argMax(D.c, 55, D.c.length - 1); return D;
+  }
+
+  const d8 = reg(() => {
+    const D = data9(); const n = D.c.length; const net = nulls(n);
+    for (let i = 20; i < n; i++) { let s = 0; for (let k = i - 19; k <= i; k++) s += D.c[k] > D.c[k - 1] ? D.v[k] : D.c[k] < D.c[k - 1] ? -D.v[k] : 0; net[i] = s; }
+    const pk = argMax(net, 20, n - 1); const pp = argMax(D.c, 0, n - 1);
+    stack('c8', { n, vlines: [{ i: pk, col: 'c1', label: 'pressure peaks' }, { i: pp, col: 'sell', label: 'price peaks' }],
+      panels: [{ h: 2, ohlc: D, label: 'price (simulated)' }, { h: 1.2, lines: [{ d: net, col: 'c1', w: 2.2, label: '20-day net volume pressure (up-day minus down-day volume)' }], zero: true, label: 'net pressure' }] });
+    $('r8').innerHTML = `net volume pressure peaked on day <b>${pk}</b> · price peaked on day <b>${pp}</b> · volume led by <b class="${pp > pk ? 'good' : 'bad'}">${pp - pk} days</b>`;
+  });
+
+  // OBV step-by-step table (small worked example)
+  let step9 = 1;
+  function ex9() {
+    const r = rng(seed * 41 + 9); const c = [50], v = [Math.round(800 + 600 * r()) * 10];
+    for (let i = 1; i < 12; i++) { const ch = i === 6 ? 0 : Math.round((r() - 0.45) * 160) / 100; c.push(+(c[i - 1] + ch).toFixed(2)); v.push(Math.round(600 + 900 * r()) * 10); }
+    return { c, v, obv: obvOf(c, v) };
+  }
+  function draw9t() {
+    const E = ex9(); const rows = ['<thead><tr><th>Day</th><th>Close</th><th>vs yesterday</th><th>Volume</th><th>Signed volume</th><th>OBV</th></tr></thead><tbody>'];
+    for (let i = 0; i < step9; i++) {
+      const ch = i ? E.c[i] - E.c[i - 1] : 0; const sg = !i ? '—' : ch > 0 ? '+' + E.v[i].toLocaleString('en-IN') : ch < 0 ? '−' + E.v[i].toLocaleString('en-IN') : '0 (unchanged)';
+      rows.push(`<tr${i === step9 - 1 ? ' class="hl"' : ''}><td class="num">${i + 1}</td><td class="num">${E.c[i].toFixed(2)}</td><td class="num">${!i ? 'start' : ch > 0 ? 'higher' : ch < 0 ? 'lower' : 'same'}</td><td class="num">${E.v[i].toLocaleString('en-IN')}</td><td class="num">${sg}</td><td class="num"><b>${E.obv[i].toLocaleString('en-IN')}</b></td></tr>`);
+    }
+    $('tab9').innerHTML = rows.join('') + '</tbody>';
+  }
+  $('step9').addEventListener('click', () => { step9 = Math.min(12, step9 + 1); draw9t(); });
+  $('reset9').addEventListener('click', () => { step9 = 1; draw9t(); });
+  reg(draw9t);
+
+  const d9 = reg(() => {
+    const D = data9(); const n = D.c.length; const A = D.pA, C = D.pC; const show = $('chk9').checked;
+    stack('c9', {
+      n, panels: [
+        { h: 1.8, ohlc: D, marks: [{ i: A, v: D.h[A], kind: 'ring', col: 'c3', t: 'peak 1' }, { i: C, v: D.h[C], kind: 'ring', col: 'sell', t: 'peak 2 (higher)' }], segs: show ? [{ i0: A, v0: D.h[A], i1: C, v1: D.h[C], col: 'buy', w: 2 }] : [], label: 'price (simulated)' },
+        { h: 1.2, lines: [{ d: D.obv, col: 'c2', w: 2.2, label: 'on balance volume' }], marks: [{ i: A, v: D.obv[A], kind: 'ring', col: 'c3' }, { i: C, v: D.obv[C], kind: 'ring', col: 'sell', t: 'lower', below: true }], segs: show ? [{ i0: A, v0: D.obv[A], i1: C, v1: D.obv[C], col: 'sell', w: 2 }] : [], label: 'OBV' }
+      ]
+    });
+    const div = D.c[C] > D.c[A] && D.obv[C] < D.obv[A];
+    $('r9').innerHTML = `price peak 1 <b>${D.c[A].toFixed(1)}</b> → peak 2 <b>${D.c[C].toFixed(1)}</b> · OBV at peak 1 <b>${fmtK(D.obv[A])}</b> → at peak 2 <b>${fmtK(D.obv[C])}</b> · ${div ? '<b class="bad">bearish divergence: price higher, OBV lower</b>' : '<b>no divergence on this roll</b>'}`;
+  });
+  $('chk9').addEventListener('change', d9);
+
+  // ---- s10: OBV variations
+  const d10 = reg(() => {
+    const D = data9(); const n = D.c.length; const sel = $('sel10').value; let line, name;
+    if (sel === 'pw') { line = [0]; for (let i = 1; i < n; i++) line.push(line[i - 1] + D.v[i] * (D.c[i] - D.c[i - 1])); name = 'cumulative volume × price change'; }
+    else if (sel === 'cl') { line = [0]; for (let i = 1; i < n; i++) { const rg = D.h[i] - D.l[i] || 1; line.push(line[i - 1] + D.v[i] * ((D.c[i] - D.l[i]) - (D.h[i] - D.c[i])) / rg); } name = 'cumulative close-location volume'; }
+    else { line = D.obv; name = 'on balance volume'; }
+    const A = D.pA, C = D.pC; const lower = line[C] < line[A];
+    if ($('chk10').checked) {
+      let lo = Infinity, hi = -Infinity, plo = Infinity, phi = -Infinity; line.forEach((x) => { lo = Math.min(lo, x); hi = Math.max(hi, x); }); D.c.forEach((x) => { plo = Math.min(plo, x); phi = Math.max(phi, x); });
+      const ov = line.map((x) => plo + (x - lo) / ((hi - lo) || 1) * (phi - plo));
+      stack('c10', { n, panels: [{ h: 1, ohlc: D, lines: [{ d: ov, col: 'c2', w: 2.2, label: name + ' (rescaled onto price)' }], label: 'price with the volume line drawn over it' }] });
+    } else {
+      stack('c10', { n, panels: [{ h: 1.6, ohlc: D, label: 'price (simulated, same market as section 09)' }, { h: 1.2, lines: [{ d: line, col: 'c2', w: 2.2, label: name }], marks: [{ i: A, v: line[A], kind: 'ring', col: 'c3' }, { i: C, v: line[C], kind: 'ring', col: 'sell' }], label: name }] });
+    }
+    $('r10').innerHTML = `at the higher second price peak this line is <b class="${lower ? 'bad' : 'good'}">${lower ? 'lower than at the first peak (it agrees: bearish divergence)' : 'higher than at the first peak (no divergence from this line)'}</b>`;
+  });
+  $('sel10').addEventListener('change', d10); $('chk10').addEventListener('change', d10);
+
+  // ---- s11: locked limit-up day (my queue model)
+  function d11() {
+    const b = val('b11q'), s = val('s11q'), normal = 20000; const vol = Math.min(b, s), left = Math.max(0, b - s); const mx = 40000; const N = (x) => x.toLocaleString('en-IN');
+    const row = (lab, x, col) => `<span>${lab}</span><div class="bar" style="width:${Math.max(0.5, x / mx * 100)}%;background:var(--${col})"></div><span>${N(x)}</span>`;
+    $('m11').innerHTML = row('buyers waiting', b, 'buy') + row('sellers at limit', s, 'sell') + row('volume today', vol, 'c1') + row('normal day', normal, 'muted');
+    if (b > s) $('r11').innerHTML = `<span>volume = min(${N(b)}, ${N(s)}) = <b>${N(vol)}</b>, only <b>${(vol / normal).toFixed(2)}×</b> a normal day</span><span>unfilled buyers still waiting: <b class="good">${N(left)}</b></span><span>traditional rule: light volume on a rally = weak · reality: demand is ${s ? (b / s).toFixed(1) + '×' : 'far more than'} supply at the limit = <b class="good">strong</b></span><span>OBV adds just +${N(vol)} today, vs about +${N(normal)} on an ordinary up day</span>`;
+    else $('r11').innerHTML = `<span>sellers (${N(s)}) can fill every buyer (${N(b)}): volume <b>${N(vol)}</b></span><span><b>not locked</b>: with this much supply, price can trade back below the limit, and volume means what it usually means</span>`;
+  }
+  bindRange('b11q', d11); bindRange('s11q', d11); d11();
+
+  // ---- s12: four OI rules
+  let h12 = 'e';
+  const R12 = [
+    { lab: '1 · bullish', col: 'buy', txt: 'rule 1, price up + OI up: new buying (long build-up), bullish' },
+    { lab: '2 · bearish', col: 'sell', txt: 'rule 2, price up + OI down: short covering, money leaving, bearish' },
+    { lab: '3 · bearish', col: 'sell', txt: 'rule 3, price down + OI up: aggressive new short selling (short build-up), bearish' },
+    { lab: '4 · bullish', col: 'buy', txt: 'rule 4, price down + OI down: losing longs liquidating (long unwinding), bullish' }
+  ];
+  const d12 = reg(() => {
+    const D = bridge([[0, 100], [40, 118, { v: 1.15 }], [80, 127, { v: 0.9 }], [120, 108, { v: 1.15 }], [160, 97, { v: 0.9 }]], seed * 37 + 8, 0.009);
+    const r = rng(seed * 43 + 2); const n = D.c.length; const oi = [60000]; const dir = [0.006, -0.006, 0.006, -0.006];
+    for (let i = 1; i < n; i++) oi.push(oi[i - 1] * Math.exp(dir[Math.min(3, Math.floor((i - 1) / 40))] + 0.004 * gauss(r)));
+    const sel = { a: 0, b: 1, c: 2, d: 3 }[h12];
+    const shade = R12.map((q, k) => ({ a: k * 40 + 1, b: (k + 1) * 40, col: q.col, alpha: sel == null ? 0.09 : sel === k ? 0.2 : 0.03, label: q.lab }));
+    stack('c12', { n, shade, panels: [{ h: 2, ohlc: D, label: 'price (simulated futures)' }, { h: 1.1, lines: [{ d: oi, col: 'c2', w: 2.2, label: 'open interest' }], label: 'open interest' }, { h: 0.9, bars: [{ d: D.v, col: 'c1', alpha: 0.55 }], label: 'volume' }] });
+    const ph = (k) => `${R12[k].txt}: price <b>${pct((D.c[(k + 1) * 40] / D.c[k * 40] - 1) * 100)}</b>, OI <b>${pct((oi[(k + 1) * 40] / oi[k * 40] - 1) * 100)}</b>`;
+    $('r12').innerHTML = (sel == null ? [0, 1, 2, 3] : [sel]).map((k) => `<span style="flex-basis:100%">${ph(k)}</span>`).join('');
+  });
+  ['a', 'b', 'c', 'd', 'e'].forEach((k) => $('b12' + k).addEventListener('click', () => { h12 = k; setOn(['b12a', 'b12b', 'b12c', 'b12d', 'b12e'], 'b12' + k); d12(); }));
+
+  // s12 worked example: weekly trade mix -> volume, change in OI, who bought and sold, which rule
+  const W12 = [
+    { p: 1.2, bo: 6000, lh: 3000, sh: 2000, bc: 1500 },
+    { p: 0.8, bo: 3000, lh: 2500, sh: 2500, bc: 2000 },
+    { p: 1.0, bo: 1000, lh: 2000, sh: 3000, bc: 4500 },
+    { p: -1.5, bo: 5000, lh: 2000, sh: 2500, bc: 1000 },
+    { p: -1.0, bo: 800, lh: 3500, sh: 1500, bc: 4200 }
+  ];
+  let st12 = 0;
+  function draw12t() {
+    const N = (x) => x.toLocaleString('en-IN'); let oi = 50000; const rows = ['<thead><tr><th>Week</th><th>Price</th><th>Both open</th><th>Long hand-off</th><th>Short hand-off</th><th>Both close</th><th>Volume</th><th>OI change</th><th>OI</th><th>Rule</th></tr></thead><tbody>', '<tr><td class="num">start</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num">50,000</td><td></td></tr>'];
+    let last = null;
+    for (let k = 0; k < st12; k++) {
+      const w = W12[k]; const vol = w.bo + w.lh + w.sh + w.bc, d = w.bo - w.bc; oi += d;
+      const rule = w.p > 0 ? (d > 0 ? 1 : 2) : (d > 0 ? 3 : 4);
+      rows.push(`<tr${k === st12 - 1 ? ' class="hl"' : ''}><td class="num">${k + 1}</td><td class="num">${w.p > 0 ? '+' : ''}${w.p}%</td><td class="num">${N(w.bo)}</td><td class="num">${N(w.lh)}</td><td class="num">${N(w.sh)}</td><td class="num">${N(w.bc)}</td><td class="num">${N(vol)}</td><td class="num">${d > 0 ? '+' : '−'}${N(Math.abs(d))}</td><td class="num">${N(oi)}</td><td class="num">${rule}</td></tr>`);
+      last = { w, vol, d, oi, rule };
+    }
+    $('tab12').innerHTML = rows.join('') + '</tbody>';
+    if (!last) { $('log12').textContent = 'Press "Next week". Long hand-off = a new long buys from an old long. Short hand-off = an old short buys back from a new short.'; return; }
+    const { w, vol, d, rule } = last; const pc = (a) => Math.round(a / vol * 100) + '%';
+    const nl = w.bo + w.lh, cov = w.sh + w.bc, ns = w.bo + w.sh, out = w.lh + w.bc;
+    const verdict = ['', 'new money buying: bullish', 'mainly short covering, money leaving: bearish', 'new short selling: bearish', 'losing longs liquidating: bullish (strengthening)'][rule];
+    $('log12').textContent = `week ${st12}: price ${w.p > 0 ? 'up' : 'down'} ${Math.abs(w.p)}%\n` +
+      `volume  = ${N(w.bo)} + ${N(w.lh)} + ${N(w.sh)} + ${N(w.bc)} = ${N(vol)}   (every trade counts)\n` +
+      `OI change = both open − both close = ${N(w.bo)} − ${N(w.bc)} = ${d > 0 ? '+' : '−'}${N(Math.abs(d))}\n` +
+      `buyers:  new longs ${N(nl)} (${pc(nl)}) · shorts buying back ${N(cov)} (${pc(cov)})\n` +
+      `sellers: new shorts ${N(ns)} (${pc(ns)}) · longs getting out ${N(out)} (${pc(out)})\n` +
+      `→ price ${w.p > 0 ? 'up' : 'down'} + OI ${d > 0 ? 'up' : 'down'} = rule ${rule}: ${verdict}`;
+  }
+  $('step12').addEventListener('click', () => { st12 = Math.min(W12.length, st12 + 1); draw12t(); });
+  $('reset12').addEventListener('click', () => { st12 = 0; draw12t(); });
+  draw12t();
+
+  // s12 classifier (same logic as the code block)
+  function oiState(dp, doi, minOiPct) {
+    if (dp === 0) return 'price flat: no read';
+    if (Math.abs(doi) < minOiPct) return 'OI roughly flat: no read';
+    if (dp > 0) return doi > 0 ? 'long build-up · rule 1 · bullish' : 'short covering · rule 2 · bearish';
+    return doi > 0 ? 'short build-up · rule 3 · bearish' : 'long unwinding · rule 4 · bullish';
+  }
+  function d12c() {
+    const dp = val('pc12'), doi = val('oi12'); const s = oiState(dp, doi, 2); const cls = /bullish/.test(s) ? 'good' : /bearish/.test(s) ? 'bad' : '';
+    const oi0 = 1000000, oi1 = oi0 * (1 + doi / 100);
+    $('r12c').innerHTML = `<span>example: total OI ${oi0.toLocaleString('en-IN')} → ${Math.round(oi1).toLocaleString('en-IN')} contracts (${doi > 0 ? '+' : ''}${doi}%)</span><span>state <b class="${cls}">${s}</b></span>`;
+  }
+  bindRange('pc12', d12c); bindRange('oi12', d12c); d12c();
+
+  // ---- s13: 10,000 contracts trapped by a breakout
+  let dir13 = 1;
+  const d13 = reg(() => {
+    const r = rng(seed * 47 + 3); const R = 63, B = 26; const c = [], o = [], h = [], l = []; let x = 0;
+    for (let i = 0; i < R; i++) { x = 0.82 * x + 0.9 * gauss(r); const p = Math.max(96.6, Math.min(103.4, 100 + 1.5 * x)); const op = i ? c[i - 1] : 100; c.push(p); o.push(op); h.push(Math.max(op, p) + 0.5 * r()); l.push(Math.min(op, p) - 0.5 * r()); }
+    const add = []; for (let i = 0; i < R; i++) add.push(0.3 + r()); const sum = add.reduce((s, a) => s + a, 0); let tot = 0;
+    for (let i = 0; i < R; i++) { add[i] = Math.round(add[i] / sum * 10000); tot += add[i]; } add[R - 1] += 10000 - tot;
+    const top = Math.max(...h), bot = Math.min(...l);
+    const Bk = bridge([[0, c[R - 1]], [4, dir13 > 0 ? top + 2.2 : bot - 2.2, { noise: 0.01 }], [B, dir13 > 0 ? top + 13 : bot - 13, { noise: 0.01 }]], seed * 53 + 1, 0.01);
+    for (let j = 1; j <= B; j++) { c.push(Bk.c[j]); o.push(Bk.o[j]); h.push(Bk.h[j]); l.push(Bk.l[j]); }
+    const d = val('n13'); const now = R - 1 + d; const cur = c[now];
+    const show = (a) => a.map((v, i) => (i <= now ? v : null));
+    const losing = (i) => (dir13 > 0 ? cur > c[i] : cur < c[i]);
+    let lose = 0; for (let i = 0; i < R; i++) if (losing(i)) lose += add[i];
+    const bars = add.concat(new Array(B).fill(null));
+    stack('c13', {
+      n: R + B, shade: [{ a: 0, b: R - 1, col: 'muted', alpha: 0.07, label: 'three-month trading range' }],
+      panels: [
+        { h: 2, ohlc: { o: show(o), h: show(h), l: show(l), c: show(c) }, hlines: [{ v: top, col: 'muted', label: 'range top', below: dir13 < 0 }, { v: bot, col: 'muted', label: 'range bottom', below: true }, { v: cur, col: 'c1', label: 'today\'s price', right: true, below: dir13 < 0 }], ymin: dir13 > 0 ? bot - 3 : bot - 15, ymax: dir13 > 0 ? top + 15 : top + 3, label: 'price (simulated futures)' },
+        { h: 1, bars: [{ d: bars, col: (i) => colorOf(losing(i) ? 'sell' : 'muted', losing(i) ? 0.75 : 0.45) }], label: 'contracts opened each range day (sum = 10,000)' }
+      ],
+      legend: [[(dir13 > 0 ? 'shorts' : 'longs') + ' opened that day now losing', 'sell'], ['not yet losing', 'muted']]
+    });
+    const who = dir13 > 0 ? 'shorts' : 'longs';
+    $('r13').innerHTML = `day ${d} after the breakout · ${who} opened inside the range that are now losing: <b class="bad">${lose.toLocaleString('en-IN')} of 10,000</b> (${(lose / 100).toFixed(0)}%) · each must eventually ${dir13 > 0 ? 'buy back' : 'sell out'}, adding ${dir13 > 0 ? 'upward' : 'downward'} pressure`;
+  });
+  bindRange('n13', d13);
+  $('up13').addEventListener('click', () => { dir13 = 1; setOn(['up13', 'dn13'], 'up13'); d13(); });
+  $('dn13').addEventListener('click', () => { dir13 = -1; setOn(['up13', 'dn13'], 'dn13'); d13(); });
+
+  // ---- s14: dim futures-only rules
+  $('chk14').addEventListener('change', () => { $('list14').classList.toggle('dimfut', $('chk14').checked); });
+
+  // ---- s15: blowoff / selling climax
+  let m15 = 'bo';
+  const d15 = reg(() => {
+    const r = rng(seed * 59 + 4);
+    if (m15 === 'bo') {
+      const D = bridge([[0, 100], [90, 135, { v: 1.0 }], [108, 176, { v: 2.8, up: 1.2, noise: 0.012 }], [111, 180, { v: 3.2 }], [135, 142, { v: 1.6, noise: 0.012 }]], seed * 61 + 2, 0.009);
+      const n = D.c.length; const oi = [50000];
+      for (let i = 1; i < n; i++) oi.push(oi[i - 1] * Math.exp((i <= 90 ? 0.0028 : i <= 111 ? -0.009 : -0.006) + 0.003 * gauss(r)));
+      const pk = argMax(D.c, 0, n - 1);
+      stack('c15', { n, shade: [{ a: 91, b: 111, col: 'sell', alpha: 0.1, label: 'final rally' }], panels: [{ h: 2, ohlc: D, marks: [{ i: pk, v: D.h[pk], kind: 'ring', col: 'sell' }], label: 'price (simulated futures)' }, { h: 1, lines: [{ d: oi, col: 'c2', w: 2.2, label: 'open interest' }], label: 'open interest' }, { h: 1, bars: [{ d: D.v, col: upDown(D.c) }], label: 'volume' }] });
+      $('r15').innerHTML = `abrupt peak circled · volume in the final rally <b>${(avg(D.v.slice(91, 112)) / avg(D.v.slice(1, 91))).toFixed(1)}×</b> the earlier average · open interest during the final rally <b class="bad">${pct((oi[111] / oi[90] - 1) * 100)}</b> (the warning) · price in the final rally <b>${pct((D.c[111] / D.c[90] - 1) * 100)}</b>`;
+    } else {
+      const D = bridge([[0, 140], [90, 108, { v: 1.0 }], [95, 84, { v: 4.0, noise: 0.012 }], [100, 100, { v: 2.2, noise: 0.012 }], [135, 104, { v: 0.9 }]], seed * 67 + 3, 0.009);
+      const n = D.c.length; const lo = argMin(D.c, 85, 100);
+      stack('c15', { n, shade: [{ a: 91, b: 100, col: 'buy', alpha: 0.1, label: 'climax' }], panels: [{ h: 2, ohlc: D, marks: [{ i: lo, v: D.l[lo], kind: 'ring', col: 'buy', t: 'climax low', below: true }], label: 'price (simulated)' }, { h: 1, bars: [{ d: D.v, col: upDown(D.c) }], label: 'volume' }] });
+      $('r15').innerHTML = `volume in the climax <b>${(avg(D.v.slice(91, 96)) / avg(D.v.slice(1, 91))).toFixed(1)}×</b> the earlier average · drop <b class="bad">${pct((D.c[95] / D.c[90] - 1) * 100)}</b> in 5 days, then rebound <b class="good">${pct((D.c[100] / D.c[95] - 1) * 100)}</b> in 5 days · the book gives no open interest rule for climaxes, so none is drawn`;
+    }
+  });
+  $('bo15').addEventListener('click', () => { m15 = 'bo'; setOn(['bo15', 'sc15'], 'bo15'); d15(); });
+  $('sc15').addEventListener('click', () => { m15 = 'sc'; setOn(['bo15', 'sc15'], 'sc15'); d15(); });
+
+  // ---- s16: COT net positions (weekly, 4 years)
+  function data16() {
+    const r = rng(seed * 71 + 5); const n = 208; const ph = r() * 6.28; const c = [], o = [], h = [], l = [], cm = [], ls = [], st = []; let w = 0;
+    for (let i = 0; i < n; i++) {
+      w += 0.012 * gauss(r); const cyc = Math.sin(2 * Math.PI * i / 62 + ph) + 0.35 * Math.sin(2 * Math.PI * i / 23 + 2 * ph);
+      const p = 100 * Math.exp(0.2 * cyc + 0.0007 * i + w); const op = i ? c[i - 1] : p;
+      c.push(p); o.push(op); h.push(Math.max(op, p) * (1 + 0.012 * r())); l.push(Math.min(op, p) * (1 - 0.012 * r()));
+      const a = -60 * cyc + 9 * gauss(r), b = 38 * cyc + 7 * gauss(r); cm.push(a); ls.push(b); st.push(-(a + b));
+    }
+    return { c, o, h, l, cm, ls, st, n };
+  }
+  const d16 = reg(() => {
+    const D = data16(); const t = val('n16') / 100; const n = D.n;
+    const rk = (a) => { const lo = Math.min(...a), hi = Math.max(...a); return a.map((x) => (x - lo) / ((hi - lo) || 1)); };
+    const pc = rk(D.cm), pl = rk(D.ls); const marks = []; let last = -99, nb = 0, ns = 0;
+    for (let i = 0; i < n; i++) {
+      if (i - last < 8) continue;
+      if (pc[i] >= 1 - t && pl[i] <= t) { marks.push({ i, v: D.l[i], kind: 'buy' }); last = i; nb++; }
+      else if (pc[i] <= t && pl[i] >= 1 - t) { marks.push({ i, v: D.h[i], kind: 'sell' }); last = i; ns++; }
+    }
+    stack('c16', { n, panels: [{ h: 1.7, ohlc: D, marks, label: 'weekly price (simulated futures)' },
+      { h: 1.3, lines: [{ d: D.cm, col: 'c2', w: 2.4, label: 'commercials (net)' }, { d: D.ls, col: 'c1', w: 1.8, dash: [6, 4], label: 'large speculators (net)' }, { d: D.st, col: 'c3', w: 1.4, dash: [2, 3], label: 'small traders (net)' }], zero: true, label: 'net positions, thousands of contracts' }],
+      legend: [['buy: commercials heavily long, large specs heavily short', 'buy'], ['sell: the reverse', 'sell']] });
+    $('r16').innerHTML = `buy signals <b class="good">${nb}</b> · sell signals <b class="bad">${ns}</b> over 208 weeks · the three lines add to zero every week: e.g. last week ${fmt(D.cm[n - 1])} + ${fmt(D.ls[n - 1])} + ${fmt(D.st[n - 1])} = <b>${Math.abs(D.cm[n - 1] + D.ls[n - 1] + D.st[n - 1]).toFixed(1)}</b>`;
+  });
+  bindRange('n16', d16);
+
+  // ---- s17: put/call ratio as a contrary indicator
+  const d17 = reg(() => {
+    const D = bridge([[0, 100], [30, 112], [42, 100, { noise: 0.013 }], [80, 118], [92, 105, { noise: 0.013 }], [130, 97], [138, 106, { noise: 0.012 }], [180, 99], [210, 116], [222, 104, { noise: 0.013 }], [250, 113]], seed * 73 + 6, 0.009);
+    const r = rng(seed * 79 + 1); const n = D.c.length; const pc = nulls(n);
+    for (let i = 5; i < n; i++) pc[i] = 0.85 * Math.exp(-7 * (D.c[i] / D.c[i - 5] - 1) + 0.1 * gauss(r));
+    const hi = val('hi17'), lo = val('lo17'), conf = $('chk17').checked; const marks = []; let nb = 0, ns = 0, raw = 0;
+    for (let i = 6; i < n; i++) {
+      const up = pc[i] > hi && pc[i - 1] <= hi, dn = pc[i] < lo && pc[i - 1] >= lo; if (!up && !dn) continue;
+      raw++; let at = i;
+      if (conf) { at = -1; for (let j = i + 1; j <= Math.min(n - 1, i + 10); j++) { const w = D.c.slice(j - 5, j); if (up ? D.c[j] > Math.max(...w) : D.c[j] < Math.min(...w)) { at = j; break; } } }
+      if (at < 0) continue;
+      if (up) { marks.push({ i: at, v: D.l[at], kind: 'buy' }); nb++; } else { marks.push({ i: at, v: D.h[at], kind: 'sell' }); ns++; }
+    }
+    stack('c17', { n, panels: [{ h: 1.8, ohlc: D, marks, label: 'price (simulated)' }, { h: 1.1, lines: [{ d: pc, col: 'c3', w: 1.6, label: 'put/call volume ratio' }], hlines: [{ v: hi, col: 'buy', label: 'very high: oversold' }, { v: lo, col: 'sell', label: 'very low: overbought' }], label: 'put/call ratio' }],
+      legend: [['▲ contrary buy (fear extreme)', 'buy'], ['▼ contrary sell (complacency extreme)', 'sell']] });
+    $('r17').innerHTML = `contrary buy marks <b class="good">${nb}</b> · contrary sell marks <b class="bad">${ns}</b>${conf ? ` · only those confirmed by a 5-day breakout within 10 days: <b>${nb + ns}</b> of <b>${raw}</b> extremes; the other ${raw - nb - ns} never got a price turn in time, which is the failure mode the confirmation filters out` : ` · ${raw} raw extremes, no price confirmation`}`;
+  });
+  bindRange('hi17', d17); bindRange('lo17', d17); $('chk17').addEventListener('change', d17);
+
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; i6b = 0; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

@@ -1,0 +1,1742 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.6 Continuation Patterns</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* chapter-pattern pages: HTML concept map (no mermaid) */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .node { border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; background: var(--paper); line-height: 1.45; }
+.flow .node.hot { border-color: var(--c1); background: var(--tint); }
+.flow .node small { color: var(--muted); font-size: 12px; }
+.flow .arrow { text-align: center; color: var(--muted); line-height: 1; }
+.flow .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.flow .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 640px) { .flow .row2, .flow .row3 { grid-template-columns: 1fr; } }
+.box ul.plain { padding-left: 4px; list-style: none; }
+.controls label { flex-wrap: wrap; max-width: 100%; min-width: 0; }
+.controls select { max-width: 100%; min-width: 0; }
+.readout span { min-width: 0; overflow-wrap: anywhere; }
+.plate, .fig, .wrap { grid-template-columns: minmax(0, 1fr); }
+/* depth pass: worked examples (book numbers) and beyond-the-book boxes */
+.worked { background: var(--paper); border: 1px solid var(--rule); }
+.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.worked .formula, .beyond .formula { background: var(--plate); white-space: pre-wrap; }
+.tablewrap td.good { color: var(--buy); } .tablewrap td.bad { color: var(--sell); }
+.tablewrap tr.hi td { font-weight: 600; background: var(--tint2); }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch05_reversal_patterns.html">← Ch.5 Major Reversal Patterns</a><a href="ch07_volume_open_interest.html">Ch.7 Volume and Open Interest →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John J. Murphy · Technical Analysis of the Financial Markets · Chapter 6 · pdf p166–193</div>
+  <h1>Continuation patterns: the market <em>pauses</em>, then carries on</h1>
+  <p class="lede">The whole chapter in plain words and in the book's order: symmetrical, ascending and descending triangles (with their time limit and measuring rules), the broadening formation, flags and pennants, wedges, rectangles, the measured move, the continuation head and shoulders, and the ideas of confirmation and divergence. Every chart is a <b>simulated</b> price path built to show one pattern clearly; it isn't real market data. The button re-rolls the small day-to-day noise; the pattern shapes stay the same.</p>
+  <div class="topbar"><button id="reroll" type="button">Re-roll the noise</button><span class="readout">noise seed #<b id="seedOut">7</b> · pattern shapes stay the same</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Chapter 5 was about sideways stretches that end a trend. This chapter is about sideways stretches that only interrupt one. Almost every pattern here is two lines drawn around the pause, plus three questions: which way will it break, when, and how far will it go?</p>
+  <div class="flow" aria-label="Concept map of chapter 6">
+    <div class="node">A trend pauses → a short sideways pattern (usually 1–3 months, flags and pennants 1–3 weeks) → <b>the trend usually resumes</b></div>
+    <div class="arrow">↓ what do the two boundary lines do?</div>
+    <div class="row3">
+      <div class="node hot"><b>Converge</b><br><small>symmetrical triangle (neutral) · ascending (bullish) · descending (bearish) · pennant · wedge (slants against the trend)</small></div>
+      <div class="node"><b>Stay parallel</b><br><small>rectangle (flat) · flag (slopes against the trend)</small></div>
+      <div class="node"><b>Diverge</b><br><small>broadening formation: wider swings, rising volume, usually at major tops</small></div>
+    </div>
+    <div class="arrow">↓ every pattern then gets the same three checks</div>
+    <div class="row3">
+      <div class="node"><b>Breakout</b><br><small>a <i>close</i> outside a line, on rising volume (upside volume matters most) · a return move to the line is common</small></div>
+      <div class="node"><b>Timing</b><br><small>triangle: break between ⅔ and ¾ of the way to the apex</small></div>
+      <div class="node"><b>Measurement</b><br><small>pattern height from the breakout · flags fly at half-mast · measured move: second leg ≈ first leg</small></div>
+    </div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Continuation vs reversal</a>
+    <a href="#s2"><span>02</span>Three kinds of triangle</a>
+    <a href="#s3"><span>03</span>Symmetrical triangle: drawing it</a>
+    <a href="#s4"><span>04</span>Time limit: the ⅔–¾ rule</a>
+    <a href="#s5"><span>05</span>Triangle volume</a>
+    <a href="#s6"><span>06</span>Measuring a symmetrical triangle</a>
+    <a href="#s7"><span>07</span>Ascending triangle</a>
+    <a href="#s8"><span>08</span>Descending triangle</a>
+    <a href="#s9"><span>09</span>Volume and time in triangles</a>
+    <a href="#s10"><span>10</span>Broadening formation</a>
+    <a href="#s11"><span>11</span>Flags and pennants</a>
+    <a href="#s12"><span>12</span>Flag measurement and summary</a>
+    <a href="#s13"><span>13</span>Wedges</a>
+    <a href="#s14"><span>14</span>Rectangles</a>
+    <a href="#s15"><span>15</span>Trading the range</a>
+    <a href="#s16"><span>16</span>The measured move</a>
+    <a href="#s17"><span>17</span>Continuation head and shoulders</a>
+    <a href="#s18"><span>18</span>Confirmation and divergence</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · INTRODUCTION</div><h2>A pause, not a turn</h2></div><span class="chip">pdf p166–167</span></div>
+  <p>Continuation patterns usually say that the sideways action on the chart is just a pause in the prevailing trend, and that the next move will go the same way as the trend that came before. That separates them from Chapter 5's patterns, which usually say a major reversal is under way.</p>
+  <p>They also differ in <b>time</b>. Reversal patterns usually take much longer to build and mark major trend changes. Continuation patterns are usually shorter and are better described as near-term or intermediate patterns.</p>
+  <p>Notice how often Murphy hedges with the word <i>usually</i>. Chart patterns are general tendencies, not rigid rules, and there are always exceptions. Even the grouping is sometimes shaky: triangles are usually continuation patterns but sometimes act as reversals; they're usually intermediate but occasionally appear on long-term charts with major significance; the <b>inverted</b> triangle usually marks a major top; and even the head and shoulders is occasionally a consolidation. Allowing for that, patterns do generally fall into the two groups, and read properly they help the chartist work out what the market will probably do most of the time.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch06_marathon_water_stop.svg" alt="A marathon runner pauses briefly at a roadside water table and keeps facing forward, while in an inset another runner sits down, removes his shoes and walks back." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A long-distance runner stopping at a water table. The stop is short, they don't turn around, and you'd bet they keep running the same way. A reversal is the runner who sits down, takes their shoes off and walks back.</p></div>
+  <div class="fig">
+    <canvas id="c1" aria-label="Simulated trend with several short pauses"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>After a fast move, some early buyers take profits and new buyers wait for a better price, so the market goes sideways while the move is digested. Nothing has changed the reason for the trend, so once the selling is absorbed, prices carry on. The three pauses have different shapes (a flag, a triangle, a rectangle), but each one is exited in the direction the trend was already going. Their durations, days to a few weeks, are also typical of continuation patterns rather than of the long bases and tops in Chapter 5.</p></div>
+  <div class="box beyond"><b>Beyond the book: how a trader turns a pattern into four numbers</b>
+    <p>Murphy describes the shapes. To trade one, you need four numbers, and every pattern in this chapter gives you all four:</p>
+    <ul>
+      <li><b>Direction</b>: the prior trend (symmetrical triangle, rectangle, flag, pennant) or the shape itself (ascending/descending triangle, wedge).</li>
+      <li><b>Trigger</b>: the price where a close outside the boundary line would complete the pattern.</li>
+      <li><b>Invalidation (stop)</b>: a price that should not trade if the pattern is right, usually beyond the last reversal point inside the pattern. Murphy doesn't set stops in this chapter; this part is mine.</li>
+      <li><b>Target</b>: the pattern's measured height projected from the breakout.</li>
+    </ul>
+    <p>Risk = trigger − stop, reward = target − trigger, R = reward ÷ risk. The pattern's value is only as good as how often the trade reaches its target compared with 1 ÷ (1 + R). Section 06 lets you test that on simulated paths.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_reversal_patterns.html">Chapter 5</a>: the reversal family and its preliminary rules (prior trend, bigger pattern = bigger move, volume matters more on the upside).</li>
+    <li><a href="ch16_money_management.html">Chapter 16</a>: Murphy's money management and reward-to-risk ratios.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · TRIANGLES</div><h2>Three kinds of triangle (and a fourth, inside out)</h2></div><span class="chip">pdf p167–169 · Fig 6.1a–c</span></div>
+  <p>There are three types of triangle: <b>symmetrical</b>, <b>ascending</b> and <b>descending</b>. Some chartists count a fourth, the <b>expanding triangle</b> or <b>broadening formation</b>, treated separately later (section 10). Each has a slightly different shape and different forecasting implications.</p>
+  <ul class="plain">
+    <li><b>Symmetrical:</b> two converging trendlines, the upper one falling and the lower one rising. The vertical line at the left that measures the pattern's height is the <b>base</b>. The point at the right where the two lines meet is the <b>apex</b>. Because it winds tighter and tighter, it's also called a <b>coil</b>.</li>
+    <li><b>Ascending:</b> a rising lower line with a flat, horizontal upper line. Generally bullish.</li>
+    <li><b>Descending:</b> a falling upper line with a flat, horizontal bottom line. Usually bearish.</li>
+  </ul>
+  <div class="fig">
+    <svg viewBox="0 0 660 190" role="img" aria-label="Diagrams of symmetrical, ascending and descending triangles">
+      <g fill="none" stroke-width="2">
+        <polyline points="10,150 40,120 50,130 80,40 105,120 128,58 148,108 165,72 180,96 190,82 205,70 225,20" stroke="var(--price)"/>
+        <line x1="80" y1="40" x2="215" y2="86" stroke="var(--c1)"/><line x1="105" y1="120" x2="215" y2="86" stroke="var(--c1)"/>
+        <line x1="80" y1="40" x2="80" y2="124" stroke="var(--c3)" stroke-dasharray="4 3"/>
+        <polyline points="235,150 265,120 275,130 300,45 330,120 355,45 375,100 395,45 410,82 425,45 440,25 450,35 460,10" stroke="var(--price)"/>
+        <line x1="300" y1="45" x2="450" y2="45" stroke="var(--c1)"/><line x1="320" y1="122" x2="450" y2="66" stroke="var(--c1)"/>
+        <polyline points="465,15 495,45 505,35 530,130 555,60 578,130 598,80 615,130 628,100 640,140 655,175" stroke="var(--price)"/>
+        <line x1="530" y1="130" x2="655" y2="130" stroke="var(--c1)"/><line x1="545" y1="52" x2="655" y2="110" stroke="var(--c1)"/>
+      </g>
+      <text x="68" y="140" text-anchor="end">base</text><text x="218" y="100">apex</text>
+      <text x="112" y="182" text-anchor="middle">symmetrical (neutral)</text>
+      <text x="345" y="182" text-anchor="middle">ascending (bullish)</text>
+      <text x="575" y="182" text-anchor="middle">descending (bearish)</text>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two people pushing a door from opposite sides. In the symmetrical triangle both give a little ground each time: it's a fair fight and the door will swing whichever way the bigger trend pushes. In the ascending triangle the sellers stand firm at one spot (the flat top), but the buyers keep stepping closer (rising lows): sooner or later the buyers burst through. The descending triangle is the opposite.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each line is a record of one side's behaviour. The upper line joins the prices where sellers overwhelmed buyers; the lower line joins the prices where buyers overwhelmed sellers. A <b>flat</b> line means one side keeps showing up at exactly the same price (often one large order, or many orders parked at a round number). A <b>sloping</b> line means that side is changing its mind each swing: a rising lower line is buyers paying more each dip, a falling upper line is sellers accepting less each rally. So the two slopes tell you who is moving and who is standing still, and that's all the triangle's forecast is.</p></div>
+  <div class="fig">
+    <canvas id="c2" class="short" aria-label="Two boundary lines with adjustable slopes; the page names the resulting pattern"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="su2">upper line slope <input id="su2" type="range" min="-0.4" max="0.4" step="0.02" value="-0.2"><output id="su2o">-0.2</output></label>
+      <label for="sl2">lower line slope <input id="sl2" type="range" min="-0.4" max="0.4" step="0.02" value="0.2"><output id="sl2o">0.2</output></label>
+      <label for="tr2">trend before it <select id="tr2"><option value="up">up</option><option value="dn">down</option></select></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: one rule names (almost) every pattern in the chapter</b><p>Drag the two slopes (points per day). Lines that <b>converge</b> give triangles, pennants and wedges; lines that stay <b>parallel</b> give rectangles and flags; lines that <b>diverge</b> give the broadening formation. Which one you get depends on the sign of each slope. The classifier and its cut-off (a slope between −0.05 and +0.05 counts as flat) are mine, not Murphy's; the reading attached to each name is his. Two things the slopes can't tell you: duration (a 2-week pennant and a 2-month triangle have the same shape, see section 09) and what came before (flags need a sharp pole).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_trend.html">Chapter 4</a>: each side of a triangle is an ordinary trendline, and the flat sides are horizontal support or resistance.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · THE SYMMETRICAL TRIANGLE</div><h2>Drawing a symmetrical triangle, point by point</h2></div><span class="chip">pdf p168–170 · Fig 6.1a</span></div>
+  <p>The symmetrical triangle (the coil) is usually a continuation pattern: a pause, after which the original trend resumes. In Murphy's Figure 6.1a the prior trend was up, so the odds favour an upside resolution. Had the trend been down, the triangle would be bearish.</p>
+  <p>The <b>minimum requirement is four reversal points</b>. It takes two points to draw a trendline, so each of the two converging lines needs at least two touches. The triangle begins at point 1, where the consolidation starts. Prices pull back to 2, then rally to 3, which is lower than 1. Only once prices fall away from 3 can the upper line be drawn. Point 4 is higher than 2, and only when prices rally from 4 can the rising lower line be drawn. That's when the analyst begins to suspect a symmetrical triangle: four reversal points and two converging lines.</p>
+  <p>Many triangles have <b>six</b> reversal points: three peaks and three troughs, making <b>five waves</b> inside the triangle before the uptrend resumes. (Murphy returns to this five-wave tendency in the Elliott Wave chapter.) As the Figure 6.1a caption puts it, a <b>close outside either trendline</b> completes the pattern.</p>
+  <div class="box picture"><b>Picture it</b><p>Joining dots in a children's puzzle book, except the dots appear one at a time and you're not told the picture. After two dots you can only guess at a line; after four you can see a funnel taking shape; after six you're fairly sure. A triangle is something you <i>discover</i> as the swings happen, never something you can see on day one. Press <i>Next point</i> and notice how long you spend guessing.</p></div>
+  <div class="fig">
+    <canvas id="c3" class="tall" aria-label="Symmetrical triangle drawn reversal point by reversal point"></canvas>
+    <div class="legend" id="c3L"></div>
+    <div class="controls"><button id="pv3" type="button">◀ Back</button><button id="nx3" type="button">Next point ▶</button><button id="al3" type="button">Show all</button><span>step <b id="st3">1</b> / 8</span></div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each swing is smaller than the last: buyers are willing to pay a little less on each rally and sellers to accept a little more on each dip. The range is being squeezed from both sides, so neither side is winning. That's why the symmetrical triangle on its own is neutral, and why you lean on the trend that came <i>before</i> it to guess the exit.</p>
+  <p>Notice the lag built into the rules. The lower line can only be drawn once prices rally away from point 4 (step 5, day 43 here), more than halfway through the pattern. Until then a chartist has a guess, not a triangle. In practice (my addition, not Murphy's): the reversal points also tell you where you're wrong. A trader who buys the upside break would put the stop under the last trough (point 6), because a fall back below it would mean the lower line has failed too.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch13_elliott_wave.html">Chapter 13</a>: Elliott's five-wave triangles.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · TIME LIMIT FOR TRIANGLE RESOLUTION</div><h2>The two-thirds to three-quarters rule</h2></div><span class="chip">pdf p170–171 · Fig 6.1d</span></div>
+  <p>A triangle has a built-in deadline: the <b>apex</b>, where the two lines meet. As a general rule, prices should break out in the direction of the prior trend somewhere between <b>two-thirds and three-quarters</b> of the triangle's horizontal width, measured from the vertical base on the left to the apex on the right. Because the lines must meet somewhere, that width can be measured as soon as both lines are drawn. An upside breakout is signalled by a penetration of the upper line. If prices stay inside beyond the three-quarters point, the triangle starts to <b>lose its potency</b>, and prices usually just drift out to the apex and beyond.</p>
+  <p>So the triangle combines <b>price and time</b>. The lines give the price boundaries and tell you when the pattern is complete (a break of the upper line, in an uptrend). They also give a time target: if the triangle is <b>20 weeks</b> wide, the breakout should come between about the <b>13th and 15th week</b>. Murphy's Dell example (Fig 6.1d, a bullish symmetrical triangle in the fourth quarter of 1997) was <b>18 weeks</b> wide and broke out in the <b>13th week</b>, just past the two-thirds point (⅔ × 18 = 12).</p>
+  <p>The actual signal is a <b>closing</b> penetration of a trendline (an intraday poke isn't enough; other penetration filters from earlier chapters can be added). Sometimes a <b>return move</b> comes back to the broken line: in an uptrend the broken upper line becomes support; in a downtrend the broken lower line becomes resistance. The <b>apex</b> itself also acts as important support or resistance after the breakout.</p>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Triangle with the two-thirds to three-quarters breakout window"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <label for="w4">width base→apex (weeks) <input id="w4" type="range" min="8" max="30" step="1" value="20"><output id="w4o">20</output></label>
+      <label for="b4">breakout at week <input id="b4" type="range" min="2" max="30" step="1" value="14"><output id="b4o">14</output></label>
+    </div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A funnel. Early on there's plenty of room and the ball bounces about. Two-thirds of the way down the walls are close enough that the ball has to come out one side. If it somehow rolls all the way to the narrow tip, it just dribbles out with no force; the pattern has lost its spring.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The window is pure geometry: ⅔ × 20 = 13.3 and ¾ × 20 = 15, hence the 13th to 15th week. At default settings the breakout falls inside the green window. Drag the breakout past ¾: it becomes a late, weak exit near the apex, where the lines are so close together that almost any wiggle crosses one of them. The upside move after a late break is drawn smaller to illustrate the loss of potency Murphy describes; the size of that move is my illustration, not a book number.</p>
+  <p>Why would a late break be weaker? The readout's gap figure gives one mechanical reason (my explanation, not the book's). The two lines close in at a steady rate, so the gap between them is base × (1 − t ÷ width). A break means prices escaped a band that narrow. Escaping a 10-point band says something; escaping a 1-point band says almost nothing, because one ordinary day's range is enough.</p></div>
+  <div class="box worked"><b>Worked example</b>
+    <div class="formula">Murphy's 20-week triangle:  ⅔ × 20 = 13.3   ¾ × 20 = 15     → breakout due in about weeks 13–15
+Dell (Fig 6.1d), 18 weeks:   ⅔ × 18 = 12     ¾ × 18 = 13.5   → it broke in week 13 = 13 ÷ 18 = 72%: inside
+
+Gap left between the lines (my addition), base = 30 points:
+  break at ⅔ (67%)  → gap = 30 × (1 − 0.67) = 10 points
+  break at ¾ (75%)  → gap = 30 × (1 − 0.75) = 7.5 points
+  break at 90%      → gap = 30 × (1 − 0.90) = 3 points (one ordinary day can cross it)</div></div>
+  <h3>Why Murphy insists on a close: a breakout-filter lab</h3>
+  <p>Murphy's signal is a <b>closing</b> penetration, and he lets you add the penetration filters of Chapter 4 (a close a set percentage beyond the line, commonly 3% for major lines, or two closes in a row beyond it). Each filter is a trade-off: it ignores more of the false pokes, but when it does fire you get in later and at a worse price. The lab measures both sides on the same simulated paths.</p>
+  <div class="fig">
+    <canvas id="c4b" class="tall" aria-label="Simulated price paths around a horizontal line, with the filter's trigger marked"></canvas>
+    <div class="legend" id="c4bL"></div>
+    <div class="controls">
+      <label for="sel4b">Show filter <select id="sel4b"><option value="poke">intraday poke above the line</option><option value="close" selected>a close above the line</option><option value="p1">a close 1% above</option><option value="p3">a close 3% above</option><option value="two">two closes in a row above</option></select></label>
+      <label for="dr4b">follow-through after the first poke, points/day <input id="dr4b" type="range" min="0" max="0.3" step="0.05" value="0"><output id="dr4bo">0</output></label>
+    </div>
+    <div class="tablewrap" id="t4b"></div>
+    <div class="readout" id="r4b"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: how the lab works and what it shows</b>
+    <p>1,000 simulated paths start at 96 under a resistance line at 100 (think of an ascending triangle's flat top). Each day the close moves a random amount (typical size 1 point) and the day's high pokes a little above the higher of the two closes. Each filter waits up to 60 days for its trigger and buys at that day's close (the poke buys at 100, the line itself). A <b>whipsaw</b> is a trigger followed by a close back under 100 within 10 days. With follow-through 0 the paths have no memory: there is no edge to find, so this measures only what each filter costs and saves. All runs are simulated; the numbers say nothing about real markets.</p>
+    <ul>
+      <li><b>The stricter the filter, the fewer the whipsaws.</b> With no follow-through, about 8 in 10 intraday pokes are followed by a close back under the line within 10 days; after a 3% close it's about 2 in 10, because the entry starts more than 3 points further from the line. (Figures from three seeds; they move by a few points with the re-roll.)</li>
+      <li><b>You pay for that three ways.</b> The 3% filter buys about 3½ points above the line, about two weeks after the first poke, and it never fires at all on roughly half the paths that poked the line. In a memoryless market the fewer whipsaws and the worse entry cancel out: buying higher on a random walk is no better or worse than buying lower. A filter earns its keep only if real breakouts have some follow-through (drag the slider: every filter's whipsaw rate falls) <i>and</i> false pokes are common.</li>
+      <li><b>Murphy's close rule is the cheap middle ground.</b> It costs about half a point of entry and fires about 3 days after the first poke on average, and it skips the pokes that never managed a close beyond the line. It still whipsaws often on a memoryless path, which is why Murphy treats volume (section 05) and return moves as part of reading the break.</li>
+    </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_trend.html">Chapter 4</a>: the 3% penetration criterion and the two-day time filter, the filters Murphy refers to here.</li>
+    <li>Section 06's pooled test: the tight stop that a return move knocks out is the same problem seen from the stop side.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · IMPORTANCE OF VOLUME</div><h2>Volume dries up inside, then jumps on the break</h2></div><span class="chip">pdf p171–172</span></div>
+  <p>Volume should <b>diminish</b> as the price swings narrow inside the triangle. That contraction is true of <b>all consolidation patterns</b>. Volume should then <b>pick up noticeably</b> on the trendline break that completes the pattern. The return move should come on light volume, with heavier activity again as the trend resumes.</p>
+  <p>Two more points. As with reversal patterns, volume is <b>more important on the upside</b>: an increase is essential when an uptrend resumes from any consolidation pattern. And although activity dwindles during the pattern, a close look usually shows whether the heavier volume comes on the up-moves or the down-moves. In an uptrend there should be a slight tendency for volume to be heavier on the bounces and lighter on the dips.</p>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Triangle with volume on up swings versus down swings"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls"><label><input id="chk5" type="checkbox"> show a light-volume breakout (the failure case)</label></div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Green volume bars are days that closed up, red ones closed down. Across the pattern the bars shrink (fewer people care while the market is undecided), but the green bars inside the triangle are on average a bit taller than the red ones: buyers are still slightly keener. That small lean is the clue to the likely exit before it happens.</p>
+  <p>Volume is the number of shares that changed hands, so it measures how many people were willing to trade at those prices. Inside the triangle the range narrows and neither side sees a bargain, so fewer people bother. On the break, a new price is on offer and two groups act at once: traders waiting for the breakout, and holders on the wrong side who now have to get out. A break on light volume means few people accepted the new price, so it's easy for prices to slip back inside.</p></div>
+  <div class="box picture"><b>Picture it</b><p>An auction room where the bids have stalled. People stop raising their paddles and the room goes quiet (shrinking volume). Then someone jumps the price, and suddenly half the room is bidding again (the volume burst). If the jump draws no other bids, the auctioneer is soon back at the old price.</p></div>
+  <div class="box worked"><b>Worked example: reading volume as three numbers</b>
+    <div class="formula">Illustrative numbers (mine, in thousands of shares a day):
+1. lean inside   up days avg 120, down days avg 100   → 120 ÷ 100 = 1.2   buyers slightly keener ✓
+2. drying up     first half avg 110, second half 70   → 70 ÷ 110 = 0.64   volume shrinking ✓
+3. the break     3 breakout days avg 175              → 175 ÷ 70 = 2.5×   a noticeable pick-up ✓
+   light break   3 breakout days avg 77               → 77 ÷ 70  = 1.1×   no burst: suspect it</div>
+    <p>Murphy gives no number for a noticeable pick-up; any threshold (1.5×, 2×) is your own choice. The same three ratios are what the readout computes from the chart. Tick the failure case: the inside of the triangle is identical (same lean, same drying up), only the break differs, and the light-volume break falls back inside and then out the bottom. That is the volume rule's practical job: it doesn't tell you a break will fail, it tells you which breaks deserve less trust.</p>
+    <div class="formula">// the three checks as code (beyond the book; thresholds are yours)
+function volumeRead(close, vol, start, brk) {      // start: first bar of the pattern, brk: breakout bar
+  const mean = (a, i, j) => a.slice(i, j + 1).reduce((s, x) => s + x, 0) / (j - i + 1);
+  let up = 0, nu = 0, dn = 0, nd = 0;
+  for (let i = start + 1; i &lt; brk; i++) {
+    if (close[i] &gt;= close[i - 1]) { up += vol[i]; nu++; } else { dn += vol[i]; nd++; }
+  }
+  const mid = Math.floor((start + brk) / 2);
+  return {
+    lean: (up / Math.max(1, nu)) / (dn / Math.max(1, nd)),            // &gt; 1: buyers keener
+    dryUp: mean(vol, mid, brk - 1) / mean(vol, start, mid - 1),       // &lt; 1: shrinking
+    burst: mean(vol, brk, Math.min(brk + 2, vol.length - 1)) / mean(vol, mid, brk - 1)  // e.g. ≥ 1.5
+  };
+}</div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_volume_open_interest.html">Chapter 7</a>: volume in full. Section 18 here links the volume rule to the breakout filters in your <code>intraday_swing_playbook.md</code>.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · MEASURING TECHNIQUE</div><h2>Two ways to measure a symmetrical triangle</h2></div><span class="chip">pdf p172 · Fig 6.2</span></div>
+  <p>The simplest technique, and the one Murphy prefers: measure the height of the vertical line at the widest part of the triangle (the <b>base</b>, AB), and project that distance from the <b>breakout point</b> (C). The second: from the top of the base (A), draw a line <b>parallel to the lower trendline</b>. That upper channel line becomes the upside target in an uptrend. It also gives a rough <b>time</b> target for when prices will meet it; sometimes prices hit the channel line at about the same time the two converging lines meet at the apex.</p>
+  <div class="fig">
+    <canvas id="c6" class="tall" aria-label="Symmetrical triangle with base projection and parallel line targets"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls"><label for="b6">breakout at bar <input id="b6" type="range" min="48" max="60" step="1" value="50"><output id="b6o">50</output></label><label><input id="chk6" type="checkbox"> show a false breakout (the failure case)</label></div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The base method gives one fixed number. The parallel line slopes upward with the triangle's lower line, so its target rises the longer you wait. On this simulated path the time target is where the parallel line sits as the apex arrives. The two methods agree only roughly, which is why both are approximations of a <b>minimum</b>, just as in Chapter 5.</p>
+  <p>Why should the height mean anything? The base is the widest swing the market made while it was undecided, so it's a measure of how far this market normally travels in one burst. The method assumes the escape move will be at least as big as the biggest swing inside. Notice that the target is fixed but the breakout point slides down the falling upper line: a later breakout (drag the slider) starts lower, so it gives a lower target.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A spring squeezed between two hands. The base is how far apart the hands were at the start; when the spring gets loose, you expect it to jump at least that far. The parallel line is a second guess: it assumes the market keeps climbing at the same rate as the rising lows did.</p></div>
+  <div class="box worked"><b>Worked example (simulated chart, default settings)</b>
+    <div class="formula">base AB  = 90 − 72.75             = 17.25
+breakout C on day 50, upper line at 83.6
+method 1 = 83.6 + 17.25              ≈ 100.8   (minimum target)
+
+trade plan (mine, not Murphy's):
+entry    = close above the line      ≈ 84.3
+stop     = under point 6 (78.4)      ≈ 77.9    risk   ≈ 6.4
+target   = 100.8                               reward ≈ 16.5
+R        = 16.5 ÷ 6.4                ≈ 2.6
+break-even win rate = 1 ÷ (1 + R)    ≈ 28%</div>
+    <p>Tick <i>false breakout</i> above to see the failure case: prices close above the line, slip back in, close under the lower line and hit the stop for a loss of 1R. The trade plan doesn't stop that from happening; it caps the cost.</p></div>
+  <h3>Test the trade plan on 2,000 simulated paths</h3>
+  <div class="fig">
+    <canvas id="c6b" class="tall" aria-label="Simulated price paths after a breakout, with entry, stop and target"></canvas>
+    <div class="legend" id="c6bL"></div>
+    <div class="controls">
+      <label for="sel6b">Pattern <select id="sel6b"><option value="tri">symmetrical triangle (s03–06)</option><option value="rect">rectangle (s14)</option><option value="flag">bull flag (s12)</option></select></label>
+      <label for="sel6c">Stop <select id="sel6c"><option value="wide">wide: beyond the last reversal point</option><option value="tight">tight: just back inside the broken line</option></select></label>
+      <label for="dr6">post-breakout drift (edge), points/day <input id="dr6" type="range" min="-0.1" max="0.3" step="0.02" value="0"><output id="dr6o">0</output></label>
+    </div>
+    <div class="readout" id="r6b"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: what the pooled test shows</b>
+    <p>Each run starts at the entry price and moves like a coin-flip random walk (typical daily move 1 point) plus the drift you set, for up to 60 days. A path that touches the stop is a loss of 1R; one that touches the target wins R; the rest are closed at day 60. The stop is assumed to fill exactly at its price (no gaps). The 2,000 runs reuse the same random numbers when you change a setting, so differences come from the setting, not luck. All of it is simulated and says nothing about real markets.</p>
+    <ul>
+      <li><b>With drift 0, expectancy is about zero for every stop.</b> A random walk reaches the target before the stop roughly risk ÷ (risk + reward) of the time, and that is exactly the break-even win rate 1 ÷ (1 + R). A big R:R is not an edge by itself. Tight stops win less often but win bigger; the sum comes out the same.</li>
+      <li><b>The tight stop is the return move's victim.</b> Murphy says return moves to the broken line are not unusual. A stop just under that line gets hit by one, even on paths that later go on to the target.</li>
+      <li><b>Only a real drift after the break makes money.</b> Set drift to 0.1 and expectancy turns positive. Whether real breakouts have that drift is a question for real data, not for this page. Your own daily breakout test made 13–18% a year but was no better than holding the same stocks (<code>backtest_results_summary.md</code>); note that it bought 20-day highs on heavy volume (the full report, <code>projects/trading-equation-backtests/reports/REPORT.md</code>), not the chart patterns in this chapter.</li>
+      <li><b>Costs bite harder with tight stops.</b> The readout charges a 0.3% round trip, the low end of the 0.3–0.4% delivery cost for trades of ₹40k or more in your <code>breakeven_move_fyers.md</code>. The cost is the same in rupees whatever the stop, so in R it grows as the risk shrinks: a stop a quarter as far away makes the cost four times bigger in R.</li>
+    </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_reversal_patterns.html">Chapter 5</a>: the same idea of projecting the height from the breakout as the head and shoulders. <a href="ch04_trend.html">Chapter 4</a>: channel lines drawn parallel to a trendline.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · THE ASCENDING TRIANGLE</div><h2>Flat top, rising bottoms: buyers are pushing</h2></div><span class="chip">pdf p173–175 · Fig 6.3a, 6.3b</span></div>
+  <p>The ascending and descending triangles are variations of the symmetrical one, but they forecast differently. In the <b>ascending</b> triangle the upper line is flat and the lower line rises. That shows buyers are more aggressive than sellers. It's a bullish pattern and is usually resolved by an upside breakout.</p>
+  <p>The key difference from the symmetrical triangle: <b>no matter where they appear in the trend</b>, ascending and descending triangles have very definite forecasts, the ascending bullish and the descending bearish. The symmetrical triangle is inherently neutral. It still has forecasting value, but only because it's a continuation pattern: you look at the previous trend and assume it will continue.</p>
+  <p>The bullish breakout is a <b>decisive close above the flat upper line</b>. As with every valid upside breakout, volume should rise noticeably. A return move back to the flat line, which has now turned into support, is not unusual and should come on light volume. <b>Measuring</b> is simple: take the height of the pattern at its widest point and project it up from the breakout point; one more example of using a pattern's volatility for a minimum objective. Murphy's Dow Transports example (Fig 6.3b), formed near the end of 1997, had its flat upper line at 3,400 and a rising lower line; his caption adds that the pattern is normally bullish wherever it appears on the chart.</p>
+  <p><b>As a bottom:</b> the ascending triangle appears most often in uptrends as a continuation, but it sometimes forms near the end of a downtrend as a bottoming pattern. Even then it's read as bullish: the break of the upper line completes the base. Ascending and descending triangles are also called <b>right-angle triangles</b>.</p>
+  <div class="fig">
+    <canvas id="c7" class="tall" aria-label="Ascending triangle in an uptrend or as a bottom"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="controls"><label for="sel7">Setting <select id="sel7"><option value="cont">in an uptrend (continuation)</option><option value="bot">after a downtrend (bottom)</option></select></label></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A large seller (or many sellers) is supplying shares at one price, so every rally stops at the same line. Buyers, though, are willing to pay more on each dip: the lows rise. Each test eats into the seller's supply. When it's used up, nothing is left at that price and the market jumps through. That logic doesn't depend on the earlier trend, which is why the ascending triangle is bullish even at the end of a downtrend.</p>
+  <p>The return move has a mechanism too. After the break, the people who sold at 90 and watched prices run away from them often want back in at 90; so do buyers who missed the break. Their orders sit at the old ceiling, which is why it tends to hold as a floor. If it doesn't hold and prices close back under 90 on heavy volume, I'd treat the breakout as failed (my reading; this chapter doesn't spell out a failure rule).</p></div>
+  <div class="box worked"><b>Worked example (simulated chart)</b>
+    <div class="formula">flat top A = 90, first low B = 76   → height = 90 − 76 = 14
+breakout: a decisive close above 90  → minimum target = 90 + 14 = 104
+
+trade plan (mine, not Murphy's):
+entry  ≈ 90.5   stop under the last rising low (84) ≈ 83.5   risk ≈ 7
+reward ≈ 104 − 90.5 = 13.5    R ≈ 1.9    break-even win rate ≈ 1 ÷ 2.9 ≈ 34%
+
+on the chart the first close above 90 is a strong jump to 91.6 (day 64):
+risk = 91.6 − 83.5 = 8.1   reward = 104 − 91.6 = 12.4   R ≈ 1.5   break-even ≈ 40%</div>
+    <p>That last line is a practical lesson: a strong breakout day, the kind the volume rule wants, also moves your entry away from the line and eats into R. Buying the return move to 90 instead (if it comes) restores the better numbers, at the risk of never getting filled.</p>
+    <p>Murphy's own example (Fig 6.3b, Dow Transports) gives the flat line, 3,400, but no height, so its target can't be worked out from the text. The pattern is the same: measure the widest point, add it to 3,400.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch06_queue_at_fixed_price_shop.svg" alt="Customers queue each morning ever closer to a shop door where the owner sells at a fixed price, until his stock runs out and the price board has to be raised." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A queue of buyers outside a shop whose owner sells at exactly ₹90 and won't budge. Every morning the queue forms a little earlier and a little closer to the door (the rising lows). The owner's stock runs down a bit each day. The day it runs out, the next buyer has to pay ₹91, and the one after ₹92: that's the breakout. And the people who didn't get served at ₹90 are the ones who come back and buy on the dip to ₹90 (the return move).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_trend.html">Chapter 4</a>: the flat top is horizontal resistance, and once broken it turns into support (role reversal).</li>
+    <li><a href="ch05_reversal_patterns.html">Chapter 5</a>: the bottoming version does the same job as the reversal bottoms there; the same rule applies that the upside break needs volume.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · THE DESCENDING TRIANGLE</div><h2>Flat bottom, falling tops: sellers are pushing</h2></div><span class="chip">pdf p175–176 · Fig 6.4a, 6.4b</span></div>
+  <p>The descending triangle is a mirror image of the ascending one and is generally bearish: a falling upper line and a flat lower line. Sellers are more aggressive than buyers, and it usually resolves to the downside. The signal is a <b>decisive close under the lower line</b>, usually on increased volume. A return move sometimes follows, and should meet resistance at the broken lower line. Measuring is exactly the same: the height of the pattern at the base on the left, projected down from the breakdown point. (Murphy's Du Pont example, Fig 6.4b, broke its flat lower line in early October 1997.)</p>
+  <p><b>As a top:</b> it's a continuation pattern usually found in downtrends, but occasionally it forms at a market top. It isn't hard to recognise there, and a close below the flat lower line then signals a major reversal to the downside.</p>
+  <div class="fig">
+    <canvas id="c8" class="tall" aria-label="Descending triangle in a downtrend or as a top"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls"><label for="sel8">Setting <select id="sel8"><option value="cont">in a downtrend (continuation)</option><option value="top">after an uptrend (top)</option></select></label></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Flip the ascending triangle's story. A buyer (or a crowd of buyers) is defending one price, 80 here, so every dip stops there. Sellers, meanwhile, accept less on each rally: the highs fall. Each test of 80 uses up some of that buyer's demand. Once it's gone there's nobody left at 80, and prices drop through. The volume lean (section 09) shows it: heavier on the way down, lighter on bounces.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A goalkeeper who never leaves the goal line (the flat floor at 80). The attackers don't retreat as far after each attack (the lower highs), so every new attack starts closer to goal. The keeper saves the first few; sooner or later one goes in.</p></div>
+  <div class="box beyond"><b>Beyond the book: acting on a bearish pattern on NSE</b><p>In the Indian cash market a retail short sale has to be squared off the same day, so a breakdown on a daily chart can't be held short overnight in cash. In practice a bearish daily pattern means one of three things: sell (or don't buy) a stock you hold, use stock futures or options, or use it as a filter for long trades. The measuring rule is the same either way: height 94 − 80 = 14, target 80 − 14 = 66.</p></div>
+  <div class="box worked"><b>Worked example (simulated chart)</b>
+    <div class="formula">flat floor 80, first high A = 94     → height = 94 − 80 = 14
+breakdown: a decisive close below 80  → minimum target = 80 − 14 = 66
+
+trade plan (mine, not Murphy's), for a futures short or as an exit for a holder:
+entry ≈ 79.5   stop above the last falling high (86) ≈ 86.5   risk ≈ 7
+reward ≈ 79.5 − 66 = 13.5    R ≈ 1.9    break-even win rate ≈ 1 ÷ 2.9 ≈ 34%
+on the chart the first close below 80 is 78.4 (day 64): risk 8.1, reward 12.4, R ≈ 1.5</div>
+    <p>The failure mode (my reading) is the mirror of section 07's: a close back above 80 on heavy volume after the break means the buyer at 80 wasn't finished. The stop above the last lower high gives the pattern room for a return move up to the old floor (which should now act as resistance) without being knocked out by it.</p></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · THE VOLUME PATTERN · THE TIME FACTOR IN TRIANGLES</div><h2>Volume leans with the winner; triangles take 1–3 months</h2></div><span class="chip">pdf p177</span></div>
+  <p>In both right-angle triangles volume shrinks as the pattern works itself out and then rises on the breakout. As with the symmetrical triangle, small shifts in volume line up with the swings: in the <b>ascending</b> triangle volume tends to be slightly heavier on bounces and lighter on dips; in the <b>descending</b> triangle it should be heavier on the way down and lighter on bounces.</p>
+  <p><b>Time:</b> the triangle is an <b>intermediate</b> pattern. It usually takes <b>longer than a month</b> to form but generally <b>less than three months</b>. A triangle-shaped pause that lasts less than a month is probably a different pattern, such as a <b>pennant</b> (section 11). Triangles sometimes appear on long-term charts, but their basic meaning is always the same.</p>
+  <div class="fig">
+    <canvas id="c9" class="short" aria-label="Duration ruler for continuation patterns"></canvas>
+    <div class="controls"><label for="n9">your pattern lasts (trading days) <input id="n9" type="range" min="3" max="90" step="1" value="40"><output id="n9o">40</output></label></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The ruler converts Murphy's durations to trading days at about 5 per week and 21 per month (my conversion, <b>beyond the book</b>). Pennants and flags: 1–3 weeks (≈5–15 days; in downtrends often 1–2 weeks). Triangles, wedges and rectangles: 1–3 months (≈21–63 days). Duration is one of the cheapest ways to name a pattern correctly.</p>
+  <p>Why does duration change the name? A pause of a few days after a sharp run is the market catching its breath; a pause of two months means a real disagreement had to be worked out. The bigger pattern has absorbed more trading, so (Chapter 5's rule) it tends to lead to a bigger move.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A stop at a traffic light and a stop for lunch on a long drive. Both are pauses and you carry on the same way afterwards, but you'd never confuse them: the clock tells you which one it was.</p></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · THE BROADENING FORMATION</div><h2>The megaphone: a market losing control</h2></div><span class="chip">pdf p177–178 · Fig 6.5</span></div>
+  <p>An unusual and fairly rare variation: an <b>inverted triangle</b>, a triangle turned backwards. Every triangle so far had converging lines; in the <b>broadening formation</b> they <b>diverge</b>, so the picture looks like an expanding triangle. It's also called a <b>megaphone top</b>.</p>
+  <p>The volume is different too. In the other triangles volume shrinks as the swings narrow; here <b>volume tends to expand along with the wider price swings</b>. It reflects a market that is out of control and unusually emotional. Because it also reflects an unusual amount of public participation, it most often occurs at <b>major market tops</b>, so the expanding pattern is <b>usually bearish</b> and generally appears near the end of a major bull market. Murphy's Figure 6.5: three successively <b>higher peaks</b> (1, 3, 5) and two <b>declining troughs</b> (2, 4); the <b>violation of the second trough</b> completes the pattern. (The sketch carries on past that break: a drop to 6, a bounce to 7 and a slide to 8.) It's unusually hard to trade, and fortunately rare.</p>
+  <div class="fig">
+    <canvas id="c10" class="tall" aria-label="Broadening top with expanding volume"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls"><button id="pv10" type="button">◀ Back</button><button id="nx10" type="button">Next signal ▶</button><span>step <b id="st10">0</b> / 4</span></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>An argument in a crowd that gets louder each round: every shout is bigger than the last, more people join in, and nobody is in charge. It usually ends badly.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In a triangle, each side gets more cautious every swing. Here each side gets more reckless: every rally runs past the last high, and every drop runs past the last low. Breaking an old high triggers late buyers and short-covering; breaking an old low triggers stop-loss selling. Each wave pulls in more people (Murphy's public participation), so volume grows with the swings. A market making higher highs <i>and</i> lower lows has no agreed value, which is why it tends to show up at the end of a long bull market, when the crowd is most excited.</p>
+  <p>It's hard to trade because every ordinary breakout signal fails inside it. Step through the chart (<i>Next signal</i>) to take each one; on this simulated sketch (my numbers, measured from the swing points; the chart's readout uses the actual closes, so it differs a little):</p>
+  <div class="formula">buy the break above peak 1 (84)      → price then falls to trough 4 at 72   = −12 points
+short the break under trough 2 (76)  → price then rallies to peak 5 at 93   = −17 points
+buy the break above peak 3 (88.2)    → price then falls to point 6 at 66    = −22.2 points</div>
+  <p>Only the break of the second trough, after the third higher peak, carries Murphy's meaning: the pattern is complete and the top is in.</p></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · FLAGS AND PENNANTS · CONSTRUCTION</div><h2>Catching its breath after a sprint</h2></div><span class="chip">pdf p178–180 · Fig 6.6a, 6.6b</span></div>
+  <p>Flags and pennants are quite common. They're treated together because they look alike, show up at about the same place in a trend, and share the same volume and measuring rules. Both are <b>brief pauses in a dynamic move</b>. One requirement for both is that they're <b>preceded by a sharp, almost straight-line move</b>: an advance or decline that has got ahead of itself, so the market takes a short rest before running off again in the same direction. They are among the <b>most reliable continuation patterns</b> and only rarely produce a reversal.</p>
+  <ul class="plain">
+    <li><b>Flag:</b> a small parallelogram or rectangle between two parallel lines that tend to slope <b>against</b> the prevailing trend. In a downtrend the flag slopes slightly upward.</li>
+    <li><b>Pennant:</b> two converging lines, more horizontal; it looks very like a small symmetrical triangle.</li>
+    <li><b>Volume</b> must dry up noticeably while each pattern forms, after a steep move on heavy volume, then burst out again on the breakout.</li>
+    <li><b>Time:</b> relatively short term, completed within <b>one to three weeks</b>. In downtrends they tend to be even quicker, often no more than one or two weeks.</li>
+    <li><b>Completion:</b> a break of the upper line in an uptrend, or of the lower line to resume a downtrend, on heavier volume. Upside volume matters more than downside volume.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c11" class="tall" aria-label="Bull or bear flag or pennant with volume"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls"><label for="sel11">Pattern <select id="sel11"><option value="flag">flag</option><option value="pen">pennant</option></select></label><label><input id="chk11" type="checkbox"> in a downtrend</label><label><input id="chk11b" type="checkbox"> the rare failure</label></div>
+    <div class="readout" id="r11"></div>
+    <div class="readout" id="r11b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The pole is a burst of urgent buying (or selling). The flag is the market resting: a few holders take quick profits, but there's no real selling pressure, which is why volume collapses. A flag that slopes <i>with</i> the trend would mean buyers are still chasing, so it isn't a rest at all. Switch to the downtrend: the flag now tilts up against the fall, and it's drawn shorter (Murphy: patterns in downtrends take less time).</p>
+  <p>Tick <i>the rare failure</i>: the flag breaks the wrong way. Murphy says flags and pennants only rarely produce a reversal, but rarely isn't never. Everyone who bought the pole is now trapped above the market, and their selling speeds the fall. The flag's own low is the natural place for a stop (my addition), and it's close, which is why flags are popular with traders: the risk is small next to the pole-sized target (section 12).</p></div>
+  <div class="box picture"><b>Picture it</b><p>A sprinter who stops for a few seconds, hands on knees, then sets off again the same way. A flag is the breather. If the sprinter sits down instead, that isn't a breather any more (the failure case).</p></div>
+  <div class="box beyond"><b>Beyond the book: Murphy's flag checklist as code</b>
+    <p>Each of Murphy's requirements becomes one test. The numbers (a pole at least 4 average daily ranges tall, measured over the 8 bars before its top, a flag no deeper than half the pole, flag volume under 60% of the pole's) are my thresholds; he gives none. The sloping upper line is drawn by fitting the slope of the flag's highs and shifting it up until it touches the highest one, and the trigger is a close above it. The second readout above runs this exact function on the chart (the downtrend is handled by flipping the price upside down) and draws its stop and target, then reports how the trade ended. In the failure case it usually stays out, because the pattern never breaks the way the trend points; on some re-rolls of the downtrend failure it fires on a brief poke first and is stopped out the next day. That is the false breakout the stop exists for, and it costs 1R, not the whole move.</p>
+    <div class="formula">// atr14(h, l, c, i): average true range of the 14 bars ending at i
+// avg(a, i, j): mean of a[i..j]
+function bullFlag(c, h, l, v, i) {                  // is bar i a bull-flag breakout?
+  for (let f = 7; f &lt;= 15; f++) {                 // the flag lasts 6–14 bars (1–3 weeks)
+    const s = i - f, p0 = s - 8;                    // s: top of the pole, p0: 8 bars before it
+    if (p0 &lt; 1) break;
+    const pole = c[s] - c[p0];
+    if (pole &lt; 4 * atr14(h, l, c, p0)) continue;               // sharp, almost straight move
+    if (Math.max(...c.slice(p0, i)) &gt; c[s]) continue;           // s really is the top
+    const fh = Math.max(...h.slice(s + 1, i)), fl = Math.min(...l.slice(s + 1, i));
+    if (fh - fl &gt; 0.5 * pole) continue;                         // a small pause
+    const vFlag = avg(v, s + 1, i - 1);
+    if (vFlag &gt; 0.6 * avg(v, p0 + 1, s)) continue;              // volume dries up
+    // upper line: the slope of the flag's highs, shifted up to touch the highest one
+    let sj = 0, sh = 0, sjj = 0, sjh = 0;
+    for (let j = s + 1; j &lt; i; j++) { sj += j; sh += h[j]; sjj += j * j; sjh += j * h[j]; }
+    const m = f - 1, b = (m * sjh - sj * sh) / (m * sjj - sj * sj);
+    if (b &gt; 0) continue;                                        // highs must not rise with the trend
+    let a = -Infinity; for (let j = s + 1; j &lt; i; j++) a = Math.max(a, h[j] - b * j);
+    if (c[i] &lt;= a + b * i || v[i] &lt;= vFlag) continue;          // close above the line on heavier volume
+    return { entry: c[i], stop: fl, target: c[i] + pole };      // pole projected from the break
+  }
+  return null;
+}</div>
+    <p>Two honest caveats. First, a detector like this finds the shape; it says nothing about whether the shape has an edge, which needs real data and the pooled reasoning of section 06. Second, the pole here is measured from 8 bars back, a stand-in for Murphy's <i>original breakout point</i>; on a real chart you'd anchor it on the level or trendline that actually broke.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_volume_open_interest.html">Chapter 7</a>: volume. Murphy's real examples: International Paper's flag at the halfway point of its uptrend (Fig 6.7a), and two Caterpillar pennants, one continuing an uptrend and one a downtrend (Fig 6.7b).</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · MEASURING IMPLICATIONS · SUMMARY</div><h2>Flying at half-mast: measure the pole</h2></div><span class="chip">pdf p180–182 · Fig 6.7a, 6.7b</span></div>
+  <p>Flags and pennants are said to <b>"fly at half-mast"</b> from a <b>flagpole</b>, the sharp advance or decline before them. Half-mast means these minor patterns tend to appear about <b>halfway</b> through the move. In general, the move after the trend resumes duplicates the flagpole, the move just before the pattern.</p>
+  <p>More precisely: measure the preceding move from the <b>original breakout point</b>, where the original trend signal was given (a break of a support or resistance level or of an important trendline). Then project that vertical distance from the flag's or pennant's <b>breakout point</b> (where the upper line breaks in an uptrend, or the lower line in a downtrend).</p>
+  <div class="fig">
+    <canvas id="c12" class="tall" aria-label="Flagpole measured from the original breakout and projected from the flag breakout"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls"><label for="p12">flagpole height <input id="p12" type="range" min="6" max="24" step="1" value="12"><output id="p12o">12</output></label></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Murphy's summary, regrouped</th><th>Flag</th><th>Pennant</th></tr></thead>
+    <tbody>
+      <tr><td>Before it</td><td colspan="2">an almost straight-line move (the flagpole) on heavy volume</td></tr>
+      <tr><td>During it</td><td colspan="2">a pause of about 1–3 weeks on very light volume; shorter in downtrends</td></tr>
+      <tr><td>Shape</td><td>small parallelogram sloping against the trend</td><td>small, horizontal symmetrical triangle</td></tr>
+      <tr><td>After it</td><td colspan="2">the trend resumes on a burst of trading activity</td></tr>
+      <tr><td>Where</td><td colspan="2">about the midpoint of the move</td></tr>
+      <tr><td>How common</td><td colspan="2">very common in the financial markets</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The target is the pole length added to the flag's breakout price, so the flag sits roughly in the middle of the whole move. That symmetry is the same assumption as the measured move (section 16): the second leg of a move tends to resemble the first.</p>
+  <p>Why measure from the <i>original breakout</i> and not from wherever the pole seems to start? Because the breakout is where the urgent move began: the point where a level broke and buyers rushed in. Measuring from there captures the full burst, not a random low picked after the fact. Then the flag breakout is a second, similar burst by the same kind of buyers.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch06_flag_halfway_up_pole.svg" alt="A flag hung halfway up a tall flagpole on a school ground, with the pole below it and the equal empty length of pole above it marked as the expected move." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A flag on a pole, hoisted halfway up. The pole below the flag is the move you've already seen; the empty stretch of pole above it is about the same length again.</p></div>
+  <div class="box worked"><b>Worked example</b>
+    <div class="formula">pole: original breakout 100 → top of the pole 112   = 12 points
+flag breakout at 110                               → target = 110 + 12 = 122
+
+trade plan on the chart's defaults (mine, not Murphy's):
+pole 64 → 76 = 12   flag breakout ≈ 72.7   flag low ≈ 70   stop ≈ 69.5
+risk ≈ 3.2   reward = 12   R ≈ 3.7   break-even win rate ≈ 1 ÷ 4.7 ≈ 21%</div>
+    <p>That small risk next to a pole-sized target is the flag's attraction. The pooled test in section 06 (choose <i>bull flag</i>) shows why a good R alone still isn't an edge.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Nison's <i>Japanese Candlestick Charting Techniques</i> has a whole chapter on measured moves (ch.16, pdf p251).</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · THE WEDGE FORMATION · WEDGES AS TOPS AND BOTTOMS</div><h2>A slanted triangle that leans against the trend</h2></div><span class="chip">pdf p183–185 · Fig 6.8a–c</span></div>
+  <p>A <b>wedge</b> is like a symmetrical triangle in both shape and duration: two converging trendlines meeting at an apex, usually lasting <b>more than one month but not more than three</b> (intermediate). What sets it apart is a <b>noticeable slant</b>, up or down. As a rule, like the flag, the wedge slants <b>against</b> the prevailing trend. So a <b>falling wedge is bullish</b> and a <b>rising wedge is bearish</b>. In Figure 6.8a the bullish wedge slants down between two converging lines; in the downtrend of Figure 6.8b the lines slant unmistakably up.</p>
+  <p><b>As tops and bottoms:</b> wedges most often appear within a trend as continuation patterns. They can appear at tops or bottoms and signal a reversal, but that's much less common. Near the end of an uptrend you may see a clear-cut <b>rising</b> wedge. A continuation wedge in an uptrend should slope down against the trend, so a rising one is a clue that this is bearish, not bullish. At bottoms, a falling wedge can tip off the end of a bear trend. Wherever it appears, follow the maxim: <b>a rising wedge is bearish and a falling wedge is bullish</b>. (Murphy's example: a bearish rising wedge in the CRB index, Fig 6.8c.)</p>
+  <div class="fig">
+    <canvas id="c13" class="tall" aria-label="Falling or rising wedge"></canvas>
+    <div class="legend" id="c13L"></div>
+    <div class="controls"><label for="sel13">Show <select id="sel13"><option value="fall">falling wedge in an uptrend (bullish)</option><option value="rise">rising wedge in a downtrend (bearish)</option><option value="top">rising wedge at the end of an uptrend (bearish reversal)</option></select></label></div>
+    <div class="readout" id="r13"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A falling wedge is a ball bouncing down a narrowing staircase: each step down is smaller and the bounces come quicker, so the fall is running out of energy. A rising wedge is the same thing upside down: each push up gains less ground.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In a rising wedge the lower line climbs faster than the upper line, so new highs gain less and less ground per swing. Buyers are still lifting prices, but with diminishing force. When the lower line finally breaks, the move against the trend is over (in a downtrend) or the uptrend's tiredness is confirmed (at a top). The slope tells you which side is running out of energy.</p>
+  <p>Compare the readout's two slopes with section 02's classifier: in a falling wedge both lines fall, but the upper one falls faster (−0.35 against −0.15 points a day), so the gap closes. Each new low is only a little lower than the last, while the rallies still reach well up. Sellers are pushing, but each push buys less ground. Note what the chapter does <b>not</b> give for wedges: no measuring rule and no separate volume rule. Any target you put on a wedge is borrowed from elsewhere (for example the height at its widest point, as with triangles), and that would be your own assumption.</p></div>
+  <div class="box worked"><b>Worked example: where and when the wedge runs out (simulated falling wedge)</b>
+    <div class="formula">upper line   y = 88 − 0.35 × (day − 20)  = 95.0 − 0.35 × day
+lower line   y = 79 − 0.15 × (day − 26)  = 82.9 − 0.15 × day
+
+apex: the lines meet where 95.0 − 0.35 d = 82.9 − 0.15 d
+      12.1 = 0.20 d   →   d = 60.5
+width: day 20 (first touch of the upper line) → 60.5 = 40.5 days
+⅔–¾ window (my extension of section 04): day 20 + 27 = 47 to day 20 + 30.4 ≈ 50
+height at the widest point: 88 − lower(20) = 88 − 79.9 = 8.1
+
+trade plan (mine; Murphy gives no wedge target or stop):
+first close above the upper line: day 51 (31 ÷ 40.5 = 77% of the width, just past ¾)
+upper line there 95.0 − 0.35 × 51 = 77.15, entry close ≈ 77.6
+stop under the last low (75.55)  ≈ 75.0   risk ≈ 2.6
+borrowed triangle target 77.15 + 8.1 ≈ 85.3   reward ≈ 7.7   R ≈ 3.0</div>
+    <div class="formula">// apex of two lines y = m1·d + b1 and y = m2·d + b2 (any converging pattern)
+const apexDay = (m1, b1, m2, b2) =&gt; (b2 - b1) / (m1 - m2);
+apexDay(-0.35, 95.0, -0.15, 82.9)   // 60.5</div>
+    <p>The same arithmetic for the rising wedge at a top (third setting): upper 71.5 + 0.25 d, lower 60.1 + 0.45 d, apex at 11.4 ÷ 0.2 = day 57. Both lines rise, but the lower one almost twice as fast, so the room for new highs closes. Murphy says a wedge is like a symmetrical triangle in shape and duration; applying the triangle's ⅔–¾ timing to it is my extension, not his rule. The failure mode to watch: a rising wedge inside an uptrend is easy to mistake for a healthy rising channel, and then it breaks down instead of out.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_trend.html">Chapter 4</a>: both sides of a wedge are trendlines; a falling wedge's upper line is a downtrend line whose break Chapter 4 already treats as a warning.</li>
+    <li>Section 02's slope classifier: drag both slopes to the same sign with the lines converging and it names a wedge.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · THE RECTANGLE FORMATION · VOLUME · SIMILARITIES AND DIFFERENCES</div><h2>The trading range between two flat lines</h2></div><span class="chip">pdf p184–188 · Fig 6.9a–c</span></div>
+  <p>The <b>rectangle</b> goes by other names, but it's usually easy to spot: a pause in the trend during which prices move sideways between <b>two parallel horizontal lines</b>. It's also called a <b>trading range</b> or <b>congestion area</b>; in Dow Theory it's a <b>line</b>. It usually represents a consolidation and is usually resolved in the direction of the trend before it. As a forecaster it's like a symmetrical triangle with flat instead of converging lines.</p>
+  <p>A <b>decisive close outside either boundary</b> completes it and shows the direction. But stay alert that a rectangle doesn't turn into a reversal pattern: in the uptrend of Figure 6.9a the three peaks might at first look like a possible <b>triple top</b> (and a bearish rectangle could turn into a triple bottom, Fig 6.9b). Murphy's Compaq example (Fig 6.9c) traded sideways for four months before an early-May break above the upper line resumed the uptrend.</p>
+  <p><b>Volume:</b> because the swings in both directions are fairly broad, watch which moves carry the heavier volume. Rallies on heavier and setbacks on lighter volume → probably a continuation of the uptrend. Heavier volume on the declines → a warning that a reversal may be in the works.</p>
+  <p><b>Similarities and differences:</b> rectangles usually last <b>one to three months</b>, like triangles and wedges. Their volume differs from other continuation patterns: the broad swings <b>prevent the usual drop-off</b> in activity. The most common <b>measurement</b> uses the height of the range: measure top to bottom and project it from the breakout point (a vertical measure based on volatility; the point and figure count gives a horizontal one). Everything said about breakout volume and return moves applies. Because the boundaries are flat and well defined, support and resistance are especially clear: after an upside breakout, the top of the old range should give solid <b>support</b> on dips; after a downside breakout, the bottom of the range should become a solid <b>ceiling</b> on rallies.</p>
+  <div class="fig">
+    <canvas id="c14" class="tall" aria-label="Rectangle with volume on rallies and declines"></canvas>
+    <div class="legend" id="c14L"></div>
+    <div class="controls"><label for="sel14">Volume inside the range <select id="sel14"><option value="cont">heavier on rallies (continuation)</option><option value="warn">heavier on declines (warning)</option></select></label></div>
+    <div class="readout" id="r14"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Same price path in both settings; only the volume changes. With heavier volume on rallies, the buyers are the committed side, and the range resolves up: the old ceiling (top line) then holds as a floor on the pullback. Switch the volume: the price ending is drawn breaking down instead, because heavy volume on declines is Murphy's warning sign of a top. The readout compares average volume on up days and down days inside the range.</p>
+  <p>The second setting is the failure case of the continuation idea, and it's the one Murphy warns about with Figure 6.9a: three equal peaks inside an uptrend can turn out to be a triple top. The flat lines look identical either way; only the volume (and eventually the break) tells them apart. That's why a rectangle is read with both eyes: price for the boundaries, volume for the likely winner.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A ball bouncing between the floor and ceiling of a room. While it's in the room you only learn how high the room is (that height becomes the target). The interesting moment is when it goes through the ceiling or the floor. And because everyone could see the ceiling, once the ball is above it the ceiling turns into a floor people are happy to stand on.</p></div>
+  <div class="box worked"><b>Worked example (simulated chart)</b>
+    <div class="formula">ceiling 90, floor 80          → height = 10
+upside break  (close above 90) → minimum target 90 + 10 = 100, and 90 should now act as support
+downside break (close below 80) → minimum target 80 − 10 = 70, and 80 should now act as resistance</div>
+    <p>A practical check (mine): a stop for an upside break goes back inside the range, for example under the midpoint of 85 or under the floor at 80. The first is closer but can be hit by a return move to 90 that overshoots; the second survives almost anything but makes the risk equal to the whole target, R ≈ 1. Section 06's pooled test (choose <i>rectangle</i>) shows the same trade-off on simulated paths.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch02_dow_theory.html">Chapter 2</a>: the Dow Theory <i>line</i>, the same sideways range under another name.</li>
+    <li><a href="ch05_reversal_patterns.html">Chapter 5</a>: triple tops and bottoms, the reversal patterns a rectangle can turn into (Fig 6.9a and 6.9b).</li>
+    <li><a href="ch11_point_and_figure.html">Chapter 11</a>: the horizontal count, which measures the range by its width rather than its height.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SWINGS WITHIN THE RANGE CAN BE TRADED</div><h2>Buy the floor, sell the ceiling, reverse on the break</h2></div><span class="chip">pdf p187–188</span></div>
+  <p>Some chartists trade the swings inside a rectangle: buy dips near the bottom and sell rallies near the top. The short-term trader uses the well-defined boundaries to profit from an otherwise trendless market. Because positions are taken at the extremes, the <b>risk is relatively small and well defined</b>. While the range holds, this <b>counter-trend</b> approach works quite well. When a breakout does occur, the trader not only exits the last losing trade <b>immediately</b> but can <b>reverse</b> into the direction of the new trend. Oscillators are especially useful in sideways markets but less useful once a breakout has happened (Chapter 10).</p>
+  <p>Other traders assume the rectangle is a continuation pattern and only buy near the bottom of the range in an uptrend, or sell near the top in a downtrend. Others avoid trendless markets altogether and wait for a clear breakout. Most <b>trend-following systems perform very poorly</b> in these sideways periods.</p>
+  <div class="fig">
+    <canvas id="c15" class="tall" aria-label="Trading the swings within a range, then reversing on the breakout"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls"><label for="sel15">Approach <select id="sel15"><option value="swing">trade both swings, reverse on the break</option><option value="cont">continuation only: buy near the floor</option><option value="wait">wait for the breakout</option></select></label></div>
+    <div class="readout" id="r15"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The rules here are my illustration, <b>beyond the book</b>: enter at the boundary ±0.6 points, exit at the opposite boundary, and on a close beyond either line exit and (in the first approach) reverse. Results are in price points on this one simulated path, with no costs. The point is the shape of the trade-off: the swing trader collects several small, well-defined gains and takes one small loss when the range breaks; the waiter takes nothing until the break and then rides the trend.</p>
+  <p>Be suspicious of that single path, though: it was built to hold the range for six clean swings and then break upward, so range trading wins on it by design. The pooled test below removes that.</p></div>
+  <h3>Pooled test: 400 simulated ranges where nothing is guaranteed</h3>
+  <div class="fig">
+    <canvas id="c15b" class="short" aria-label="A few of the simulated range markets used in the pooled test"></canvas>
+    <div class="legend" id="c15bL"></div>
+    <div class="controls">
+      <label for="k15">pull back to the middle (κ) <input id="k15" type="range" min="0" max="0.3" step="0.05" value="0.2"><output id="k15o">0.2</output></label>
+      <label for="dr15">trend after the break, points/day <input id="dr15" type="range" min="0" max="0.6" step="0.1" value="0.3"><output id="dr15o">0.3</output></label>
+      <label for="q15">chance the break is upward (%) <input id="q15" type="range" min="50" max="90" step="5" value="65"><output id="q15o">65</output></label>
+      <label for="cs15">cost per round trip (points) <input id="cs15" type="range" min="0" max="0.5" step="0.05" value="0.25"><output id="cs15o">0.25</output></label>
+    </div>
+    <div class="tablewrap" id="t15"></div>
+    <div class="readout" id="r15b"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: how the pooled test works and what it shows</b>
+    <p>Each simulated market starts at 85 between a floor of 80 and a ceiling of 90. For a random 30–70 days it is a <b>range</b>: each day it moves a random amount (typical size 1.2 points) plus a pull back toward 85 of κ × (85 − price). Then the range ends and a <b>trend</b> starts: a drift up (with the chance you set) or down, typical daily move 1 point, until day 110. Entries are within 1.5 points of a boundary; a breakout is a close more than 0.5 beyond a line. The three approaches follow the same logic as the chart above, with a wider entry zone and a small breakout filter so that ordinary noise doesn't trigger everything. Prices are in points (85 ≈ a ₹85 stock, so the default cost of 0.25 is about 0.3%). All simulated; not evidence about any real market.</p>
+    <ul>
+      <li><b>Each approach is paid by one assumption.</b> Range trading lives on κ, the pull back to the middle. The breakout waiter lives on the trend after the break. Set κ = 0 and the trend to 0 and every approach loses about its costs. That's the honest summary: no rule makes money unless the market has the behaviour the rule assumes.</li>
+      <li><b>False breakouts are the range trader's failure mode.</b> When κ is weak, noise alone closes the price outside the range before the real break (the readout counts it). The swing trader reverses into a trend that doesn't exist.</li>
+      <li><b>The continuation-only approach is a bet on direction.</b> It only buys, so it does well when breaks are mostly upward and badly when they aren't. Drag the chance to 50% and watch it fade.</li>
+    </ul>
+    <p>Murphy's practical point survives the test: inside a range the risk of a swing trade is small and well defined, and the trader must get out at once when the range breaks.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch09_moving_averages.html">Chapter 9</a>: why trend-following systems (moving-average crossovers) whipsaw in sideways markets. <a href="ch10_oscillators.html">Chapter 10</a>: oscillators for ranges.</li>
+    <li>Your <code>backtest_results_summary.md</code>: the VWAP pullback / reversion versions (a range-trading idea) lost in every version you tested, and <code>intraday_swing_playbook.md</code> (I-4, VWAP mean reversion on range days) says the range-day filter is essential. Range trading works only while the range holds. The pooled test makes the requirement concrete: reversion pays only if prices pull back toward the middle by more than the round-trip cost.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · THE MEASURED MOVE</div><h2>The second leg tends to copy the first</h2></div><span class="chip">pdf p188–190 · Fig 6.10a, 6.10b</span></div>
+  <p>The <b>measured move</b>, or <b>swing measurement</b>, describes a major advance or decline that splits into <b>two equal and parallel moves</b>. For it to work, the market moves should be fairly orderly and well defined. It's really a variation of ideas already covered: consolidation patterns like flags and pennants usually occur about halfway through a move, and markets tend to retrace about <b>a third to a half</b> of a prior trend before resuming it.</p>
+  <p>In a well-defined case, a rally from A to B is followed by a counter-trend swing from B to C that retraces a third to a half of AB. The next leg up (CD) is then assumed to come close to duplicating the first (AB) in size and slope. So the height of AB is simply measured <b>upward from the bottom of the correction at C</b>. Murphy's Procter &amp; Gamble example (Fig 6.10b): AB was 20 points, and adding 20 to the low at C (62) gave a target of <b>82</b> at D. One thing the caption doesn't say (my reading of the chart's scale, not Murphy's numbers): A sits near 57½ and B near 78, so that real correction gave back about two-thirds to three-quarters of AB (two-thirds measured to the lowest bars near 64½, more to the drawn C at 62), deeper than the third-to-a-half of the textbook case, yet prices still climbed to about the 82 target by the chart's right edge (February 1998).</p>
+  <div class="fig">
+    <canvas id="c16" class="tall" aria-label="Measured move with adjustable correction depth"></canvas>
+    <div class="legend" id="c16L"></div>
+    <div class="controls">
+      <label for="a16">A <input id="a16" type="range" min="40" max="60" step="1" value="50"><output id="a16o">50</output></label>
+      <label for="ab16">AB (points) <input id="ab16" type="range" min="10" max="30" step="1" value="20"><output id="ab16o">20</output></label>
+      <label for="rt16">BC retraces (% of AB) <input id="rt16" type="range" min="20" max="70" step="1" value="40"><output id="rt16o">40</output></label>
+    </div>
+    <div class="readout" id="r16"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Set A = 50, AB = 20 and the retracement to 40%: C lands at 62 and D at 82, the same C and D as Murphy's P&amp;G chart (A = 50 and 40% are my choices for the calculator; the real chart's A was higher and its correction deeper). Push the retracement outside ⅓–½ and the readout flags that the setup is no longer the well-defined case the book describes. The target always sits AB above C, so a deeper correction lowers the target.</p>
+  <p>Why might the second leg copy the first? Murphy's answer is that it's the halfway-flag and one-third-to-half-retracement ideas combined. A plausible reason underneath (mine): the same buyers, with the same reasons, facing the same kind of market, tend to move it a similar distance; and once enough traders expect it, the target becomes a place where they take profits, which is self-fulfilling. Murphy presents it as a tendency in orderly markets, not a law.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A staircase with one landing. The first flight (AB) tells you how tall a flight is in this building. The landing (BC) is a short step back down. The second flight (CD) is assumed to be the same height as the first.</p></div>
+  <div class="box worked"><b>Worked example</b>
+    <div class="formula">Murphy's P&amp;G (Fig 6.10b):  AB = 20 points   low of the correction C = 62
+target D = C + AB = 62 + 20 = 82
+
+the textbook case with my A = 50:  B = 70
+retrace ⅓ → C = 70 − 6.7 = 63.3 → D = 83.3
+retrace ½ → C = 70 − 10  = 60   → D = 80</div>
+    <p>The deeper the correction, the lower the target, by exactly the extra depth.</p></div>
+  <div class="box beyond"><b>Beyond the book: the no-edge baseline</b><p>Say you buy at C, aim for D and give up if prices fall back to A. If prices had no memory (a random walk), the chance of reaching D first would just be the distance to A divided by the total distance between A and D: (1 − r) ÷ (2 − r), where r is the retracement as a fraction of AB. For r = 40% that's 0.6 ÷ 1.6 = 37.5%; for ⅓ it's 40%; for ½ it's 33%. The readout shows it for your settings. A real measured-move edge has to beat that number on real data, and Murphy gives no hit-rate statistics for the measured move.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_trend.html">Chapter 4</a>: the ⅓, ½ and ⅔ retracement percentages. <a href="ch13_elliott_wave.html">Chapter 13</a>: wave equality in Elliott Wave theory.</li>
+    <li>Nison ch.16, <i>Measured moves</i> (pdf p251), applies the same idea to candlestick charts.</li>
+  </ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · THE CONTINUATION HEAD AND SHOULDERS PATTERN</div><h2>An upside-down head and shoulders inside a trend</h2></div><span class="chip">pdf p190–192 · Fig 6.11a–c</span></div>
+  <p>Chapter 5 described the head and shoulders as the best-known and most trustworthy reversal pattern. Sometimes it appears as a <b>continuation</b> instead. Prices trace something that looks like a sideways rectangle, except that in an <b>uptrend</b> the middle trough is lower than either shoulder (Fig 6.11a), and in a <b>downtrend</b> the middle peak is higher than the other two (Fig 6.11b). Either way it's a head and shoulders <b>turned upside down</b> relative to what a reversal would look like there, so there's no chance of confusing it with the reversal pattern. Murphy's General Motors example (Fig 6.11c, first half of 1997) was very clear but in an unusual place, and completed with a close above the neckline at <b>60</b>.</p>
+  <div class="fig">
+    <canvas id="c17" class="tall" aria-label="Continuation head and shoulders in an uptrend or downtrend"></canvas>
+    <div class="legend" id="c17L"></div>
+    <div class="controls"><label for="sel17">Trend <select id="sel17"><option value="up">uptrend (bullish continuation)</option><option value="dn">downtrend (bearish continuation)</option></select></label></div>
+    <div class="readout" id="r17"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>In an uptrend a reversal top would have three <i>peaks</i>; here the market makes three <i>troughs</i>, an inverse head and shoulders, which is a bullish shape. So the shape agrees with the trend instead of fighting it, and the neckline break sends prices on in the trend's direction.</p>
+  <p>The quick test (my phrasing of Murphy's point): ask whether the head points <i>with</i> the trend or <i>against</i> it. A reversal head sticks out in the trend's direction, a last push that fails. A continuation head sticks out against the trend, a last shakeout before the trend resumes. In practice (my addition) you treat it like any rectangle-type pause: wait for the close through the neckline in the trend's direction (60 in Murphy's GM example), and use the right shoulder as the place where you'd be proved wrong.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch06_tug_of_war_slip_recover.svg" alt="A winning tug-of-war team slips badly once in the middle of the contest, between two smaller slips, then digs in and pulls harder." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A tug-of-war team that's winning slips once, badly, in the middle of the contest (the head), recovers, and then pulls harder. The slip looks dramatic, but it's surrounded by two smaller slips at about the same level, and the team never loses its footing for good.</p></div>
+  <div class="box worked"><b>Worked example (simulated uptrend chart)</b>
+    <div class="formula">neckline     y = 79 + 0.5 × (day − 33) ÷ 13     (a gentle rise of about 0.04 a day)
+head         68 on day 40, neckline there 79.3  → height = 79.3 − 68 = 11.3
+right shoulder 72.5 on day 52
+
+breakout: first close above the neckline (about day 56, neckline ≈ 79.9)
+target (Chapter 5's rule, borrowed) = 79.9 + 11.3 ≈ 91.2
+
+trade plan (mine, not Murphy's):
+entry ≈ 80.0   stop under the right shoulder ≈ 72.0   risk ≈ 8.0
+reward ≈ 91.2 − 80.0 = 11.2   R ≈ 1.4   break-even win rate ≈ 1 ÷ 2.4 ≈ 42%</div>
+    <p>Compare that R with the flag's 3.7 in section 12: a head and shoulders is wide, so the natural stop is far away and the trade carries a lot of risk for its target. A tighter stop (under the neckline) improves R on paper but sits right where a return move would come. Murphy's GM example gives the neckline (60) but not the head, so its target can't be worked from the text. The readout uses the actual breakout day, so its target moves a little with the re-roll.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_reversal_patterns.html">Chapter 5</a>: the head and shoulders and its inverse; there, Murphy flags that the pattern can occasionally act as a consolidation.</li>
+  </ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · CONFIRMATION AND DIVERGENCE · CONCLUSION</div><h2>Do the signals agree?</h2></div><span class="chip">pdf p192–193</span></div>
+  <p><b>Confirmation</b> is one of the themes that runs through all of market analysis. It means comparing all the technical signals and indicators to make sure most of them point the same way and confirm each other. Murphy introduces it here in the context of chart patterns, but it applies to virtually every part of technical analysis, and he says he'll come back to both ideas again and again through the book. Its counterpart is <b>divergence</b>: a situation where different indicators <b>fail</b> to confirm each other. Here it's used in a negative sense, but divergence is valuable: it's one of the best early warnings of an impending trend reversal. Chapter 10 (<i>Oscillators and Contrary Opinion</i>) covers it at length.</p>
+  <p><b>Conclusion:</b> this ends the treatment of price patterns. The technician's three raw inputs are <b>price, volume and open interest</b>, and most of what has been said so far has been about price. Chapter 7 looks at volume and open interest and how they fit into the analysis.</p>
+  <div class="fig">
+    <canvas id="c18" class="tall" aria-label="Price breakout confirmed or not confirmed by volume"></canvas>
+    <div class="legend" id="c18L"></div>
+    <div class="controls"><label for="sel18">Show <select id="sel18"><option value="conf">confirmation: price and volume agree</option><option value="div">divergence: price breaks out, volume doesn't</option></select></label></div>
+    <div class="readout" id="r18"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Here the second indicator is volume, the one this chapter has used all along. In the confirming case, price makes a new high and the volume on that move is the heaviest in the chart. In the divergent case, price makes the same new high but on fading volume: the two disagree, and that disagreement is the warning. The ending shown for the divergent case is an illustration of the risk, not a certainty.</p>
+  <p>Why does agreement matter? Each indicator is a different, noisy measurement of the same hidden thing: whether buyers or sellers are in control. Price alone can be pushed to a new high by a few eager buyers in a thin market. Price plus volume plus (later) momentum all agreeing is much harder to fake. When they disagree, one of the measurements is telling you the move has less behind it than the price suggests.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A second opinion from a doctor. One test saying you're fine is reassuring; two independent tests saying so is much more convincing. If the second test disagrees, you don't panic, but you stop assuming all is well.</p></div>
+  <div class="box worked"><b>Worked example: a confirmation checklist at a breakout</b>
+    <div class="formula">Illustrative (mine): price closes at a new high of 86, above the last high of 80.
+                                    agrees?
+price    new high above the last     yes   (the signal being tested)
+volume   rally to 86 avg 180 vs 120  yes   1.5× the rally to 80
+         rally to 86 avg  70 vs 120  NO    0.6×: divergence
+trend    above the rising trendline  yes   (Chapter 4)
+
+if volume agrees    → 3 of 3: act on the break at full size
+if it doesn't       → 2 of 3, a divergence: treat the break as suspect, smaller size or wait for the return move</div>
+    <p>The checklist itself is mine; Murphy's point is the principle behind it: the more independent signals agree, the more the move can be trusted, and a disagreement is an early warning rather than a sell signal by itself. Flip the chart's setting to see the second case play out on simulated prices.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_volume_open_interest.html">Chapter 7</a>: volume and open interest. <a href="ch10_oscillators.html">Chapter 10</a>: divergence between price and oscillators.</li>
+    <li>Your <code>intraday_swing_playbook.md</code>: the S-1 breakout needs volume above 1.5 × the 20-day average and the ORB needs relative volume above 2. Both are volume confirming a price breakout.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. What are the two main differences between continuation and reversal patterns?</summary><p>Direction (a continuation is a pause, the prior trend resumes) and time (continuation patterns are usually shorter, near-term or intermediate) (section 01).</p></details>
+  <details><summary>2. What is the minimum number of reversal points for a triangle, and why?</summary><p>Four: each of the two converging lines needs at least two touches. Many triangles have six, making five waves (section 03).</p></details>
+  <details><summary>3. A symmetrical triangle is 20 weeks from base to apex. When should it break out? What if it's still inside at week 17?</summary><p>Between about the 13th and 15th week (⅔ to ¾ of the width). Beyond ¾ it loses potency and tends to drift to the apex and beyond (section 04).</p></details>
+  <details><summary>4. Inside an uptrend triangle, on which swings should volume be slightly heavier?</summary><p>On the bounces; lighter on the dips. Overall volume shrinks inside, then rises on the breakout (section 05).</p></details>
+  <details><summary>5. Name Murphy's two ways to measure a symmetrical triangle, and which he prefers.</summary><p>Base height projected from the breakout point (preferred), or a line from the top of the base parallel to the lower trendline (section 06).</p></details>
+  <details><summary>6. An ascending triangle appears near the end of a long downtrend. Bullish or bearish?</summary><p>Still bullish. Ascending and descending triangles keep their meaning wherever they appear; this one would be a bottom (section 07).</p></details>
+  <details><summary>7. A triangle-shaped pause has formed in 8 trading days. What is it more likely to be?</summary><p>A pennant. Triangles usually take more than a month (section 09).</p></details>
+  <details><summary>8. How does volume behave in a broadening formation, and where does it usually appear?</summary><p>It expands with the widening swings; it usually appears at major tops, near the end of a bull market, and is bearish (section 10).</p></details>
+  <details><summary>9. A flagpole ran from the original breakout at 100 to 112; the flag breaks out at 110. Target?</summary><p>110 + 12 = 122. Measure the pole from the original breakout point and project it from the flag's breakout (section 12).</p></details>
+  <details><summary>10. A rising wedge forms in an uptrend. What does Murphy's maxim say?</summary><p>Bearish. A continuation wedge in an uptrend should slope down; a rising wedge is bearish, a falling wedge bullish (section 13).</p></details>
+  <details><summary>11. Inside a rectangle in an uptrend, volume is heavier on the declines. What does that suggest?</summary><p>A warning of a possible trend reversal; heavier volume on rallies would point to continuation (section 14).</p></details>
+  <details><summary>12. AB = 20 points, C = 62. Measured-move target? What retracement of AB makes it a well-defined case?</summary><p>82. BC should retrace roughly a third to a half of AB (section 16).</p></details>
+  <details><summary>13. Entry 84.3, stop 77.9, target 100.8. What are R and the break-even win rate? If prices were a pure random walk, about how often would the target be hit before the stop, and what does that imply?</summary><p>Risk 6.4, reward 16.5, R ≈ 2.6, break-even win rate 1 ÷ 3.6 ≈ 28%. A random walk hits the target first about risk ÷ (risk + reward) = 6.4 ÷ 22.9 ≈ 28% of the time: exactly break-even. A good R:R isn't an edge; the edge has to come from real follow-through after the break (section 06, my addition).</p></details>
+  <details><summary>14. Your breakouts often go on to the target, yet your stop just under the broken line keeps getting hit first. What's happening?</summary><p>Return moves. Murphy says a pullback to the broken line, which should now act as support, is not unusual. A stop placed just under that line is in the path of the return move; a stop beyond the last reversal point survives it at the price of a larger risk (sections 04, 07 and the section 06 test).</p></details>
+  <details><summary>15. In the section 15 pooled test, which market behaviour pays the range trader and which pays the breakout waiter? What happens when both are switched off?</summary><p>The range trader is paid by the pull back toward the middle (κ); the waiter by the trend after the break. With both at zero every approach loses roughly its costs: a rule only makes money if the market really behaves the way the rule assumes (my simulation, not Murphy's).</p></details>
+</section>
+
+<footer>Built from Murphy, <i>Technical Analysis of the Financial Markets</i>, Chapter 6, <i>Continuation Patterns</i> (printed pp. 129–156, PDF pages 166–193), summarised in my own words. Charts use simulated prices, not real market data; the company names in the text are the book's figure examples. Education, not investment advice.</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ---------- pattern engine (added for the chart-pattern chapters) ----------
+  // Patterns are drawn through fixed anchor points; only the small noise between anchors changes on re-roll,
+  // so the defining relationships (head above shoulders, lows at the same level, ...) always hold.
+  let nseed = 7;
+  const A = (rows) => rows.map(([i, p, v]) => ({ i, p, v }));
+  // anchors: [{i, p, v}] with anchors[0].i = 0; v = volume level of the leg that ENDS at this anchor
+  function pathFrom(anchors, opt) {
+    opt = opt || {};
+    const r = rng(nseed * 131 + (opt.salt || 0));
+    const n = anchors[anchors.length - 1].i + 1;
+    const c = nulls(n), v = nulls(n), h = nulls(n), l = nulls(n);
+    const amp = opt.noise != null ? opt.noise : 0.6;
+    c[anchors[0].i] = anchors[0].p;
+    for (let k = 1; k < anchors.length; k++) {
+      const a = anchors[k - 1], b = anchors[k]; const L = b.i - a.i;
+      const w = [0]; for (let j = 1; j <= L; j++) w.push(w[j - 1] + gauss(r));
+      const br = w.map((x, j) => x - j / L * w[L]); let m = 1e-9; br.forEach((x) => { m = Math.max(m, Math.abs(x)); });
+      const sc = amp * Math.min(1, L / 8) / m;
+      for (let j = 1; j <= L; j++) c[a.i + j] = a.p + (b.p - a.p) * j / L + (j < L ? br[j] * sc : 0);
+    }
+    const vb = opt.vbase || 100; let k = 0;
+    for (let i = 0; i < n; i++) {
+      while (k < anchors.length - 1 && i > anchors[k].i) k++;
+      const lvl = anchors[k].v != null ? anchors[k].v : 1;
+      v[i] = vb * lvl * (0.8 + 0.4 * r());
+      const prev = i > 0 ? c[i - 1] : c[i]; const rg = (opt.range != null ? opt.range : amp * 0.8 + 0.3) * (0.4 + r());
+      h[i] = Math.max(c[i], prev) + rg * r(); l[i] = Math.min(c[i], prev) - rg * r();
+    }
+    return { c, v, h, l, n };
+  }
+  const mirror = (rows, m) => rows.map(([i, p, v]) => [i, m - p, v]);
+  function lineFn(i0, p0, i1, p1) { const s = (p1 - p0) / (i1 - i0); return (i) => p0 + s * (i - i0); }
+  const upto = (a, k) => a.map((x, i) => (i <= k ? x : null));
+  function firstIdx(n, from, test) { for (let i = Math.max(0, from); i < n; i++) if (test(i)) return i; return -1; }
+  const avg = (a, i0, i1) => { let s = 0, m = 0; for (let i = i0; i <= i1; i++) if (a[i] != null) { s += a[i]; m++; } return m ? s / m : 0; };
+  const maxOf = (a) => { let m = -Infinity; a.forEach((x) => { if (x != null && x > m) m = x; }); return m; };
+  const f1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+  const f2 = (x) => (Math.round(x * 100) / 100).toFixed(2);
+
+  // geometry identical to plot() when ymin/ymax/x0/x1 are given explicitly
+  function geo(id, sp) {
+    const cv = $(id); const W = cv.clientWidth, H = cv.clientHeight;
+    const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : sp.n - 1;
+    const subH = sp.sub ? Math.round((H - 18) * 0.28) : 0, gap = sp.sub ? 16 : 0, mainH = H - 18 - subH - gap;
+    const X = (i) => 6 + (i - x0) / Math.max(1, x1 - x0) * (W - 54);
+    const Y = (v) => 10 + (sp.ymax - v) / (sp.ymax - sp.ymin) * mainH;
+    const subTop = 10 + mainH + gap;
+    const YS = sp.sub ? (v) => subTop + (sp.sub.ymax - v) / (sp.sub.ymax - sp.sub.ymin) * subH : Y;
+    return { W, H, X, Y, YS, mainH, subTop, subH };
+  }
+  function label(g, G, x, y, s, col, align) {
+    g.font = '600 11px ' + css('mono'); const tw = g.measureText(s).width;
+    let tx = align === 'left' ? x : align === 'right' ? x - tw : x - tw / 2;
+    tx = Math.max(8, Math.min(G.W - 52 - tw, tx)); const ty = Math.max(12, Math.min(G.H - 4, y));
+    g.setLineDash([]); g.lineWidth = 3; g.strokeStyle = colorOf('plate', 0.92); g.strokeText(s, tx, ty);
+    g.fillStyle = col; g.fillText(s, tx, ty);
+  }
+  // items: {t:'seg'|'arrow'|'dot'|'zone'|'hline'|'txt', ...}; text/li/lv/dy/align place a label
+  function annotate(id, sp, items) {
+    const cv = $(id); if (!cv || !cv.clientWidth || !cv.clientHeight) return;
+    const G = geo(id, sp); const g = cv.getContext('2d');
+    (items || []).forEach((it) => {
+      if (!it) return;
+      const Yf = it.sub ? G.YS : G.Y; const col = colorOf(it.col || 'ink');
+      g.save(); g.strokeStyle = col; g.fillStyle = col; g.lineWidth = it.w || 1.5; g.setLineDash(it.dash || []);
+      let lx = null, ly = null;
+      if (it.t === 'seg') { g.beginPath(); g.moveTo(G.X(it.i0), Yf(it.v0)); g.lineTo(G.X(it.i1), Yf(it.v1)); g.stroke(); lx = G.X(it.i1); ly = Yf(it.v1); }
+      else if (it.t === 'hline') { const xa = G.X(it.i0 != null ? it.i0 : (sp.x0 || 0)), xb = G.X(it.i1 != null ? it.i1 : (sp.x1 != null ? sp.x1 : sp.n - 1)); g.beginPath(); g.moveTo(xa, Yf(it.v)); g.lineTo(xb, Yf(it.v)); g.stroke(); lx = xb; ly = Yf(it.v); }
+      else if (it.t === 'arrow') {
+        const x = G.X(it.i), ya = Yf(it.v0), yb = Yf(it.v1); g.setLineDash([4, 3]); g.beginPath(); g.moveTo(x, ya); g.lineTo(x, yb); g.stroke(); g.setLineDash([]);
+        const d = yb > ya ? 1 : -1; g.beginPath(); g.moveTo(x, yb); g.lineTo(x - 4, yb - d * 7); g.lineTo(x + 4, yb - d * 7); g.closePath(); g.fill(); lx = x; ly = (ya + yb) / 2;
+      }
+      else if (it.t === 'dot') { g.beginPath(); g.arc(G.X(it.i), Yf(it.v), it.r || 3.5, 0, Math.PI * 2); g.fill(); lx = G.X(it.i); ly = Yf(it.v); }
+      else if (it.t === 'zone') { g.fillStyle = colorOf(it.col || 'c1', it.alpha != null ? it.alpha : 0.12); const xa = G.X(it.i0), xb = G.X(it.i1); g.fillRect(xa, 10, xb - xa, G.mainH); lx = (xa + xb) / 2; ly = 24; }
+      else if (it.t === 'hl') { g.strokeStyle = colorOf(it.col || 'price', it.alpha != null ? it.alpha : 0.55); g.lineWidth = 1.2; const a = it.i0 || 0, z = it.i1 != null ? it.i1 : it.h.length - 1; for (let i = a; i <= z; i++) { if (it.h[i] == null || it.l[i] == null) continue; const x = G.X(i); g.beginPath(); g.moveTo(x, Yf(it.h[i])); g.lineTo(x, Yf(it.l[i])); g.stroke(); } }
+      else if (it.t === 'band') { g.fillStyle = colorOf(it.col || 'c1', it.alpha != null ? it.alpha : 0.14); const xa = G.X(it.i0), xb = G.X(it.i1), ya = Yf(it.hi), yb = Yf(it.lo); g.fillRect(xa, ya, xb - xa, yb - ya); lx = xb; ly = ya; }
+      else { lx = G.X(it.i); ly = Yf(it.v); }
+      if (it.text) {
+        if (it.li != null) lx = G.X(it.li); if (it.lv != null) ly = Yf(it.lv);
+        label(g, G, lx + (it.dx || 0), ly + (it.dy != null ? it.dy : -8), it.text, colorOf(it.lcol || it.col || 'ink'), it.align);
+      }
+      g.restore();
+    });
+  }
+  function draw(id, sp, items) { plot(id, sp); annotate(id, sp, items); }
+  function volSub(v, hl, ymax) {
+    return { bars: [{ d: v, col: (i) => (hl && hl(i) ? colorOf('c1', 0.85) : colorOf('muted', 0.45)) }], ymin: 0, ymax: ymax || maxOf(v) * 1.08, label: 'volume (simulated)' };
+  }
+  // short helpers for annotation items
+  // readouts are flex rows: one span per fact so the text wraps cleanly
+  function out(id, html, split) { $(id).innerHTML = split === false ? '<span>' + html + '</span>' : html.split(' · ').map((x) => '<span>' + x + '</span>').join(''); }
+  const T = (i, v, text, col, dy, align) => ({ t: 'txt', i, v, text, col, dy, align });
+  const P = (i, v, text, up, col) => ({ t: 'txt', i, v, text, col: col || 'ink', dy: up ? -9 : 17 });
+
+
+  // ---------- Chapter 6 data (all simulated, built through fixed anchor points) ----------
+  const onChange = (id, f) => $(id).addEventListener('change', f);
+  function clampIn(d, i0, i1, up, lo) { for (let i = i0; i <= i1; i++) { if (up) d.c[i] = Math.min(d.c[i], up(i)); if (lo) d.c[i] = Math.max(d.c[i], lo(i)); } }
+  const upDown = (c, a) => (i) => (i > 0 && c[i] != null && c[i - 1] != null ? (c[i] >= c[i - 1] ? colorOf('buy', a || 0.65) : colorOf('sell', a || 0.65)) : colorOf('muted', 0.4));
+  function upDownAvg(d, i0, i1) { let u = 0, nu = 0, w = 0, nw = 0; for (let i = Math.max(1, i0); i <= i1; i++) { if (d.c[i] >= d.c[i - 1]) { u += d.v[i]; nu++; } else { w += d.v[i]; nw++; } } return { up: nu ? u / nu : 0, dn: nw ? w / nw : 0 }; }
+
+  // symmetrical triangle used in sections 3, 5, 6
+  const triU = lineFn(20, 90, 34, 87), triL = lineFn(26, 74, 38, 76.5);
+  const sU = (87 - 90) / 14, sL = (76.5 - 74) / 12, triApex = (16 - 20 * sU + 26 * sL) / (sL - sU), triBase = 90 - triL(20);
+  const triRows = [[0, 60, 1.2], [6, 67, 1.3], [9, 65, .9], [20, 90, 1.5], [26, 74, .95], [34, 87, 1.0], [38, 76.5, .7], [43, triU(43), .8], [47, triL(47), .55]];
+  const rectU = 90, rectL = 80;
+  let D1, TRI, TRIF, triBrk, D7, D8, D10, D11, D13, D14, D15, D17, D18;
+
+  function buildData() {
+    D1 = pathFrom(A([[0, 50, 1.1], [14, 64, 1.5], [16, 62.4, .6], [18, 63.6, .5], [20, 61.8, .5], [22, 62.9, .5], [32, 74, 1.4], [36, 78, 1], [41, 72.5, .7], [45, 76.8, .7], [49, 73.6, .6], [52, 75.9, .55], [55, 74.6, .5], [66, 88, 1.4], [70, 84, .8], [74, 88, .8], [78, 84, .8], [82, 88, .8], [86, 84, .7], [90, 88.4, .8], [100, 100, 1.3]]), { salt: 61, noise: 0.5 });
+    TRI = pathFrom(A(triRows.concat([[50, 85, 1.8], [56, 91, 1.4], [72, 103, 1.2]])), { salt: 63, noise: 0.5 });
+    clampIn(TRI, 20, 49, triU, triL);
+    triBrk = firstIdx(TRI.n, 47, (i) => TRI.c[i] > triU(i));
+    TRIF = pathFrom(A(triRows.concat([[50, 84.6, 0.75], [53, 81.8, .6], [58, 75.5, 1.25], [72, 69, 1.1]])), { salt: 63, noise: 0.5 });
+    clampIn(TRIF, 20, 49, triU, triL);
+    const asc = { cont: [[0, 62, 1], [10, 72, 1.1], [13, 69, .8], [24, 90, 1.3], [32, 76, .9], [40, 90, 1.0], [47, 80, .7], [54, 90, .85], [60, 84, .6], [64, 91.6, 1.9], [66, 92.6, 1.7], [69, 90.3, .5], [86, 106, 1.3]],
+      bot: [[0, 112, 1], [8, 103, 1], [11, 106, .8], [20, 82, 1.1], [23, 85, .8], [30, 76, 1.0], [38, 90, 1.0], [45, 80, .7], [52, 90, .85], [58, 84, .6], [64, 91.6, 1.9], [66, 92.6, 1.7], [69, 90.3, .5], [86, 106, 1.3]] };
+    D7 = {}; D8 = {};
+    Object.keys(asc).forEach((k) => {
+      const rows = asc[k]; const b0 = k === 'cont' ? 24 : 38, l0 = k === 'cont' ? 32 : 30, l1 = k === 'cont' ? 60 : 58;
+      const lo = lineFn(l0, 76, l1, 84);
+      const d = pathFrom(A(rows), { salt: 67, noise: 0.5 }); clampIn(d, b0, 63, () => 90, (i) => (i >= l0 ? lo(i) : -Infinity)); d.lo = lo; d.b0 = b0; d.l0 = l0; D7[k] = d;
+      const m = pathFrom(A(mirror(rows, 170)), { salt: 68, noise: 0.5 }); clampIn(m, b0, 63, (i) => (i >= l0 ? 170 - lo(i) : Infinity), () => 80); m.b0 = b0; m.l0 = l0; m.up = (i) => 170 - lo(i); D8[k === 'cont' ? 'cont' : 'top'] = m;
+    });
+    D10 = pathFrom(A([[0, 60, .9], [8, 68, 1], [11, 65, .8], [20, 84, 1.0], [27, 76, 1.05], [34, 88.2, 1.2], [42, 72, 1.35], [50, 93, 1.55], [60, 66, 1.8], [66, 78, 1.2], [82, 55, 1.6]]), { salt: 70, noise: 0.6 });
+    const U = (i0) => [[0, 60, .9], [10, 63, .9], [13, 62, .8], [15, 64, 1.0], [24, 80, 2.1]];
+    D11 = {
+      flag: { rows: U().concat([[26, 76.5, .5], [29, 78.75, .45], [32, 75, .4], [35, 77.25, .4], [37, 74.25, .45], [39, 78, 1.9], [48, 92, 1.6], [56, 94, 1]]), up: (i) => 80 - 0.25 * (i - 24), lo: (i) => 77 - 0.25 * (i - 24), e: 37 },
+      pen: { rows: U().concat([[26, 75, .5], [28, 79.2, .45], [30, 75.8, .4], [32, 78.4, .4], [34, 76.6, .4], [36, 79, 1.9], [45, 92, 1.6], [56, 94, 1]]), up: (i) => 80 - 0.2 * (i - 24), lo: (i) => 75 + 0.2 * (i - 26), e: 34 },
+      flagD: { rows: U().concat([[26, 76.4, .5], [28, 78.8, .45], [30, 75.2, .4], [32, 77.6, .4], [34, 79.5, 1.9], [42, 92, 1.6], [56, 95, 1]]), up: (i) => 80 - 0.3 * (i - 24), lo: (i) => 77 - 0.3 * (i - 24), e: 32 },
+      penD: { rows: U().concat([[26, 75.5, .5], [28, 78.8, .45], [30, 76.7, .4], [31, 77.9, .4], [32, 79.5, 1.9], [42, 92, 1.6], [56, 95, 1]]), up: (i) => 80 - 0.3 * (i - 24), lo: (i) => 75.5 + 0.3 * (i - 26), e: 31 }
+    };
+    Object.keys(D11).forEach((k) => {
+      const o = D11[k]; const dn = /D$/.test(k); o.d = pathFrom(A(dn ? mirror(o.rows, 160) : o.rows), { salt: 71, noise: 0.35 });
+      const fr = o.rows.filter(([i]) => i <= o.e).concat([[o.e + 2, o.lo(o.e + 2) - 1.6, 1.6], [o.e + 12, 69, 1.4], [56, 66, 1.1]]);
+      o.f = pathFrom(A(dn ? mirror(fr, 160) : fr), { salt: 72, noise: 0.35 });
+    });
+    const fallRows = [[0, 60, 1], [8, 68, 1.1], [11, 66, .8], [20, 88, 1.4], [26, 79, .9], [32, 83.8, .8], [38, 77.2, .7], [44, 79.6, .6], [49, 75.55, .5], [52, 78.5, 1.8], [70, 94, 1.3]];
+    const topRows = [[0, 50, 1], [10, 58, 1.1], [13, 56, .8], [22, 70, 1.2], [26, 78, 1.1], [32, 74.5, .9], [38, 81, .9], [44, 79.9, .8], [49, 83.75, .75], [52, 83.5, .8], [54, 82.4, 1.5], [70, 66, 1.4]];
+    D13 = { fall: pathFrom(A(fallRows), { salt: 73, noise: 0.4 }), rise: pathFrom(A(mirror(fallRows, 160)), { salt: 73, noise: 0.4 }), top: pathFrom(A(topRows), { salt: 74, noise: 0.4 }) };
+    clampIn(D13.fall, 20, 50, (i) => 88 - 0.35 * (i - 20), (i) => (i >= 26 ? 79 - 0.15 * (i - 26) : -Infinity));
+    clampIn(D13.rise, 20, 50, (i) => (i >= 26 ? 160 - (79 - 0.15 * (i - 26)) : Infinity), (i) => 160 - (88 - 0.35 * (i - 20)));
+    clampIn(D13.top, 26, 52, (i) => 78 + 0.25 * (i - 26), (i) => 70 + 0.45 * (i - 22));
+    const rect = [[0, 60, 1], [8, 68, 1.1], [11, 66, .8], [20, 90, 1.3]];
+    const inside = [[27, 80], [34, 90], [41, 80], [48, 90], [55, 80], [62, 89]];
+    D14 = {};
+    ['cont', 'warn'].forEach((k) => {
+      const rows = rect.concat(inside.map(([i, p], j) => { const rally = j % 2 === 1; return [i, p, (rally === (k === 'cont')) ? 1.3 : 0.65]; }))
+        .concat(k === 'cont' ? [[66, 92, 1.8], [70, 90.4, .6], [86, 102, 1.3]] : [[68, 78, 1.8], [72, 79.6, .6], [86, 68, 1.3]]);
+      const d = pathFrom(A(rows), { salt: 75, noise: 0.5 }); clampIn(d, 20, 63, () => rectU, () => rectL); D14[k] = d;
+    });
+    D15 = pathFrom(A([[0, 66, 1], [8, 74, 1.1], [11, 72, .8], [16, 90, 1.2], [22, 80, .8], [28, 90, .8], [34, 80, .8], [40, 90, .8], [46, 80, .8], [52, 90, .8], [58, 80, .8], [64, 89.6, .8], [66, 87, .8], [70, 91.6, 1.7], [73, 90.6, .7], [95, 106, 1.2]]), { salt: 76, noise: 0.45 });
+    clampIn(D15, 16, 67, () => rectU, () => rectL);
+    const ch = [[0, 55, 1], [10, 63, 1.1], [13, 61, .8], [22, 80, 1.3], [28, 72, .8], [33, 79, .9], [40, 68, .8], [46, 79.5, 1.1], [52, 72.5, .6], [57, 82, 1.8], [60, 80.3, .6], [76, 92, 1.3]];
+    D17 = { up: pathFrom(A(ch), { salt: 77, noise: 0.45 }), dn: pathFrom(A(mirror(ch, 150)), { salt: 77, noise: 0.45 }) };
+    const cf = [[0, 60, 1], [10, 70, 1.1], [14, 67, .8], [24, 80, 1.2], [30, 74, .8]];
+    D18 = { conf: pathFrom(A(cf.concat([[40, 86, 1.8], [44, 83, .8], [60, 96, 1.4]])), { salt: 78, noise: 0.45 }),
+            div: pathFrom(A(cf.concat([[40, 86, .55], [44, 83, .8], [48, 85, .6], [56, 76, 1.5], [60, 73, 1.3]])), { salt: 78, noise: 0.45 }) };
+    $('seedOut').textContent = nseed;
+  }
+
+  // ---------- 01 pauses in a trend ----------
+  const d1 = reg(() => {
+    const d = D1; const z = [[14, 22, 'flag'], [36, 55, 'triangle'], [66, 90, 'rectangle']];
+    const sp = { n: 101, x0: 0, x1: 100, ymin: 46, ymax: 104, lines: [{ d: d.c, col: 'price', w: 1.6, label: 'price (simulated)' }], legend: [['pause (continuation pattern)', 'c2']] };
+    draw('c1', sp, z.map(([a, b, nm]) => ({ t: 'zone', i0: a, i1: b, col: 'c2', alpha: 0.13, text: nm, lcol: 'c2' })));
+    const legs = [[0, 14], [22, 36], [55, 66], [90, 100]];
+    out('r1', `three pauses lasting <b>${z.map(([a, b]) => b - a).join(', ')}</b> days · the four trend legs lasted ${legs.map(([a, b]) => b - a).join(', ')} days · every pause ends in the direction of the trend before it · price ${f1(d.c[0])} → <b>${f1(d.c[100])}</b>`);
+  });
+
+  // ---------- 02 slope classifier (my classifier; Murphy's readings) ----------
+  function classify(su, sl, upTrend) {
+    const eps = 0.05, flat = (s) => Math.abs(s) < eps, d = sl - su; // d > 0: converging
+    const trendWord = upTrend ? 'bullish (prior trend up)' : 'bearish (prior trend down)';
+    if (flat(su) && flat(sl)) return ['rectangle', 'usually a pause; breaks with the prior trend → ' + trendWord, '14'];
+    if (Math.abs(d) < eps) {
+      const against = upTrend ? su < 0 : su > 0;
+      return against ? ['flag (if short and after a sharp pole) or a channel', 'a flag slopes against the trend and continues it → ' + trendWord, '11–12']
+        : ['a channel sloping with the trend', 'not a flag: a resting flag slopes against the trend (Chapter 4 channels)', '11'];
+    }
+    if (d > 0) {
+      if (su < -eps && sl > eps) return ['symmetrical triangle (or a pennant if 1–3 weeks)', 'neutral shape; read it from the prior trend → ' + trendWord, '03–06'];
+      if (flat(su) && sl > eps) return ['ascending triangle', 'bullish wherever it appears', '07'];
+      if (su < -eps && flat(sl)) return ['descending triangle', 'bearish wherever it appears', '08'];
+      if (su > 0 && sl > 0) return ['rising wedge', upTrend ? 'bearish: in an uptrend it is a reversal clue' : 'bearish: slants up against the downtrend', '13'];
+      return ['falling wedge', upTrend ? 'bullish: slants down against the uptrend' : 'bullish: at the end of a downtrend, a possible bottom', '13'];
+    }
+    if (su > eps && sl < -eps) return ['broadening formation', 'usually bearish, usually at major tops', '10'];
+    return ['a lopsided expanding shape', 'not one of this chapter\'s patterns', '—'];
+  }
+  const d2 = reg(() => {
+    const su = val('su2'), sl = val('sl2'), up = $('tr2').value === 'up', n = 41;
+    const gap = (i) => 10 + (sl - su) * -i; // upper − lower
+    const conv = sl - su > 0; const apex = conv ? 10 / (sl - su) : Infinity; const end = Math.min(n - 1, apex);
+    const u = nulls(n), lo = nulls(n), c = nulls(n);
+    for (let i = 0; i < n; i++) if (i <= end + 1e-9) { u[i] = 90 + su * i; lo[i] = 80 + sl * i; }
+    const zEnd = Math.min(n - 1, Math.floor(conv ? apex * 0.85 : n - 1)); const stepZ = Math.max(2, Math.round(zEnd / 7));
+    const piv = []; for (let i = 0, k = 0; i <= zEnd; i += stepZ, k++) piv.push([i, k % 2 ? 80 + sl * i + 0.3 : 90 + su * i - 0.3]);
+    for (let k = 1; k < piv.length; k++) { const [a, pa] = piv[k - 1], [b, pb] = piv[k]; for (let i = a; i <= b; i++) c[i] = pa + (pb - pa) * (i - a) / (b - a); }
+    const sp = { n, x0: 0, x1: n - 1, ymin: 60, ymax: 110, lines: [{ d: u, col: 'c2', w: 2, label: 'upper line' }, { d: lo, col: 'c1', w: 2, label: 'lower line' }, { d: c, col: 'price', w: 1.4, alpha: 0.7, label: 'swings (schematic)' }] };
+    plot('c2', sp);
+    const [name, reading, sec] = classify(su, sl, up);
+    const g0 = 10, gE = isFinite(apex) && apex <= 40 ? 0 : gap(40);
+    out('r2', `upper ${su >= 0 ? '+' : ''}${f2(su)}/day · lower ${sl >= 0 ? '+' : ''}${f2(sl)}/day · gap ${f1(g0)} → ${f1(gE)} points over 40 days (${Math.abs(sl - su) < 0.05 ? 'parallel' : conv ? 'converging' : 'diverging'}${isFinite(apex) && apex <= 40 ? ', apex on day ' + f1(apex) : ''}) · name: <b>${name}</b> · Murphy's reading: ${reading} · section ${sec}`);
+  });
+  bindRange('su2', d2); bindRange('sl2', d2); onChange('tr2', d2);
+
+  // ---------- 03 symmetrical triangle stepper ----------
+  let k3 = 0;
+  const pts3 = [[20, 90, '1', true], [26, 74, '2', false], [34, 87, '3', true], [38, 76.5, '4', false], [43, triU(43), '5', true], [47, triL(47), '6', false]];
+  const steps3 = () => [
+    { e: 20, n: 1, t: '<b>Point 1:</b> the uptrend stalls. This is where the consolidation (and the triangle) begins, but nobody knows that yet.' },
+    { e: 26, n: 2, t: '<b>Point 2:</b> prices pull back. Still just a normal dip in an uptrend.' },
+    { e: 34, n: 3, t: '<b>Point 3:</b> the rally stops <i>below</i> point 1. A lower high. The upper line can\'t be drawn until prices turn down from here.' },
+    { e: 38, n: 4, t: '<b>Point 4:</b> prices fell from 3, so the upper line 1–3 can now be drawn. And 4 is <i>higher</i> than 2: a higher low.' },
+    { e: 43, n: 5, t: '<b>Rally from 4:</b> now the lower line 2–4 can be drawn. Four reversal points and two converging lines: the minimum. This is when you start to suspect a symmetrical triangle.' },
+    { e: 47, n: 6, t: '<b>Points 5 and 6:</b> many triangles show six reversal points, three peaks and three troughs: five waves (1→2, 2→3, 3→4, 4→5, 5→6).' },
+    { e: triBrk, n: 6, t: `<b>Breakout:</b> a close above the upper line on day ${triBrk}, on rising volume. That is <b>${Math.round((triBrk - 20) / (triApex - 20) * 100)}%</b> of the way from the base (day 20) to the apex (day ${f1(triApex)}), ${((triBrk - 20) / (triApex - 20) >= 2 / 3 && (triBrk - 20) / (triApex - 20) <= 0.75) ? 'inside' : 'outside'} the ⅔–¾ window.` },
+    { e: 72, n: 6, t: `<b>The trend resumes.</b> Base height ${f1(triBase)} projected from the breakout (${f1(triU(triBrk))}) gives a minimum target of about <b>${f1(triU(triBrk) + triBase)}</b> (section 06).` }
+  ];
+  const d3 = reg(() => {
+    const S = steps3(); const s = S[k3]; const e = s.e;
+    const sp = { n: 73, x0: 0, x1: 72, ymin: 58, ymax: 108, lines: [{ d: upto(TRI.c, e), col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(upto(TRI.v, e), (i) => k3 >= 6 && i >= triBrk && i <= triBrk + 3, 220) };
+    const it = pts3.slice(0, s.n).map(([i, p, nm, up]) => P(i, p, nm, up, 'c1'));
+    if (k3 >= 3) it.push({ t: 'seg', i0: 20, v0: 90, i1: k3 >= 6 ? triApex : 50, v1: triU(k3 >= 6 ? triApex : 50), col: 'c2', w: 1.6 });
+    if (k3 >= 4) it.push({ t: 'seg', i0: 26, v0: 74, i1: k3 >= 6 ? triApex : 50, v1: triL(k3 >= 6 ? triApex : 50), col: 'c2', w: 1.6 });
+    if (k3 >= 6) {
+      it.push({ t: 'seg', i0: 20, v0: 90, i1: 20, v1: triL(20), col: 'c3', dash: [4, 3], text: 'base', align: 'right', dx: -4, dy: 4 });
+      it.push(T(triApex, triU(triApex), 'apex', 'c2', 16));
+      it.push({ t: 'dot', i: triBrk, v: TRI.c[triBrk], col: 'buy', r: 5 });
+    }
+    if (k3 >= 7) it.push({ t: 'hline', v: triU(triBrk) + triBase, i0: triBrk, i1: 72, col: 'buy', dash: [6, 4], text: 'min. target', align: 'right', dy: -5 });
+    draw('c3', sp, it);
+    out('r3', s.t, false); $('st3').textContent = k3 + 1;
+  });
+  $('nx3').addEventListener('click', () => { k3 = Math.min(7, k3 + 1); d3(); });
+  $('pv3').addEventListener('click', () => { k3 = Math.max(0, k3 - 1); d3(); });
+  $('al3').addEventListener('click', () => { k3 = 7; d3(); });
+
+  // ---------- 04 time limit ----------
+  const d4 = reg(() => {
+    const W = val('w4'), bw = val('b4'), base = 25, apex = base + W * 5, bd = base + bw * 5;
+    const up = lineFn(base, 100, apex, 85), lo = lineFn(base, 70, apex, 85), H = 30;
+    const rows = [[0, 62], [10, 72], [14, 69], [base, 100]]; const step = Math.max(4, Math.round(W * 5 / 7)); let k = 1;
+    for (let x = base + step; x < bd - 1; x += step, k++) rows.push([x, k % 2 ? lo(x) + 0.4 : up(x) - 0.4]);
+    const late = bw > W * 0.75; const bp = bd <= apex ? up(bd) + 0.8 : 85 + 0.8;
+    rows.push([bd, bp]);
+    const after = late ? [[bd + 12, bp + H * 0.25], [bd + 30, bp + H * 0.2]] : [[bd + 25, bp + H * 1.05], [bd + 30, bp + H * 1.0]];
+    const all = rows.concat(after).map(([i, p]) => [Math.round(i), p, 1]);
+    const d = pathFrom(A(all), { noise: 0 });
+    const n = d.n;
+    const sp = { n, x0: 0, x1: n - 1, ymin: 58, ymax: 140, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'schematic price (1 point = 1 trading day)' }],
+      vlines: [{ i: base, col: 'c3', label: 'base (week 0)' }, { i: apex, col: 'c2', label: 'apex (week ' + W + ')', row: 1 }] };
+    draw('c4', sp, [{ t: 'zone', i0: base + W * 5 * 2 / 3, i1: base + W * 5 * 0.75, col: 'buy', alpha: 0.16, text: '⅔–¾', lcol: 'buy' },
+      { t: 'seg', i0: base, v0: 100, i1: apex, v1: 85, col: 'c2', w: 1.6 }, { t: 'seg', i0: base, v0: 70, i1: apex, v1: 85, col: 'c2', w: 1.6 },
+      { t: 'dot', i: bd, v: bp, col: late ? 'sell' : 'buy', r: 5, text: 'breakout, week ' + bw, dy: -12 }]);
+    const a = W * 2 / 3, z = W * 0.75;
+    const verdict = bw > W ? '<span class="bad">past the apex: the pattern has lost its potency</span>' : bw > z ? '<span class="bad">after the ¾ point: losing potency, likely to drift</span>' : bw >= a ? '<span class="good">inside the ⅔–¾ window: the textbook timing</span>' : 'before ⅔: early (allowed, but less typical)';
+    out('r4', `width ${W} weeks · window = ⅔×${W} to ¾×${W} = <b>week ${f1(a)} to ${f1(z)}</b> · breakout in week <b>${bw}</b> = ${Math.round(bw / W * 100)}% of the width → ${verdict} · gap left between the lines at the break: <b>${f1(Math.max(0, 30 * (1 - bw / W)))}</b> of the 30-point base (${Math.max(0, Math.round((1 - bw / W) * 100))}%)`);
+  });
+  bindRange('w4', d4); bindRange('b4', d4);
+
+  // ---------- 04b breakout-filter lab (my simulation, beyond the book) ----------
+  const FILT4 = [['poke', 'intraday poke'], ['close', 'close above'], ['p1', 'close 1% above'], ['p3', 'close 3% above'], ['two', 'two closes above']];
+  function lab4(drift, seed) {
+    const N = 1000, D = 60, Hz = 10, LINE = 100, r = rng(seed); const res = {}; FILT4.forEach(([k]) => { res[k] = { n: 0, whip: 0, ent: 0, lag: 0 }; });
+    const samples = [];
+    for (let m = 0; m < N; m++) {
+      const c = [96], h = [96.3]; let poke = -1;
+      for (let t = 1; t <= D + Hz; t++) {
+        const dr = poke >= 0 ? drift : 0; const x = c[t - 1] + dr + gauss(r);
+        c.push(x); h.push(Math.max(x, c[t - 1]) + Math.abs(gauss(r)) * 0.5);
+        if (poke < 0 && h[t] > LINE && t <= D) poke = t;
+      }
+      const trig = {
+        poke: poke,
+        close: firstIdx(D + 1, 1, (t) => c[t] > LINE),
+        p1: firstIdx(D + 1, 1, (t) => c[t] > LINE * 1.01),
+        p3: firstIdx(D + 1, 1, (t) => c[t] > LINE * 1.03),
+        two: firstIdx(D + 1, 2, (t) => c[t] > LINE && c[t - 1] > LINE)
+      };
+      const info = {};
+      FILT4.forEach(([k]) => {
+        const t = trig[k]; if (t < 0) { info[k] = null; return; }
+        const ent = k === 'poke' ? LINE : c[t]; let whip = false;
+        for (let j = t + 1; j <= t + Hz; j++) if (c[j] < LINE) { whip = true; break; }
+        const o = res[k]; o.n++; o.whip += whip ? 1 : 0; o.ent += ent - LINE; o.lag += t - poke; info[k] = { t, ent, whip };
+      });
+      if (samples.length < 14) samples.push({ c, info });
+    }
+    return { N, res, samples };
+  }
+  const d4b = reg(() => {
+    const key = $('sel4b').value, drift = val('dr4b'); const L = lab4(drift, nseed * 613 + 4); const n = 71;
+    const lines = L.samples.map((s) => { const f = s.info[key]; return { d: s.c, col: !f ? 'muted' : f.whip ? 'sell' : 'buy', w: 1.1 }; });
+    lines[0].label = 'simulated paths (green: held above, red: whipsaw, grey: no trigger)';
+    const items = [{ t: 'hline', v: 100, i0: 0, i1: 70, col: 'c2', w: 2, text: 'resistance 100', align: 'left', dy: -5 }];
+    if (key === 'p1' || key === 'p3') items.push({ t: 'hline', v: key === 'p1' ? 101 : 103, i0: 0, i1: 70, col: 'c2', dash: [4, 3], text: key === 'p1' ? '101 (1%)' : '103 (3%)', align: 'right', dy: -5 });
+    L.samples.forEach((s) => { const f = s.info[key]; if (f) items.push({ t: 'dot', i: f.t, v: key === 'poke' ? 100 : f.ent, col: f.whip ? 'sell' : 'buy', r: 3.5 }); });
+    draw('c4b', { n, x0: 0, x1: 70, ymin: 76, ymax: 120, lines }, items);
+    const pct = (a, b) => (b ? Math.round(a / b * 100) : 0) + '%';
+    $('t4b').innerHTML = '<table><thead><tr><th>filter</th><th>paths that trigger</th><th>whipsaw within 10 days</th><th>entry above the line</th><th>days after the first poke</th></tr></thead><tbody>' +
+      FILT4.map(([k, nm]) => { const o = L.res[k]; return `<tr${k === key ? ' class="hi"' : ''}><td>${nm}</td><td class="num">${pct(o.n, L.N)}</td><td class="num ${o.whip / Math.max(1, o.n) > 0.5 ? 'bad' : 'good'}">${pct(o.whip, o.n)}</td><td class="num">${f2(o.n ? o.ent / o.n : 0)}</td><td class="num">${f1(o.n ? o.lag / o.n : 0)}</td></tr>`; }).join('') + '</tbody></table>';
+    const a = L.res.poke, z = L.res.p3;
+    out('r4b', `1,000 simulated paths, seed #${nseed} · poke whipsaws <b>${pct(a.whip, a.n)}</b> vs 3% close <b>${pct(z.whip, z.n)}</b> · but the 3% close buys <b>${f2(z.n ? z.ent / z.n : 0)}</b> points above the line and <b>${f1(z.n ? z.lag / z.n : 0)}</b> days later · follow-through ${drift} points/day ${drift > 0 ? '(a built-in edge, set by you)' : '(none: a memoryless market)'}`);
+  });
+  onChange('sel4b', d4b); bindRange('dr4b', d4b);
+
+  // ---------- 05 triangle volume ----------
+  const d5 = reg(() => {
+    const fail = $('chk5').checked, T = fail ? TRIF : TRI; const bk = firstIdx(T.n, 47, (i) => T.c[i] > triU(i));
+    const back = fail ? firstIdx(T.n, bk + 1, (i) => T.c[i] < triU(i)) : -1, dnb = fail ? firstIdx(T.n, bk + 1, (i) => T.c[i] < triL(i)) : -1;
+    const sp = { n: 73, x0: 0, x1: 72, ymin: fail ? 60 : 58, ymax: 108, lines: [{ d: T.c, col: 'price', w: 1.7, label: 'price (simulated)' }],
+      sub: { bars: [{ d: T.v, col: upDown(T.c) }], ymin: 0, ymax: 220, label: 'volume: green = up day, red = down day' } };
+    const items = [{ t: 'seg', i0: 20, v0: 90, i1: triApex, v1: triU(triApex), col: 'c2', w: 1.4 }, { t: 'seg', i0: 26, v0: 74, i1: triApex, v1: triL(triApex), col: 'c2', w: 1.4 },
+      { t: 'zone', i0: 20, i1: bk - 1, col: 'c2', alpha: 0.06 }, { t: 'dot', i: bk, v: T.c[bk], col: fail ? 'muted' : 'buy', r: 5, text: fail ? 'break on light volume' : 'break on heavy volume', dy: -12 }];
+    if (fail && back > 0) items.push({ t: 'dot', i: back, v: T.c[back], col: 'sell', r: 4, text: 'back inside', dy: 18, align: 'right' });
+    if (fail && dnb > 0) items.push({ t: 'dot', i: dnb, v: T.c[dnb], col: 'sell', r: 5, text: 'out the bottom', dy: 18, align: 'left' });
+    draw('c5', sp, items);
+    const ud = upDownAvg(T, 21, bk - 1), first = avg(T.v, 21, 34), second = avg(T.v, 35, bk - 1), brk = avg(T.v, bk, bk + 2);
+    out('r5', `inside the triangle: up days <b>${Math.round(ud.up)}</b> vs down days <b>${Math.round(ud.dn)}</b> average volume · first half ${Math.round(first)} → second half <b>${Math.round(second)}</b> (drying up) · breakout days <b>${f1(brk / second)}×</b> the second half` +
+      (fail ? ` · <span class="bad">no volume burst: closed back inside on day ${back} and below the lower line on day ${dnb}</span>` : ' · <span class="good">volume confirms the break</span>'));
+  });
+  onChange('chk5', d5);
+
+
+  // ---------- 06 measuring ----------
+  const d6 = reg(() => {
+    const b = val('b6'); const bp = triU(b) + 0.7; const fail = $('chk6').checked; const stop = triL(47) - 0.5;
+    const after = fail ? [[b, bp, 1.8], [b + 3, bp + 1.2, 1.1], [b + 10, stop - 1.5, 1.6], [b + 22, stop - 7, 1.3]] : [[b, bp, 1.8], [b + 22, bp + triBase + 3, 1.2]];
+    const d = pathFrom(A(triRows.concat(after)), { salt: 64, noise: 0.45 });
+    clampIn(d, 20, b - 1, triU, triL);
+    const tBase = triU(b) + triBase, par = (i) => 90 + sL * (i - 20), tPar = par(b + 10), tTime = par(triApex);
+    const risk = bp - stop, rew = tBase - bp, R = rew / risk;
+    const back = fail ? firstIdx(d.n, b + 1, (i) => d.c[i] < triU(i)) : -1, hit = fail ? firstIdx(d.n, b + 1, (i) => d.c[i] <= stop) : -1;
+    const sp = { n: b + 23, x0: 0, x1: 82, ymin: fail ? 66 : 58, ymax: 112, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], legend: [['stop under point 6 (my trade plan)', 'sell']] };
+    draw('c6', sp, [{ t: 'seg', i0: 20, v0: 90, i1: triApex, v1: triU(triApex), col: 'c2', w: 1.4 }, { t: 'seg', i0: 26, v0: 74, i1: triApex, v1: triL(triApex), col: 'c2', w: 1.4 },
+      { t: 'seg', i0: 20, v0: 90, i1: 20, v1: triL(20), col: 'c3', dash: [4, 3] }, P(20, 90, 'A', true), P(20, triL(20), 'B', false), P(b, triU(b), 'C', false, 'buy'),
+      { t: 'arrow', i: b, v0: triU(b), v1: tBase, col: 'buy' },
+      { t: 'hline', v: tBase, i0: b, i1: 82, col: 'buy', dash: [6, 4], text: 'base target ' + f1(tBase), align: 'left', li: b + 1, dy: -5 },
+      { t: 'seg', i0: 20, v0: 90, i1: 82, v1: par(82), col: 'c1', dash: [5, 4], text: 'parallel line', align: 'left', li: 34, lv: par(34), dy: -7 },
+      { t: 'dot', i: triApex, v: tTime, col: 'c1', r: 4 },
+      { t: 'hline', v: stop, i0: 47, i1: 82, col: 'sell', dash: [3, 3], w: 1.2, text: 'stop ' + f1(stop), align: 'right', dy: 14 },
+      hit >= 0 ? { t: 'dot', i: hit, v: d.c[hit], col: 'sell', r: 5, text: 'stop hit', dy: 18 } : null]);
+    const plan = `trade plan (mine): entry ${f1(bp)} · stop ${f1(stop)} (risk ${f1(risk)}) · reward to base target ${f1(rew)} · <b>R = ${f1(R)}</b> · break-even win rate 1 ÷ (1 + R) = <b>${Math.round(100 / (1 + R))}%</b>`;
+    out('r6', `base AB = ${f1(90)} − ${f1(triL(20))} = <b>${f1(triBase)}</b> · breakout C at ${f1(triU(b))} on day ${b} (${Math.round((b - 20) / (triApex - 20) * 100)}% of the width) · method 1: ${f1(triU(b))} + ${f1(triBase)} = <b>${f1(tBase)}</b> · method 2: the parallel line is at <b>${f1(par(triApex))}</b> when the apex arrives (day ${f1(triApex)}), the rough time-and-price target · ${plan}` +
+      (fail ? ` · <span class="bad">false breakout: back inside on day ${back}, stop hit on day ${hit}: a loss of 1R (${f1(risk)} points)</span>` : ''));
+  });
+  bindRange('b6', d6); onChange('chk6', d6);
+
+  // ---------- 06b pooled test of the trade plan (my simulation) ----------
+  const plans6 = () => ({
+    tri: { name: 'symmetrical triangle', entry: triU(50) + 0.7, line: triU(50), wide: triL(47) - 0.5, target: triU(50) + triBase },
+    rect: { name: 'rectangle', entry: 90.6, line: 90, wide: 79.5, target: 100 },
+    flag: { name: 'bull flag', entry: 72.7, line: 72.1, wide: 69.5, target: 84.7 }
+  });
+  function pool6(pl, stop, drift, seed) {
+    const N = 2000, H = 60, sig = 1, r = rng(seed); const risk = pl.entry - stop; let win = 0, lose = 0, sumR = 0, sumR2 = 0; const samples = [];
+    for (let k = 0; k < N; k++) {
+      let p = pl.entry, res = null; const path = k < 30 ? [p] : null;
+      for (let t = 1; t <= H; t++) {
+        p += drift + sig * gauss(r);
+        if (p <= stop) { res = -1; p = stop; } else if (p >= pl.target) { res = 1; p = pl.target; }
+        if (path) path.push(p);
+        if (res) break;
+      }
+      const x = (p - pl.entry) / risk; sumR += x; sumR2 += x * x; if (res === 1) win++; else if (res === -1) lose++;
+      if (path) samples.push({ path, res });
+    }
+    const m = sumR / N, se = Math.sqrt(Math.max(0, sumR2 / N - m * m) / N);
+    return { N, win: win / N, lose: lose / N, open: (N - win - lose) / N, m, se, samples, risk };
+  }
+  const d6b = reg(() => {
+    const key = $('sel6b').value, pl = plans6()[key], tight = $('sel6c').value === 'tight', drift = val('dr6');
+    const stop = tight ? pl.line - 0.5 : pl.wide; const P6 = pool6(pl, stop, drift, nseed * 977 + (key === 'tri' ? 1 : key === 'rect' ? 2 : 3));
+    const risk = P6.risk, rew = pl.target - pl.entry, R = rew / risk, pStar = 1 / (1 + R), cost = 0.003 * pl.entry, costR = cost / risk;
+    const n = 61, lines = P6.samples.map((s) => ({ d: s.path.concat(nulls(n - s.path.length)), col: s.res === 1 ? 'buy' : s.res === -1 ? 'sell' : 'muted', w: 1, alpha: 0.45 }));
+    const sp = { n, x0: 0, x1: 60, ymin: Math.min(stop, pl.wide) - 2, ymax: pl.target + 2, lines, legend: [['reached target', 'buy'], ['stopped out', 'sell'], ['still open at day 60', 'muted']] };
+    draw('c6b', sp, [{ t: 'hline', v: pl.entry, col: 'ink', w: 1.4, text: 'entry ' + f1(pl.entry), align: 'left', li: 1, dy: -5 },
+      { t: 'hline', v: stop, col: 'sell', w: 1.6, dash: [5, 4], text: 'stop ' + f1(stop), align: 'left', li: 1, dy: 14 },
+      { t: 'hline', v: pl.target, col: 'buy', w: 1.6, dash: [5, 4], text: 'target ' + f1(pl.target), align: 'left', li: 1, dy: 14 }]);
+    const pct = (x) => Math.round(x * 1000) / 10 + '%'; const net = P6.m - costR;
+    out('r6b', `${pl.name}, ${tight ? 'tight' : 'wide'} stop · risk ${f1(risk)} · reward ${f1(rew)} · R = <b>${f1(R)}</b> · break-even win rate <b>${pct(pStar)}</b> · random-walk theory (no drift, no time limit): target first ≈ risk ÷ (risk + reward) = ${pct(risk / (risk + rew))} · simulated over ${P6.N} paths: target <b>${pct(P6.win)}</b>, stop ${pct(P6.lose)}, open at day 60 ${pct(P6.open)} · expectancy <b class="${P6.m >= 0 ? 'good' : 'bad'}">${P6.m >= 0 ? '+' : ''}${f2(P6.m)}R</b> ± ${f2(P6.se)} (1 standard error) · cost 0.3% = ${f2(cost)} points = ${f2(costR)}R → net <b class="${net >= 0 ? 'good' : 'bad'}">${net >= 0 ? '+' : ''}${f2(net)}R</b> per trade · simulated, not evidence`);
+  });
+  onChange('sel6b', d6b); onChange('sel6c', d6b); bindRange('dr6', d6b);
+
+  // ---------- 07 ascending ----------
+  const d7 = reg(() => {
+    const k = $('sel7').value; const d = D7[k]; const b = firstIdx(d.n, 61, (i) => d.c[i] > 90); const ht = 90 - 76, tg = 90 + ht;
+    let rm = b + 3; for (let i = b + 3; i <= b + 7; i++) if (d.c[i] < d.c[rm]) rm = i;
+    const sp = { n: 87, x0: 0, x1: 86, ymin: 60, ymax: 114, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(d.v, (i) => i >= b && i <= b + 2, 220) };
+    draw('c7', sp, [{ t: 'hline', v: 90, i0: d.b0, i1: 86, col: 'c2', w: 2, text: 'flat resistance 90 → support', align: 'right', dy: 14 },
+      { t: 'seg', i0: d.l0, v0: 76, i1: 64, v1: d.lo(64), col: 'c2', w: 1.6, text: 'rising lows', align: 'right', dy: 14, dx: 6 },
+      P(d.l0, 90, 'A', true), P(d.l0, 76, 'B', false), { t: 'arrow', i: d.l0, v0: 76, v1: 90, col: 'c3' },
+      { t: 'dot', i: b, v: d.c[b], col: 'buy', r: 5 }, P(b, 90, 'C', false, 'buy'), { t: 'arrow', i: b + 1, v0: 90, v1: tg, col: 'buy' },
+      { t: 'hline', v: tg, i0: b, i1: 86, col: 'buy', dash: [6, 4], text: 'min. target ' + tg, align: 'right', dy: -5 },
+      { t: 'hline', v: 83.5, i0: b - 4, i1: 86, col: 'sell', dash: [3, 3], text: 'stop 83.5 (mine)', align: 'right', dy: 14 }]);
+    out('r7', `${k === 'cont' ? 'continuation in an uptrend' : 'bottom after a downtrend'} · decisive close above 90 on <b>day ${b}</b> · breakout volume <b>${f1(avg(d.v, b, b + 2) / avg(d.v, d.b0, b - 1))}×</b> the pattern average · height AB = 90 − 76 = ${ht} → target <b>${tg}</b> · plan (mine): entry ${f1(d.c[b])}, stop 83.5 under the last rising low (84), R ≈ ${f1((tg - d.c[b]) / (d.c[b] - 83.5))} · return move dipped to ${f1(d.c[rm])} on volume ${f1(d.v[rm] / avg(d.v, d.b0, b - 1))}× the pattern average · bullish either way`);
+  });
+  onChange('sel7', d7);
+
+  // ---------- 08 descending ----------
+  const d8 = reg(() => {
+    const k = $('sel8').value; const d = D8[k]; const b = firstIdx(d.n, 61, (i) => d.c[i] < 80); const ht = 94 - 80, tg = 80 - ht;
+    const sp = { n: 87, x0: 0, x1: 86, ymin: 56, ymax: 110, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(d.v, (i) => i >= b && i <= b + 2, 220) };
+    draw('c8', sp, [{ t: 'hline', v: 80, i0: d.b0, i1: 86, col: 'c2', w: 2, text: 'flat support 80 → resistance', align: 'right', dy: -5 },
+      { t: 'seg', i0: d.l0, v0: 94, i1: 64, v1: d.up(64), col: 'c2', w: 1.6, text: 'falling highs', align: 'right', dy: -6, dx: 6 },
+      P(d.l0, 94, 'A', true), P(d.l0, 80, 'B', false), { t: 'arrow', i: d.l0, v0: 94, v1: 80, col: 'c3' },
+      { t: 'dot', i: b, v: d.c[b], col: 'sell', r: 5 }, P(b, 80, 'C', true, 'sell'), { t: 'arrow', i: b + 1, v0: 80, v1: tg, col: 'sell' },
+      { t: 'hline', v: tg, i0: b, i1: 86, col: 'sell', dash: [6, 4], text: 'min. target ' + tg, align: 'right', dy: 14 },
+      { t: 'hline', v: 86.5, i0: b - 4, i1: 86, col: 'buy', dash: [3, 3], text: 'stop 86.5 (mine)', align: 'right', dy: -5 }]);
+    out('r8', `${k === 'cont' ? 'continuation in a downtrend' : 'top after an uptrend: a major reversal signal'} · decisive close below 80 on <b>day ${b}</b> · volume <b>${f1(avg(d.v, b, b + 2) / avg(d.v, d.b0, b - 1))}×</b> the pattern average · height AB = 94 − 80 = ${ht} → target <b>${tg}</b> · plan (mine): short at ${f1(d.c[b])}, stop 86.5 above the last falling high (86), R ≈ ${f1((d.c[b] - tg) / (86.5 - d.c[b]))}`);
+  });
+  onChange('sel8', d8);
+
+  // ---------- 09 duration ruler (custom canvas) ----------
+  const d9 = reg(() => {
+    const cv = $('c9'); if (!cv || !cv.clientWidth) return; const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const L = 14, R = W - 14, X = (dd) => L + dd / 90 * (R - L), n = val('n9'); const font = '11px ' + css('mono');
+    const rows = [[5, 15, 'flags & pennants: 1–3 weeks', 'c1', 0.3], [5, 10, 'in downtrends often 1–2 weeks', 'c1', 0.55], [21, 63, 'triangles, wedges, rectangles: 1–3 months', 'c2', 0.3]];
+    const rh = Math.min(30, (H - 50) / 3.4);
+    rows.forEach(([a, b, nm, col, al], k) => { const y = 10 + k * (rh + 8); g.fillStyle = colorOf(col, al); g.fillRect(X(a), y, X(b) - X(a), rh); g.font = font; g.fillStyle = colorOf('ink'); const tw = g.measureText(nm).width; g.fillText(nm, Math.min(X(a) + 4, R - tw), y + rh / 2 + 4); });
+    const ay = 10 + 3 * (rh + 8) + 4; g.strokeStyle = colorOf('muted'); g.lineWidth = 1; g.beginPath(); g.moveTo(L, ay); g.lineTo(R, ay); g.stroke();
+    [[0, '0'], [5, '1w'], [15, '3w'], [21, '1m'], [42, '2m'], [63, '3m'], [84, '4m']].forEach(([dd, t]) => { g.beginPath(); g.moveTo(X(dd), ay); g.lineTo(X(dd), ay + 5); g.stroke(); g.fillStyle = colorOf('muted'); g.font = font; g.fillText(t, X(dd) - g.measureText(t).width / 2, ay + 17); });
+    g.strokeStyle = colorOf('sell'); g.lineWidth = 2; g.beginPath(); g.moveTo(X(n), 6); g.lineTo(X(n), ay + 2); g.stroke();
+    const fits = []; if (n >= 5 && n <= 15) fits.push('flag or pennant'); if (n >= 21 && n <= 63) fits.push('triangle, wedge or rectangle');
+    out('r9', `${n} trading days ≈ <b>${f1(n / 5)} weeks</b> ≈ ${f1(n / 21)} months → ${fits.length ? 'fits a <b>' + fits.join(' / ') + '</b>' : n < 21 && n > 15 ? 'between the two ranges: look at the shape' : n < 5 ? 'too short for these patterns' : 'longer than 3 months: more like a major (reversal-sized) pattern'}`);
+  });
+  bindRange('n9', d9);
+
+  // ---------- 10 broadening ----------
+  let k10 = 0;
+  const d10 = reg(() => {
+    const d = D10; const b = firstIdx(d.n, 51, (i) => d.c[i] < 72);
+    // the three ordinary breakout signals that fail inside the megaphone (my illustration), then Murphy's completion
+    const sig = [
+      { nm: 'buy the break above peak 1 (84)', lv: 84, dir: 1, i: firstIdx(d.n, 28, (i) => d.c[i] > 84), ex: [42, 72, 'trough 4'] },
+      { nm: 'short the break under trough 2 (76)', lv: 76, dir: -1, i: firstIdx(d.n, 35, (i) => d.c[i] < 76), ex: [50, 93, 'peak 5'] },
+      { nm: 'buy the break above peak 3 (88.2)', lv: 88.2, dir: 1, i: firstIdx(d.n, 43, (i) => d.c[i] > 88.2), ex: [60, 66, 'point 6'] }];
+    const sp = { n: 83, x0: 0, x1: 82, ymin: 50, ymax: 98, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(d.v, (i) => i > 20 && i <= 60, 260) };
+    const items = [{ t: 'seg', i0: 20, v0: 84, i1: 60, v1: 84 + 0.3 * 40, col: 'c2', w: 1.6 }, { t: 'seg', i0: 27, v0: 76, i1: 66, v1: 76 - 0.2667 * 39, col: 'c2', w: 1.6 },
+      P(20, 84, '1', true), P(27, 76, '2', false), P(34, 88.2, '3', true), P(42, 72, '4', false), P(50, 93, '5', true), P(60, 66, '6', false), P(66, 78, '7', true)];
+    let msg;
+    if (k10 >= 1 && k10 <= 3) {
+      const g = sig[k10 - 1], e = d.c[g.i], loss = g.dir * (g.ex[1] - e);
+      items.push({ t: 'hline', v: g.lv, i0: g.i - 8, i1: g.ex[0], col: 'c1', dash: [5, 4] }, { t: 'zone', i0: g.i, i1: g.ex[0], col: 'sell', alpha: 0.08 },
+        { t: 'dot', i: g.i, v: e, col: g.dir > 0 ? 'buy' : 'sell', r: 5, text: g.dir > 0 ? 'buy' : 'short', dy: g.dir > 0 ? -12 : 20 },
+        { t: 'dot', i: g.ex[0], v: g.ex[1], col: 'sell', r: 5, text: 'loss ' + f1(loss), dy: g.dir > 0 ? 20 : -12 });
+      msg = `signal ${k10} of 3 (my illustration): <b>${g.nm}</b> · entry close ${f1(e)} on day ${g.i} · prices then swing to ${g.ex[2]} at ${g.ex[1]} · <span class="bad">${f1(loss)} points against you</span>, and the move is bigger each time`;
+    } else if (k10 === 4) {
+      items.push({ t: 'hline', v: 72, i0: 42, i1: 82, col: 'sell', dash: [5, 4], text: 'second trough (4)', align: 'right', dy: -5 }, { t: 'dot', i: b, v: d.c[b], col: 'sell', r: 5, text: 'complete', dy: 20 });
+      msg = `Murphy's completion: after the third higher peak (5), the first close below the second trough (72) on <b>day ${b}</b> · the top is in: a sell signal, not a buy`;
+    } else {
+      items.push({ t: 'hline', v: 72, i0: 42, i1: 82, col: 'sell', dash: [5, 4], text: 'second trough (4)', align: 'right', dy: -5 }, { t: 'dot', i: b, v: d.c[b], col: 'sell', r: 5 });
+      const sw = [[20, 27], [27, 34], [34, 42], [42, 50], [50, 60]];
+      msg = `swing sizes ${sw.map(([a, z]) => f1(Math.abs(d.c[z] - d.c[a]))).join(' → ')} (each wider) · volume per swing ${sw.map(([a, z]) => Math.round(avg(d.v, a + 1, z))).join(' → ')} (rising with the swings) · completed on <b>day ${b}</b>, the first close below the second trough at 72 · press <i>Next signal</i> to try trading it`;
+    }
+    draw('c10', sp, items); $('st10').textContent = k10; out('r10', msg);
+  });
+  $('nx10').addEventListener('click', () => { k10 = Math.min(4, k10 + 1); d10(); });
+  $('pv10').addEventListener('click', () => { k10 = Math.max(0, k10 - 1); d10(); });
+
+  // ---------- 11 flags and pennants ----------
+  function atr14(h, l, c, i) { let s = 0, k = 0; for (let j = Math.max(1, i - 13); j <= i; j++) { s += Math.max(h[j] - l[j], Math.abs(h[j] - c[j - 1]), Math.abs(l[j] - c[j - 1])); k++; } return s / k; }
+  function bullFlag(c, h, l, v, i) {                  // is bar i a bull-flag breakout?
+    for (let f = 7; f <= 15; f++) {                 // the flag lasts 6–14 bars (1–3 weeks)
+      const s = i - f, p0 = s - 8;                    // s: top of the pole, p0: 8 bars before it
+      if (p0 < 1) break;
+      const pole = c[s] - c[p0];
+      if (pole < 4 * atr14(h, l, c, p0)) continue;               // sharp, almost straight move
+      if (Math.max(...c.slice(p0, i)) > c[s]) continue;           // s really is the top
+      const fh = Math.max(...h.slice(s + 1, i)), fl = Math.min(...l.slice(s + 1, i));
+      if (fh - fl > 0.5 * pole) continue;                         // a small pause
+        const vFlag = avg(v, s + 1, i - 1);
+      if (vFlag > 0.6 * avg(v, p0 + 1, s)) continue;              // volume dries up
+      // upper line: the slope of the flag's highs, shifted up to touch the highest one
+      let sj = 0, sh = 0, sjj = 0, sjh = 0;
+      for (let j = s + 1; j < i; j++) { sj += j; sh += h[j]; sjj += j * j; sjh += j * h[j]; }
+      const m = f - 1, b = (m * sjh - sj * sh) / (m * sjj - sj * sj);
+      if (b > 0) continue;                                        // highs must not rise with the trend
+    let a = -Infinity; for (let j = s + 1; j < i; j++) a = Math.max(a, h[j] - b * j);
+      if (c[i] <= a + b * i || v[i] <= vFlag) continue;          // close above the line on heavier volume
+      return { i, s, f, entry: c[i], stop: fl, target: c[i] + pole, pole };      // pole projected from the break
+    }
+    return null;
+  }
+  function scanFlag(d, dn) {
+    const t = (a) => a.map((x) => (x == null ? null : 160 - x));
+    const c = dn ? t(d.c) : d.c, h = dn ? t(d.l) : d.h, l = dn ? t(d.h) : d.l;
+    for (let i = 20; i < d.n; i++) {
+      const g = bullFlag(c, h, l, d.v, i); if (!g) continue;
+      g.out = 'open'; for (let j = i + 1; j < d.n; j++) { if (l[j] <= g.stop) { g.out = 'stop'; g.j = j; break; } if (h[j] >= g.target) { g.out = 'target'; g.j = j; break; } }
+      return g;
+    }
+    return null;
+  }
+  const d11 = reg(() => {
+    const pen = $('sel11').value === 'pen', dn = $('chk11').checked, fail = $('chk11b').checked; const o = D11[(pen ? 'pen' : 'flag') + (dn ? 'D' : '')]; const d = fail ? o.f : o.d;
+    const M = (v) => (dn ? 160 - v : v); const e = o.e; const bI = e + 2;
+    const sp = { n: 57, x0: 0, x1: 56, ymin: dn ? 62 : 56, ymax: dn ? 104 : 98, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(d.v, (i) => (i > 15 && i <= 24) || (i >= bI && i <= bI + 2), 260) };
+    let fl = Infinity; for (let i = 25; i <= e; i++) fl = Math.min(fl, dn ? 160 - d.c[i] : d.c[i]);
+    const stopF = fl - 0.5;
+    draw('c11', sp, [{ t: 'seg', i0: 24, v0: M(o.up(24)), i1: e + 1, v1: M(o.up(e + 1)), col: 'c2', w: 1.6 }, { t: 'seg', i0: pen ? 26 : 24, v0: M(o.lo(pen ? 26 : 24)), i1: e + 1, v1: M(o.lo(e + 1)), col: 'c2', w: 1.6 },
+      { t: 'seg', i0: 15, v0: M(64), i1: 24, v1: M(80), col: 'c1', w: 3, alpha: 0.5, text: 'pole', align: 'right', dx: -10, dy: dn ? 16 : -4 },
+      { t: 'zone', i0: 24, i1: e + 1, col: 'c2', alpha: 0.1 },
+      fail ? { t: 'hline', v: M(stopF), i0: 24, i1: 56, col: 'sell', dash: [3, 3], w: 1.2, text: 'stop beyond the pattern (mine) ' + f1(M(stopF)), align: 'right', dy: dn ? -5 : 14 } : null]);
+    const days = e + 1 - 24; const vf = avg(d.v, 25, e), vp = avg(d.v, 16, 24), vb = avg(d.v, bI, bI + 2);
+    const failTxt = fail ? ` · <span class="bad">the rare failure: prices broke ${dn ? 'up' : 'down'} out of the ${pen ? 'pennant' : 'flag'} instead</span> · a trader who ${dn ? 'shorted' : 'bought'} at the flag's last swing (${f1(d.c[e])}, day ${e}) with a stop just beyond the pattern at ${f1(M(stopF))} loses about <b>${f1(Math.abs(d.c[e] - M(stopF)))}</b> points; without a stop the move ran <b>${f1(Math.abs(d.c[56] - d.c[e]))}</b> points against them` : '';
+    const g = scanFlag(d, dn); const MM = (v) => (dn ? 160 - v : v);
+    if (g) annotate('c11', sp, [{ t: 'dot', i: g.i, v: MM(g.entry), col: dn ? 'sell' : 'buy', r: 4.5 },
+      { t: 'hline', v: MM(g.stop), i0: g.i, i1: 56, col: 'sell', dash: [3, 3], text: fail ? '' : 'detector stop', align: 'right', dy: dn ? -5 : 14 },
+      { t: 'hline', v: MM(g.target), i0: g.i, i1: 56, col: 'buy', dash: [6, 4], text: 'detector target', align: 'right', dy: dn ? 14 : -5 }]);
+    const res11 = g ? (g.out === 'stop' ? `<span class="bad">stopped out on day ${g.j}: −1R</span>` : g.out === 'target' ? `<span class="good">target reached on day ${g.j}: +${f1(g.pole / (g.entry - g.stop))}R</span>` : 'still open at the chart edge') : '';
+    out('r11b', g ? `detector (code below) fires on <b>day ${g.i}</b>: ${dn ? 'short' : 'buy'} ${f1(MM(g.entry))} · stop ${f1(MM(g.stop))} (the ${dn ? 'pattern high' : 'flag low'}) · target ${f1(MM(g.target))} (pole ${f1(g.pole)}) · R = ${f1(g.pole / (g.entry - g.stop))} · ${res11}` : `detector (code below): <b>no signal</b> · the pattern never closed beyond its ${dn ? 'low' : 'high'} on heavier volume, so a rule-follower was never in the trade`);
+    out('r11', `${pen ? 'pennant: converging lines, nearly horizontal' : 'flag: parallel lines sloping ' + (dn ? 'up' : 'down') + ', against the trend'} · lasted <b>${days} trading days</b> (≈${f1(days / 5)} weeks) · volume in the pattern <b>${f1(vf / vp)}×</b> the pole's · ${fail ? 'volume on the failed break' : 'breakout volume'} <b>${f1(vb / vf)}×</b> the pattern's` + failTxt);
+  });
+  onChange('sel11', d11); onChange('chk11', d11); onChange('chk11b', d11);
+
+  // ---------- 12 half-mast measurement ----------
+  const d12 = reg(() => {
+    const p = val('p12'), ob = 64, top = ob + p, fu = (i) => top - 0.3 * (i - 24), fl = (i) => top - 3 - 0.3 * (i - 24);
+    const fb = fu(37) + 0.6, tg = fb + p;
+    const rows = [[0, 55], [6, 62], [9, 59], [12, 63.6], [14, ob + 0.6], [24, top], [26, fl(26)], [29, fu(29)], [32, fl(32)], [35, fu(35)], [36, fl(36) + 0.6], [37, fb], [60, tg], [66, tg - 1.2]].map(([i, v]) => [i, v, 1]);
+    const d = pathFrom(A(rows), { noise: 0 });
+    let flo = Infinity; for (let i = 24; i <= 37; i++) flo = Math.min(flo, d.c[i]);
+    const sp = { n: 67, x0: 0, x1: 66, ymin: 50, ymax: 64 + 2 * 24 + 4, lines: [{ d: d.c, col: 'price', w: 1.8, label: 'schematic price' }], legend: [['stop under the flag low (my trade plan)', 'sell']] };
+    draw('c12', sp, [{ t: 'hline', v: ob, i0: 0, i1: 30, col: 'muted', dash: [4, 3], text: 'resistance 64: original breakout', align: 'left', li: 0, dy: -5 },
+      { t: 'seg', i0: 24, v0: fu(24), i1: 38, v1: fu(38), col: 'c2', w: 1.4 }, { t: 'seg', i0: 24, v0: fl(24), i1: 38, v1: fl(38), col: 'c2', w: 1.4 },
+      { t: 'arrow', i: 18, v0: ob, v1: top, col: 'c1', text: 'pole ' + p, dx: -6, align: 'right' },
+      { t: 'arrow', i: 40, v0: fb, v1: tg, col: 'buy', text: '+' + p, dx: 6, align: 'left' },
+      { t: 'dot', i: 37, v: fb, col: 'buy', r: 5, text: 'flag breakout', dy: 18 },
+      { t: 'hline', v: tg, i0: 37, i1: 66, col: 'buy', dash: [6, 4], text: 'target ' + f1(tg), align: 'right', dy: -5 },
+      { t: 'hline', v: flo - 0.5, i0: 37, i1: 66, col: 'sell', dash: [3, 3], w: 1.2, text: 'stop ' + f1(flo - 0.5), align: 'right', dy: 14 }]);
+    out('r12', `pole: from the original breakout at 64 up to ${top} = <b>${p}</b> · flag breakout at <b>${f1(fb)}</b> · target = ${f1(fb)} + ${p} = <b>${f1(tg)}</b> · the flag sits ${Math.round((fb - ob) / (tg - ob) * 100)}% of the way from 64 to the target: roughly half-mast · trade plan (mine): stop under the flag low ${f1(flo)} at ${f1(flo - 0.5)} → risk ${f1(fb - flo + 0.5)} · <b>R = ${f1(p / (fb - flo + 0.5))}</b> · break-even win rate ${Math.round(100 / (1 + p / (fb - flo + 0.5)))}%`);
+  });
+  bindRange('p12', d12);
+
+  // ---------- 13 wedges ----------
+  const d13 = reg(() => {
+    const k = $('sel13').value; const d = D13[k];
+    let up, lo, i0u, i0l, e, b, verdict;
+    if (k === 'fall') { up = (i) => 88 - 0.35 * (i - 20); lo = (i) => 79 - 0.15 * (i - 26); i0u = 20; i0l = 26; e = 56; b = firstIdx(d.n, 49, (i) => d.c[i] > up(i)); verdict = '<span class="good">falling wedge: bullish</span> (slants down, against the uptrend)'; }
+    else if (k === 'rise') { up = (i) => 160 - (79 - 0.15 * (i - 26)); lo = (i) => 160 - (88 - 0.35 * (i - 20)); i0u = 26; i0l = 20; e = 56; b = firstIdx(d.n, 49, (i) => d.c[i] < lo(i)); verdict = '<span class="bad">rising wedge: bearish</span> (slants up, against the downtrend)'; }
+    else { up = (i) => 78 + 0.25 * (i - 26); lo = (i) => 70 + 0.45 * (i - 22); i0u = 26; i0l = 22; e = 56; b = firstIdx(d.n, 52, (i) => d.c[i] < lo(i)); verdict = '<span class="bad">rising wedge after an uptrend: bearish reversal</span>'; }
+    const sp = { n: 71, x0: 0, x1: 70, ymin: k === 'top' ? 46 : k === 'rise' ? 60 : 56, ymax: k === 'top' ? 92 : k === 'rise' ? 106 : 100, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }] };
+    draw('c13', sp, [{ t: 'seg', i0: i0u, v0: up(i0u), i1: e, v1: up(e), col: 'c2', w: 1.6 }, { t: 'seg', i0: i0l, v0: lo(i0l), i1: e, v1: lo(e), col: 'c2', w: 1.6 },
+      { t: 'dot', i: b, v: d.c[b], col: k === 'fall' ? 'buy' : 'sell', r: 5, text: 'breakout', dy: k === 'fall' ? -12 : 20 }]);
+    const su = (up(40) - up(30)) / 10, sl = (lo(40) - lo(30)) / 10;
+    out('r13', `upper line ${su >= 0 ? '+' : ''}${f2(su)}/day · lower line ${sl >= 0 ? '+' : ''}${f2(sl)}/day: both slant the same way and converge · ${verdict} · wedge lasted about <b>${b - Math.min(i0u, i0l)} trading days</b> (1–3 months is typical)`);
+  });
+  onChange('sel13', d13);
+
+  // ---------- 14 rectangle ----------
+  const d14 = reg(() => {
+    const k = $('sel14').value; const d = D14[k]; const upB = k === 'cont';
+    const b = firstIdx(d.n, 63, (i) => (upB ? d.c[i] > rectU : d.c[i] < rectL)); const tg = upB ? rectU + 10 : rectL - 10;
+    const sp = { n: 87, x0: 0, x1: 86, ymin: 56, ymax: 106, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: { bars: [{ d: d.v, col: upDown(d.c) }], ymin: 0, ymax: 220, label: 'volume: green = up day, red = down day' } };
+    draw('c14', sp, [{ t: 'hline', v: rectU, i0: 20, i1: 86, col: 'c2', w: 2, text: upB ? 'old ceiling → new floor' : 'ceiling 90', align: 'right', dy: upB ? 14 : -5 },
+      { t: 'hline', v: rectL, i0: 20, i1: 86, col: 'c2', w: 2, text: upB ? 'floor 80' : 'old floor → new ceiling', align: 'right', dy: upB ? 14 : -5 },
+      { t: 'arrow', i: 30, v0: rectL, v1: rectU, col: 'c3', text: '10', dx: 6, align: 'left' },
+      { t: 'dot', i: b, v: d.c[b], col: upB ? 'buy' : 'sell', r: 5 },
+      { t: 'hline', v: tg, i0: b, i1: 86, col: upB ? 'buy' : 'sell', dash: [6, 4], text: 'min. target ' + tg, align: 'right', dy: upB ? -5 : 14 }]);
+    const ud = upDownAvg(d, 21, 62);
+    out('r14', `inside the range: up days <b>${Math.round(ud.up)}</b> vs down days <b>${Math.round(ud.dn)}</b> average volume → ${upB ? '<span class="good">rallies heavier: continuation likely</span>' : '<span class="bad">declines heavier: warning of a reversal</span>'} · range lasted <b>42 trading days</b> (~2 months) · height 10 → target <b>${tg}</b> · break on day ${b}`);
+  });
+  onChange('sel14', d14);
+
+  // ---------- 15 trading the range ----------
+  const d15 = reg(() => {
+    const mode = $('sel15').value; const d = D15; const c = d.c; const n = d.n; const marks = []; const trades = [];
+    let pos = 0, ent = 0, ei = 0; const close = (i, why) => { const pnl = pos * (c[i] - ent); trades.push({ a: ei, b: i, dir: pos, pnl, why }); marks.push({ i, v: c[i], kind: pos > 0 ? 'sell' : 'buy' }); pos = 0; };
+    const open = (i, dir) => { pos = dir; ent = c[i]; ei = i; marks.push({ i, v: c[i], kind: dir > 0 ? 'buy' : 'sell' }); };
+    let broke = 0;
+    for (let i = 17; i < n; i++) {
+      if (!broke && c[i] > rectU) { broke = 1; if (mode === 'wait') { open(i, 1); continue; } if (pos < 0) close(i, 'breakout: exit at once'); if (pos > 0 && mode !== 'swing') continue; if (mode === 'swing' || mode === 'cont') { if (pos === 0) open(i, 1); } continue; }
+      if (!broke && c[i] < rectL) { broke = -1; if (pos > 0) close(i, 'breakdown: exit'); if (mode !== 'cont') open(i, -1); continue; }
+      if (broke || mode === 'wait') continue;
+      if (pos === 0 && c[i] <= rectL + 0.6) open(i, 1);
+      else if (pos === 0 && c[i] >= rectU - 0.6 && mode === 'swing') open(i, -1);
+      else if (pos > 0 && c[i] >= rectU - 0.6) { close(i, 'top of range'); if (mode === 'swing') open(i, -1); }
+      else if (pos < 0 && c[i] <= rectL + 0.6) { close(i, 'bottom of range'); open(i, 1); }
+    }
+    const openPnl = pos ? pos * (c[n - 1] - ent) : 0;
+    const sp = { n, x0: 0, x1: n - 1, ymin: 62, ymax: 110, lines: [{ d: c, col: 'price', w: 1.6, label: 'price (simulated)' }], marks, legend: [['buy / cover', 'buy'], ['sell / short', 'sell']] };
+    draw('c15', sp, [{ t: 'hline', v: rectU, i0: 16, i1: n - 1, col: 'c2', w: 1.6, text: 'ceiling 90', align: 'left', li: 0, lv: 90, dy: -5 }, { t: 'hline', v: rectL, i0: 16, i1: n - 1, col: 'c2', w: 1.6, text: 'floor 80', align: 'left', li: 0, lv: 80, dy: 14 }]);
+    const wins = trades.filter((t) => t.pnl > 0).length, loss = trades.filter((t) => t.pnl <= 0);
+    const tot = trades.reduce((s, t) => s + t.pnl, 0) + openPnl;
+    out('r15', `closed trades <b>${trades.length}</b> · winners ${wins} · losers ${loss.length}${loss.length ? ' (worst ' + f1(Math.min(...loss.map((t) => t.pnl))) + ' pts, ' + loss[loss.length - 1].why + ')' : ''} · open position ${pos > 0 ? 'long' : pos < 0 ? 'short' : 'none'} ${pos ? f1(openPnl) + ' pts' : ''} · total <b class="${tot >= 0 ? 'good' : 'bad'}">${tot >= 0 ? '+' : ''}${f1(tot)} pts</b> (simulated, no costs; my rules, not Murphy's)`);
+  });
+  onChange('sel15', d15);
+
+  // ---------- 15b pooled range test (my simulation, not Murphy's) ----------
+  function rangeRun(c, mode, cost) {
+    const band = 1.5, filt = 0.5; let pos = 0, ent = 0, broke = 0, pnl = 0, n = 0, worst = 0, bi = -1;
+    const close = (i) => { const x = pos * (c[i] - ent) - cost; pnl += x; n++; if (x < worst) worst = x; pos = 0; };
+    const open = (i, dir) => { pos = dir; ent = c[i]; };
+    for (let i = 1; i < c.length; i++) {
+      if (!broke && c[i] > rectU + filt) { broke = 1; bi = i; if (pos < 0) close(i); if (pos === 0) open(i, 1); continue; }
+      if (!broke && c[i] < rectL - filt) { broke = -1; bi = i; if (pos > 0) close(i); if (pos === 0 && mode !== 'cont') open(i, -1); continue; }
+      if (broke || mode === 'wait') continue;
+      if (pos === 0 && c[i] <= rectL + band) open(i, 1);
+      else if (pos === 0 && c[i] >= rectU - band && mode === 'swing') open(i, -1);
+      else if (pos > 0 && c[i] >= rectU - band) { close(i); if (mode === 'swing') open(i, -1); }
+      else if (pos < 0 && c[i] <= rectL + band) { close(i); open(i, 1); }
+    }
+    if (pos) close(c.length - 1);
+    return { pnl, n, worst, bi };
+  }
+  function rangeMarket(r, k, drift, q) {
+    const n = 110, T = 30 + Math.floor(r() * 41), up = r() < q / 100; const c = [85];
+    for (let i = 1; i < n; i++) { let p = c[i - 1]; p += i < T ? k * (85 - p) + 1.2 * gauss(r) : (up ? drift : -drift) + gauss(r); c.push(p); }
+    return { c, T, up };
+  }
+  const d15b = reg(() => {
+    const k = val('k15'), dr = val('dr15'), q = val('q15'), cost = val('cs15'), M = 400, r = rng(nseed * 389 + 15);
+    const modes = [['swing', 'trade both swings, reverse on the break'], ['cont', 'continuation only: buy near the floor'], ['wait', 'wait for the breakout']];
+    const acc = {}; modes.forEach(([m]) => { acc[m] = { s: 0, s2: 0, win: 0, n: 0, worst: 0 }; });
+    let fb = 0; const show = [];
+    for (let j = 0; j < M; j++) {
+      const mk = rangeMarket(r, k, dr, q); if (j < 4) show.push(mk.c);
+      modes.forEach(([m]) => { const t = rangeRun(mk.c, m, cost); const a = acc[m]; a.s += t.pnl; a.s2 += t.pnl * t.pnl; a.win += t.pnl > 0 ? 1 : 0; a.n += t.n; a.worst += t.worst; if (m === 'wait' && t.bi >= 0 && t.bi < mk.T) fb++; });
+    }
+    const n = 110, cols = ['c1', 'c2', 'c3', 'price'];
+    let lo = 76, hi = 94; show.forEach((c) => c.forEach((v) => { if (v < lo) lo = v; if (v > hi) hi = v; }));
+    const sp = { n, x0: 0, x1: n - 1, ymin: Math.floor(lo - 2), ymax: Math.ceil(hi + 2), lines: show.map((c, j) => ({ d: c, col: cols[j], w: 1.1, alpha: 0.75 })), legend: [['4 of the 400 simulated markets', 'muted']] };
+    draw('c15b', sp, [{ t: 'hline', v: rectU, col: 'muted', dash: [4, 3], text: 'ceiling 90', align: 'left', li: 1, dy: -5 }, { t: 'hline', v: rectL, col: 'muted', dash: [4, 3], text: 'floor 80', align: 'left', li: 1, dy: 14 }]);
+    const rows = modes.map(([m, nm]) => {
+      const a = acc[m], mean = a.s / M, se = Math.sqrt(Math.max(0, a.s2 / M - mean * mean) / M);
+      return `<tr><td>${nm}</td><td class="num ${mean >= 0 ? 'good' : 'bad'}">${mean >= 0 ? '+' : ''}${f1(mean)} ± ${f1(se)}</td><td class="num">${Math.round(a.win / M * 100)}%</td><td class="num">${f1(a.n / M)}</td><td class="num">${f1(a.worst / M)}</td></tr>`;
+    }).join('');
+    $('t15').innerHTML = `<table><thead><tr><th>Approach</th><th>Average points per market (± 1 s.e.)</th><th>Markets in profit</th><th>Trades per market</th><th>Average worst trade</th></tr></thead><tbody>${rows}</tbody></table>`;
+    out('r15b', `${M} simulated markets · range pull κ = ${f2(k)} · trend after break ${f1(dr)} points/day, upward ${q}% of the time · cost ${f2(cost)} points per round trip · a noise-only close outside the range before the real break (a false breakout) happened in <b>${Math.round(fb / M * 100)}%</b> of markets · simulated, not evidence`);
+  });
+  ['k15', 'dr15', 'q15', 'cs15'].forEach((id) => bindRange(id, d15b));
+
+  // ---------- 16 measured move ----------
+  const d16 = reg(() => {
+    const a = val('a16'), ab = val('ab16'), r = val('rt16') / 100; const B = a + ab, C = B - r * ab, D = C + ab;
+    const rows = [[0, a - 6], [6, a], [16, a + 0.55 * ab], [19, a + 0.45 * ab], [28, B], [33, B - 0.6 * r * ab], [35, B - 0.45 * r * ab], [40, C], [50, C + 0.55 * ab], [53, C + 0.45 * ab], [62, D], [68, D - 2]].map(([i, v]) => [i, v, 1]);
+    const d = pathFrom(A(rows), { noise: 0 });
+    const sp = { n: 69, x0: 0, x1: 68, ymin: a - 10, ymax: a + 2 * ab + 6, lines: [{ d: d.c, col: 'price', w: 1.8, label: 'schematic price' }] };
+    draw('c16', sp, [P(6, a, 'A', false), P(28, B, 'B', true), P(40, C, 'C', false), P(62, D, 'D', true),
+      { t: 'seg', i0: 6, v0: a, i1: 28, v1: B, col: 'c1', dash: [5, 4] }, { t: 'seg', i0: 40, v0: C, i1: 62, v1: D, col: 'c1', dash: [5, 4] },
+      { t: 'arrow', i: 30, v0: a, v1: B, col: 'c3', text: 'AB ' + ab, dx: 6, align: 'left' }, { t: 'arrow', i: 64, v0: C, v1: D, col: 'buy', text: '= ' + ab, dx: -6, align: 'right' },
+      { t: 'hline', v: D, i0: 40, i1: 68, col: 'buy', dash: [6, 4], text: 'target ' + f1(D), align: 'left', li: 40, dy: -5 }]);
+    const ok = r >= 1 / 3 - 0.005 && r <= 0.5 + 0.005;
+    out('r16', `B = ${a} + ${ab} = <b>${B}</b> · C = ${B} − ${Math.round(r * 100)}% × ${ab} = <b>${f1(C)}</b> · D = C + AB = ${f1(C)} + ${ab} = <b>${f1(D)}</b> · ${ok ? '<span class="good">correction within ⅓–½ of AB: the well-defined case</span>' : '<span class="bad">correction outside ⅓–½ of AB: not the well-defined case Murphy describes</span>'} · no-edge baseline (mine): a random walk from C reaches D before A about (1 − r) ÷ (2 − r) = <b>${Math.round((1 - r) / (2 - r) * 100)}%</b> of the time`);
+  });
+  ['a16', 'ab16', 'rt16'].forEach((id) => bindRange(id, d16));
+
+  // ---------- 17 continuation H&S ----------
+  const d17 = reg(() => {
+    const up = $('sel17').value === 'up'; const d = up ? D17.up : D17.dn; const M = (v) => (up ? v : 150 - v);
+    const nk = (i) => M(79 + 0.5 * (i - 33) / 13); const b = firstIdx(d.n, 53, (i) => (up ? d.c[i] > nk(i) : d.c[i] < nk(i)));
+    const ht = Math.abs(nk(40) - M(68)), tg = up ? nk(b) + ht : nk(b) - ht;
+    const sp = { n: 77, x0: 0, x1: 76, ymin: up ? 52 : 56, ymax: up ? 96 : 100, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }] };
+    draw('c17', sp, [P(28, M(72), 'LS', !up), P(40, M(68), 'H', !up), P(52, M(72.5), 'RS', !up),
+      { t: 'seg', i0: 30, v0: nk(30), i1: 64, v1: nk(64), col: 'c1', w: 2, text: 'neckline', align: 'left', li: 30, dy: up ? -6 : 14 },
+      { t: 'dot', i: b, v: d.c[b], col: up ? 'buy' : 'sell', r: 5 }, { t: 'hline', v: tg, i0: b, i1: 76, col: up ? 'buy' : 'sell', dash: [6, 4], text: 'height target ' + f1(tg), align: 'right', dy: up ? -5 : 14 }]);
+    out('r17', `${up ? 'uptrend: the middle trough (head) is the lowest point' : 'downtrend: the middle peak (head) is the highest point'} · neckline broken on <b>day ${b}</b> in the direction of the trend · the usual head-to-neckline height gives about <b>${f1(tg)}</b> (Murphy gives no separate measuring rule for this variant; this is the Chapter 5 rule)`);
+  });
+  onChange('sel17', d17);
+
+  // ---------- 18 confirmation / divergence ----------
+  const d18 = reg(() => {
+    const k = $('sel18').value; const d = D18[k];
+    const sp = { n: 61, x0: 0, x1: 60, ymin: 56, ymax: 100, lines: [{ d: d.c, col: 'price', w: 1.7, label: 'price (simulated)' }], sub: volSub(d.v, (i) => (i > 14 && i <= 24) || (i > 30 && i <= 40), 220) };
+    draw('c18', sp, [P(24, 80, 'high 1', true), P(40, 86, 'high 2', true), { t: 'seg', i0: 24, v0: 80, i1: 40, v1: 86, col: 'c1', dash: [4, 3] }]);
+    const v1 = avg(d.v, 15, 24), v2 = avg(d.v, 31, 40);
+    out('r18', `price: high 2 (86) above high 1 (80) · volume on the rally to high 1 <b>${Math.round(v1)}</b>, to high 2 <b>${Math.round(v2)}</b> → ${k === 'conf' ? '<span class="good">volume agrees: confirmation</span>' : '<span class="bad">volume fails to confirm: divergence, an early warning</span>'}`);
+  });
+  onChange('sel18', d18);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { nseed = nseed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

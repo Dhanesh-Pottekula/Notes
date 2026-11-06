@@ -1,0 +1,1589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.8 Pattern Failure</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+<style>
+/* page additions: let long paths and controls wrap on phones */
+.plate > *, .fig > *, .box > * { min-width: 0; }
+code { font-family: var(--mono); font-size: .88em; overflow-wrap: anywhere; }
+.readout, .box li, .box p { overflow-wrap: anywhere; }
+select { max-width: 100%; }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch07_breakout.html">← Ch.7 Breakout</a><a href="ch09_practical_trading_psychology.html">Ch.9 Practical trading psychology →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Adam Grimes · The Art and Science of Trading: Course Workbook (2017) · Module 8 · pdf p312–332</div>
+  <h1>Pattern failure, sizing, <em>risk and luck</em></h1>
+  <p class="lede">Module 8 is called "Pattern Failures", but its workbook pages are mostly about what surrounds every pattern: a plan you can test, how much to bet on each trade, which risks can end you, how much of any result is luck, how to keep discretion disciplined, and why calling tops and bottoms is so tempting and so costly. Every chart here uses simulated prices or simulated trades built to show one idea. None of it is real-market evidence.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll new simulated data</button><span class="readout">data set #<b id="seedOut">1</b></span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The module has two halves. First come four projects you do yourself: revise your trading plan, start your own research, run a position-sizing simulation, and write down your beliefs. Then come readings: a pointer to the risk chapter of Grimes's 2012 book, and blog essays grouped under <i>On Risk</i>, <i>On Trading Styles</i> and <i>On Reversals</i>. The "pattern failure" theme itself is taught in the course material itself and in the earlier modules (failure tests in Module 6); these pages only introduce it. Read the map top to bottom: the projects build the trader, the essays describe the dangers.</p>
+  <div class="map">
+    <svg viewBox="0 0 820 420" width="100%" role="img" aria-label="Concept map: the module introduction leads to four projects and three groups of essays, all feeding the idea that trading is mostly risk management">
+      <defs><marker id="mapArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/></marker></defs>
+      <rect x="230" y="8" width="360" height="52" rx="6" style="fill: var(--tint); stroke: var(--c1)"/>
+      <text x="410" y="29" text-anchor="middle" style="font-weight:600">Module 8 · pattern failures (§01)</text>
+      <text x="410" y="48" text-anchor="middle">a failure = an entry for some, risk control for all</text>
+      <path d="M410,60 L410,84" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#mapArrow)"/>
+      <text x="20" y="100" style="font-weight:600; fill: var(--c1)">PROJECTS (your own work)</text>
+      <rect x="20" y="110" width="185" height="56" rx="6" style="fill: var(--plate); stroke: var(--rule)"/>
+      <text x="112" y="133" text-anchor="middle" style="font-weight:600">Trading plan §02</text><text x="112" y="152" text-anchor="middle">test → paper → live</text>
+      <rect x="220" y="110" width="185" height="56" rx="6" style="fill: var(--plate); stroke: var(--rule)"/>
+      <text x="312" y="133" text-anchor="middle" style="font-weight:600">Research §03</text><text x="312" y="152" text-anchor="middle">bar-by-bar, Excel, code</text>
+      <rect x="420" y="110" width="185" height="56" rx="6" style="fill: var(--tint2); stroke: var(--c2)"/>
+      <text x="512" y="133" text-anchor="middle" style="font-weight:600">Position sizing §04</text><text x="512" y="152" text-anchor="middle">same edge, many futures</text>
+      <rect x="620" y="110" width="180" height="56" rx="6" style="fill: var(--plate); stroke: var(--rule)"/>
+      <text x="710" y="133" text-anchor="middle" style="font-weight:600">Beliefs §05</text><text x="710" y="152" text-anchor="middle">bridge to Module 9</text>
+      <text x="20" y="200" style="font-weight:600; fill: var(--c2)">READINGS §06</text>
+      <rect x="20" y="210" width="250" height="118" rx="6" style="fill: var(--plate); stroke: var(--c2)"/>
+      <text x="145" y="232" text-anchor="middle" style="font-weight:600">On Risk</text>
+      <text x="145" y="254" text-anchor="middle">four kinds of risk §07</text>
+      <text x="145" y="274" text-anchor="middle">six keys §08</text>
+      <text x="145" y="294" text-anchor="middle">luck: 4 questions §09</text>
+      <text x="145" y="314" text-anchor="middle">managing luck §10</text>
+      <rect x="285" y="210" width="250" height="118" rx="6" style="fill: var(--plate); stroke: var(--c3)"/>
+      <text x="410" y="232" text-anchor="middle" style="font-weight:600">On Trading Styles</text>
+      <text x="410" y="258" text-anchor="middle">discretionary AND consistent</text>
+      <text x="410" y="278" text-anchor="middle">= rules about where</text>
+      <text x="410" y="298" text-anchor="middle">discretion is allowed §11</text>
+      <rect x="550" y="210" width="250" height="118" rx="6" style="fill: var(--plate); stroke: var(--sell)"/>
+      <text x="675" y="232" text-anchor="middle" style="font-weight:600">On Reversals</text>
+      <text x="675" y="254" text-anchor="middle">fading big moves §12</text>
+      <text x="675" y="274" text-anchor="middle">calling turns §13–§15</text>
+      <text x="675" y="294" text-anchor="middle">pundit payoffs §16</text>
+      <text x="675" y="314" text-anchor="middle">a safe way to find ends §17</text>
+      <path d="M512,166 L145,208" style="stroke: var(--c2); stroke-width:1.2; stroke-dasharray:4 3" marker-end="url(#mapArrow)"/>
+      <path d="M145,328 L360,372" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#mapArrow)"/>
+      <path d="M410,328 L410,368" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#mapArrow)"/>
+      <path d="M675,328 L460,372" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#mapArrow)"/>
+      <rect x="200" y="372" width="420" height="40" rx="6" style="fill: var(--tint3); stroke: var(--c3)"/>
+      <text x="410" y="397" text-anchor="middle" style="font-weight:600">trading is mostly risk management (once "risk" is defined)</text>
+    </svg>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Module 8 · why study failures</a>
+    <a href="#s2"><span>02</span>Trading plan · revise &amp; refine</a>
+    <a href="#s3"><span>03</span>Your own research project</a>
+    <a href="#s4"><span>04</span>Position sizing project</a>
+    <a href="#s5"><span>05</span>Belief inventory</a>
+    <a href="#s6"><span>06</span>Readings</a>
+    <a href="#s7"><span>07</span>Where are your risks?</a>
+    <a href="#s8"><span>08</span>Six keys to risk management</a>
+    <a href="#s9"><span>09</span>What's luck got to do with it?</a>
+    <a href="#s10"><span>10</span>Managing your luck</a>
+    <a href="#s11"><span>11</span>Discretionary and consistent?</a>
+    <a href="#s12"><span>12</span>The problem with reversals</a>
+    <a href="#s13"><span>13</span>Don't be this guy</a>
+    <a href="#s14"><span>14</span>Why we look for the turn</a>
+    <a href="#s15"><span>15</span>Trading lessons and psychology</a>
+    <a href="#s16"><span>16</span>Commentators' lopsided payoffs</a>
+    <a href="#s17"><span>17</span>Finding ends of trends</a>
+    <a href="#quiz"><span>?</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 01 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · MODULE 8 – PATTERN FAILURES</div><h2>Every pattern fails sometimes: learn how</h2></div><span class="chip">pdf p312</span></div>
+  <p>Grimes calls this module a bring-it-all-together look at the patterns of the whole course (pullbacks, anti, failure tests, breakouts), with special attention to <b>how those patterns fail</b>. He names three uses of that study:</p>
+  <ul class="plain">
+    <li><b>Some traders specialise in entries around pattern failures</b>: when the expected move does not come, they trade the other way.</li>
+    <li><b>Other traders use failures to manage risk</b> better: knowing what failure looks like tells you where to get out.</li>
+    <li><b>Every trader</b> gains insight into how patterns develop and evolve.</li>
+  </ul>
+  <p>The module also covers <b>position sizing</b>. Trade too big and even a good system can blow up and take all your money; trade too small and nothing you do matters. You need to understand that trade-off for your own approach, and this module gives an exercise you can come back to as your trading grows (§04). It ends with thoughts on <b>risk</b>: it is no exaggeration, Grimes says, that trading is mostly about risk management, but only once the terms are defined. Finally, the module moves you further toward <b>personal responsibility</b>: fewer supplementary pages, because more of the work is yours. The hard work is yours, and so are the rewards.</p>
+  <div class="box picture"><b>Picture it</b><p>A pullback buy is a bet that "the trend resumes". When price instead slices through the pullback low, the bet is wrong. The trend trader reads that as "get out now". The failure trader reads the same bar as "the people who bought are trapped; sell". One event, two jobs.</p></div>
+  <div class="fig">
+    <canvas id="c1" class="tall" aria-label="Candlestick chart: a pullback buy that fails, shown either as an exit for the trend trader or as a short entry for the failure trader"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls">
+      <label for="sel1">Read the failure as <select id="sel1"><option value="risk">risk control (exit the long)</option><option value="entry">an entry (go short)</option></select></label>
+      <button id="st1" type="button">Next bar ▶</button><button id="rs1" type="button">Restart</button>
+    </div>
+    <div class="readout" id="r1" style="display:block"></div>
+  </div>
+  <p class="readout">My illustration (not a chart from the book): simulated bars. The pullback and failure rules shown are the ones taught in this course's earlier modules; this page only uses them to show the two jobs.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>A pattern is a bet that one group of traders will act a certain way. When the pattern fails, those traders are now on the wrong side, and their exits push price further against them. That is why the failure point is both the trend trader's natural stop (the reason for the trade is gone) and the failure trader's natural entry (the trapped traders are about to become sellers). The same idea powered the failure test in Module 6.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch06_failure_test.html">Ch.6 Failure test</a>: a whole pattern built on a failed breakout. <a href="ch04_pullback.html">Ch.4 Pullback</a> and <a href="ch07_breakout.html">Ch.7 Breakout</a>: the patterns whose failures this module studies.</li>
+    <li>§17 of this page: Grimes's rule for trading the end of a trend is, in effect, a sequence of failures (the trend fails, then the countertrend shows strength).</li>
+  </ul></div>
+</section>
+
+<!-- 02 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SECTION 1: TRADING PLAN: REVISING AND REFINING</div><h2>A plan is a living document, and it must be tested</h2></div><span class="chip">pdf p312–313</span></div>
+  <p>Your trading plan is a <b>living document</b>: you will revise it for years as your style grows. In this module, revisit it. If you skipped the plan work in Module 7, stop and do it now: without a solid plan, Grimes says, you are just guessing. What you need to do will differ for each trader, but at a bare minimum:</p>
+  <ul class="plain">
+    <li>Have the documents from the previous module (the business plan and trading plan), complete and in a form you would be comfortable <b>showing to investors</b>. Expect to change many parts of them as you grow.</li>
+    <li>Start moving toward a plan that is <b>backtest-able and backtested</b>: now that you have all the pieces, write down exactly how you want to trade.</li>
+    <li>Run that plan through <b>backtesting, then paper trading, and only then live trading</b>.</li>
+  </ul>
+  <p>Writing a plan is a terribly unexciting topic, he admits, but it is one of the most important steps in a trader's development.</p>
+  <div class="box picture"><b>Picture it</b><p>Shipping software: spec → unit tests → staging → production. Nobody deploys straight from an idea to prod. Backtest is your test suite, paper trading is staging, live is production, and every incident sends you back to edit the spec.</p></div>
+  <div class="fig">
+    <svg viewBox="0 0 820 185" width="100%" role="img" aria-label="Pipeline: written plan, backtest, paper trade, live trading, with a revise loop back to the plan">
+      <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/></marker></defs>
+      <rect x="10" y="30" width="170" height="60" rx="6" style="fill: var(--tint); stroke: var(--c1)"/><text x="95" y="56" text-anchor="middle" style="font-weight:600">Written plan</text><text x="95" y="76" text-anchor="middle">exact rules</text>
+      <rect x="220" y="30" width="170" height="60" rx="6" style="fill: var(--plate); stroke: var(--rule)"/><text x="305" y="56" text-anchor="middle" style="font-weight:600">Backtest</text><text x="305" y="76" text-anchor="middle">past data</text>
+      <rect x="430" y="30" width="170" height="60" rx="6" style="fill: var(--plate); stroke: var(--rule)"/><text x="515" y="56" text-anchor="middle" style="font-weight:600">Paper trade</text><text x="515" y="76" text-anchor="middle">live data, no money</text>
+      <rect x="640" y="30" width="170" height="60" rx="6" style="fill: var(--tint2); stroke: var(--c2)"/><text x="725" y="56" text-anchor="middle" style="font-weight:600">Live</text><text x="725" y="76" text-anchor="middle">real money, small</text>
+      <path d="M180,60 L218,60" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#a2)"/>
+      <path d="M390,60 L428,60" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#a2)"/>
+      <path d="M600,60 L638,60" style="stroke: var(--muted); stroke-width:1.5" marker-end="url(#a2)"/>
+      <path d="M725,90 C725,150 95,150 95,92" style="fill:none; stroke: var(--c3); stroke-width:1.4; stroke-dasharray:5 4" marker-end="url(#a2)"/>
+      <text x="410" y="176" text-anchor="middle" style="fill: var(--c3)">revise the living document (every stage can send you back)</text>
+    </svg>
+    <div class="controls">
+      <label><input type="checkbox" id="chk2a"> documents from Module 7 done</label>
+      <label><input type="checkbox" id="chk2b"> fit to show an investor</label>
+      <label><input type="checkbox" id="chk2c"> rules exact enough to backtest</label>
+      <label><input type="checkbox" id="chk2d"> backtested</label>
+      <label><input type="checkbox" id="chk2e"> paper traded</label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each stage removes a different kind of self-deception. Writing the rules removes vagueness ("I'll buy strong pullbacks" is not a rule). The backtest removes the illusion that the idea works because you remember the good examples. Paper trading removes the gap between "I would have" and "I did" (you see fills, timing and your own hesitation). Only then does money test the last thing: you, under pressure.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_breakout.html">Ch.7</a> §03 and §07: the business plan, CRG sheet and setup sheets this section asks you to finish.</li>
+    <li>My own pipeline does the same: <code>Notes/trading/using_equations_to_trade.md</code> lays out edge → backtest pass/fail → sizing → trade management → kill switch, and <code>backtest_results_summary.md</code> lists several ideas (5-min ORB, a 15-min sell setup) that are marked "paper trade only" because they passed the backtest stage but not more.</li>
+  </ul></div>
+</section>
+
+<!-- 03 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · SECTION 2: YOUR OWN RESEARCH PROJECT</div><h2>Start your own research, and keep records</h2></div><span class="chip">pdf p313–314</span></div>
+  <p>By now you should have ideas you want to test. They don't need to be complicated or unique. You might revisit one of the pattern studies from earlier modules and change how the pattern is defined now that your plan has matured. Above all, look at <b>your trading plan as a research subject</b>. Ideas will also come from conversations with other traders and from books; all of it should flow into your <b>research journal</b>, which becomes a growing source of things to explore.</p>
+  <p>Tools, in Grimes's order: the <b>bar-by-bar testing</b> you have used all course still has its place (he recommends it even to his more quantitative students); you can also try other <b>backtesting frameworks</b>, simple <b>Excel spreadsheets</b>, or code in <b>R or Python</b>. Much of a trader's future work is testing and examining ideas. Begin, and keep good records of the results.</p>
+  <div class="box picture"><b>Picture it</b><p>Bar-by-bar testing is replaying a match with the future covered by a card. You slide the card one bar to the right, decide, write the decision down, and only then look. You can't cheat with hindsight because you never saw the hindsight.</p></div>
+  <div class="fig">
+    <canvas id="c3" aria-label="Bar-by-bar replay: the chart reveals one bar at a time; you can mark buys and later reveal their outcomes"></canvas>
+    <div class="legend" id="c3L"></div>
+    <div class="controls">
+      <button id="st3" type="button">Reveal next bar ▶</button>
+      <button id="buy3" type="button">Mark a buy here</button>
+      <button id="out3" type="button">Show outcomes</button>
+      <button id="rs3" type="button">New replay</button>
+    </div>
+    <div class="readout" id="r3" style="display:block"></div>
+  </div>
+  <p class="readout">Simulated random-walk bars (no edge exists in them by construction). Outcome of each mark = close 10 bars later minus entry, in units of the 14-bar average range (ATR).</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The replay forces two habits: you decide before you know, and you record every decision (not only the memorable ones). Those two habits are what make the later statistics honest. Code does the same thing faster and over thousands of cases, but it can't teach your eye what the pattern looks like as it forms, which is why Grimes keeps the manual version even for quantitative traders.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch07_breakout.html">Ch.7</a> §04 (the research journal) and §18 (how to find trading ideas).</li>
+    <li>My Python backtest project <code>projects/trading-equation-backtests</code> is exactly the "code it in Python" route; its summary (<code>Notes/trading/backtest_results_summary.md</code>) is my research record.</li>
+  </ul></div>
+</section>
+
+<!-- 04 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · SECTION 3: POSITION SIZING PROJECT</div><h2>One edge, many possible futures</h2></div><span class="chip">pdf p315–316</span></div>
+  <p>Understanding the maths of sizing, drawdown and equity-curve volatility on paper is one thing; running it yourself teaches more. Grimes's procedure (spreadsheet or code):</p>
+  <ol class="plain">
+    <li>Define a "trading system" by three variables: <b>chance of a win</b>, <b>size of a win</b>, <b>size of a loss</b>. Example: 50% wins; a win pays <b>1.1</b>, a loss costs <b>1.0</b>.</li>
+    <li>Draw a series of <b>100 trades</b> from that system (one spreadsheet row per trade).</li>
+    <li>Start with <b>$100,000</b>. Choose the amount risked per trade, starting with <b>$1,000</b> (keep it a variable). A win adds win-size × amount risked; a loss subtracts loss-size × amount risked.</li>
+    <li>Keep a running balance over the 100 trades, compute basic statistics of the equity curve, and graph it.</li>
+    <li>If the balance reaches zero or below, <b>stop trading for that run</b>, leave the balance there and flag the run as <b>bankrupt</b>.</li>
+    <li>The random draws give a different curve every run: generate many and see how variable they are.</li>
+    <li>Repeat with different amounts risked; then switch to risking a <b>percentage of the previous balance</b> instead of a fixed dollar amount; then change the base system. How does a stronger or weaker edge change the spread of results?</li>
+  </ol>
+  <p>His conclusion: with a positive edge there is truth in "risk more, make more", but the <b>variability and the risk of ruin both grow as size grows</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>Same dice, same rules, a hundred parallel lives. Bet small and the lives stay in a tight bundle drifting up. Bet big and the bundle explodes into a fan: a few lives get rich, many get poor, some hit zero and stop.</p></div>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Thirty simulated equity curves for the chosen system and position size, bankrupt runs in red, median in amber"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <label for="p4">Win chance % <input id="p4" type="range" min="30" max="70" step="1" value="50"><output id="p4o">50</output></label>
+      <label for="w4">Win size <input id="w4" type="range" min="0.5" max="3" step="0.1" value="1.1"><output id="w4o">1.1</output></label>
+      <label for="l4">Loss size <input id="l4" type="range" min="0.5" max="2" step="0.1" value="1"><output id="l4o">1</output></label>
+    </div>
+    <div class="controls">
+      <label for="sel4">Sizing <select id="sel4"><option value="fixed">fixed $ per trade</option><option value="pct">% of previous balance</option></select></label>
+      <label for="k4">Risk (% of $100k start) <input id="k4" type="range" min="0.5" max="25" step="0.5" value="1"><output id="k4o">1</output></label>
+      <label for="n4">Trades <input id="n4" type="range" min="50" max="500" step="50" value="100"><output id="n4o">100</output></label>
+      <button id="rr4" type="button">New batch</button>
+    </div>
+    <div class="readout" id="r4" style="display:block"></div>
+    <canvas id="c4b" class="short" aria-label="Bar chart: median ending balance and chance of losing money or going bankrupt at ten risk levels"></canvas>
+    <div class="legend" id="c4bL"></div>
+    <div class="readout" id="r4b" style="display:block"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>Each trade adds (win-size × p − loss-size × (1−p)) × risk on average: 0.05 × risk for the book's system. That average grows in proportion to size, but so does the spread: the standard deviation of one trade is about 1.05 × risk, so after 100 trades the expected gain is 5 × risk while one standard deviation is about 10.5 × risk. The noise is twice the signal even after 100 trades, which is why about 30% of runs lose money at small fixed sizes ($1,000–$5,000), and more once bankruptcies become common.</p>
+    <p>Fixed-dollar sizing can go bankrupt: a run of losses subtracts the same dollars from a shrinking account. Percent-of-balance sizing never mathematically reaches zero (each loss takes a fraction of what is left), but it can shrink an account to a fraction of itself, and because losses compound on a smaller base, a big percent size drags the <i>median</i> outcome down even when the average trade is positive.</p>
+  </div>
+  <div class="box"><b>Worked example (the book's numbers)</b>
+    <div class="tablewrap"><table>
+      <tr><th>Trade</th><th>Result</th><th>Change</th><th>Balance</th></tr>
+      <tr><td>start</td><td></td><td></td><td class="num">$100,000</td></tr>
+      <tr><td>1</td><td>win</td><td class="num">+1.1 × $1,000 = +$1,100</td><td class="num">$101,100</td></tr>
+      <tr><td>2</td><td>loss</td><td class="num">−1.0 × $1,000 = −$1,000</td><td class="num">$100,100</td></tr>
+      <tr><td>3</td><td>loss</td><td class="num">−$1,000</td><td class="num">$99,100</td></tr>
+      <tr><td>4</td><td>win</td><td class="num">+$1,100</td><td class="num">$100,200</td></tr>
+    </table></div>
+    <p>Expected gain over 100 trades: 100 × (0.5 × 1,100 − 0.5 × 1,000) = <b>$5,000</b>. My own run of the procedure (20,000 simulated runs, not from the book) gives:</p>
+    <div class="tablewrap"><table>
+      <tr><th>Sizing</th><th>P(end below $100k)</th><th>P(bankrupt)</th><th>P(drawdown ≥ 50%)</th><th>Median end</th></tr>
+      <tr><td>fixed $1,000</td><td class="num">31%</td><td class="num">0%</td><td class="num">0%</td><td class="num">$105,000</td></tr>
+      <tr><td>fixed $5,000</td><td class="num">31%</td><td class="num">1.8%</td><td class="num">26%</td><td class="num">$125,000</td></tr>
+      <tr><td>fixed $10,000</td><td class="num">34%</td><td class="num">19%</td><td class="num">62%</td><td class="num">$150,000</td></tr>
+      <tr><td>fixed $20,000</td><td class="num">49%</td><td class="num">46%</td><td class="num">84%</td><td class="num">$116,000</td></tr>
+      <tr><td>10% of balance</td><td class="num">54%</td><td class="num">0%</td><td class="num">86%</td><td class="num">$95,100</td></tr>
+      <tr><td>20% of balance</td><td class="num">69%</td><td class="num">0%</td><td class="num">≈100%</td><td class="num">$29,700</td></tr>
+    </table></div>
+  </div>
+  <div class="box connect"><b>Beyond the book · Kelly and my notes</b><ul>
+    <li>The growth-maximising fraction for this system is the Kelly fraction f* = p/L − (1−p)/W = 0.5 − 0.5/1.1 ≈ <b>4.5%</b> of the balance at risk per trade. Above about twice that (≈9%), percent sizing makes the median account shrink; the table's 10% and 20% rows show it. Kelly is not in this section of the workbook; see formula 6 in <code>Notes/trading/trading_equations.md</code>, which also explains why traders use ¼–½ Kelly.</li>
+    <li><code>Notes/trading/using_equations_to_trade.md</code> has my own sizing Monte Carlo on a 51.5% / 2R setup: at 1% risk, 0% chance of a ≥50% drawdown; at 6.8% risk (¼ Kelly), 39%; and 79% if the true win rate is really 45%. Same lesson as this project, plus one more: your edge is only an estimate.</li>
+    <li>My backtests found fixed 1% risk with ATR stops "as good as or better than" volatility targeting (<code>backtest_results_summary.md</code>).</li>
+  </ul></div>
+</section>
+
+<!-- 05 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SECTION 4: BELIEF INVENTORY</div><h2>Write down what you believe</h2></div><span class="chip">pdf p316–317</span></div>
+  <p>Beliefs define much of who we are and drive behaviour, sometimes in ways we don't fully understand. The market is extremely challenging, and most of the obstacles in a trader's way are, to some extent, <b>self-imposed</b>: much of the work on trading is work on ourselves. The course has so far focused on the intellectual side (patterns, maths, building an approach); this exercise is the <b>bridge to the work on yourself</b> in Module 9.</p>
+  <p>The exercise: for <b>several days, a few minutes a day</b>, sit quietly and write down what you think your <b>core beliefs</b> are. A high-level view is enough. Don't judge them as good or bad (Grimes suggests "empowering" or "limiting" as better labels) and don't dig into where they came from. Suggested topics: <b>yourself, health, career, the universe, family, relationships, money, success</b>. Beliefs usually start "I am…", "People are…", "Life is…". Many are things you have never examined; you simply accept them as true. If you end with a handful of your most important beliefs on these or similar topics, the exercise is a success.</p>
+  <div class="box picture"><b>Picture it</b><p>Beliefs are the default settings of your mind: nobody chose them, they shipped with the device, and they silently change behaviour. "Money is dangerous" might show up as cutting winners early; "I am someone who can't be wrong" as refusing to take a stop.</p></div>
+  <div class="fig">
+    <div class="controls" id="topics5">
+      <button type="button" id="t5_0">Yourself</button><button type="button" id="t5_1">Health</button><button type="button" id="t5_2">Career</button><button type="button" id="t5_3">Universe</button>
+      <button type="button" id="t5_4">Family</button><button type="button" id="t5_5">Relationships</button><button type="button" id="t5_6">Money</button><button type="button" id="t5_7">Success</button>
+    </div>
+    <div class="readout" id="r5" style="display:block"></div>
+    <label for="ta5" class="readout">Your beliefs on this topic (saved only in this browser):</label>
+    <textarea id="ta5" rows="5" style="width:100%; font-family: var(--body); font-size:16px; background: var(--paper); color: var(--ink); border:1px solid var(--rule); border-radius:4px; padding:8px"></textarea>
+    <div class="controls"><label for="sel5">Label (optional) <select id="sel5"><option value="">no label yet</option><option value="empowering">empowering</option><option value="limiting">limiting</option></select></label><button id="sv5" type="button">Save</button></div>
+    <div class="readout" id="r5b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Under pressure people fall back on defaults, and beliefs are the defaults. Writing them down turns hidden rules into visible ones, which is the first step before you can question or change any of them. Doing it over several days matters: the first day's answers are the polite ones; later answers are closer to the truth.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch09_practical_trading_psychology.html">Ch.9 Practical trading psychology</a> opens with an introspection project that goes deeper on exactly this list.</li><li>§08 key 5 "you are the biggest risk" and §14 (the contrarian personality): both are beliefs in action.</li></ul></div>
+</section>
+
+<!-- 06 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SECTION 5: READINGS</div><h2>Assigned reading: the risk chapter, then the essays</h2></div><span class="chip">pdf p317</span></div>
+  <p>The assigned reading is Grimes's 2012 book <i>The Art and Science of Technical Analysis: Market Structure, Price Action, and Trading Strategies</i> (Wiley), printed pages <b>263–290 (risk)</b>, followed by the blog essays below, grouped as <i>On Risk</i> (§07–§10), <i>On Trading Styles</i> (§11) and <i>On Reversals</i> (§12–§17).</p>
+  <div class="box connect"><b>Connects to</b><ul><li>The 2012 book is not in my library (<code>books/trading/</code> holds this workbook, not the 2012 book, despite the PDF's file name). If I get it, pages 263–290 are the next read after this page.</li></ul></div>
+</section>
+
+<!-- 07 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · ON RISK · WHERE ARE YOUR RISKS?</div><h2>Four kinds of risk, and where the wild things are</h2></div><span class="chip">pdf p317–319</span></div>
+  <p>Trading is a risky business, and understanding your risks is the first step in managing them. Risk is counterintuitive here: in most of life we try to reduce it (fire, car crashes), but in trading we <b>want</b> risk, the right kinds, because risk and opportunity are locked together. There is no free lunch. The key is to take the right risks and know what they really are. Grimes sorts risks by <b>consequence</b> and <b>probability</b>:</p>
+  <ul class="plain">
+    <li><b>Low consequence / high probability</b>: common, routine, forgiving. Example: a normal losing trade. Make sure you have categorised correctly: putting something here that is not low-consequence is how bad things happen.</li>
+    <li><b>Low consequence / low probability</b>: disruptive, rarely dangerous. Example: a longer-term trader losing the datafeed or internet for a moment. These are relative: for a short-term trader the same outage can be high-consequence. The main danger is psychological: the break in routine leads to further mistakes.</li>
+    <li><b>High consequence / high probability</b>: the true risk of an event (its expected value) is magnitude × probability, so by the maths these look worst. Grimes argues they don't matter for most traders, because anyone who takes them is quickly eliminated. Example: breaking your per-trade risk limit and then doubling up. Simply stupid, in his view; you can't do it and stay a trader for long.</li>
+    <li><b>High consequence / low probability</b>: where the true dangers lie for most traders. Humans have poor intuition here: we either obsess (and trade worse) or ignore them until the day of reckoning. Options traders know the stories: made money every week for 20 years, then lost their entire net worth in one trade. If you are naked short premium, ask what happens when all those deltas go to 1.0, because some day they will. Swing traders will one day see the whole portfolio gap far beyond the stops on an "act of God"; short-term traders fading a move will meet another Flash Crash that takes them to their margin limit. This, borrowing a children's book, is "where the wild things are", and it demands your best attention and discipline.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch08_coins_steamroller.svg" alt="A man happily picks up coins on a road in front of a slowly approaching steamroller." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Picking up coins in front of a steamroller. Every week you pick up a coin; the steamroller is slow and you've never been caught. The chart below is twenty such lives, simulated: smooth staircases up, and for the unlucky ones a single step down longer than all the stairs put together.</p></div>
+  <div class="fig">
+    <div class="fig" style="max-width:460px">
+      <svg viewBox="0 0 400 330" width="100%" role="img" aria-label="Two by two grid of risk categories by probability and consequence; the selected example is highlighted">
+        <text x="200" y="16" text-anchor="middle" style="font-weight:600">probability →</text>
+        <text x="14" y="180" text-anchor="middle" transform="rotate(-90 14 180)" style="font-weight:600">consequence →</text>
+        <text x="115" y="34" text-anchor="middle">low</text><text x="300" y="34" text-anchor="middle">high</text>
+        <rect id="q7c" x="30" y="44" width="175" height="135" rx="5" style="fill: var(--tint); stroke: var(--rule)"/>
+        <text x="117" y="72" text-anchor="middle" style="font-weight:600">HIGH cons · LOW prob</text>
+        <text x="117" y="94" text-anchor="middle">the real danger</text><text x="117" y="114" text-anchor="middle">gaps, crashes,</text><text x="117" y="132" text-anchor="middle">short premium</text>
+        <rect id="q7d" x="215" y="44" width="175" height="135" rx="5" style="fill: var(--plate); stroke: var(--rule)"/>
+        <text x="302" y="72" text-anchor="middle" style="font-weight:600">HIGH cons · HIGH prob</text>
+        <text x="302" y="94" text-anchor="middle">simply stupid:</text><text x="302" y="114" text-anchor="middle">takers are removed</text><text x="302" y="132" text-anchor="middle">from the game fast</text>
+        <rect id="q7a" x="30" y="189" width="175" height="135" rx="5" style="fill: var(--plate); stroke: var(--rule)"/>
+        <text x="117" y="217" text-anchor="middle" style="font-weight:600">LOW cons · LOW prob</text>
+        <text x="117" y="239" text-anchor="middle">disruptive, rarely</text><text x="117" y="259" text-anchor="middle">dangerous; mind the</text><text x="117" y="277" text-anchor="middle">follow-on mistakes</text>
+        <rect id="q7b" x="215" y="189" width="175" height="135" rx="5" style="fill: var(--plate); stroke: var(--rule)"/>
+        <text x="302" y="217" text-anchor="middle" style="font-weight:600">LOW cons · HIGH prob</text>
+        <text x="302" y="239" text-anchor="middle">routine, forgiving:</text><text x="302" y="259" text-anchor="middle">a normal losing</text><text x="302" y="277" text-anchor="middle">trade</text>
+      </svg>
+      <div class="controls"><label for="sel7">Classify <select id="sel7">
+        <option value="0">a normal stopped-out trade</option>
+        <option value="1">datafeed drops for a minute (swing trader)</option>
+        <option value="2">datafeed drops for a minute (scalper in a fast market)</option>
+        <option value="3">breaking your risk limit, then doubling up</option>
+        <option value="4">naked short options when deltas go to 1.0</option>
+        <option value="5">overnight gap far through all your stops</option>
+        <option value="6">Flash Crash while fading a move</option>
+      </select></label></div>
+      <div class="readout" id="r7a"></div>
+    </div>
+    <div class="fig">
+      <canvas id="c7" class="tall" aria-label="Twenty simulated short-premium lives: steady weekly gains, rare catastrophic losses"></canvas>
+      <div class="legend" id="c7L"></div>
+      <div class="controls">
+        <label for="q7">Weekly crash chance % <input id="q7" type="range" min="0.05" max="1" step="0.05" value="0.1"><output id="q7o">0.1</output></label>
+        <label for="y7">Years <input id="y7" type="range" min="1" max="30" step="1" value="20"><output id="y7o">20</output></label>
+        <button id="rr7" type="button">20 new lives</button>
+      </div>
+      <div class="readout" id="r7" style="display:block"></div>
+    </div>
+  </div>
+  <p class="readout">The chart's model is mine, not the book's: 20 independent lives, +1 unit of premium per week; in a crash week the short options go deep in the money and lose 1,500 units (so the expected value is negative). The 0.1%/week crash rate is an assumption chosen only to make "rare" concrete.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>"Rare per week" is not rare per career. With a 0.1% weekly chance, the chance of at least one crash in 20 years (1,040 weeks) is 1 − 0.999<sup>1040</sup> ≈ <b>65%</b>. The strategy looks perfect in any short sample because the sample almost never contains the event that defines it. Its true expected value (magnitude × probability) can be near zero or negative while the visible track record is flawless.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>§08 key 2 ("think about the extremes") is the defence against this quadrant.</li><li><code>Notes/trading/strategies_from_equations.md</code> lists "selling options when IV &gt; GARCH forecast", and <code>using_equations_to_trade.md</code> says option sellers earn premium on average but take rare large losses, so it needs strict sizing: exactly this quadrant.</li></ul></div>
+</section>
+
+<!-- 08 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · ON RISK · SIX KEYS TO EFFECTIVE RISK MANAGEMENT</div><h2>Six keys: the unknown, extremes, middles, strategy, you, life</h2></div><span class="chip">pdf p319–320</span></div>
+  <ol class="plain">
+    <li><b>Leave room for the unknown and unknowable.</b> Some risks are hard to understand; some are impossible to understand. That is why great traders always remind you to stay humble. There is much you don't know and much you cannot know, and what you don't know can hurt you.</li>
+    <li><b>Think about the extremes.</b> Find the most extreme events in your market, then look further back in history and across related markets: what is the most extreme thing that has ever happened in markets like yours? Then accept that <b>more extreme events lie ahead</b>. Ask what would happen to your position and how bad it could be, then assume your answers vastly understate the risk.</li>
+    <li><b>Think about the "middles".</b> What happens a few times a year that could unsettle you, and how do you prepare? Many traders watch only the extremes, but many accounts die slowly from a thousand small cuts: mundane risks add up and can also take you out permanently.</li>
+    <li><b>Your trading strategy is a risk.</b> One of the biggest risks for developing traders is doing something that simply doesn't work. How well do you know your strategy's characteristics, and how sure are you of those numbers? Socrates said the unexamined life may not be worth living; the unexamined trading system is certainly not worth trading.</li>
+    <li><b>You are the biggest risk.</b> All the talk of discipline, planning, screen time and trader chats is worth little if you don't follow through. If you aren't disciplined every moment of every trading day, you are not a disciplined trader. The market will challenge you more than you imagine possible. Spend a lot of time on the most critical part of your system: yourself.</li>
+    <li><b>Plan for risks outside the market.</b> Institutions face regulatory change and shifts in market structure, and investors who turn fearful or exuberant at exactly the wrong time. Individuals face financial stress, personal and health issues. These are hard to capture in numbers, but planning helps you navigate them.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><p>A stop-loss is a promise the market doesn't have to keep. You plan to lose 1% if price touches your stop; the market opens 8% lower and your order fills there. Key 2 is about the day the promise is broken; key 3 is about the small costs that are kept every single day.</p></div>
+  <div class="fig">
+    <canvas id="c8" class="short" aria-label="Candles with a stop line and an overnight gap that opens far below the stop"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls">
+      <label for="g8">Overnight gap % <input id="g8" type="range" min="0" max="30" step="1" value="10"><output id="g8o">10</output></label>
+      <label for="d8">Stop distance % <input id="d8" type="range" min="1" max="10" step="0.5" value="3"><output id="d8o">3</output></label>
+      <label for="k8">Planned risk % of account <input id="k8" type="range" min="0.25" max="3" step="0.25" value="1"><output id="k8o">1</output></label>
+    </div>
+    <div class="readout" id="r8" style="display:block"></div>
+    <div class="controls">
+      <label for="m8">"Middles": cost per trade (R) <input id="m8" type="range" min="0" max="0.3" step="0.01" value="0.05"><output id="m8o">0.05</output></label>
+      <label for="e8">Edge per trade before costs (R) <input id="e8" type="range" min="0" max="0.5" step="0.01" value="0.1"><output id="e8o">0.1</output></label>
+    </div>
+    <div class="readout" id="r8b" style="display:block"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Position size is computed as risk ÷ stop distance. A gap bigger than the stop distance multiplies the loss by gap ÷ stop distance. With a 3% stop and 1% planned risk, a 10% gap costs 3.3% of the account: the tighter the stop, the larger the position, and the worse the gap. The "middles" work the other way: no single cost hurts, but each trade pays it, so a 0.1R edge with 0.05R of costs and slippage keeps only half its profit, and with 0.1R of costs keeps none.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Key 4 is the reason for every backtest in my notes: <code>backtest_results_summary.md</code> found most intraday ideas lost after FYERS charges + slippage; <code>breakeven_move_fyers.md</code> puts the break-even move at ~0.1–0.2% intraday and ~0.3–0.4% delivery. That is key 3 measured.</li>
+    <li>Key 5 leads to Module 9 (<a href="ch09_practical_trading_psychology.html">Ch.9</a>).</li>
+  </ul></div>
+</section>
+
+<!-- 09 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · ON RISK · WHAT'S LUCK GOT TO DO WITH IT?</div><h2>Luck matters a lot, and our intuition for it is bad</h2></div><span class="chip">pdf p320–322</span></div>
+  <p>Grimes's punchline: luck plays a large part. People selling investment tools are, in a sense, selling an illusion of certainty, whatever words they use (consistency, security, risk management), because humans naturally want safety and to know which actions lead to which results. His analogy: you know tonight's steak won't be identical to last week's (tougher, more marbling), but you don't expect a small asteroid to destroy your town while it sears. Surprises of that scale happen in markets more often than we admit.</p>
+  <p>Randomness hurts in two ways. <b>Objectively</b>, it makes results highly variable even when you do everything right. <b>Subjectively</b>, our intuition for it is poor: most of what we see in a market most of the time is meaningless noise, and our brains, superb pattern finders, find patterns even where none exist. He poses four questions (answer before opening them):</p>
+  <div class="fig">
+    <details><summary>1. How many people must be in a room for a 50% chance that two share a birthday?</summary><p>Only <b>23</b> (50.7%); 22 people give 47.6%. Most people guess around 180. Use the slider to see how fast it climbs.</p></details>
+    <details><summary>2. Flip a fair coin a million times: good or bad chance of exactly 500,000 heads?</summary><p>A <b>bad</b> chance: about <b>0.08%</b> (≈ √(2 / (π × 1,000,000))). The fraction of heads gets very close to ½, but the exact count spreads over thousands of possible values, so any single one is unlikely.</p></details>
+    <details><summary>3. 30 flips: "pretty good chance" or "almost no chance" of 5 heads in a row?</summary><p>A <b>pretty good chance</b>: about <b>37%</b> for 5 heads in a row, and about <b>63%</b> for 5 in a row of either face. Random sequences are streakier than our intuition expects.</p></details>
+    <details><summary>4. How likely is it that someone wins a lottery twice?</summary><p>For one named person, astronomically unlikely. For <i>someone, somewhere</i>, among millions of players buying tickets every week for years, quite likely; double winners do appear in the news. The question you ask (this person or anyone) changes the answer completely.</p></details>
+    <p class="readout">Grimes gives no answers; the numbers above are my calculations (exact for 1–3).</p>
+    <div class="controls">
+      <label for="b9">People in the room <input id="b9" type="range" min="2" max="80" step="1" value="23"><output id="b9o">23</output></label>
+      <label for="f9">Flips <input id="f9" type="range" min="10" max="200" step="1" value="30"><output id="f9o">30</output></label>
+      <label for="h9">Streak length <input id="h9" type="range" min="2" max="12" step="1" value="5"><output id="h9o">5</output></label>
+    </div>
+    <div class="readout" id="r9a" style="display:block"></div>
+  </div>
+  <p>Because we don't understand randomness, few traders expect how random their own results will be. Some traders get lucky and some get very unlucky. It is easy to build models where traders trade the <b>same system with no errors</b> (in different periods) and get radically different results: no mistakes, no emotions, no tweaking, and results still diverge dramatically because of luck.</p>
+  <div class="box picture"><b>Picture it</b><p>Twenty traders, one rulebook, perfect discipline. After 100 trades one of them is writing a book about her method and another is wondering what he did wrong. Neither did anything different.</p></div>
+  <div class="fig">
+    <canvas id="c9" class="tall" aria-label="Twenty simulated traders running the identical system: equity curves spread widely; best and worst highlighted"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls"><label for="n9">Traders <input id="n9" type="range" min="5" max="50" step="5" value="20"><output id="n9o">20</output></label><button id="rr9" type="button">Re-run</button></div>
+    <div class="readout" id="r9" style="display:block"></div>
+  </div>
+  <p class="readout">Simulated: the §04 system (50% wins, +1.1 / −1.0, fixed $1,000 risk on $100,000), 100 trades each.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Over 100 trades this system's expected gain is $5,000 with a standard deviation of about $10,500, so the middle 95% of traders land roughly between −$16,000 and +$26,000 relative to start. The gap between best and worst of 20 averages about $39,000 (roughly 3.7 standard deviations), about eight times the edge itself; any one batch will differ. That spread is luck, by construction, because the system and execution are identical.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>§10 (what to do about it) and §04 (the same engine at different sizes).</li><li><code>Notes/trading/price_physics_basics.md</code>: drift grows with t but noise with √t; this plate is that sentence drawn as equity curves.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · ON RISK · MANAGING YOUR LUCK</div><h2>You can't control luck, but you can manage its impact</h2></div><span class="chip">pdf p322–324</span></div>
+  <p>Here luck does not mean "preparation meets opportunity" (true and motivating, but not this sense). It means <b>random variation you cannot control</b>: good or bad, by definition unpredictable. What you can do:</p>
+  <ul class="plain">
+    <li><b>You absolutely must have an edge.</b> In the short run you can make money without one, but expected value catches up. Grimes calls this possibly the single most important thing about trading.</li>
+    <li><b>You must be consistent and disciplined</b>, and the reason is randomness: short-term results are confounded by noise, so you can't change your approach because of them. You can lose doing the right thing and make money doing the wrong thing. Adjusting after a handful of trades is likely a serious, even fatal, error. Markets are random; you don't have to be.</li>
+    <li><b>Luck matters, but so do skill and edge.</b> Paradoxically, the more skilful you are, the more luck matters. You can succeed without luck, but wildly successful traders (the outliers) always had a large component of it. If overall skill in the market is rising (far from certain, in his view), performance converges and luck plays a bigger part for top performers.</li>
+    <li><b>Emotional reactions to results are largely inappropriate.</b> Riding from euphoria to depression on short-term results means letting random fluctuation jerk your emotions around.</li>
+    <li><b>This isn't bad news.</b> You are still responsible for building your method and skill; without them you won't make it, and it is very unlikely to do everything right for a long time and not do adequately well. But outlier stories (a few thousand dollars to hundreds of millions) can't be your goal: those were people who got lucky. Maybe you will too (by definition, you probably won't). Focus on a disciplined core method, not on getting lucky.</li>
+  </ul>
+  <p>He recommends Michael Mauboussin's <i>The Success Equation: Untangling Skill and Luck in Business, Sports, and Investing</i>, which measures how much skill and luck contribute to success and draws parallels from sports; one of the most important books he had read in a long time.</p>
+  <div class="box picture"><b>Picture it</b><p>Judging a system on 10 trades is like judging a coin's fairness on 3 flips. The left chart shows how many trades it takes before a genuinely good system stops looking like a losing one.</p></div>
+  <div class="two">
+    <div class="fig">
+      <canvas id="c10" aria-label="Chance that a positive-edge system shows a net loss after N trades, falling slowly as N grows"></canvas>
+      <div class="legend" id="c10L"></div>
+      <div class="controls">
+        <label for="p10">Win % <input id="p10" type="range" min="40" max="65" step="1" value="50"><output id="p10o">50</output></label>
+        <label for="w10">Win size <input id="w10" type="range" min="0.8" max="3" step="0.1" value="1.1"><output id="w10o">1.1</output></label>
+      </div>
+      <div class="readout" id="r10" style="display:block"></div>
+    </div>
+    <div class="fig">
+      <canvas id="c10b" aria-label="Model of skill and luck: share of the top performers' results explained by luck as the spread of skill shrinks"></canvas>
+      <div class="legend" id="c10bL"></div>
+      <div class="controls"><label for="sk10">Skill spread <input id="sk10" type="range" min="0.05" max="2" step="0.05" value="1"><output id="sk10o">1</output></label><button id="rr10" type="button">Re-run</button></div>
+      <div class="readout" id="r10b" style="display:block"></div>
+    </div>
+  </div>
+  <p class="readout">Left: exact binomial calculation (the saw-tooth is real: with 1.1 : 1 payoffs the number of wins needed to break even jumps by one every few trades). Right: my toy model (beyond the book): 1,000 managers, result = skill + luck, luck ~ Normal(0, 1), skill ~ Normal(0, spread). "Paradox of skill" is Mauboussin's term.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Left: for the §04 system (50%, 1.1 : 1) the chance of being net negative is 38% after 10 trades, 41% after 20, 34% after 50, 31% after 100 and still 24% after 250. The edge (0.05R per trade) is tiny next to the noise (1.05R), so it takes hundreds of trades to show. That is why changing rules after a handful of trades is "fatal": you are reacting to noise. Right: when everyone is about equally skilled, the ranking at the top is decided by luck. Shrink the skill spread and watch the luck share of the top 10 rise toward 100%: Grimes's "the more skilful, the more luck matters".</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><code>Notes/trading/trader_returns_reality.md</code>: SPIVA India (most large-cap funds lag the index over 10 years) is what converging skill looks like in data.</li><li>§11: consistency is a rule you set in advance; §04: a system's edge vs its spread.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · ON TRADING STYLES · DISCRETIONARY AND CONSISTENT? HOW?</div><h2>Discretion with rules about where it's allowed</h2></div><span class="chip">pdf p325–327</span></div>
+  <p>Readers asked Grimes variations of one question: can an edge be discretionary, or must it be a set of rules to be applied consistently? Is his trading rule-based or discretionary, or some of each? One reader put it as: consistency needs rules, but being adaptive and flexible may challenge consistency. So: <b>how can you be discretionary and consistent at the same time?</b></p>
+  <p>Many people place traders on a spectrum. At one end, the <b>purely systematic</b> trader always applies a set of rules (a computer could do it, probably better). At the other, an imagined <b>purely discretionary</b> trader buys or sells whatever he likes by mood, with no consistency (1 share or 1,000; one minute or ten years). Grimes calls this classification flawed because it misreads "discretionary". To him, discretionary trading simply means <b>allowing some human intuition into the process</b>; it does not mean unstructured or undisciplined. Discretion can be highly structured:</p>
+  <ul class="plain">
+    <li><b>Specify where discretion is allowed</b>: entries only? sizing? trade management? stop location? getting out early? doubling up? all of them? Some choices suit your method better than others.</li>
+    <li><b>Have a rule for when intuition and other rules strongly conflict</b>; it may differ at different points. Example: intuition says skip an entry the system calls for: perhaps not allowed. Intuition says exit early: perhaps fine.</li>
+  </ul>
+  <p>Note the words: "specify", "have a rule". You decide <b>in advance</b> what you will and won't do; that is the key to consistency. And no process is free of human input. A systematic trader's rules came from research, and research is full of human decisions: why these markets, these parameters, this approach, these data sets? Someone is also monitoring the system; if conditions change and it stops working, it gets pulled, humans refine it on recent data and send it back in. Even in the most rigid approach, intuition still plays around the edges. Grimes agrees that following bullet-point rules is easier, and that using discretion without emotion taking over takes a lot of experience; but removing all emotion should not be a goal. Consistency just means following a set of rules consistently, and those rules can include discretion.</p>
+  <div class="box picture"><b>Picture it</b><p>A pilot flies by checklist and still uses judgement, but the checklist says exactly where judgement goes ("go around if unstable at 500 ft" is a rule about a judgement call). Discretion lives inside fences you built before take-off.</p></div>
+  <div class="fig">
+    <svg viewBox="0 0 820 110" width="100%" role="img" aria-label="Spectrum from purely systematic to purely discretionary, with structured discretion in the middle">
+      <defs><linearGradient id="g11" x1="0" x2="1"><stop offset="0" style="stop-color: var(--c2)"/><stop offset="1" style="stop-color: var(--sell)"/></linearGradient></defs>
+      <rect x="20" y="40" width="780" height="14" rx="7" style="fill: url(#g11); opacity:.55"/>
+      <text x="20" y="30">purely systematic</text><text x="800" y="30" text-anchor="end">"purely discretionary" (mood)</text>
+      <rect x="250" y="34" width="330" height="26" rx="6" style="fill:none; stroke: var(--c1); stroke-width:2"/>
+      <text x="415" y="82" text-anchor="middle" style="font-weight:600">structured discretion: rules say where intuition may act</text>
+      <text x="415" y="102" text-anchor="middle">(even the systematic end has human choices in research and monitoring)</text>
+    </svg>
+    <div class="tablewrap"><table>
+      <tr><th>Decision point</th><th>Your rule</th></tr>
+      <tr><td>Entries (skip a signal)</td><td><select id="sel11a"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+      <tr><td>Sizing</td><td><select id="sel11b"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+      <tr><td>Trade management</td><td><select id="sel11c"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+      <tr><td>Stop location</td><td><select id="sel11d"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+      <tr><td>Getting out early</td><td><select id="sel11e"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+      <tr><td>Doubling up</td><td><select id="sel11f"><option value="r">rules only</option><option value="d">discretion allowed</option><option value="x">discretion may only reduce risk</option></select></td></tr>
+    </table></div>
+    <div class="controls"><button id="pre11" type="button">Load Grimes's example</button><button id="clr11" type="button">All rules only</button></div>
+    <div class="readout" id="r11" style="display:block"></div>
+  </div>
+  <p class="readout">The policy builder is my tool; the decision points and the "skip entry not allowed / early exit allowed" example are Grimes's.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Consistency is a property of the decision process, not of whether a human is in it. A rule like "intuition may exit early but never skip an entry" is perfectly consistent: you can audit it afterwards. What breaks consistency is discretion with no boundary, because then every result can be explained away and nothing can be measured. One reason the asymmetry in Grimes's example makes sense: skipping entries lets fear filter out exactly the uncomfortable trades a backtest counted on, while an early exit only cuts exposure.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch07_breakout.html">Ch.7</a> §08 (the trader / system developer / boss hats): the developer hat writes the discretion rules, the trader hat follows them.</li><li>§10: consistency matters because results are noisy.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · ON REVERSALS · THE PROBLEM WITH REVERSALS</div><h2>Why fading big moves is seductive, and how it ends</h2></div><span class="chip">pdf p327–328</span></div>
+  <p>Humans tend to fade moves and try to pick turning points. Grimes started that way himself: hunting for patterns that showed a trend ending and taking the countertrend side. Over the years he has seen many traders focus on fading; a few succeed, most struggle. We must know this bias colours our thinking and work hard to see the market objectively.</p>
+  <p>Calling tops and bottoms is seductive. With a public platform you only need to be right once; people keep following callers who are wrong again and again, because a correct call makes you look and feel so smart that the accumulated losses from the failed calls are forgotten. It's also an inconsistent game. Many prop-firm stock traders specialise in fading large news moves: think of a <b>$50 stock with an ATR of $1 that moves $5 in under a minute</b>. They take the other side and are ready to add as it keeps going against them: down, buy more; down, buy more. They often have long strings of winning weeks or even years, then give back years of profit in one trade, sometimes leaving the game completely. He has seen it more than once.</p>
+  <p>Beneath the psychology, Grimes sees a misunderstanding of how markets work. After a very large move, out of proportion to recent history, which is more likely: another move the same way, or a reversal? Our instinct says the market has gone "too far" (and maybe we are sorry we missed it), but he says it is far more likely for a market to make <b>another large move in the same direction</b>, citing Mandelbrot's <i>The Misbehavior of Markets</i>. If you see a trend and immediately look for a place to get on board against it, you have a bias; it may even be harnessed constructively. He is not advocating blind trend following, and tools exist for trend-termination trades, but you must manage your biases relentlessly and efficiently or fail as a trader.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch08_rubber_band_averaging.svg" alt="A man keeps stretching a rubber band further, which usually snaps back, until one day it does not and he is left holding a huge stretched band." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Averaging down is a rubber band you keep stretching. Most days it snaps back and pays you a little. One day it doesn't snap back, and you are holding five times the size at the worst price.</p></div>
+  <div class="fig">
+    <canvas id="c12" class="tall" aria-label="Simulated fade-and-add trader: cumulative profit over many news events, a staircase with rare cliffs"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls">
+      <label for="a12">Max adds <input id="a12" type="range" min="0" max="6" step="1" value="4"><output id="a12o">4</output></label>
+      <label for="t12">Take profit ($ bounce from avg) <input id="t12" type="range" min="0.25" max="2" step="0.25" value="0.5"><output id="t12o">0.5</output></label>
+      <label for="sel12"><select id="sel12"><option value="none">no stop (hold till close)</option><option value="stop">stop after last add</option></select></label>
+      <button id="rr12" type="button">New events</button>
+    </div>
+    <div class="readout" id="r12" style="display:block"></div>
+    <canvas id="c12b" class="short" aria-label="Histogram of fade trade results: many small wins, a long tail of large losses"></canvas>
+    <div class="legend" id="c12bL"></div>
+  </div>
+  <p class="readout">My simulation, not the book's evidence: after a $5 shock on a $50 stock (ATR $1), price follows a random walk with high volatility for one session (390 one-minute steps). The fader buys 100 shares, adds 100 more at every further $1 against, exits at the profit target or the close. A random walk has no edge either way, so any average profit you see is luck.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>On a random walk the expected profit of any buy-and-add scheme is zero before costs: adding cannot create an edge, it only reshapes the outcome. A small target with no stop wins very often, and the rare losses are huge because by then the position is several times its starting size. That shape (high win rate, negative skew) produces exactly the "years of winning weeks, then one trade" story. And real markets after shocks are worse than a random walk for the fader if Grimes is right that large moves tend to be followed by more large moves.</p></div>
+  <div class="box connect"><b>Beyond the book · what Mandelbrot showed</b><ul>
+    <li>The best-established form of Mandelbrot's point is <b>volatility clustering</b>: large moves (of either sign) tend to be followed by large moves. That alone breaks the fader, who sizes for normal volatility. Whether the next move is in the <i>same direction</i> is a separate (momentum) claim; Grimes asserts it, citing Mandelbrot.</li>
+    <li>My own test agrees with the volatility half: in <code>Notes/trading/indicators/trend_vs_sideways_tools.md</code>, only Bollinger width predicted anything (volatility), not direction or trendiness.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · ON REVERSALS · DON'T BE THIS GUY</div><h2>Calling a turn into a 35-knot headwind</h2></div><span class="chip">pdf p328–329 · photo p329</span></div>
+  <p>Grimes tells a story behind a photo he took on a Friday afternoon in 2008 on a New York–New Jersey ferry: a very drunk commuter, after a stressful week, walked to the bow and relieved himself over the front, straight into what was probably a 35-knot headwind. The ferries are fast and the river wind can blow glasses off your face; the people who didn't see it coming got the spray. Few of us would make that error literally, but financial commentators make its equivalent all the time.</p>
+  <p>After much reading across social media, "big" media, gurus, pundits and paid research, he finds common themes (a less kind word is groupthink) and one recurring error: <b>attempts to catch or call a trend turn with no justification</b>. It is hazardous to your financial health.</p>
+  <div class="box picture"><b>Picture it</b><p>The trend is the wind. You can stand at the bow and act against it, but the wind does not care how confident you are, and the result comes straight back at you.</p></div>
+  <svg viewBox="0 0 820 150" width="100%" role="img" aria-label="Diagram: a strong trend drawn as wind arrows pushing against a countertrend call, which bounces back as a loss">
+    <defs><marker id="a13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--c2)"/></marker><marker id="b13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill: var(--sell)"/></marker></defs>
+    <path d="M800,30 L470,30" style="stroke: var(--c2); stroke-width:2" marker-end="url(#a13)"/><path d="M800,60 L470,60" style="stroke: var(--c2); stroke-width:2" marker-end="url(#a13)"/><path d="M800,90 L470,90" style="stroke: var(--c2); stroke-width:2" marker-end="url(#a13)"/>
+    <text x="640" y="120" text-anchor="middle" style="fill: var(--c2)">the trend (headwind)</text>
+    <rect x="300" y="35" width="150" height="50" rx="6" style="fill: var(--tint); stroke: var(--c1)"/><text x="375" y="57" text-anchor="middle" style="font-weight:600">"this is the top"</text><text x="375" y="75" text-anchor="middle">no justification</text>
+    <path d="M300,60 C200,60 160,120 40,120" style="fill:none; stroke: var(--sell); stroke-width:2; stroke-dasharray:5 4" marker-end="url(#b13)"/>
+    <text x="120" y="142" text-anchor="middle" style="fill: var(--sell)">comes back at you</text>
+  </svg>
+  <div class="box behind"><b>What's happening behind it</b><p>A call against the trend with no evidence of a change is a bet that the current flow of orders will stop for no visible reason. Trends persist because the buyers (or sellers) driving them are still there; until something shows they are gone (§17), betting on their disappearance is betting against the force that is actually moving price.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>§14–§16 explain why we keep doing it; §17 gives the justified alternative.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · ON REVERSALS · WHY WE ARE ALWAYS LOOKING FOR THE TURN</div><h2>The contrarian wiring</h2></div><span class="chip">pdf p329–330</span></div>
+  <p>Many traders who hunt turns are competitive and contrary in the extreme. Grimes jokes about himself: someone agrees the sky is a pretty blue, and, alarmed to be agreeing, he starts arguing it's really blue-green, and an optical illusion anyway. This trait is common among traders. It helps (you do your own work, distrust outside opinion, think critically) and it hurts (you see any move and assume the crowd is wrong). <b>The crowd is not always wrong; often it is right, and right for a very long time.</b> Many traders are simply wired to be contrary and to stand apart; that is part of personality to be managed, knowing it is a lens that can distort everything you see.</p>
+  <div class="box picture"><b>Picture it</b><p>A strong uptrend is full of small dips. To a contrarian, each dip looks like the start of the end. The chart counts how many "this is the top" calls a natural contrarian would have made in one trend.</p></div>
+  <div class="fig">
+    <canvas id="c14" aria-label="Simulated long uptrend with a sell mark at every dip a contrarian might call the top"></canvas>
+    <div class="legend" id="c14L"></div>
+    <div class="controls"><label for="x14">Call the top after a dip of % <input id="x14" type="range" min="1" max="10" step="0.5" value="3"><output id="x14o">3</output></label></div>
+    <div class="readout" id="r14" style="display:block"></div>
+  </div>
+  <p class="readout">Simulated trend (my illustration). A "call" = price closes x% below its highest close so far; a call is "wrong" if price later makes a new high before falling 2x% further.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Inside a trend, dips are the normal rhythm, not signals. A personality that reads every disagreement as an opportunity will generate many calls in a persistent trend, and almost all are wrong: the crowd was right for the whole move.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>§05 belief inventory: "I must disagree to be smart" is a belief worth writing down.</li><li><a href="ch04_pullback.html">Ch.4 Pullback</a>: what the contrarian sells, the pullback trader buys.</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · ON REVERSALS · TRADING LESSONS AND PSYCHOLOGY</div><h2>Four bad reasons to hunt the turn</h2></div><span class="chip">pdf p330–331</span></div>
+  <ul class="plain">
+    <li><b>"You must catch the turn to make money."</b> Misguided: decades of trend-following returns (the Turtles, for example) show you don't; taking a chunk out of the middle is enough.</li>
+    <li><b>Anger at a missed move.</b> Watching a long, multi-month trend you are not in, it's natural to scorn those who are and look for reasons it should end.</li>
+    <li><b>Classical patterns out of context.</b> Every trend shows several "head and shoulders" patterns, and inexperienced chartists point them out. With poorly defined patterns you can see anything you want; you can always justify long, short or flat, at least without clearly defined rules and objectives.</li>
+    <li><b>Many "extreme" tools that are really one tool.</b> Overbought/oversold indicators, sentiment, ratios, bands all measure the same thing in different ways. Oversold on sentiment, RSI and a Fibonacci extension is <b>one</b> signal, not three, because the tools are tightly correlated. Missing that gives false confidence and worse performance. Better to know you don't know than to think you know more than you do.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch08_three_thermometers.svg" alt="Three different thermometers on one wall all show the same reading, because they are measuring the same room." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Three thermometers in the same room are not three opinions about the temperature. When RSI, Stochastics and Bollinger %b all say "oversold", they are reading the same last few days of prices.</p></div>
+  <div class="two">
+    <div class="fig">
+      <canvas id="c15" aria-label="Simulated trend with a breakout entry and trailing exit capturing the middle of the move"></canvas>
+      <div class="legend" id="c15L"></div>
+      <div class="controls"><label for="e15">Entry breakout (bars) <input id="e15" type="range" min="10" max="55" step="5" value="20"><output id="e15o">20</output></label><label for="x15">Exit (bars) <input id="x15" type="range" min="5" max="30" step="5" value="10"><output id="x15o">10</output></label></div>
+      <div class="readout" id="r15" style="display:block"></div>
+    </div>
+    <div class="fig">
+      <div class="tablewrap"><table id="t15"><tr><td>…</td></tr></table></div>
+      <div class="readout" id="r15b" style="display:block"></div>
+    </div>
+  </div>
+  <p class="readout">Left: simulated trend; Turtle-style rule (buy a new N-bar high, sell a new M-bar low), my illustration. Right: correlations of four "extreme" gauges computed on 2,000 simulated bars: RSI(14), Stochastic %K(14), Bollinger %b(20, 2), and distance from the 20-bar average in standard deviations.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Left: the breakout rule never buys the low or sells the high; it gives up the first and last part of the move and still keeps most of the middle. Right: all four gauges are functions of the same recent closes (where the close sits relative to its recent past), so their correlations come out around 0.8–1.0. Stacking them adds confidence, not information. Bollinger %b and the distance-in-standard-deviations are the same number rescaled (beyond the book: %b = 0.5 + z/4), so their correlation is exactly 1.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>My Stoch RSI + MACD test (<code>Notes/trading/stoch_rsi_macd_strategy.md</code>): combining two oscillators still was not worth trading on any timeframe I tested, per the summary.</li><li>Murphy's Donchian 4-week rule (<code>Notes/trading/murphy_moving_averages.md</code>) is the same middle-chunk idea.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · ON REVERSALS · COMMENTATORS AND ASYMMETRICAL PAYOFFS</div><h2>The pundit's scoreboard is not your account</h2></div><span class="chip">pdf p331–332</span></div>
+  <p>A trader's payoff is simple and just: money when right, losses when wrong. A commentator's (blogger, research provider, TV personality, guru) is different: the public remembers the hits and quickly forgets the misses. The existence of <b>permabears</b>, bearish for decades and still invited onto TV and into the papers whenever the market falls, proves it. You can run a newsletter for years on outrageous claims that never come true ("end of the financial world", "the coming crash", "where to bury your gold"). The crazier the better: predict the S&amp;P falls 500 points tomorrow and, if wrong, nobody remembers a dumb call; if right, you are forever "the one who called the crash"; and if it's wrong but a mild decline follows within months, creative PR still ties it in. So read commentators with scepticism: they have a reason to call ends of trends. Your account has a different standard: if your losses add up to more than your wins, that's a problem in the long run.</p>
+  <div class="box picture"><b>Picture it</b><p>Two scoreboards for the same predictions. The pundit's counts only hits. Your account counts everything.</p></div>
+  <div class="fig">
+    <canvas id="c16" aria-label="A permabear's remembered hits keep rising while an account that shorts every call loses money"></canvas>
+    <div class="legend" id="c16L"></div>
+    <div class="controls">
+      <label for="q16">Crash chance per month % <input id="q16" type="range" min="0.5" max="5" step="0.5" value="1"><output id="q16o">1</output></label>
+      <label for="y16">Years <input id="y16" type="range" min="5" max="40" step="5" value="20"><output id="y16o">20</output></label>
+      <button id="rr16" type="button">Another history</button>
+    </div>
+    <div class="readout" id="r16" style="display:block"></div>
+  </div>
+  <p class="readout">My model: each month the pundit says "crash coming". Normal months the market rises 1%; a crash month it falls 20%. An account that shorts 10% of capital on each call pays for every miss.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The pundit's payoff is a free option: misses cost almost nothing, a hit pays forever. That makes extreme, frequent calls the rational business strategy, whether or not they are good forecasts. A trader has no such option; the losses from all the wrong calls are real and cumulative.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>§12: public callers "only have to get it right once".</li><li><code>Notes/trading/trader_returns_reality.md</code>: the SEBI F&amp;O loss figures are the trader's scoreboard, not the guru's.</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · ON REVERSALS · FINDING ENDS OF TRENDS</div><h2>Two steps before you bet on a turn</h2></div><span class="chip">pdf p332</span></div>
+  <p>Grimes's way to avoid fighting a trend: <b>require a clear signal from the market that the trend may have ended</b>. Patterns that can provide it: <b>exhaustion, climax, three pushes, failure tests, price rejection</b>. Then look for a <b>change of character</b> (new momentum in the other direction), which sets up a <b>pullback in the possibly-new trend</b>; that pullback is the trade. Without the sequence (1) something that breaks the trend and (2) new countertrend momentum and change of character, the best bet is <b>not to fade</b> and to wait for clear signals. And the man on the ferry? Don't be that guy.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch08_moving_train_wait.svg" alt="A passenger waits on the platform instead of jumping onto a moving train, and steps on only after the train stops, reverses and slows at a station." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Don't jump off a moving train. Wait until it stops (the break), starts rolling the other way (change of character), and slows at a station (the pullback). Then step on.</p></div>
+  <div class="fig">
+    <canvas id="c17" class="tall" aria-label="Step-through candlestick chart: uptrend, climax, change of character, pullback, short entry with stop and target"></canvas>
+    <div class="legend" id="c17L"></div>
+    <div class="controls">
+      <label for="sel17">Scenario <select id="sel17"><option value="seq">full sequence appears</option><option value="none">climax, but no change of character</option></select></label>
+      <button id="st17" type="button">Next step ▶</button><button id="rs17" type="button">Restart</button>
+    </div>
+    <div class="readout" id="r17" style="display:block"></div>
+    <div class="win" id="w17"></div>
+  </div>
+  <p class="readout">Simulated, hand-built scenarios (my illustration of the sequence). The entry, stop and target placement follows the pullback logic from Module 4; Grimes gives no statistics for this sequence in these pages.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The two steps answer two different questions. The break (climax, failure test, rejection) asks "have the trend's buyers stopped?". The change of character asks "have sellers taken control?". A climax alone answers only the first; trends often pause and resume. Waiting for the second costs part of the move, but it turns a guess into a pattern with a defined stop (above the pullback high, inside the new structure) and avoids every trend that merely pauses.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch06_failure_test.html">Ch.6 Failure test</a> (one of the listed trend-ending signals) and <a href="ch04_pullback.html">Ch.4 Pullback</a> (the entry in the new trend). <a href="ch05_anti.html">Ch.5 Anti</a> is the first pullback after a change of character.</li><li>§01: the trend itself "failing" is the pattern failure at the largest scale.</li></ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Name the two different ways traders use the study of pattern failures.</summary><p>Some trade them as entries (go the other way when the expected move fails); others use them to manage risk (the failure point is where the reason for the trade is gone). Everyone learns how patterns develop. (§01)</p></details>
+  <details><summary>2. What order does Grimes give for taking a plan to live trading?</summary><p>Write it so it's backtest-able, backtest it, paper trade it, and only then trade live. (§02)</p></details>
+  <details><summary>3. In the position sizing project, what are the three variables of the "system", and what happens to a run whose balance hits zero?</summary><p>Win probability, win size, loss size (example 50%, 1.1, 1.0). The run stops at that balance and is flagged bankrupt. (§04)</p></details>
+  <details><summary>4. Why can percent-of-balance sizing never go bankrupt, yet still be dangerous?</summary><p>Each loss takes a fraction of what's left, so the balance approaches zero but never reaches it. But large fractions shrink the median outcome (losses compound on a smaller base) and make deep drawdowns almost certain; past roughly twice the Kelly fraction the typical account shrinks even with a positive edge. (§04, Kelly beyond the book)</p></details>
+  <details><summary>5. Why does Grimes say high-consequence / high-probability risks "don't really matter" for most traders?</summary><p>Because anyone who takes them (e.g. breaking the risk limit then doubling up) is eliminated from the game quickly. The real danger is high-consequence / low-probability risk, where intuition fails. (§07)</p></details>
+  <details><summary>6. A short-premium trader has made money every week for 20 years. What does that tell you about the strategy's risk?</summary><p>Very little. A rare catastrophic event may simply not be in the sample; with a 0.1% weekly chance, there's still about a 35% chance of seeing none in 20 years. Ask what happens when all the deltas go to 1.0. (§07)</p></details>
+  <details><summary>7. You risk 1% with a stop 2% away and the stock gaps 12% through it. Roughly what do you lose, and which of the six keys covers this?</summary><p>About 6% of the account (12 ÷ 2 × 1%). Key 2, think about the extremes, and assume your answers understate the risk. (§08)</p></details>
+  <details><summary>8. Why does Grimes link consistency to randomness instead of to "discipline is good"?</summary><p>Because short-term results are mostly noise, you can lose doing the right thing and win doing the wrong thing; changing your approach after a few trades means reacting to noise. For a 50% / 1.1:1 system there's still about a 31% chance of a net loss after 100 trades. (§10)</p></details>
+  <details><summary>9. Why would the most skilful traders depend more on luck, not less?</summary><p>When skill among competitors is high and similar, differences in skill shrink, so the ranking at the top is decided by luck. Outlier success always includes a big dose of it. (§10)</p></details>
+  <details><summary>10. How can a discretionary trader be consistent?</summary><p>By writing rules in advance about where discretion is allowed (entries, sizing, management, stops, early exits, doubling up) and what happens when intuition conflicts with the rules (e.g. may exit early, may not skip an entry). (§11)</p></details>
+  <details><summary>11. You get "oversold" from RSI, Stochastics and a Bollinger band at once. How many signals do you have?</summary><p>Essentially one: they're all functions of the same recent prices and are highly correlated. Treating them as three gives false confidence. (§15)</p></details>
+  <details><summary>12. A prop trader fades every $5 news shock in $1-ATR stocks and adds as it goes against him. Describe the likely track record.</summary><p>A high win rate and long strings of winning weeks or years, then a rare loss big enough to wipe out years of profit, because the position is largest exactly when the move keeps going. Grimes adds that big moves are more likely followed by more big moves. (§12)</p></details>
+  <details><summary>13. What two-step sequence must appear before Grimes will trade against a trend, and where is the entry?</summary><p>(1) Something that breaks the trend (exhaustion, climax, three pushes, failure test, price rejection), then (2) new countertrend momentum, a change of character. The entry is on a pullback in the possibly-new trend. Without both, don't fade. (§17)</p></details>
+  <details><summary>14. Why is a permabear's public reputation not evidence that following him would make money?</summary><p>His payoff is asymmetric: misses are forgotten, one hit is remembered forever. Your account counts every miss. (§16)</p></details>
+</section>
+
+<footer>Built from Adam Grimes, <i>The Art and Science of Trading: Course Workbook</i> (2017), Module 8 "Pattern Failures": the four projects and the essays On Risk, On Trading Styles and On Reversals (PDF pages 312–332), summarised in my own words; the only direct quote is Grimes's borrowed children's-book phrase "where the wild things are". The only figure in this range (a photo, pdf p329) is described, not reproduced. All charts use simulated data; the probability answers, the Kelly fraction, the short-premium, gap, fade, pundit and skill-versus-luck models, and links to my notes are my additions and are marked as such. Simulated results are not market evidence. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // ---------- data / registry ----------
+  let seed = 7;
+  const sd = (k) => seed * 131 + k; // per-section seeds that change with the reroll button
+  const sgn = (v, d = 1) => (v >= 0 ? '+' : '') + v.toFixed(d);
+  const money = (v) => (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
+  const pct = (v, d = 1) => (v * 100).toFixed(d) + '%';
+  function buildData() { $('seedOut').textContent = seed; }
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+  const caches = [];
+  const cache = () => { const c = {}; caches.push(c); return c; };
+  function clearCaches() { caches.forEach((c) => { for (const k in c) delete c[k]; }); }
+  const constArr = (n, v) => new Array(n).fill(v);
+  function lgam(n) { let s = 0; for (let i = 2; i <= n; i++) s += Math.log(i); return s; }
+  const LG = [0]; for (let i = 1; i <= 4000; i++) LG[i] = LG[i - 1] + Math.log(i);
+
+  function genOHLC(segs, s0, start = 100) {
+    const r = rng(s0); const o = [], h = [], l = [], c = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        const op = Math.max(1, p * (1 + (s.gap != null ? s.gap : 0.002) * gauss(r)));
+        let ret = s.drift + s.vol * gauss(r); if (s.revert) ret += s.revert * (center - op) / op;
+        const cl = Math.max(1, op * (1 + ret));
+        const top = Math.max(op, cl), bot = Math.min(op, cl); const rg = op * (s.vol * 0.7 + 0.002);
+        o.push(op); c.push(cl); h.push(top + rg * r() * r() * 1.8); l.push(Math.min(bot, Math.max(0.5, bot - rg * r() * r() * 1.8)));
+        p = cl;
+      }
+    }
+    return { o, h, l, c, n: c.length };
+  }
+  // built scenario: piecewise-linear path through anchors [[i, price], ...] plus bar noise
+  function mkPath(anchors, n) {
+    const p = new Array(n).fill(anchors[anchors.length - 1][1]);
+    for (let k = 0; k < anchors.length - 1; k++) { const [i0, v0] = anchors[k], [i1, v1] = anchors[k + 1]; for (let i = i0; i <= i1 && i < n; i++) p[i] = v0 + (v1 - v0) * (i - i0) / Math.max(1, i1 - i0); }
+    return p;
+  }
+  function mkBars(anchors, n, s0, vol, volAt) {
+    const p = mkPath(anchors, n); const r = rng(s0); const o = [], h = [], l = [], c = []; let prev = p[0];
+    for (let i = 0; i < n; i++) {
+      const v = volAt ? volAt(i) : vol;
+      const cl = p[i] * (1 + v * 0.7 * gauss(r)); const op = prev + (cl - prev) * 0.15 + p[i] * v * 0.25 * gauss(r);
+      const top = Math.max(op, cl), bot = Math.min(op, cl); const rg = p[i] * v;
+      o.push(op); c.push(cl); h.push(top + rg * Math.abs(gauss(r)) * 0.55); l.push(bot - rg * Math.abs(gauss(r)) * 0.55); prev = cl;
+    }
+    return { o, h, l, c, n };
+  }
+  function setBar(D, i, o, h, l, c) { D.o[i] = o; D.c[i] = c; D.h[i] = Math.max(h, o, c); D.l[i] = Math.min(l, o, c); }
+  function capHigh(D, i, v) { if (D.h[i] > v) D.h[i] = v; const t = v - (D.h[i] - D.l[i]) * 0.15; if (D.o[i] > t) D.o[i] = t; if (D.c[i] > t) D.c[i] = t - (D.h[i] - D.l[i]) * 0.1; D.h[i] = Math.min(v, Math.max(D.h[i], D.o[i], D.c[i])); D.l[i] = Math.min(D.l[i], D.o[i], D.c[i]); }
+  function capLow(D, i, v) { if (D.l[i] < v) D.l[i] = v; const t = v + (D.h[i] - D.l[i]) * 0.15; if (D.o[i] < t) D.o[i] = t; if (D.c[i] < t) D.c[i] = t + (D.h[i] - D.l[i]) * 0.1; D.l[i] = Math.max(v, Math.min(D.l[i], D.o[i], D.c[i])); D.h[i] = Math.max(D.h[i], D.o[i], D.c[i]); }
+  function shiftFrom(D, i0, delta) { for (let i = i0; i < D.n; i++) { D.o[i] += delta; D.h[i] += delta; D.l[i] += delta; D.c[i] += delta; } }
+  function mirror(D, m) { return { o: D.o.map((v) => m - v), c: D.c.map((v) => m - v), h: D.l.map((v) => m - v), l: D.h.map((v) => m - v), n: D.n }; }
+  function atr(D, n) {
+    const tr = D.c.map((c, i) => i === 0 ? D.h[0] - D.l[0] : Math.max(D.h[i] - D.l[i], Math.abs(D.h[i] - D.c[i - 1]), Math.abs(D.l[i] - D.c[i - 1])));
+    const o = nulls(D.n); let a = null;
+    for (let i = 0; i < D.n; i++) { a = a == null ? tr[i] : a + (tr[i] - a) / n; o[i] = a; }
+    return o;
+  }
+  const maxOf = (a, i0, i1) => { let m = -Infinity, at = i0; for (let i = Math.max(0, i0); i <= i1; i++) if (a[i] > m) { m = a[i]; at = i; } return [m, at]; };
+  const minOf = (a, i0, i1) => { let m = Infinity, at = i0; for (let i = Math.max(0, i0); i <= i1; i++) if (a[i] < m) { m = a[i]; at = i; } return [m, at]; };
+  function fmtP(v, span) { return span < 0.2 ? v.toFixed(4) : span < 2 ? v.toFixed(3) : span < 30 ? v.toFixed(1) : v.toFixed(0); }
+
+  function drawCandleAt(g, x, w, Y, o, h, l, c, col) {
+    const up = c >= o;
+    const stroke = col ? colorOf(col) : colorOf('price');
+    const fill = col ? colorOf(col, up ? 0.25 : 1) : (up ? colorOf('plate') : colorOf('price'));
+    const yT = Y(Math.max(o, c)), yB = Y(Math.min(o, c));
+    g.strokeStyle = stroke; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, Y(h)); g.lineTo(x, yT); g.moveTo(x, yB); g.lineTo(x, Y(l)); g.stroke();
+    const bh = yB - yT;
+    if (bh < 1) { g.lineWidth = 1.5; g.beginPath(); g.moveTo(x - w / 2, yT); g.lineTo(x + w / 2, yT); g.stroke(); return; }
+    g.fillStyle = fill; g.fillRect(x - w / 2, yT, w, bh);
+    if (w > 3) { g.lineWidth = 1; g.strokeRect(x - w / 2 + 0.5, yT + 0.5, Math.max(0, w - 1), Math.max(0, bh - 1)); }
+  }
+  // candle chart. sp: {x0, x1, upto, ymin, ymax, lines:[{d,col,w,dash,label}], hl:[{v,a,b,col,dash,label,w}],
+  //   marks:[{i,v,dir,col,label}], shade:[{a,b,col,alpha}], colOf:(i)=>token|null, legend:[[t,c]], sub:{lines,ymin,ymax,label}}
+  function cplot(id, D, sp) {
+    const cv = $(id); if (!cv) return null;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : D.n - 1; const upto = sp.upto != null ? sp.upto : x1;
+    const padL = 6, padR = 58, padT = 12, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.26) : 0, gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const slot = (W - padL - padR) / (x1 - x0 + 1); const X = (i) => padL + (i - x0 + 0.5) * slot;
+    let lo = Infinity, hi = -Infinity;
+    const sx1 = sp.scaleTo != null ? sp.scaleTo : x1;
+    for (let i = x0; i <= sx1; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    (sp.hl || []).forEach((h) => { lo = Math.min(lo, h.v); hi = Math.max(hi, h.v); });
+    if (sp.ymin != null) lo = sp.ymin; if (sp.ymax != null) hi = sp.ymax;
+    const pad = (hi - lo) * 0.08 || 1; if (sp.ymin == null) lo -= pad; if (sp.ymax == null) hi += pad;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    const font = '11px ' + css('mono'); const span = hi - lo;
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - slot / 2, padT, (s.b - s.a + 1) * slot, mainH); });
+    g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, mainH > 160 ? 4 : 3).forEach((t) => { const y = Y(t); if (y < padT - 1 || y > padT + mainH + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmtP(t, span), W - padR + 5, y + 4); });
+    const w = Math.max(1, slot * 0.62);
+    (sp.lines || []).forEach((ln) => { if (ln.under) strokeSeries(g, ln.d, X, Y, x0, Math.min(x1, ln.full ? x1 : upto), colorOf(ln.col, ln.alpha != null ? ln.alpha : 1), ln.w || 1.4, ln.dash); });
+    for (let i = x0; i <= Math.min(x1, upto); i++) drawCandleAt(g, X(i), w, Y, D.o[i], D.h[i], D.l[i], D.c[i], sp.colOf ? sp.colOf(i) : null);
+    (sp.lines || []).forEach((ln) => { if (!ln.under) strokeSeries(g, ln.d, X, Y, x0, Math.min(x1, ln.full ? x1 : upto), colorOf(ln.col, ln.alpha != null ? ln.alpha : 1), ln.w || 1.6, ln.dash); });
+    (sp.hl || []).forEach((h) => {
+      const a = h.a != null ? h.a : x0, b = h.b != null ? h.b : x1; const y = Y(h.v);
+      g.strokeStyle = colorOf(h.col || 'muted'); g.lineWidth = h.w || 1.3; g.setLineDash(h.dash === false ? [] : (h.dash || [5, 4]));
+      g.beginPath(); g.moveTo(X(a) - slot / 2, y); g.lineTo(X(b) + slot / 2, y); g.stroke(); g.setLineDash([]);
+      if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); g.font = font; const tw = g.measureText(h.label).width; let tx = h.end ? X(b) + slot / 2 - tw - 2 : X(a) - slot / 2 + 2; if (tx + tw > W - padR) tx = W - padR - tw - 2; g.fillText(h.label, Math.max(padL, tx), y + (h.below ? 13 : -4)); }
+    });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1) return; const x = X(m.i), s = Math.max(4, Math.min(7, slot * 0.8)); const col = colorOf(m.col || 'c1');
+      g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath();
+      let ty;
+      if (m.dir > 0) { const y = Y(m.v) + 4; g.moveTo(x, y); g.lineTo(x - s, y + s * 1.5); g.lineTo(x + s, y + s * 1.5); g.closePath(); ty = y + s * 1.5 + 12; }
+      else if (m.dir < 0) { const y = Y(m.v) - 4; g.moveTo(x, y); g.lineTo(x - s, y - s * 1.5); g.lineTo(x + s, y - s * 1.5); g.closePath(); ty = y - s * 1.5 - 4; }
+      else { g.arc(x, Y(m.v), 4, 0, Math.PI * 2); ty = Y(m.v) - 8; }
+      g.fill();
+      if (m.label) { g.font = font; const tw = g.measureText(m.label).width; let tx = x - tw / 2; tx = Math.max(padL, Math.min(W - padR - tw, tx)); g.fillText(m.label, tx, Math.max(padT + 10, Math.min(padT + mainH - 2, ty))); }
+    });
+    if (sp.sub) {
+      const top = padT + mainH + gap; const s = sp.sub; let slo = s.ymin, shi = s.ymax;
+      if (slo == null || shi == null) { slo = Infinity; shi = -Infinity; (s.lines || []).forEach((ln) => { for (let i = x0; i <= x1; i++) { const v = ln.d[i]; if (v != null && isFinite(v)) { slo = Math.min(slo, v); shi = Math.max(shi, v); } } }); if (!isFinite(slo)) { slo = 0; shi = 1; } const pd2 = (shi - slo) * 0.1 || 1; slo -= pd2; shi += pd2; }
+      const Ys = (v) => top + (shi - v) / (shi - slo) * subH;
+      g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke();
+      g.fillStyle = colorOf('muted'); g.font = font; niceTicks(slo, shi, 2).forEach((t) => { const y = Ys(t); if (y < top || y > top + subH) return; g.fillText(fmt(t), W - padR + 5, y + 4); });
+      (s.lines || []).forEach((ln) => strokeSeries(g, ln.d, X, Ys, x0, Math.min(x1, upto), colorOf(ln.col), ln.w || 1.5, ln.dash));
+      if (s.label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(s.label, padL + 4, top + 12); }
+    }
+    if (sp.label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(sp.label, padL + 4, padT + 10); }
+    const L = $(id + 'L');
+    if (L) {
+      const items = []; (sp.lines || []).forEach((ln) => ln.label && items.push([ln.label, ln.col])); (sp.hl || []).forEach((h) => h.legend && items.push([h.legend, h.col || 'muted'])); (sp.legend || []).forEach((x) => items.push(x));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+    return { X, Y, slot };
+  }
+
+  // grouped bar chart with category labels. sp: {labels, series:[{v,col,label,alpha}], dots:[{v,col,label}], hi, ymin, ymax, yfmt}
+  function barChart(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 6, padR = 52, padT = 12, padB = 22; const n = sp.labels.length; const ns = sp.series.length;
+    let lo = sp.ymin != null ? sp.ymin : 0, hi = sp.ymax != null ? sp.ymax : 0;
+    if (sp.ymin == null || sp.ymax == null) { sp.series.concat(sp.dots || []).forEach((s) => s.v.forEach((v) => { if (v == null || !isFinite(v)) return; if (sp.ymin == null) lo = Math.min(lo, v); if (sp.ymax == null) hi = Math.max(hi, v); })); const pd = (hi - lo) * 0.08 || 1; if (sp.ymax == null) hi += pd; if (sp.ymin == null && lo < 0) lo -= pd; }
+    const Y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+    const slot = (W - padL - padR) / n; const X = (i) => padL + (i + 0.5) * slot; const bw = Math.max(2, slot * 0.78 / ns);
+    const font = '11px ' + css('mono'); g.font = font;
+    g.strokeStyle = colorOf('rule', 0.9); g.fillStyle = colorOf('muted'); g.lineWidth = 1;
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(sp.yfmt ? sp.yfmt(t) : fmt(t), W - padR + 5, y + 4); });
+    if (lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted'); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); }
+    if (sp.hi != null) { g.fillStyle = colorOf('c1', 0.1); g.fillRect(X(sp.hi) - slot / 2, padT, slot, H - padT - padB); }
+    sp.series.forEach((s, k) => { s.v.forEach((v, i) => { if (v == null || !isFinite(v)) return; const x = X(i) - (ns * bw) / 2 + k * bw; const base = Y(Math.max(lo, Math.min(hi, 0))); const y = Y(v); g.fillStyle = colorOf(typeof s.col === 'function' ? s.col(i) : s.col, s.alpha != null ? s.alpha : 0.8); g.fillRect(x + 0.5, Math.min(y, base), bw - 1, Math.max(1, Math.abs(base - y))); }); });
+    (sp.dots || []).forEach((s, k) => { s.v.forEach((v, i) => { if (v == null || !isFinite(v)) return; const off = s.offset != null ? s.offset * bw : 0; g.fillStyle = colorOf(s.col); g.strokeStyle = colorOf('plate'); g.lineWidth = 1.5; g.beginPath(); g.arc(X(i) + off, Y(Math.min(hi, Math.max(lo, v))), 3.5, 0, Math.PI * 2); g.fill(); g.stroke(); }); });
+    g.fillStyle = colorOf('muted'); const every = Math.ceil(n / Math.max(1, Math.floor((W - padL - padR) / 44)));
+    sp.labels.forEach((t, i) => { if (i % every) return; const tw = g.measureText(t).width; g.fillText(t, X(i) - tw / 2, H - 6); });
+    const L = $(id + 'L');
+    if (L) { const items = []; sp.series.forEach((s) => s.label && items.push([s.label, typeof s.col === 'string' ? s.col : 'muted'])); (sp.dots || []).forEach((s) => s.label && items.push([s.label, s.col])); L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join(''); }
+  }
+  function stepper(stId, rsId, k0, kMax, draw) {
+    const st = { k: k0 };
+    $(stId).addEventListener('click', () => { st.k = Math.min(kMax, st.k + 1); draw(); });
+    $(rsId).addEventListener('click', () => { st.k = k0; draw(); });
+    return st;
+  }
+
+
+  // =====================================================================
+  // 01 · a pullback buy that fails: exit or entry
+  // =====================================================================
+  const C1 = cache();
+  function build1() {
+    const n = 60;
+    const D = mkBars([[0, 100], [24, 118], [32, 112.6], [35, 115.2], [38, 114.6], [46, 107.5], [59, 104]], n, sd(1), 0.0065);
+    const [pbLow] = minOf(D.l, 28, 34);
+    const ent = 34; const entry = D.c[ent];
+    const stopL = pbLow - 0.2;
+    let f = -1; for (let j = ent + 1; j < n; j++) if (D.c[j] < pbLow) { f = j; break; }
+    if (f < 0) f = 42;
+    let hit = -1; for (let j = ent + 1; j < n; j++) if (D.l[j] <= stopL) { hit = j; break; }
+    if (hit < 0) hit = f;
+    const exitL = Math.min(stopL, D.o[hit]);
+    const [rallyHi] = maxOf(D.h, ent, f);
+    const sEntry = D.c[f], sStop = rallyHi + 0.2, sRisk = sStop - sEntry, sTgt = sEntry - 2 * sRisk;
+    Object.assign(C1, { D, n, pbLow, ent, entry, stopL, f, hit, exitL, sEntry, sStop, sRisk, sTgt, built: seed });
+  }
+  const st1 = stepper('st1', 'rs1', 33, 59, () => d1());
+  const d1 = reg(() => {
+    if (C1.built !== seed) build1();
+    const S = C1, D = S.D, k = st1.k, mode = $('sel1').value;
+    const hl = [], marks = []; let txt;
+    const riskL = S.entry - S.stopL;
+    hl.push({ v: S.pbLow, a: 26, b: S.n - 1, col: 'muted', label: 'pullback low', legend: 'pullback low (the line that must hold)' });
+    if (k >= S.ent) {
+      marks.push({ i: S.ent, v: D.l[S.ent], dir: 1, col: 'buy', label: 'buy' });
+      hl.push({ v: S.entry, a: S.ent, b: S.n - 1, col: 'buy', dash: false, end: true, label: 'long ' + S.entry.toFixed(2), legend: 'pullback entry' });
+      hl.push({ v: S.stopL, a: S.ent, b: S.n - 1, col: 'c1', end: true, below: true, label: 'stop ' + S.stopL.toFixed(2), legend: 'stop under the pullback low' });
+    }
+    if (k < S.ent) txt = `Bar ${k}: an uptrend pulls back. A pullback buyer is waiting for the trend to resume.`;
+    else if (k < Math.min(S.f, S.hit)) txt = `Bar ${k}: long from ${S.entry.toFixed(2)} at bar ${S.ent}; stop ${S.stopL.toFixed(2)} just under the pullback low (risk ${riskL.toFixed(2)} = 1R). The rally is weak: no new high.`;
+    else if (mode === 'risk') {
+      marks.push({ i: S.hit, v: D.h[S.hit], dir: -1, col: 'sell', label: 'stop hit' });
+      txt = `Bar ${S.hit}: price breaks the pullback low; the long is stopped near ${S.exitL.toFixed(2)} (${sgn((S.exitL - S.entry) / riskL, 2)}R). Risk-control reading: the pattern failed, the reason for the trade is gone, take the small loss. ${k > S.hit ? `Price now ${D.c[k].toFixed(2)}: staying in would be ${sgn((D.c[k] - S.entry) / riskL, 1)}R.` : ''}`;
+    } else {
+      marks.push({ i: S.f, v: D.h[S.f], dir: -1, col: 'sell', label: 'short' });
+      hl.push({ v: S.sStop, a: S.f, b: S.n - 1, col: 'sell', end: true, label: 'short stop ' + S.sStop.toFixed(2), legend: 'short stop above the failed rally' });
+      hl.push({ v: S.sTgt, a: S.f, b: S.n - 1, col: 'c2', end: true, below: true, label: '2R target ' + S.sTgt.toFixed(2), legend: 'target 2R' });
+      let res = null; for (let j = S.f + 1; j <= k; j++) { if (D.h[j] >= S.sStop) { res = -1; break; } if (D.l[j] <= S.sTgt) { res = 2; break; } }
+      const open = (S.sEntry - D.c[k]) / S.sRisk;
+      txt = `Bar ${S.f}: the first close below the pullback low. Failure reading: everyone who bought the pullback is now trapped; short at ${S.sEntry.toFixed(2)}, stop above the failed rally at ${S.sStop.toFixed(2)} (1R = ${S.sRisk.toFixed(2)}). ${res === 2 ? 'Target reached: +2R.' : res === -1 ? 'Stopped: −1R (failures fail too).' : k > S.f ? `Open: ${sgn(open, 2)}R.` : ''}`;
+    }
+    cplot('c1', D, { upto: k, scaleTo: S.n - 1, hl, marks, legend: [['simulated bars', 'price']] });
+    $('r1').innerHTML = txt;
+  });
+  $('sel1').addEventListener('change', d1);
+
+  // =====================================================================
+  // 02 · plan gates
+  // =====================================================================
+  const d2 = reg(() => {
+    const g = ['chk2a', 'chk2b', 'chk2c', 'chk2d', 'chk2e'].map((id) => $(id).checked);
+    const steps = ['finish the Module 7 documents', 'clean them up until an investor could read them', 'rewrite the rules so a backtest can follow them exactly', 'backtest the plan', 'paper trade it'];
+    const first = g.indexOf(false);
+    $('r2').innerHTML = first < 0 ? '<b class="good">All gates passed: start live, small, and keep revising the document.</b>' : `${g.filter(Boolean).length} of 5 gates passed · next step: <b>${steps[first]}</b>${g.slice(first + 1).some(Boolean) ? ' · <span class="bad">you ticked a later gate before an earlier one: the order matters</span>' : ''}`;
+  });
+  ['chk2a', 'chk2b', 'chk2c', 'chk2d', 'chk2e'].forEach((id) => $(id).addEventListener('change', d2));
+
+  // =====================================================================
+  // 03 · bar-by-bar replay
+  // =====================================================================
+  const C3 = cache(); let rep3 = 0;
+  const st3 = { k: 40, marks: [], all: false };
+  function build3() { C3.D = genOHLC([{ n: 160, drift: 0, vol: 0.012 }], sd(3) + rep3 * 7919); C3.A = atr(C3.D, 14); C3.built = seed + ':' + rep3; }
+  const d3 = reg(() => {
+    if (C3.built !== seed + ':' + rep3) build3();
+    const D = C3.D, A = C3.A, n = D.n; const upto = st3.all ? n - 1 : st3.k;
+    const marks = st3.marks.map((i) => ({ i, v: D.l[i], dir: 1, col: 'buy' }));
+    let txt = `Bar ${st3.k} of ${n - 1} · buys marked: <b>${st3.marks.length}</b>`;
+    if (st3.all) {
+      const res = st3.marks.map((i) => i + 10 < n ? (D.c[i + 10] - D.c[i]) / A[i] : null).filter((v) => v != null);
+      const avg = res.length ? res.reduce((s, v) => s + v, 0) / res.length : 0;
+      txt += res.length ? ` · outcomes (ATR, 10 bars later): ${res.map((v) => `<b class="${v >= 0 ? 'good' : 'bad'}">${sgn(v, 1)}</b>`).join(' ')} · average <b>${sgn(avg, 2)}</b>. On a random walk the true average is 0; any edge here is luck.` : ' · no marked buys with 10 bars of future yet.';
+    } else txt += ' · decide, mark, then reveal. Outcomes stay hidden until you ask.';
+    cplot('c3', D, { upto, x0: 0, x1: n - 1, scaleTo: n - 1, marks, legend: [['simulated random-walk bars', 'price'], ['your buys', 'buy']] });
+    $('r3').innerHTML = txt;
+  });
+  $('st3').addEventListener('click', () => { st3.k = Math.min(C3.D ? C3.D.n - 1 : 159, st3.k + 1); d3(); });
+  $('buy3').addEventListener('click', () => { if (!st3.all && st3.marks.indexOf(st3.k) < 0) st3.marks.push(st3.k); d3(); });
+  $('out3').addEventListener('click', () => { st3.all = true; d3(); });
+  $('rs3').addEventListener('click', () => { rep3++; st3.k = 40; st3.marks = []; st3.all = false; d3(); });
+
+  // =====================================================================
+  // 04 · position sizing project
+  // =====================================================================
+  function runSys(r, p, W, L, mode, riskPct, n, keep) {
+    let b = 100000, peak = b, mdd = 0, bk = false; const path = keep ? [b] : null;
+    for (let i = 0; i < n; i++) {
+      if (!bk) {
+        const amt = mode === 'fixed' ? riskPct / 100 * 100000 : b * riskPct / 100;
+        b += r() < p ? W * amt : -L * amt;
+        if (b > peak) peak = b; const dd = (peak - b) / peak; if (dd > mdd) mdd = dd;
+        if (b <= 0) { bk = true; mdd = 1; }
+      }
+      if (keep) path.push(b);
+    }
+    return { b, bk, mdd, path };
+  }
+  function quant(sorted, q) { return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(q * (sorted.length - 1))))]; }
+  let rr4 = 0;
+  const d4 = reg(() => {
+    const p = val('p4') / 100, W = val('w4'), L = val('l4'), mode = $('sel4').value, k = val('k4'), n = val('n4');
+    const R = 2000; const r = rng(sd(4) + rr4 * 104729);
+    const runs = []; for (let i = 0; i < R; i++) runs.push(runSys(r, p, W, L, mode, k, n, true));
+    const p5 = [], p50 = [], p95 = []; const col = new Float64Array(R);
+    for (let t = 0; t <= n; t++) { for (let i = 0; i < R; i++) col[i] = runs[i].path[t]; const s = Array.from(col).sort((a, b) => a - b); p5.push(quant(s, 0.05)); p50.push(quant(s, 0.5)); p95.push(quant(s, 0.95)); }
+    const lines = [{ d: constArr(n + 1, 100000), col: 'muted', w: 1, dash: [4, 4], label: 'start $100k' }];
+    for (let i = 0; i < 30; i++) lines.push({ d: runs[i].path, col: runs[i].bk ? 'sell' : 'c2', w: 1, alpha: runs[i].bk ? 0.9 : 0.35 });
+    lines.push({ d: p50, col: 'c1', w: 2.6, label: 'median of 2,000 runs' });
+    lines[1].label = 'one run (red = bankrupt)';
+    plot('c4', { n: n + 1, lines, bands: [{ up: p95, lo: p5, col: 'c1', alpha: 0.08, label: '5–95% of runs' }], zero: true });
+    const ends = runs.map((x) => x.b).sort((a, b) => a - b);
+    const lose = runs.filter((x) => x.b < 100000).length / R, bk = runs.filter((x) => x.bk).length / R, dd50 = runs.filter((x) => x.mdd >= 0.5).length / R;
+    const ev = (p * W - (1 - p) * L);
+    $('r4').innerHTML = `pooled over <b>2,000</b> runs × <b>${n}</b> trades · expectancy <b class="${ev >= 0 ? 'good' : 'bad'}">${sgn(ev, 3)}</b> per unit risked · P(end below start) <b>${pct(lose)}</b> · P(bankrupt) <b class="${bk > 0 ? 'bad' : ''}">${pct(bk)}</b> · P(drawdown ≥ 50%) <b>${pct(dd50)}</b> · median end <b>${money(quant(ends, 0.5))}</b> · 5th–95th pct <b>${money(quant(ends, 0.05))}</b> to <b>${money(quant(ends, 0.95))}</b>`;
+    // risk ladder
+    const lv = [0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 25]; const r2 = rng(sd(41) + rr4 * 31);
+    const pl = [], pb = [], med = [];
+    lv.forEach((x) => { const e = []; let l = 0, b = 0; for (let i = 0; i < 800; i++) { const o = runSys(r2, p, W, L, mode, x, n, false); e.push(o.b); if (o.b < 100000) l++; if (o.bk) b++; } e.sort((a, c) => a - c); pl.push(l / 8); pb.push(b / 8); med.push((quant(e, 0.5) / 100000 - 1) * 100); });
+    let hi = 0; lv.forEach((x, i) => { if (Math.abs(x - k) < Math.abs(lv[hi] - k)) hi = i; });
+    const top = Math.min(300, Math.max(100, ...med.map((v) => Math.ceil(v / 50) * 50)));
+    barChart('c4b', { labels: lv.map((x) => x + '%'), series: [{ v: pl, col: 'c3', label: 'P(end below start) %' }, { v: pb, col: 'sell', label: 'P(bankrupt) %' }], dots: [{ v: med, col: 'c1', label: 'median change % (capped at chart top)' }], hi, ymin: -100, ymax: top });
+    const best = med.indexOf(Math.max(...med));
+    $('r4b').innerHTML = `Risk ladder (${mode === 'fixed' ? 'fixed $' : '% of balance'}, 800 runs each) · at your ${lv[hi]}%: median <b>${sgn(med[hi], 0)}%</b>, P(bankrupt) <b>${pb[hi].toFixed(1)}%</b> · highest median on the ladder: <b>${lv[best]}%</b> risk (${sgn(med[best], 0)}%) with P(bankrupt) <b class="${pb[best] > 5 ? 'bad' : ''}">${pb[best].toFixed(1)}%</b>, P(loss) <b>${pl[best].toFixed(0)}%</b>. "Risk more, make more" holds for the typical outcome only while ruin stays rare; the bars show what you pay for it.${mode === 'pct' && ev > 0 ? ` Kelly fraction for this system (beyond the book): <b>${(Math.max(0, p / L - (1 - p) / W) * 100).toFixed(1)}%</b>.` : ''}`;
+  });
+  ['p4', 'w4', 'l4', 'k4', 'n4'].forEach((id) => bindRange(id, d4));
+  $('sel4').addEventListener('change', d4);
+  $('rr4').addEventListener('click', () => { rr4++; d4(); });
+
+  // =====================================================================
+  // 05 · belief inventory
+  // =====================================================================
+  const topics5 = ['Yourself', 'Health', 'Career', 'Universe', 'Family', 'Relationships', 'Money', 'Success'];
+  const stems5 = [['I am…', 'I can…', 'I can\'t…'], ['My body is…', 'Health is…'], ['Work is…', 'People like me…'], ['Life is…', 'The world is…'], ['Family means…', 'My family expects…'], ['People are…', 'Friends are…'], ['Money is…', 'Rich people are…', 'Losing money means…'], ['Success is…', 'I deserve…']];
+  const KEY5 = 'gfv-grimes-ch08-beliefs';
+  let cur5 = 0; let store5 = {};
+  try { const raw = window.localStorage.getItem(KEY5); if (raw) store5 = JSON.parse(raw) || {}; } catch (e) { store5 = {}; }
+  function save5() { try { window.localStorage.setItem(KEY5, JSON.stringify(store5)); return true; } catch (e) { return false; } }
+  const d5 = reg(() => {
+    topics5.forEach((t, i) => $('t5_' + i).classList.toggle('on', i === cur5));
+    const e = store5[cur5] || { text: '', label: '' };
+    $('ta5').value = e.text || ''; $('sel5').value = e.label || '';
+    $('r5').innerHTML = `<b>${topics5[cur5]}</b> · try finishing: ${stems5[cur5].map((s) => `<b>${s}</b>`).join(' · ')} <span>(Grimes's stems are "I am…", "People are…", "Life is…"; the rest are mine)</span>`;
+    const done = topics5.filter((t, i) => store5[i] && store5[i].text && store5[i].text.trim()).length;
+    $('r5b').innerHTML = `topics with notes: <b>${done}</b> of 8 · Grimes's target: a handful of your most important beliefs, written over several days.`;
+  });
+  topics5.forEach((t, i) => $('t5_' + i).addEventListener('click', () => { cur5 = i; d5(); }));
+  $('sv5').addEventListener('click', () => { store5[cur5] = { text: $('ta5').value, label: $('sel5').value }; const ok = save5(); d5(); if (!ok) $('r5b').innerHTML += ' · <span class="bad">this browser blocked saving; copy your text somewhere safe.</span>'; });
+  $('ta5').addEventListener('input', () => { store5[cur5] = { text: $('ta5').value, label: $('sel5').value }; save5(); });
+
+  // =====================================================================
+  // 07 · four risk quadrants + short premium life
+  // =====================================================================
+  const q7map = ['q7b', 'q7a', 'q7c', 'q7d', 'q7c', 'q7c', 'q7c'];
+  const q7txt = [
+    'Low consequence / high probability: routine. A normal losing trade is a cost of doing business, as long as it really is small.',
+    'Low consequence / low probability for a longer-term trader: annoying, not dangerous. Watch for the follow-on mistakes the disruption causes.',
+    'The same outage is high consequence for a short-term trader in a fast market: risks are relative to your style.',
+    'High consequence / high probability: simply stupid. Traders who do this are removed from the game quickly.',
+    'High consequence / low probability: the wild things. Years of small wins, then the deltas go to 1.0.',
+    'High consequence / low probability: an "act of God" gap through every stop in a swing portfolio.',
+    'High consequence / low probability: another Flash Crash can take a fader to the margin limit.'];
+  const d7a = reg(() => {
+    const s = +$('sel7').value;
+    ['q7a', 'q7b', 'q7c', 'q7d'].forEach((id) => { const el = $(id); el.style.stroke = id === q7map[s] ? colorOf('c1') : colorOf('rule'); el.style.strokeWidth = id === q7map[s] ? '4' : '1'; });
+    $('r7a').innerHTML = q7txt[s];
+  });
+  $('sel7').addEventListener('change', d7a);
+  let rr7 = 0;
+  const d7 = reg(() => {
+    const q = val('q7') / 100, Y = val('y7'), wk = 52 * Y, LOSS = 1500, NL = 20; const r = rng(sd(7) + rr7 * 977);
+    const ev = (1 - q) * 1 - q * LOSS; const evl = []; for (let t = 0; t <= wk; t++) evl.push(ev * t);
+    const lives = []; let clean = 0, below = 0, firsts = [];
+    for (let k = 0; k < NL; k++) { const eq = [0]; let first = -1; for (let t = 1; t <= wk; t++) { const crash = r() < q; if (crash && first < 0) first = t; eq.push(eq[t - 1] + (crash ? -LOSS : 1)); } if (first < 0) clean++; else firsts.push(first); if (eq[wk] < 0) below++; lives.push({ eq, first }); }
+    const lines = lives.map((x) => ({ d: x.eq, col: x.first < 0 ? 'c2' : 'sell', w: 1.2, alpha: 0.55 }));
+    lines.push({ d: evl, col: 'c1', w: 2.2, dash: [6, 4], label: 'expected value' });
+    plot('c7', { n: wk + 1, lines, zero: true, legend: [['a life with no crash', 'c2'], ['a life with a crash', 'sell']] });
+    const pAny = 1 - Math.pow(1 - q, wk);
+    firsts.sort((a, b) => a - b);
+    $('r7').innerHTML = `P(at least one crash in ${Y} years) = 1 − (1 − ${q.toFixed(4)})<sup>${wk}</sup> = <b>${pct(pAny)}</b> · expected P&L <b class="${ev >= 0 ? 'good' : 'bad'}">${sgn(ev, 2)}</b> units/week · of these ${NL} lives: <b>${clean}</b> never crashed (a flawless record), <b class="bad">${below}</b> ended below zero${firsts.length ? `, median first crash in week <b>${firsts[Math.floor(firsts.length / 2)]}</b>` : ''}`;
+  });
+  ['q7', 'y7'].forEach((id) => bindRange(id, d7));
+  $('rr7').addEventListener('click', () => { rr7++; d7(); });
+
+  // =====================================================================
+  // 08 · gap through stop + "middles"
+  // =====================================================================
+  const C8 = cache();
+  const d8 = reg(() => {
+    const g = val('g8') / 100, dpct = val('d8') / 100, k = val('k8');
+    if (C8.built !== seed) { C8.D = mkBars([[0, 96], [20, 100], [27, 100.5]], 30, sd(8), 0.006); C8.built = seed; }
+    const D = { o: C8.D.o.slice(), h: C8.D.h.slice(), l: C8.D.l.slice(), c: C8.D.c.slice(), n: 30 };
+    const E = D.c[20], stop = E * (1 - dpct), op = D.c[28] * (1 - g);
+    setBar(D, 29, op, op * 1.006, op * 0.992, op * 1.002);
+    const fill = g > 0 && op < stop ? op : stop; const gapped = op < stop;
+    const lossPct = gapped ? k * (E - op) / (E - stop) : k;
+    const posPct = k / (dpct * 100) * 100;
+    cplot('c8', D, { hl: [{ v: E, a: 20, b: 29, col: 'buy', dash: false, end: true, label: 'entry', legend: 'entry' }, { v: stop, a: 20, b: 29, col: 'c1', end: true, below: true, label: 'stop', legend: 'stop' }, { v: fill, a: 27, b: 29, col: 'sell', end: true, below: true, label: gapped ? 'actual fill' : '', legend: 'where you actually get out' }], marks: gapped ? [{ i: 29, v: D.l[29], dir: 1, col: 'sell', label: 'gap' }] : [], legend: [['simulated bars', 'price']] });
+    $('r8').innerHTML = `position = ${k}% ÷ ${(dpct * 100).toFixed(1)}% = <b>${posPct.toFixed(0)}%</b> of the account · planned loss <b>${k.toFixed(2)}%</b> · ${gapped ? `gap opens ${(g * 100).toFixed(0)}% lower, past the stop: actual loss ≈ ${k}% × ${(g * 100).toFixed(0)} ÷ ${(dpct * 100).toFixed(1)} = <b class="bad">${lossPct.toFixed(2)}%</b> (${(lossPct / k).toFixed(1)}× plan)` : 'the gap does not reach the stop: the plan holds'}`;
+    const e = val('e8'), m = val('m8'), net = e - m;
+    $('r8b').innerHTML = `net edge <b class="${net > 0 ? 'good' : 'bad'}">${sgn(net, 2)}R</b> per trade · costs take <b>${e > 0 ? Math.min(999, m / e * 100).toFixed(0) + '%' : '—'}</b> of the edge · over 200 trades: <b>${sgn(200 * net, 1)}R</b> expected (vs ${sgn(200 * e, 1)}R before costs)`;
+  });
+  ['g8', 'd8', 'k8', 'm8', 'e8'].forEach((id) => bindRange(id, d8));
+
+  // =====================================================================
+  // 09 · four questions + same system, different traders
+  // =====================================================================
+  function runP(n, k) { if (k <= 0) return 1; if (k > n) return 0; let d = new Array(k).fill(0); d[0] = 1; let hit = 0; for (let t = 0; t < n; t++) { const nd = new Array(k).fill(0); for (let s = 0; s < k; s++) { const p = d[s]; if (!p) continue; nd[0] += p / 2; if (s + 1 >= k) hit += p / 2; else nd[s + 1] += p / 2; } d = nd; } return hit; }
+  const d9a = reg(() => {
+    const b = val('b9'), f = val('f9'), h = val('h9');
+    let q = 1; for (let i = 0; i < b; i++) q *= (365 - i) / 365;
+    const half = f % 2 === 0 ? Math.exp(LG[f] - 2 * LG[f / 2] - f * Math.log(2)) : null;
+    const heads = runP(f, h), either = h >= 2 ? runP(f - 1, h - 1) : 1;
+    $('r9a').innerHTML = `${b} people: P(shared birthday) <b>${pct(1 - q)}</b> · ${f} flips: P(exactly half heads) <b>${half == null ? '0 (odd number of flips)' : pct(half, 2)}</b> · P(≥${h} heads in a row) <b>${pct(heads)}</b> · P(≥${h} in a row of either face) <b>${pct(either)}</b> · (1,000,000 flips: exactly 500,000 heads ≈ <b>0.080%</b>)`;
+  });
+  ['b9', 'f9', 'h9'].forEach((id) => bindRange(id, d9a));
+  let rr9 = 0;
+  const d9 = reg(() => {
+    const N = val('n9'); const r = rng(sd(9) + rr9 * 7907);
+    const runs = []; for (let i = 0; i < N; i++) runs.push(runSys(r, 0.5, 1.1, 1, 'fixed', 1, 100, true));
+    let bi = 0, wi = 0; runs.forEach((x, i) => { if (x.b > runs[bi].b) bi = i; if (x.b < runs[wi].b) wi = i; });
+    const lines = [{ d: constArr(101, 100000), col: 'muted', w: 1, dash: [4, 4], label: 'start' }];
+    runs.forEach((x, i) => { if (i !== bi && i !== wi) lines.push({ d: x.path, col: 'muted', w: 1, alpha: 0.4 }); });
+    lines.push({ d: runs[bi].path, col: 'buy', w: 2.4, label: 'luckiest trader' }); lines.push({ d: runs[wi].path, col: 'sell', w: 2.4, label: 'unluckiest trader' });
+    plot('c9', { n: 101, lines });
+    const pos = runs.filter((x) => x.b > 100000).length;
+    $('r9').innerHTML = `identical system, identical execution · best <b class="good">${money(runs[bi].b - 100000)}</b> · worst <b class="bad">${money(runs[wi].b - 100000)}</b> · spread <b>${money(runs[bi].b - runs[wi].b)}</b> = <b>${((runs[bi].b - runs[wi].b) / 5000).toFixed(1)}×</b> the expected gain of $5,000 · ${pos} of ${N} ended up`;
+  });
+  bindRange('n9', d9);
+  $('rr9').addEventListener('click', () => { rr9++; d9(); });
+
+  // =====================================================================
+  // 10 · P(loss) after N trades + skill vs luck
+  // =====================================================================
+  function pLose(N, p, W, L) { let s = 0; for (let k = 0; k <= N; k++) { if (k * W - (N - k) * L < -1e-9) s += Math.exp(LG[N] - LG[k] - LG[N - k] + k * Math.log(p) + (N - k) * Math.log(1 - p)); } return s; }
+  const d10 = reg(() => {
+    const p = val('p10') / 100, W = val('w10'), L = 1, NM = 500;
+    const y = [null]; for (let N = 1; N <= NM; N++) y.push(pLose(N, p, W, L) * 100);
+    const mu = p * W - (1 - p) * L, sdv = Math.sqrt(p * (1 - p)) * (W + L);
+    plot('c10', { n: NM + 1, lines: [{ d: y, col: 'c3', w: 2, label: 'P(net loss after N trades) %' }, { d: constArr(NM + 1, 10), col: 'muted', w: 1, dash: [4, 4], label: '10% line' }], ymin: 0, ymax: 60, vlines: [10, 50, 100, 250, 500].map((i, k) => ({ i, label: 'N=' + i, col: 'muted', row: k % 3 })) });
+    const at = (N) => `${N}: <b>${y[N].toFixed(1)}%</b>`;
+    const n10 = mu > 0 ? Math.ceil(Math.pow(1.2816 * sdv / mu, 2)) : null;
+    $('r10').innerHTML = `edge <b>${sgn(mu, 3)}R</b>/trade, noise <b>${sdv.toFixed(2)}R</b>/trade · P(net loss) after ${[10, 20, 50, 100, 250].map(at).join(' · ')} · trades until P(loss) &lt; 10% ≈ <b>${n10 ? n10.toLocaleString('en-US') : 'never (no edge)'}</b> (normal approximation)`;
+  });
+  ['p10', 'w10'].forEach((id) => bindRange(id, d10));
+  let rr10 = 0;
+  function luckShare(s, r) {
+    const m = []; for (let i = 0; i < 1000; i++) { const sk = s * gauss(r), lu = gauss(r); m.push({ sk, lu, o: sk + lu }); }
+    m.sort((a, b) => b.o - a.o); const top = m.slice(0, 10);
+    const o = top.reduce((t, x) => t + x.o, 0) / 10, lu = top.reduce((t, x) => t + x.lu, 0) / 10, sk = top.reduce((t, x) => t + x.sk, 0) / 10;
+    return { o, lu, sk, share: lu / o };
+  }
+  const d10b = reg(() => {
+    const s = val('sk10'); const grid = []; for (let v = 0.05; v <= 2.0001; v += 0.05) grid.push(+v.toFixed(2));
+    const ys = grid.map((v, i) => luckShare(v, rng(sd(10) + rr10 * 613 + i)).share * 100);
+    let ci = 0; grid.forEach((v, i) => { if (Math.abs(v - s) < Math.abs(grid[ci] - s)) ci = i; });
+    plot('c10b', { n: grid.length, lines: [{ d: ys, col: 'c2', w: 2, label: 'luck share of top-10 results % (x: skill spread 0.05 → 2)' }], ymin: 0, ymax: 100, vlines: [{ i: ci, col: 'c1', label: 'spread ' + s }] });
+    const now = luckShare(s, rng(sd(10) + rr10 * 613 + ci));
+    $('r10b').innerHTML = `skill spread <b>${s}</b> (luck spread 1) · top 10 of 1,000: average result <b>${now.o.toFixed(2)}</b> = skill <b>${now.sk.toFixed(2)}</b> + luck <b>${now.lu.toFixed(2)}</b> · luck share <b>${pct(now.share, 0)}</b>`;
+  });
+  bindRange('sk10', d10b);
+  $('rr10').addEventListener('click', () => { rr10++; d10b(); });
+
+  // =====================================================================
+  // 11 · discretion policy builder
+  // =====================================================================
+  const ids11 = ['sel11a', 'sel11b', 'sel11c', 'sel11d', 'sel11e', 'sel11f'];
+  const names11 = ['Entries', 'Sizing', 'Trade management', 'Stop location', 'Getting out early', 'Doubling up'];
+  const d11 = reg(() => {
+    const v = ids11.map((id) => $(id).value);
+    const say = { r: 'follow the written rule; intuition is noted in the journal, not acted on', d: 'intuition may override the rule; log every override and review the overrides separately', x: 'intuition may act only to cut risk (smaller, tighter, out sooner), never to add it' };
+    const lines = v.map((x, i) => `<b>${names11[i]}</b>: ${say[x]}.`);
+    const warn = [];
+    if (v[5] === 'd') warn.push('Discretion to double up is how traders end up in §07\'s "high consequence / high probability" box (breaking the risk limit, then doubling up).');
+    if (v[0] === 'd') warn.push('Discretion to skip entries lets fear remove exactly the trades the backtest counted on; Grimes\'s example does not allow it.');
+    if (v.every((x) => x === 'r')) warn.push('Fully systematic: fine, but remember the rules themselves came from human choices in research and monitoring.');
+    $('r11').innerHTML = lines.join('<br>') + (warn.length ? '<br>' + warn.map((w) => `<span class="bad">⚠ ${w}</span>`).join('<br>') : '');
+  });
+  ids11.forEach((id) => $(id).addEventListener('change', d11));
+  $('pre11').addEventListener('click', () => { ['r', 'r', 'x', 'r', 'd', 'r'].forEach((x, i) => { $(ids11[i]).value = x; }); d11(); });
+  $('clr11').addEventListener('click', () => { ids11.forEach((id) => { $(id).value = 'r'; }); d11(); });
+
+  // =====================================================================
+  // 12 · fade-and-add simulation
+  // =====================================================================
+  let rr12 = 0;
+  function fadeEvent(r, maxAdds, tgt, useStop) {
+    const sig = 0.08 * Math.exp(0.6 * gauss(r)); // per-minute $ volatility, varies by event (clustering)
+    let p = 45, sh = 100, cost = 45 * 100, next = 44, adds = 0;
+    for (let t = 0; t < 390; t++) {
+      p += sig * gauss(r);
+      while (adds < maxAdds && p <= next) { sh += 100; cost += next * 100; adds++; next -= 1; }
+      const avg = cost / sh;
+      if (p >= avg + tgt) return { pnl: sh * tgt, sh, adds };
+      if (useStop && adds >= maxAdds && p <= next) return { pnl: sh * (p - avg), sh, adds, stopped: true };
+    }
+    return { pnl: sh * (p - cost / sh), sh, adds };
+  }
+  const d12 = reg(() => {
+    const A = val('a12'), T = val('t12'), useStop = $('sel12').value === 'stop'; const r = rng(sd(12) + rr12 * 4111);
+    const E = 250; const res = []; for (let i = 0; i < E; i++) res.push(fadeEvent(r, A, T, useStop));
+    const eq = [0]; res.forEach((x, i) => eq.push(eq[i] + x.pnl));
+    const wins = res.filter((x) => x.pnl > 0), losses = res.filter((x) => x.pnl <= 0);
+    const mean = eq[E] / E; const sdv = Math.sqrt(res.reduce((s, x) => s + (x.pnl - mean) ** 2, 0) / (E - 1)); const se = sdv / Math.sqrt(E);
+    const worst = Math.min(...res.map((x) => x.pnl)); const wi = res.findIndex((x) => x.pnl === worst);
+    plot('c12', { n: E + 1, lines: [{ d: eq, col: 'c2', w: 1.8, label: 'cumulative P&L ($), 250 news fades' }], zero: true, vlines: [{ i: wi + 1, col: 'sell', label: 'worst: ' + money(worst) }] });
+    const lo = Math.min(...res.map((x) => x.pnl)), hi = Math.max(...res.map((x) => x.pnl));
+    const nb = 12, w = (hi - lo) / nb || 1; const cnt = new Array(nb).fill(0); res.forEach((x) => { cnt[Math.min(nb - 1, Math.floor((x.pnl - lo) / w))]++; });
+    barChart('c12b', { labels: cnt.map((c, i) => (Math.round((lo + (i + 0.5) * w) / 10) * 10).toString()), series: [{ v: cnt, col: (i) => (lo + (i + 0.5) * w >= 0 ? 'buy' : 'sell'), label: 'number of events by P&L bin ($, bin centre)' }] });
+    $('r12').innerHTML = `win rate <b>${pct(wins.length / E)}</b> · average win <b class="good">${money(wins.length ? wins.reduce((s, x) => s + x.pnl, 0) / wins.length : 0)}</b> · average loss <b class="bad">${money(losses.length ? losses.reduce((s, x) => s + x.pnl, 0) / losses.length : 0)}</b> · worst <b class="bad">${money(worst)}</b> (${res[wi].sh} shares) · mean per event <b>${money(mean)}</b> ± ${money(1.96 * se)} (95% range: zero is ${Math.abs(mean) <= 1.96 * se ? 'inside it' : 'outside it this time; re-run'})`;
+  });
+  ['a12', 't12'].forEach((id) => bindRange(id, d12));
+  $('sel12').addEventListener('change', d12);
+  $('rr12').addEventListener('click', () => { rr12++; d12(); });
+
+  // =====================================================================
+  // 14 · contrarian top calls inside a trend
+  // =====================================================================
+  const C14 = cache();
+  const d14 = reg(() => {
+    if (C14.built !== seed) { C14.M = genMarket([{ n: 260, drift: 0.0035, vol: 0.012 }], sd(14)); C14.built = seed; }
+    const c = C14.M.c, n = c.length, x = val('x14') / 100;
+    let M = c[0], armed = true; const calls = [];
+    for (let i = 1; i < n; i++) { if (c[i] > M) { M = c[i]; armed = true; } else if (armed && c[i] < M * (1 - x)) { calls.push({ i, p: c[i], hiAt: M }); armed = false; } }
+    let wrong = 0, right = 0, open = 0;
+    calls.forEach((cl) => { let res = 0; for (let j = cl.i + 1; j < n; j++) { if (c[j] > cl.hiAt) { res = -1; break; } if (c[j] <= cl.p * (1 - 2 * x)) { res = 1; break; } } if (res < 0) wrong++; else if (res > 0) right++; else open++; cl.res = res; });
+    plot('c14', { n, lines: [{ d: c, col: 'price', w: 1.4, label: 'price (simulated uptrend)' }], marks: calls.map((cl) => ({ i: cl.i, v: cl.p, kind: cl.res < 0 ? 'sell' : 'alertDown' })), legend: [['"top" call (filled = proved wrong)', 'sell']] });
+    $('r14').innerHTML = `top calls <b>${calls.length}</b> · proved wrong (new high came first) <b class="bad">${wrong}</b> · right (fell ${(2 * x * 100).toFixed(0)}% more first) <b>${right}</b> · unresolved <b>${open}</b> · the trend itself: <b class="good">${sgn((c[n - 1] / c[0] - 1) * 100, 0)}%</b>`;
+  });
+  bindRange('x14', d14);
+
+  // =====================================================================
+  // 15 · middle chunk + correlated "extreme" gauges
+  // =====================================================================
+  const C15 = cache();
+  const d15 = reg(() => {
+    if (C15.built !== seed) { C15.M = genMarket([{ n: 50, drift: 0, vol: 0.01, revert: 0.1 }, { n: 150, drift: 0.0045, vol: 0.012 }, { n: 60, drift: -0.004, vol: 0.012 }], sd(15)); C15.built = seed; }
+    const c = C15.M.c, n = c.length, E = val('e15'), X = val('x15');
+    const up = chanHi(c, E), dn = chanLo(c, X); const pos = nulls(n); let cur = 0; const shade = []; let a = 0;
+    for (let i = 0; i < n; i++) { if (cur === 0 && up[i] != null && c[i] > up[i]) { cur = 1; a = i; } else if (cur === 1 && dn[i] != null && c[i] < dn[i]) { cur = 0; shade.push({ a, b: i, col: 'buy', alpha: 0.1 }); } pos[i] = cur; }
+    if (cur === 1) shade.push({ a, b: n - 1, col: 'buy', alpha: 0.1 });
+    const bt = backtest(c, pos, 0);
+    let lo = Infinity, li = 0; for (let i = 0; i < n; i++) if (c[i] < lo) { lo = c[i]; li = i; }
+    let hi = -Infinity; for (let i = li; i < n; i++) if (c[i] > hi) hi = c[i];
+    const move = (hi / lo - 1) * 100;
+    plot('c15', { n, lines: [{ d: c, col: 'price', w: 1.3, label: 'price (simulated)' }, { d: up, col: 'c2', w: 1, step: true, label: E + '-bar high' }, { d: dn, col: 'c1', w: 1, step: true, label: X + '-bar low' }], shade, marks: crossMarks(c, pos) });
+    $('r15').innerHTML = `bottom-to-top move <b>${move.toFixed(0)}%</b> · rule's net result <b class="${bt.net >= 0 ? 'good' : 'bad'}">${sgn(bt.net, 1)}%</b> in ${bt.trades.length + (cur ? 1 : 0)} trade(s) · it never bought the low or sold the high`;
+  });
+  ['e15', 'x15'].forEach((id) => bindRange(id, d15));
+  function rsi(c, n) { const o = nulls(c.length); let g = 0, l = 0; for (let i = 1; i < c.length; i++) { const d = c[i] - c[i - 1]; const up = Math.max(0, d), dn = Math.max(0, -d); if (i <= n) { g += up / n; l += dn / n; } else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n; } if (i >= n) o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return o; }
+  function corr(a, b, idx) { let ma = 0, mb = 0; idx.forEach((i) => { ma += a[i]; mb += b[i]; }); ma /= idx.length; mb /= idx.length; let sab = 0, saa = 0, sbb = 0; idx.forEach((i) => { const x = a[i] - ma, y = b[i] - mb; sab += x * y; saa += x * x; sbb += y * y; }); return sab / Math.sqrt(saa * sbb); }
+  const d15b = reg(() => {
+    const M = genMarket([{ n: 500, drift: 0.002, vol: 0.012 }, { n: 500, drift: 0, vol: 0.012, revert: 0.08 }, { n: 500, drift: -0.002, vol: 0.013 }, { n: 500, drift: 0, vol: 0.01 }], sd(151));
+    const c = M.c, h = M.h, l = M.l, N = c.length;
+    const R = rsi(c, 14); const hh = chanHi(h, 14), ll = chanLo(l, 14);
+    const K = c.map((v, i) => { if (i < 14) return null; let H = -Infinity, Lo = Infinity; for (let k = i - 13; k <= i; k++) { H = Math.max(H, h[k]); Lo = Math.min(Lo, l[k]); } return H > Lo ? (v - Lo) / (H - Lo) * 100 : 50; });
+    const m = sma(c, 20), s = rollStd(c, 20);
+    const B = c.map((v, i) => (m[i] == null || !s[i]) ? null : (v - (m[i] - 2 * s[i])) / (4 * s[i]));
+    const Z = c.map((v, i) => (m[i] == null || !s[i]) ? null : (v - m[i]) / s[i]);
+    const idx = []; for (let i = 0; i < N; i++) if (R[i] != null && K[i] != null && B[i] != null && Z[i] != null) idx.push(i);
+    const S = [R, K, B, Z], nm = ['RSI(14)', 'Stoch %K(14)', 'Bollinger %b', 'z vs 20-bar avg'];
+    let html = '<tr><th></th>' + nm.map((x) => `<th>${x}</th>`).join('') + '</tr>';
+    S.forEach((a, i) => { html += `<tr><th>${nm[i]}</th>` + S.map((b, j) => `<td class="num">${corr(a, b, idx).toFixed(2)}</td>`).join('') + '</tr>'; });
+    $('t15').innerHTML = html;
+    const os = idx.filter((i) => R[i] < 30); const all3 = os.filter((i) => K[i] < 20 && B[i] < 0);
+    const anyK = os.filter((i) => K[i] < 20);
+    $('r15b').innerHTML = `On the ${os.length} bars where RSI &lt; 30 ("oversold"), Stochastic was also &lt; 20 on <b>${os.length ? pct(anyK.length / os.length, 0) : '—'}</b> of them, and Stochastic &lt; 20 plus price below the lower band on <b>${os.length ? pct(all3.length / os.length, 0) : '—'}</b>. When they agree, you still have one reading of the same recent prices. (Beyond the book: %b = 0.5 + z/4 exactly, so their correlation is 1.00.)`;
+  });
+
+  // =====================================================================
+  // 16 · pundit vs account
+  // =====================================================================
+  let rr16 = 0;
+  const d16 = reg(() => {
+    const q = val('q16') / 100, Y = val('y16'), T = 12 * Y; const r = rng(sd(16) + rr16 * 3089);
+    const acct = [100], hits = [0], mkt = [100];
+    for (let t = 1; t <= T; t++) { const crash = r() < q; const ret = crash ? -0.20 : 0.01; mkt.push(mkt[t - 1] * (1 + ret)); acct.push(acct[t - 1] * (1 - 0.10 * ret)); hits.push(hits[t - 1] + (crash ? 1 : 0)); }
+    plot('c16', { n: T + 1, lines: [{ d: acct, col: 'sell', w: 2, label: 'account shorting every call (start 100)' }, { d: constArr(T + 1, 100), col: 'muted', w: 1, dash: [4, 4] }], sub: { lines: [{ d: hits, col: 'c1', w: 2, step: true, label: 'pundit\'s remembered "hits"' }], label: 'hits' } });
+    const ev = (1 - q) * (-0.001) + q * 0.02;
+    $('r16').innerHTML = `${T} monthly calls · crashes (remembered hits) <b>${hits[T]}</b> · misses (forgotten) <b>${T - hits[T]}</b> · account <b class="${acct[T] >= 100 ? 'good' : 'bad'}">${sgn(acct[T] - 100, 1)}%</b> · expected account change per month <b>${sgn(ev * 100, 3)}%</b> · the market itself: ${sgn(mkt[T] - 100, 0)}%`;
+  });
+  ['q16', 'y16'].forEach((id) => bindRange(id, d16));
+  $('rr16').addEventListener('click', () => { rr16++; d16(); });
+
+  // =====================================================================
+  // 17 · finding ends of trends: step-through
+  // =====================================================================
+  const C17 = cache();
+  function build17(kind) {
+    const n = 70;
+    const anchors = kind === 'seq'
+      ? [[0, 100], [30, 121], [33, 125.5], [34, 127], [36, 125], [42, 116.5], [47, 120.2], [49, 119.6], [60, 111], [69, 109]]
+      : [[0, 100], [30, 121], [33, 125.5], [34, 127], [37, 124.5], [42, 123.6], [46, 125.8], [69, 139]];
+    const D = mkBars(anchors, n, sd(17) + (kind === 'seq' ? 0 : 5), 0.006);
+    const cl = 34; const ch = D.h[cl - 1] + 3.2; setBar(D, cl, D.c[cl - 1] + 0.3, ch, D.c[cl - 1] - 0.2, D.c[cl - 1] + 0.1); // climax / rejection bar
+    if (kind === 'seq') shiftFrom(D, 35, D.c[cl] - 0.3 - D.o[35]);
+    const [preLow, preLowAt] = minOf(D.l, 22, 32);
+    const S = { D, n, cl, climaxHi: D.h[cl], preLow, preLowAt };
+    if (kind === 'seq') {
+      const [cocLow, cocAt] = minOf(D.l, 36, 44); const [pbHi, pbAt] = maxOf(D.h, cocAt, 50);
+      let e = -1; for (let j = pbAt + 1; j < n; j++) if (D.l[j] < D.l[j - 1]) { e = j; break; }
+      if (e < 0) e = pbAt + 2;
+      const entry = Math.min(D.l[e - 1], D.o[e]), stop = pbHi + 0.3, risk = stop - entry, tgt = entry - 2 * risk;
+      let out = null, outAt = -1; for (let j = e; j < n; j++) { if (j > e && D.h[j] >= stop) { out = -1; outAt = j; break; } if (D.l[j] <= tgt) { out = 2; outAt = j; break; } }
+      Object.assign(S, { cocLow, cocAt, pbHi, pbAt, e, entry, stop, risk, tgt, out, outAt });
+    } else {
+      const entry = D.c[cl], stop = D.h[cl] + 0.3; let outAt = -1; for (let j = cl + 1; j < n; j++) if (D.h[j] >= stop) { outAt = j; break; }
+      Object.assign(S, { fadeEntry: entry, fadeStop: stop, fadeOut: outAt });
+    }
+    return S;
+  }
+  const st17 = stepper('st17', 'rs17', 0, 5, () => d17());
+  const d17 = reg(() => {
+    const kind = $('sel17').value; const key = seed + kind;
+    if (C17.key !== key) { C17.S = build17(kind); C17.key = key; }
+    const S = C17.S, D = S.D, k = st17.k; const hl = [], marks = []; let upto, txt; const boxes = [];
+    hl.push({ v: S.preLow, a: S.preLowAt, b: S.n - 1, col: 'muted', label: 'last swing low of the uptrend', legend: 'last swing low' });
+    if (kind === 'seq') {
+      const ups = [30, S.cl, S.cocAt, S.pbAt, S.e, S.outAt > 0 ? S.outAt : S.n - 1]; upto = ups[k];
+      const T = [
+        'Step 0 · a clean uptrend. No reason to fight it: the crowd is right.',
+        `Step 1 · bar ${S.cl}: a climax: a wide bar spikes to ${S.climaxHi.toFixed(1)} and closes near its low (price rejection). Signal 1, "something breaks the trend", has appeared. Still no trade.`,
+        `Step 2 · bars ${S.cl + 1}–${S.cocAt}: strong, fast selling breaks below the last swing low (${S.preLow.toFixed(1)}) to ${S.cocLow.toFixed(1)}. That is new countertrend momentum: the change of character.`,
+        `Step 3 · bars ${S.cocAt + 1}–${S.pbAt}: a weak bounce to ${S.pbHi.toFixed(1)}: the first pullback in a possibly new downtrend.`,
+        `Step 4 · bar ${S.e}: the pullback ends (price trades below the prior bar's low). Short at ${S.entry.toFixed(2)}, stop above the pullback high ${S.stop.toFixed(2)} (1R = ${S.risk.toFixed(2)}), target 2R ${S.tgt.toFixed(2)}.`,
+        S.out === 2 ? `Step 5 · target reached at bar ${S.outAt}: +2R. One simulated example, not evidence.` : S.out === -1 ? `Step 5 · stopped at bar ${S.outAt}: −1R. The sequence improves the odds and defines the risk; it does not guarantee anything.` : 'Step 5 · still open at the end of the chart.'];
+      txt = T[k];
+      if (k >= 1) marks.push({ i: S.cl, v: D.h[S.cl], dir: -1, col: 'c3', label: 'climax' });
+      if (k >= 2) marks.push({ i: S.cocAt, v: D.l[S.cocAt], dir: 1, col: 'c1', label: 'change of character' });
+      if (k >= 4) { marks.push({ i: S.e, v: D.h[S.e], dir: -1, col: 'sell', label: 'short' }); hl.push({ v: S.stop, a: S.e, b: S.n - 1, col: 'sell', end: true, label: 'stop ' + S.stop.toFixed(1), legend: 'stop' }); hl.push({ v: S.tgt, a: S.e, b: S.n - 1, col: 'c2', end: true, below: true, label: '2R ' + S.tgt.toFixed(1), legend: 'target' }); hl.push({ v: S.entry, a: S.e, b: S.n - 1, col: 'price', dash: false, end: true, label: 'entry', legend: 'entry' }); }
+      const st = ['1 · trend broken', '2 · change of character', '3 · pullback', 'entry'];
+      st.forEach((t, i) => boxes.push(`<div class="${k > i ? 'in' : ''}">${t}<small>${k > i ? 'seen' : 'waiting'}</small></div>`));
+    } else {
+      const ups = [30, S.cl, 42, 50, S.fadeOut > 0 ? Math.max(S.fadeOut, 58) : S.n - 1, S.n - 1]; upto = ups[k];
+      const T = [
+        'Step 0 · a clean uptrend.',
+        `Step 1 · bar ${S.cl}: the same climax and rejection. A fader shorts here at ${S.fadeEntry.toFixed(2)}, stop above the spike at ${S.fadeStop.toFixed(2)}. Grimes waits.`,
+        'Step 2 · the dip is shallow and slow, and it holds above the last swing low: no new countertrend momentum, no change of character.',
+        'Step 3 · price drifts sideways and starts to lift. The sequence is incomplete, so there is nothing to trade.',
+        S.fadeOut > 0 ? `Step 4 · bar ${S.fadeOut}: the trend resumes through the climax high; the fader is stopped out (−1R). The waiter lost nothing.` : 'Step 4 · the trend resumes; the fader is under water.',
+        'Step 5 · the uptrend continues. Without (1) a break and (2) a change of character, the best bet is not to fade.'];
+      txt = T[k];
+      if (k >= 1) { marks.push({ i: S.cl, v: D.h[S.cl], dir: -1, col: 'c3', label: 'climax' }); hl.push({ v: S.fadeStop, a: S.cl, b: S.n - 1, col: 'sell', end: true, label: "fader's stop", legend: "fader's stop" }); }
+      ['1 · trend broken', '2 · change of character', '3 · pullback', 'entry'].forEach((t, i) => boxes.push(`<div class="${i === 0 && k >= 1 ? 'in' : (i > 0 && k >= 2 ? 'out' : '')}">${t}<small>${i === 0 && k >= 1 ? 'seen' : (i > 0 && k >= 2 ? 'never came' : 'waiting')}</small></div>`));
+    }
+    cplot('c17', D, { upto, scaleTo: S.n - 1, hl, marks, legend: [['simulated bars', 'price']] });
+    $('r17').innerHTML = txt; $('w17').innerHTML = boxes.join('');
+  });
+  $('sel17').addEventListener('change', () => { st17.k = 0; d17(); });
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; clearCaches(); st3.k = 40; st3.marks = []; st3.all = false; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

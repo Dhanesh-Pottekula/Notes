@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.10 Reverting Back to the Mean</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* chapter 10 additions */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.fig .readout { display: block; line-height: 1.65; }
+.seq { display: grid; gap: 4px; font-family: var(--mono); font-size: 12px; }
+.seq .bt { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.seq .bt i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.seq .bt i.w { background: var(--buy); }
+.seq .bt i.l { background: var(--sell); }
+.seq .bt span { margin-left: 8px; color: var(--muted); }
+.good { color: var(--buy); } .bad { color: var(--sell); }
+input[type=number] { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; width: 7.5em; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 68ch; }
+code { font-family: var(--mono); font-size: .85em; }
+.note { font-size: 14px; color: var(--muted); margin-top: 6px; }
+table td.num, table th { white-space: nowrap; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch09_tick_fades.html">← Ch.9 Tick Fades</a><a href="ch11_the_squeeze.html">Ch.11 The Squeeze →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John F. Carter · Mastering the Trade, 3rd ed. · Chapter 10 · pdf p233–243</div>
+  <h1>Reverting back to the mean, <em>one ATR at a time</em></h1>
+  <p class="lede">Carter's swing setup for daily charts: a market keeps stretching away from its average price and snapping back, and the Average True Range (ATR) tells you how far the stretch usually goes. He draws bands 1.5 ATR either side of a 13-period average, buys pullbacks to the middle in an uptrend (sells rallies to it in a downtrend), takes about 1 ATR of profit, keeps a wide stop, and switches the whole thing off when a squeeze fires. Then he shows how he expresses it with Delta 0.70 options and with a vertical credit spread. This page walks every idea in the book's order. Every chart uses <b>simulated</b> prices; where a chart stands in for one of Carter's figures, it is rebuilt from his text, because all nine figures (10.1–10.9) are blank in this PDF copy.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b> · re-rolls the simulated charts; the pooled tables use fixed seeds and the book's numbers never change</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter builds one setup and then names the one condition that breaks it. Read it as a chain: an average price, a normal stretch away from it, bands that mark the stretch, rules for trading inside the bands, and the squeeze that tells you to throw the bands away.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Idea</span><span class="node">Markets expand away from an average price</span><span class="arr">→</span><span class="node key">…then revert back to it</span></div>
+    <div class="row"><span class="tag">Average</span><span class="node">13- and 21-period EMAs = the "mean zone"</span><span class="arr">→</span><span class="node">like a daily pivot, but for swing timeframes</span></div>
+    <div class="row"><span class="tag">Stretch</span><span class="node key">ATR(14) = normal distance a market travels</span><span class="arr">→</span><span class="node">gold: ATR $20 → $20 stretches; later ATR $60</span></div>
+    <div class="row"><span class="tag">Bands</span><span class="node">Modified Keltner: 13 mean ± 1.5 × ATR</span><span class="arr">→</span><span class="node">1.5 because ATR lags</span></div>
+    <div class="row"><span class="tag">Rules</span><span class="node">Trade only with the band slope</span><span class="node key">Enter at the mean, take ~1 ATR</span><span class="node">Stop outside the far band (or 2 × ATR)</span><span class="node">Scratch or double near the far band</span></div>
+    <div class="row"><span class="tag">Off switch</span><span class="node key">Squeeze fires → remove the bands</span><span class="arr">→</span><span class="node">trade momentum, scale out at 1, 2, 3 ATR</span></div>
+    <div class="row"><span class="tag">Options</span><span class="node">Delta 0.70 calls / puts for RTM and squeeze trades</span><span class="arr">→</span><span class="node">Sell a vertical credit spread when price slams a band before expiry</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Where markets run out of gas</a>
+    <a href="#s2"><span>02</span>ATR: how far is too far (gold)</a>
+    <a href="#s3"><span>03</span>The bands: 13 ± 1.5 ATR</a>
+    <a href="#s4"><span>04</span>The eight trading points</a>
+    <a href="#s5"><span>05</span>Why isn't everyone doing this?</a>
+    <a href="#s6"><span>06</span>Squeeze vs RTM: the seven tips</a>
+    <a href="#s7"><span>07</span>AMZN: calls for both setups</a>
+    <a href="#s8"><span>08</span>GS: the downtrend version</a>
+    <a href="#s9"><span>09</span>Selling a vertical credit spread</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · WHERE DO MARKETS STOP THEIR CURRENT TREND AND RUN OUT OF GAS?</div><h2>An average price, and the stretch away from it</h2></div><span class="chip">pdf p234 · Fig 10.1 (blank in this copy)</span></div>
+  <p><b>The opening story.</b> If you were mugged walking down a street and lived, you'd change something: call the police, buy mace or a taser, stop using that street, or stop walking alone. Carter says traders who don't understand the market's normal ebb and flow do the opposite: they walk down the same dark alley alone, again and again. The five-minute chart is that alley, and the muggers keep seeing the same victim come back.</p>
+  <p><b>Who the muggers are.</b> Computer trading programs ("algos"), which he pictures as terminators hunting your money. The useful part: many of them work moves that stay <b>within a stock's Average True Range</b>. Whether a market trends up, trends down or goes sideways, he says it keeps to its ATR most of the time.</p>
+  <p><b>Where ATR comes from.</b> J. Welles Wilder built it for daily charts in the commodity markets. Carter finds it works just as well on daily charts of individual stocks.</p>
+  <p><b>The question the chapter answers.</b> How far does a stock have to get from its 21 EMA before the odds of a return to the 21 go up? Pivots (Chapter 8) set ranges inside a day. Carter wants the same thing for daily and weekly charts: extension levels to buy and sell against for swing trades held days or weeks, not minutes or hours.</p>
+  <p><b>The link to pivots.</b> This chapter isn't about pivots, but the idea is the same. A daily pivot is an "average price" of the previous day, which is one reason price is drawn back to it the next day: the market has to test whether it holds. In general, at any moment a market is either <b>expanding away from its average price</b> or <b>reverting back to it</b> ("reverting to the mean").</p>
+  <p><b>Figure 10.1</b> (blank here) is a daily gold chart with a 13-period and a 21-period EMA. They are the average prices over the last 13 and 21 days and they keep adapting, so together they form the key average-price zone that the market stretches away from and comes back to. The key question becomes: how far from that zone does price have to get before it has to start coming back?</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch10_dog_elastic_lead_owner.svg" alt="An owner walks steadily while a playful dog on an elastic lead runs ahead and lags behind, the lead stretching only so far before pulling it back." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A dog on an elastic lead. The owner (the average) walks steadily; the dog runs ahead and drops behind. The lead stretches, but only so far before the dog is pulled back, or the owner speeds up to catch it. ATR is the usual length of the stretch.</p></div>
+  <div class="fig">
+    <canvas id="c1" class="tall" aria-label="Simulated daily closes with 13 and 21 EMAs and a sub-panel of the distance from the average in ATRs, coloured by expanding or reverting"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls"><label for="sel1">Average <select id="sel1"><option value="zone">13/21 zone (outside edge)</option><option value="13">13 EMA only</option><option value="21">21 EMA only</option></select></label></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <p>The bottom panel measures how far each close sits from the average, in ATRs. Amber bars mean the distance grew that day (expanding), teal bars mean it shrank (reverting). Notice that the bars rarely stay large for long, and that later in the chart, when the market gets wild, price moves much further in dollars but not much further in ATRs.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>A moving average is a slow summary of where most recent trading took place. When price runs far from it, two things can close the gap: price comes back, or the average catches up. Either way the distance shrinks. Measuring the distance in ATRs instead of dollars makes the yardstick fit the market: a $20 move is huge in a quiet market and noise in a wild one. That is the whole trick of the chapter.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Carter Ch.8 (pivot points, the next-day "average price" levels) and Ch.11 (the squeeze, when the stretch does <i>not</i> snap back).</li>
+    <li><a href="../murphy/ch09_moving_averages.html">Murphy Ch.9</a>: what an EMA is and why it lags; envelopes around an average are the same family of tools as these bands.</li>
+    <li>Your note <code>trading/trading_equations.md</code> eq 16 (Ornstein–Uhlenbeck): a formal model of "pulled back to a mean", with a half-life for how fast the gap closes.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">01 (cont.) · AVERAGE TRUE RANGE · THE GOLD EXAMPLE</div><h2>ATR: how far is "too far" from the average</h2></div><span class="chip">pdf p234–235 · Fig 10.1–10.2 (blank in this copy)</span></div>
+  <p>Carter's answer is the average true range. In this chapter ATR means the average price range of the previous <b>14 periods</b>.</p>
+  <p><b>Figure 10.2</b> adds ATR under the same gold chart. At point 1 the ATR is about 20, which for gold means <b>$20.00 an ounce</b>. So, most of the time, once price gets about $20 away from the mean zone (the 13 and 21 EMAs) it has to start coming back. At point 1 price got $20 above the averages and turned back toward them. At point 2 it got about $20 below them and came straight back. Later in the year the ATR rose to <b>$60.00</b> (point 3), so price could then travel that much further before it needed to work its way back.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch10_stride_child_vs_adult.svg" alt="A child and an adult each take a few steps away from a lamp post, the adult ending up much further away, with distance measured in footprints." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>ATR is the market's stride length. A child and an adult both walk "a few steps" from a lamp post, but the adult ends up much further away. Judge "far" in strides, not metres, and you can compare a quiet gold market with a wild one.</p></div>
+  <div class="fig">
+    <canvas id="c2" class="tall" aria-label="Simulated gold-like daily bars with 13 and 21 EMAs, dotted lines k ATRs outside the zone, and the ATR in a sub-panel"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="k2">Stretch (ATRs) <input id="k2" type="range" min="0.5" max="3" step="0.25" value="1"><output id="k2o">1</output></label>
+      <label for="n2">ATR length <input id="n2" type="range" min="5" max="30" step="1" value="14"><output id="n2o">14</output></label>
+      <label for="reg2">Pooled market <select id="reg2"><option value="quiet">built to revert (quiet trend)</option><option value="rw">random walk with drift</option></select></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <p>The market starts around $1,650 with an ATR near $20, like Carter's point 1, and turns wild in the last third, where the ATR climbs toward $60, like his point 3. The dotted lines sit k ATRs outside the 13/21 zone; at k = 1 they are Carter's "about one ATR away" line.</p>
+  <h3>How ATR is built, one day at a time</h3>
+  <p>Step through the table. Each day's <b>true range</b> is the largest of three numbers, so gaps count as range. The winner in each row is highlighted.</p>
+  <div class="formula">true range = max( high − low, |high − previous close|, |low − previous close| )
+simple ATR(n)  = average of the last n true ranges
+Wilder ATR(n)  = (yesterday's ATR × (n − 1) + today's true range) ÷ n</div>
+  <div class="controls"><button id="prev2" type="button">← earlier day</button><button id="next2" type="button">later day →</button></div>
+  <div id="t2"></div>
+  <div class="readout" id="r2b"></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Carter only says "the average range of the prior 14 periods"; the formulas above are the standard definitions (beyond the book). Wilder's version is what most charting platforms plot; it is an exponential-style average, so one huge day fades out slowly instead of falling off a cliff after 14 days. The pooled readout checks the idea on simulated data. Switch between the two markets: the "built to revert" market is designed to come back, so its numbers are high by construction. The interesting line is the last one. Even in a pure random walk a lot of the gap closes because the <i>average moves toward price</i>, not because price comes back. Reversion to a moving average is partly arithmetic. That's why the setup needs the trend rules in section 04 and can't rely on "it always comes back".</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your note <code>trading/trading_equations.md</code> lists ATR as eq 10, and <code>trading/backtest_results_summary.md</code> found fixed 1% risk with ATR stops as good as or better than volatility targeting.</li>
+    <li>Carter Ch.7 (the opening gap): the gap is exactly the part of a move that plain high − low misses, which is why true range adds the two "previous close" terms.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">01 (cont.) · THE MODIFIED KELTNER CHANNEL</div><h2>Bands at 1.5 ATR around a 13-period mean</h2></div><span class="chip">pdf p236 · Fig 10.3 (blank in this copy)</span></div>
+  <p><b>Figure 10.3</b> is a daily chart of the Swiss franc (SF) with a modified Keltner Channel: the ATR is plotted as outer bands around a mean. Carter's settings: the "mean" (the dotted middle band) is a <b>13-period</b> average, and each outer band sits <b>1.5 × ATR</b> from it. So at any moment the upper and lower bands are each 1.5 times the current ATR away from the middle.</p>
+  <p><b>His numbers.</b> At point 1 the ATR reads <b>0.0100</b>, which is <b>100 ticks</b> on the franc. 1.5 × 100 = <b>150 ticks</b>. At point 2 the lower band is 150 ticks below the middle, and at point 3 the upper band is 150 ticks above it.</p>
+  <p><b>Why 1.5?</b> ATR is a lagging indicator. Multiplying by 1.5 gives a bit more room so the bands can hold the most recent price action.</p>
+  <div class="box picture"><b>Picture it</b><p>A road with a centre line (the 13 mean) and two kerbs (the bands). The kerbs are placed one and a half "normal swerves" from the centre, so an ordinary swerve stays on the road and only a real loss of control hits the kerb.</p></div>
+  <div class="fig">
+    <canvas id="c3" class="tall" aria-label="Simulated Swiss-franc-like daily bars with a 13 EMA middle line and bands at a chosen multiple of ATR"></canvas>
+    <div class="legend" id="c3L"></div>
+    <div class="controls"><label for="m3">Band multiple <input id="m3" type="range" min="1" max="2.5" step="0.25" value="1.5"><output id="m3o">1.5</output></label></div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <p>Try 1.0: price pokes outside often, because yesterday's ATR is a little behind today's swings. At 1.5 it mostly stays inside. At 2.5 the bands are so wide they rarely matter.</p>
+  <h3>Worked example: ticks from an ATR reading</h3>
+  <div class="controls">
+    <label for="atr3">ATR <input id="atr3" type="number" step="0.0005" value="0.0100"></label>
+    <label for="tick3">Tick size <input id="tick3" type="number" step="0.0001" value="0.0001"></label>
+    <label for="mult3">Multiple <input id="mult3" type="number" step="0.25" value="1.5"></label>
+  </div>
+  <div class="readout" id="r3b"></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The standard Keltner Channel (beyond the book) is a moving average with bands set a multiple of ATR away; Carter's version only changes the settings: a 13-period middle and 1.5 × ATR(14). Because the band width comes from ATR, not from a fixed percentage, the bands breathe: they widen as the market gets wild and narrow when it quiets. So a touch of the band always means "about one and a half normal days' range away from average", whatever the market or price level.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.11, The Squeeze: the same Keltner Channel (with Bollinger Bands inside it) becomes the squeeze detector.</li>
+    <li><a href="../murphy/ch09_moving_averages.html">Murphy Ch.9</a>: percentage envelopes and Bollinger Bands, the other two ways to put bands around an average.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">01 (cont.) · KEY CONCEPTS TO TRADE THIS SETUP (POINTS 1–8)</div><h2>The eight trading points, made testable</h2></div><span class="chip">pdf p237–238 · Fig 10.3 (blank in this copy)</span></div>
+  <ol class="plain">
+    <li><b>Read the slope.</b> On the SF chart the bands slope up: an uptrend. So Carter only takes longs. He could short the upper band, but with the bands rising all the time, that's a lower-probability trade than buying. A short at point A would have kept going against him and stopped him out: the market was still inside its ATR, just on a steep upward slope.</li>
+    <li><b>Buy the mean, sell the band.</b> At point 4 price pulls back to the mean: he buys. At the outer band (point 5) he sells. Pullback to the mean at point 6: buy; sell at point 7. Buy at 8, sell at 9. Repeat.</li>
+    <li><b>Don't try to catch every tick.</b> The bands are 1.5 ATR away, but he only wants about <b>1 ATR</b> of the move, or a little less. That's why he exits at point 7 before the band: he's after roughly 100 ticks (1 ATR), not 150 (1.5 ATR). He's always selling a bit early, and that's fine.</li>
+    <li><b>Stops.</b> Put them just <b>outside the lower band</b>. That keeps you out of the normal wiggle, and you usually only get stopped when the trend changes. Stops that are too tight hurt this setup badly; trade a smaller size and let the trade work.</li>
+    <li><b>Bonus, and double bonus.</b> If price drops close to the lower band (a hint the trend may be turning, as at point B), you can get out when it comes back to the mean, for a scratch or a small loss. Or start with <b>half size</b>, add the other half as price nears the lower band, and exit everything at the mean for a profit: his favourite way to turn losers into small winners. This only works with proper money management: "full size" must already be a size your account can take, it is not an excuse to oversize, and the <b>hard stop stays in place</b>.</li>
+    <li><b>The universal stop.</b> He's constantly asked what stop to use on the franc hourly, on Amazon daily, on crude oil 512-tick, on the ES 15-minute, on the euro 5-minute… His answer for any market and any timeframe: put a 14-period ATR on the chart, <b>double it</b>, and that's your stop.</li>
+    <li><b>Runaway markets.</b> At point A the market just runs. In moves like that you often won't get a pullback fill for days or even weeks. The setup is built to pick off pieces of a market in a <b>quiet trend or a quiet sideways range</b>, not to catch momentum.</li>
+    <li><b>The flaw.</b> It can miss whole big moves, because big moves push straight through the ATR bands. That gap is what the squeeze (next chapter) fills.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><p>A surfer waiting for the set to come back to the beach break. In a steady swell you paddle in on each wave and get off before it dumps (sell early, 1 ATR). On a tsunami day you don't surf at all.</p></div>
+  <h3>Step through trades on a simulated quiet uptrend</h3>
+  <p>The rules below are Carter's as far as he states them. Like his SF example this market slopes up, so the step-through is long-only: buy when price touches the 13 mean while the mean is rising, target +1 ATR, stop 1.75 ATR below entry, which is just outside the lower band (the band is 1.5 ATR below the mean). Where he isn't specific, the page decides (marked): the trend is "rising" if the mean is higher than 5 days ago; if a bar touches both stop and target, the stop counts first; fills use the day's open when price gaps past a level.</p>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Step-through of one reversion-to-the-mean trade with entry, target and stop lines on simulated bars"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls"><button id="prev4" type="button">← previous trade</button><button id="next4" type="button">next trade →</button></div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <h3>Pooled test: change one rule at a time</h3>
+  <p>150 simulated markets, fixed seeds, about 300 days each. Pick the market type and the rules.</p>
+  <div class="controls">
+    <label for="reg4">Market <select id="reg4"><option value="quiet">quiet trend, built to revert</option><option value="rw">random walk with drift (no reversion)</option><option value="mix">quiet → squeeze → breakout → quiet</option></select></label>
+    <label for="side4">Side <select id="side4"><option value="with">with the trend (Carter's rule)</option><option value="against">against: fade the outer band</option></select></label>
+    <label for="tgt4">Target <select id="tgt4"><option value="1">1 ATR (Carter)</option><option value="1.5">1.5 ATR (the band)</option></select></label>
+    <label for="stop4">Stop <select id="stop4"><option value="1.75">just outside the band (1.75 ATR)</option><option value="2">2 × ATR (universal)</option><option value="0.5">tight (0.5 ATR)</option></select></label>
+    <label for="near4">Near the far band <select id="near4"><option value="none">hold to target or stop</option><option value="bail">bail at the mean (scratch)</option><option value="double">half size, double, exit at mean</option></select></label>
+    <label for="sq4"><input id="sq4" type="checkbox"> bands off while a squeeze is in play</label>
+  </div>
+  <div id="t4"></div>
+  <h3>Worked example: the 2 × ATR stop</h3>
+  <div class="controls">
+    <label for="atrS4">ATR(14) <input id="atrS4" type="number" step="0.0005" value="0.0100"></label>
+    <label for="tickS4">Tick size <input id="tickS4" type="number" step="0.0001" value="0.0001"></label>
+    <label for="pxS4">Entry price <input id="pxS4" type="number" step="0.001" value="1.050"></label>
+  </div>
+  <div class="readout" id="r4c"></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Read the pooled table as mechanics, not proof. Three things show up clearly. <b>Tight stops destroy the win rate:</b> a 0.5 ATR stop sits inside normal daily noise, so a market that would have reached the target first shakes you out; switch the stop and the win rate falls from roughly 70% to the 30s. <b>A 1-ATR target is hit more often than 1.5,</b> and quicker, which is what Carter wants for option trades. <b>Direction matters when the market doesn't truly revert:</b> in the random walk with drift, fading the upper band loses while buying the mean in the drift direction doesn't. In the "built to revert" market, fading works too, because that model pulls price back from both sides equally; real trends that run (Carter's point A) behave more like the other two markets. The half-size-then-double rule turns many losers into small winners (higher win rate) but caps the winners, so the average per trade can go down: it's a smoothing tool, not free money.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your note <code>trading/backtest_results_summary.md</code>: the setup that held up best in your NSE tests is the weekly pullback (dip to the 20-week EMA in a weekly uptrend, 2.5 ATR stop). Same family as this: buy a pullback to an average, in the trend's direction, with an ATR-sized stop.</li>
+    <li>Carter Ch.7: the same lesson about tight stops ("why a tight stop turns an 80% trade into a 30% trade").</li>
+    <li><a href="../grimes/ch04_pullback.html">Grimes Ch.4, Pullback</a>: the pullback in a trend, studied as a setup.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">02 · THIS SOUNDS AWESOME—WHY ISN'T EVERYBODY DOING THIS?</div><h2>Rule 1: go with the trend. Rule 2: a squeeze switches it off.</h2></div><span class="chip">pdf p238–239 · Fig 10.4 (blank in this copy)</span></div>
+  <p>Plenty of people have tried. Reversion to the mean isn't a new idea at all. Carter has seen two things trip traders up.</p>
+  <p><b>Rule 1: don't fight the trend.</b> On the SF chart, traders are tempted to short the upper band in a clear uptrend. It works sometimes, but it's dangerous, as point A showed. Same in a downtrend: no need to buy the lower band when you can short the pullbacks to the mean. Advanced traders with large accounts who scale in can fade both ways (short uptrends at the upper band, buy downtrends at the lower band); newer traders with small accounts get chewed up trying. With options, though, <b>vertical credit spreads</b> can be sold safely at these levels (section 09).</p>
+  <p><b>Rule 2: the trade becomes irrelevant once a squeeze fires.</b> Figure 10.4 is the SF daily with the squeeze indicator under it. The short version (the full one is in Ch.11): the <b>darker dots</b> at point 1 show volatility tightly compressed and about to be released; here the compression lasts <b>13 bars</b>. The <b>first lighter dot</b> after the dark run (point 2) says the energy is being released, and that's the trigger. If the histogram is above zero then, it's a long; below zero, a short. The squeeze stays valid as long as the histogram keeps moving in the trade's direction. When it loses momentum (shown by darker-coloured bars) the squeeze is no longer "in play".</p>
+  <div class="box picture"><b>Picture it</b><p>A coiled spring. The dark dots are the spring being pressed; the first light dot is your hand letting go. While the spring is flying, nobody measures how far it "normally" travels.</p></div>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Squeeze step-through on simulated bars: compression dots, fire, momentum in play, momentum fading"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls"><button id="prev5" type="button">← previous stage</button><button id="next5" type="button">next stage →</button></div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <p>The squeeze here is a stand-in, marked as such: dots are dark when 20-day Bollinger Bands (2 standard deviations) sit inside a 20-day Keltner Channel (1.5 ATR), and the histogram is a 20-day linear-regression momentum. Those are the commonly published TTM Squeeze settings, not settings given in this chapter; Ch.11 covers them. The chart picks the squeeze with the longest in-play run.</p>
+  <h3>Rule 1 on simulated data</h3>
+  <div class="controls"><label for="reg5">Market <select id="reg5"><option value="rw">random walk with drift (trend keeps going)</option><option value="mix">quiet → squeeze → breakout → quiet</option><option value="quiet">quiet trend, built to revert</option></select></label></div>
+  <div id="t5"></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Buying the mean in an uptrend has the trend's drift working for you while you wait. Shorting the upper band has it working against you, so every extra day in the trade costs a little, and when the market runs (point A, or a breakout) the trade has no natural end except the stop. A squeeze is the moment the market changes character: volatility was compressed, so ATR was small and the bands were narrow; when it releases, price travels several of those small ATRs in one direction and the narrow bands mean nothing. That's why Carter says the setup is valid all the time except then.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.11, The Squeeze, for the indicator's full mechanics and trade rules.</li>
+    <li><a href="ch04_what_do_i_trade.html">Carter Ch.4</a>: why he sells premium with spreads instead of naked options.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">02 (cont.) · KEY THINGS ABOUT THE SQUEEZE AND RTM (TIPS 1–7)</div><h2>Squeeze vs reversion: the seven tips</h2></div><span class="chip">pdf p239–240 · Fig 10.4 (blank in this copy)</span></div>
+  <ol class="plain">
+    <li><b>Timeframe.</b> He trades reversion-to-the-mean (RTM) setups on <b>daily charts only</b>, never intraday. Sometimes weekly charts for longer plays.</li>
+    <li><b>Markets.</b> Commodities, including stock-index futures, and individual stocks. On stocks he uses options, such as buying <b>Delta 0.70</b> calls to ride the move back to the upper band in an uptrending stock.</li>
+    <li><b>Validity.</b> The RTM trade is valid all the time, except when a squeeze has fired.</li>
+    <li><b>Remove the bands.</b> Once a squeeze fires (his name for the first lighter dot, point 2 in Fig 10.4), the bands are worthless: they won't contain price. He takes them off the chart, and puts them back when the squeeze is over.</li>
+    <li><b>Trade the squeeze instead,</b> as a directional momentum play.</li>
+    <li><b>Why RTM fails then.</b> A squeeze <b>expands the ATR</b>. People doing RTM trades who don't know about squeezes win about <b>70%</b> of the time and then give back all of it, and more, in the other <b>30%</b>, typically when a squeeze is in play.</li>
+    <li><b>Scaling out of a squeeze.</b> He uses expanding ATR levels. On the franc, at +1 ATR (<b>120 ticks</b>) he takes off a quarter. At +2 ATR (<b>240 ticks</b>) another quarter, and his stop moves to entry. At +3 ATR another quarter. The last quarter rides until momentum rolls over (point 3 in Fig 10.4). If momentum fades at any point, the squeeze is over and he gets out, even if +1 ATR was never reached.</li>
+  </ol>
+  <p>Note the franc's ATR here is 120 ticks, against 100 ticks in the Fig 10.3 example: ATR changes over time, so the tick values are a snapshot, not a constant.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch10_net_torn_by_shark.svg" alt="Fishermen pull small fish from a coastal net, but a shark fin is approaching and an old fisherman signals to pull the net out of the water." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Fishing with a net sized for small fish. Most days it works. The day a shark swims through, the net is torn and you lose the week's catch. The squeeze is the shark warning: pull the net out of the water.</p></div>
+  <h3>A squeeze widens the ATR</h3>
+  <div class="fig">
+    <canvas id="c6" class="short" aria-label="ATR of the simulated squeeze market over time with squeeze windows shaded"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <h3>The 70/30 trap on simulated data</h3>
+  <p>150 simulated markets, each with a quiet trend, a coil, a breakout in a random direction and another quiet stretch. Same rules as section 04 (1 ATR target, stop outside the band). Compare ignoring squeezes with taking the bands off while one is in play.</p>
+  <div class="controls"><label for="side6">Trader <select id="side6"><option value="against">fades the bands (the trap)</option><option value="with">buys the mean with the trend (Carter)</option></select></label></div>
+  <div id="t6"></div>
+  <h3>Worked example: scaling out of a squeeze</h3>
+  <div class="controls">
+    <label for="mx6">Furthest the move gets (ATR) <input id="mx6" type="range" min="0" max="5" step="0.25" value="3.5"><output id="mx6o">3.5</output></label>
+    <label for="rb6">Where momentum rolls over (ATR) <input id="rb6" type="range" min="-2" max="5" step="0.25" value="2.75"><output id="rb6o">2.75</output></label>
+    <label for="tk6">Ticks per ATR <input id="tk6" type="number" step="10" value="120"></label>
+  </div>
+  <div id="t6b"></div>
+  <div class="readout" id="r6b"></div>
+  <p>Assumption (not in the book): before +2 ATR the stop is the 2 × ATR universal stop from point 6 of section 04. If the rollover level is set above the furthest point, it is capped at the furthest point.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The simulated "trap" reproduces the shape of Carter's 70/30 story for the band-fader: many small wins in quiet periods and a cluster of full-size losses in breakouts (around 24% wins there in this model), enough to wipe out the quiet-period gains. Taking the bands off while a squeeze is in play cuts those losses but not all of them, because a breakout can keep going after the indicator's momentum first fades. For the with-trend trader the model shows less damage: pullbacks to the mean inside a strong breakout are rarer and usually go the breakout's way. That's a property of this model, so treat it as a question to test on real data, not an answer. The scale-out plan works the other way round from RTM: small, sure profits early (1 ATR), then a free trade (stop at entry after 2 ATR), then a runner that only momentum ends.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your note <code>trading/backtest_results_summary.md</code>: VWAP pullback / VWAP reversion "lost in every version" intraday, and no intraday strategy passed. That fits Carter keeping RTM to daily and weekly charts, though your test is of a different setup, so it's a parallel, not a confirmation.</li>
+    <li>Your note <code>trading/intraday_swing_playbook.md</code> lists Carter Ch.11 (the squeeze) as a book source for its breakout swing setup.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">02 (cont.) · AMZN WITH RTM BANDS AND THE SQUEEZE</div><h2>AMZN: Delta 0.70 calls for both setups</h2></div><span class="chip">pdf p240–241 · Fig 10.5 (blank in this copy)</span></div>
+  <p><b>The squeezes (points 1 and 2).</b> Figure 10.5 is AMZN daily with RTM bands and the squeeze. At points 1 and 2 a squeeze fires long. He buys in-the-money calls (Delta <b>0.70 or better</b>), scales out of the first part at the ATR levels, and holds a chunk for the whole ride. The first squeeze was a big one: AMZN climbed steadily from <b>$125 to $160</b> in about a month, the kind of move where an option can rise <b>500% or more</b>. With options on daily squeezes, expect to be in the trade <b>one to three weeks</b>, so if you're a week from expiry, buy the next month instead. The RTM bands are ignored until the squeeze loses momentum (two darker momentum bars); then it's officially over and RTM trading resumes. The second squeeze gave a nice pop, but it didn't last.</p>
+  <p><b>The RTM trades (points 3–7).</b> The distance from the middle to the upper band was about <b>$6.00</b>. He buys in-the-money calls on pullbacks (to the middle band, by the logic of the setup; the text just says "the band") and sells when AMZN has risen about <b>$4.50</b>, since the band is 1.5 ATR and he wants only 1 ATR. With Delta 0.70 that's about <b>$3.15</b> on the option: for example, buy a call at <b>$9.00</b> and sell it a few days later at <b>$12.15</b>. With-trend RTM trades are usually quick, which suits options because premium decays fast (Chapter 4). At point 5 the trade was stopped out: he bought the pullback, the stock fell hard, and a few days later it was back at the upper band. That, he says, is why it's called trading and not knowing the future.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch10_two_gears_one_machine.svg" alt="An old flour mill machine has a small fast gear turning normally, and a big gear engaging while the small one is disconnected by a lever." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Two gears on one machine. In normal running, the small gear turns (quick 1-ATR RTM trades). When the squeeze engages, the big gear takes over and the small one is disconnected until the big one stops.</p></div>
+  <div class="fig">
+    <canvas id="c7" class="tall" aria-label="Simulated AMZN-like daily bars with RTM bands removed during squeezes, RTM trades marked, and squeeze histogram"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <p>The chart runs both setups together, as Carter does: RTM trades (arrows) only while the bands are on, and the longest squeeze traded with the quarter-at-1/2/3-ATR plan (stop 2 × ATR until +2 ATR, then entry; last quarter out when momentum fades). Results are in ATRs of the stock, not option returns.</p>
+  <h3>Worked example: what the option makes on an RTM trade</h3>
+  <div class="controls">
+    <label for="bd7">Middle to band ($) <input id="bd7" type="number" step="0.5" value="6"></label>
+    <label for="mu7">Band multiple <input id="mu7" type="number" step="0.25" value="1.5"></label>
+    <label for="mv7">Move taken ($) <input id="mv7" type="number" step="0.25" value="4.5"></label>
+    <label for="de7">Delta <input id="de7" type="number" step="0.05" value="0.70"></label>
+    <label for="cp7">Call price ($) <input id="cp7" type="number" step="0.5" value="9"></label>
+  </div>
+  <div class="readout" id="r7b"></div>
+  <p><b>A check on the book's numbers.</b> If $6.00 is 1.5 ATR, then 1 ATR is $4.00, so "about $4.50" is roughly 1.1 ATR, a little more than the 1 ATR he says he targets. His $3.15 option gain does match $4.50 × 0.70.</p>
+  <h3>Which expiry to buy</h3>
+  <div class="controls"><label for="dte7">Days to the front-month expiry <input id="dte7" type="range" min="1" max="35" step="1" value="6"><output id="dte7o">6</output></label></div>
+  <div class="readout" id="r7c"></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Delta is roughly how many dollars the option moves per dollar of stock. An in-the-money call with Delta 0.70 behaves like 70 shares per contract but costs much less than 100 shares, and most of its price is real (intrinsic) value, so time decay eats less of it. Beyond the book: Delta isn't fixed. As the stock rises a call's Delta grows (gamma), so the real gain on a $4.50 move is a bit more than $3.15, minus a few days of time decay. Carter's $3.15 is a sensible rule-of-thumb estimate.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_what_do_i_trade.html">Carter Ch.4</a>: the Delta 0.70 rule and premium decay, which this section relies on.</li>
+    <li>Your note <code>trading/trading_equations.md</code> section D (options) for Delta and the pricing formulas.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">02 (cont.) · A DOWNTRENDING EXAMPLE: GS</div><h2>Goldman Sachs: the same setup, upside down</h2></div><span class="chip">pdf p241 · Fig 10.6 (blank in this copy)</span></div>
+  <p>Figure 10.6 is a daily chart of Goldman Sachs, a stock Carter says he will only ever short, on principle. At points 1, 2, 3 and 4 he buys in-the-money puts (Delta 0.70 again) on rallies to the mean and closes them when price gets back to the lower band. Trade 4 took <b>nine days</b> to reach its target; the others got there in <b>one to three days</b>. At point 5 a squeeze fired short and turned out very quiet, effectively a normal RTM trade. That happens: not every squeeze is a big trade, but many big trades come from squeezes. At point 6, with the squeeze's momentum gone, he takes another RTM trade.</p>
+  <p>He'll use this setup on almost anything, but again, not on intraday charts. Daily first, weekly for longer plays.</p>
+  <div class="box picture"><b>Picture it</b><p>A ball bouncing down a staircase. Each bounce up (rally to the mean) is your entry; each landing on the next step (the lower band) is your exit.</p></div>
+  <div class="fig">
+    <canvas id="c8" class="tall" aria-label="Simulated GS-like downtrend with short entries at the mean and exits at the lower band"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="readout" id="r8"></div>
+    <div id="t8"></div>
+  </div>
+  <p>Here the target is the lower band (1.5 ATR), as in Carter's description of the GS trades, rather than the 1 ATR from section 04. Short-only, bands off while a squeeze is in play. The simulated market has a coil and a gentle drop built in to mimic point 5's quiet squeeze.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The mirror image works because the logic is symmetric: in a downtrend the drift helps a short held from the mean. How long a trade takes depends on how fast the market reverts. In the simulated market the pull back toward its trend line has a half-life of about 6 days, yet trades still take anywhere from a day to a few weeks, because the mean itself keeps moving and noise can delay the touch. Carter's spread (most in 1–3 days, one in nine) is the same idea: the typical trade is quick, and some aren't. Real markets don't announce their half-life; you can estimate it (your <code>trading_equations.md</code> eq 16) and use 2–3 half-lives as a time stop.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your note <code>trading/trading_equations.md</code> eq 16: half-life = ln 2 ÷ θ, and its suggestion of a time stop at 2–3 half-lives.</li>
+    <li><a href="ch04_what_do_i_trade.html">Carter Ch.4</a>: his Goldman Sachs squeeze step-through.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">02 (cont.) · OTHER WAYS TO USE THIS SETUP WITH OPTIONS</div><h2>Selling a vertical credit spread into the band</h2></div><span class="chip">pdf p241–243 · Fig 10.7–10.9 (blank in this copy)</span></div>
+  <p><b>The setup (Fig 10.7).</b> AMZN on a daily chart rallied straight into its upper band on <b>October 12, 2011</b>, with a high of <b>$241.84</b>. The day before, through his options alert service (www.SimplerOptions.com), he'd placed an order to sell a vertical credit spread on the <b>weekly</b> options at <b>$2.30</b>, the price the spread would reach if AMZN rallied into that level. It did, and the order filled.</p>
+  <p><b>What a vertical credit spread is.</b> The goal is to sell premium and collect the fast time decay into expiration. It's most attractive when a stock gets stretched (up or down) right into its reversion bands (he calls them the TTM reversion bands here), and even more so with only a few days to expiry; weekly options make these chances come up more often. You sell an at-the-money option (the pricier one) and buy the next strike out (the cheaper one) as a hedge.</p>
+  <p><b>The actual position (Fig 10.8).</b> Short 100 of the <b>240 calls</b> (shown as −100 on the TD Ameritrade thinkorswim platform), hoping they expire worthless so he keeps all the premium. He didn't want open-ended risk (what if AMZN gapped up $50 on some crazy news?), so he also bought 100 of the <b>245 calls</b>; if AMZN shoots up, the 245s gain and the loss is limited to the distance between strikes. In the screenshot the sold calls are up <b>$31,300</b>, the bought calls are down <b>$17,150</b>, net <b>+$14,150</b>. Since he sold the spread at 2.30, the most he can make (AMZN closes under 240) is <b>$230 a contract</b>, <b>$23,000</b> on 100. The most he can lose is the strike gap minus the credit: 5.00 − 2.30 = <b>2.70</b>, or <b>$270 a contract</b>. No need to hold to expiry. If the spread is in the money there's a rare chance of being assigned the stock early; it's no big deal, you just close the stock position. That complexity, he says, is why he started SimplerOptions.com, where newer and advanced traders can follow his trades step by step and ask questions.</p>
+  <p><b>Tracking it (Fig 10.9).</b> The platform prices the spread itself continuously. The 240/245 was trading at <b>1.39 bid / 1.56 ask</b>, below the 2.30 he sold it for, so he's ahead. His stop on the spread was <b>3.50</b>. Once you see how this works, the job is patience: wait for a stretched entry, such as a slam into a band right before expiration.</p>
+  <div class="box picture"><b>Picture it</b><p>You sell someone a ticket that pays out only if AMZN closes above $240 on Friday, and you buy back the same kind of ticket at $245 so your worst case is capped. You're the insurance company, and the band tells you the stock is already stretched.</p></div>
+  <div class="fig">
+    <canvas id="c9" aria-label="Payoff at expiry of 100 short 240/245 call vertical spreads sold for 2.30"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls">
+      <label for="px9">AMZN at expiry <input id="px9" type="range" min="230" max="255" step="0.25" value="238"><output id="px9o">238</output></label>
+      <label for="ct9">Spreads <input id="ct9" type="number" step="10" value="100"></label>
+      <label for="cr9">Credit <input id="cr9" type="number" step="0.05" value="2.30"></label>
+      <label for="sv9">Spread price now <input id="sv9" type="number" step="0.01" value="1.56"></label>
+    </div>
+    <div class="readout" id="r9"></div>
+    <div class="readout" id="r9b"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Leg (Fig 10.8)</th><th>Position</th><th>P&amp;L shown</th></tr></thead>
+    <tbody>
+      <tr><td>AMZN 240 call (weekly)</td><td class="num">−100</td><td class="num">+$31,300</td></tr>
+      <tr><td>AMZN 245 call (weekly)</td><td class="num">+100</td><td class="num">−$17,150</td></tr>
+      <tr><td>Net</td><td class="num">sold at 2.30</td><td class="num">+$14,150</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>A check on the book's numbers.</b> 31,300 − 17,150 = 14,150, so the legs add up. But at the Fig 10.9 quote, buying the spread back at the 1.56 ask would make (2.30 − 1.56) × 100 × 100 = <b>$7,400</b>, not $14,150. A +$14,150 gain means the spread was worth about 0.885 at that moment. The two screenshots were most likely taken at different times. Also, the $270 a contract maximum loss means <b>$27,000</b> on 100 spreads (that total is my arithmetic, not stated in the book), and the 3.50 stop would have cost (3.50 − 2.30) × 100 × 100 = <b>$12,000</b>.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>At expiry the spread is worth nothing below 240, (price − 240) between the strikes, and the full 5.00 above 245. So you keep the whole 2.30 below 240, break even at 242.30, and lose the most above 245. Before expiry, both calls carry time value that melts every day; the short at-the-money call melts fastest, which is why selling it a few days from expiry, right when the stock is stretched to a band and likely to sag back, puts both time and reversion on your side. The cost is the shape: you risk 2.70 to make 2.30, so you need to be right more than half the time (break-even win rate about 2.70 ÷ 5.00 = 54% if trades go to full profit or full loss; beyond the book).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch04_what_do_i_trade.html">Carter Ch.4</a>: "never naked: make it a spread", and why theta favours the seller.</li>
+    <li>Your note <code>trading/backtest_results_summary.md</code>: the break-even win rate p* = (L + c)/(W + L) is the same check as the 54% above, with costs c added.</li>
+    <li>Beyond the book, India: NSE stock options are monthly; weekly expiries exist on index options (check which indices currently have them), so a weekly 240/245-style trade translates most naturally to an index vertical. Lot sizes replace "100 shares a contract".</li>
+  </ul></div>
+  <p>Carter closes by pointing ahead to the squeeze, and to <b>simplertrading.com/meanreversion</b> for more examples across markets.</p>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. What two settings define Carter's RTM bands, and why isn't the multiple 1.0?</summary><p>A 13-period mean with bands at 1.5 × ATR(14). ATR lags, so 1.5 leaves room for the most recent price action (section 03).</p></details>
+  <details><summary>2. Gold's ATR is $20. Price closes $22 above the 13/21 EMA zone. What does the chapter expect, and what changes if the ATR later reads $60?</summary><p>At about one ATR away, it expects price to start working back toward the zone. With ATR at $60 a $22 stretch is ordinary; price could go roughly $60 away before reversion is due (section 02).</p></details>
+  <details><summary>3. The franc's ATR is 0.0100 and the tick is 0.0001. Where are the bands, where does he take profit, and where's the universal stop?</summary><p>Bands 150 ticks from the middle; profit at about 1 ATR = 100 ticks from the mean entry; universal stop 2 × ATR = 200 ticks (sections 03–04).</p></details>
+  <details><summary>4. The bands slope up. Why does Carter refuse to short the upper band, even though price often turns there?</summary><p>Rising bands mean an uptrend; a short fights the drift and can run into a market that keeps going (point A), so it's lower probability. Only experienced traders with big accounts who scale in should try it; the beginner's way to sell there is a vertical credit spread (sections 04–05).</p></details>
+  <details><summary>5. Why does a tight stop hurt this setup more than most?</summary><p>Entries are at the mean, inside normal daily noise. A stop inside that noise gets hit by ordinary wiggles before the target, so the win rate collapses. His stop goes just outside the lower band, with smaller size to keep the risk the same (section 04; the pooled test shows the drop).</p></details>
+  <details><summary>6. Describe the "double bonus" and its two conditions.</summary><p>Start at half size; if price nears the lower band, add the other half; exit everything back at the mean for a small profit. Conditions: "full size" must already suit your account, and the hard stop stays in place (section 04).</p></details>
+  <details><summary>7. What exactly is the "fire" of a squeeze, and how do you know which way to trade it?</summary><p>The first lighter dot after a run of dark (compression) dots. Histogram above zero = long, below = short; it stays in play while the histogram keeps moving that way (section 05).</p></details>
+  <details><summary>8. Carter says RTM traders win 70% of the time and still lose. Explain the mechanism.</summary><p>A squeeze expands ATR, so the bands drawn from the old, small ATR no longer contain price. The 30% of trades taken while a squeeze is in play are large losses that wipe out the many small wins. Fix: remove the bands while a squeeze is in play (section 06).</p></details>
+  <details><summary>9. Franc squeeze long, ATR 120 ticks. The move reaches +3.5 ATR and momentum rolls over at +2.75. What does the scale-out plan make?</summary><p>¼ at +1, ¼ at +2 (stop to entry), ¼ at +3, last ¼ at +2.75: (1 + 2 + 3 + 2.75) ÷ 4 = 2.19 ATR ≈ 262 ticks per unit, versus 120 for taking everything at +1 ATR (section 06 calculator).</p></details>
+  <details><summary>10. AMZN's middle-to-band distance is $6. Check Carter's "$4.50, $3.15, $9 → $12.15".</summary><p>1 ATR = 6 ÷ 1.5 = $4.00, so $4.50 is about 1.1 ATR. 4.50 × 0.70 = $3.15, and 9.00 + 3.15 = 12.15, a 35% option gain (section 07).</p></details>
+  <details><summary>11. You're 5 days from expiry and a daily squeeze fires on a stock. Which options?</summary><p>Next month's: daily squeeze trades last 1–3 weeks, and within a week of expiry he rolls out (section 07).</p></details>
+  <details><summary>12. The 240/245 call spread was sold at 2.30. Max profit, max loss, break-even, and the loss at the 3.50 stop, on 100 spreads?</summary><p>Max profit $23,000 ($230 each); max loss $27,000 ($270 each); break-even 242.30 at expiry; stop at 3.50 loses (3.50 − 2.30) × 100 × 100 = $12,000 (section 09).</p></details>
+  <details><summary>13. Deeper: why can "price returned to its moving average" be true even in a market with no real mean reversion?</summary><p>The average moves toward price. After a big move, even if price stops dead, the EMA keeps catching up and the gap closes. The section 02 readout shows a large share of the gap closing that way in a random walk. That's why the setup needs the trend filter and a stop; the band touch alone isn't an edge (section 02, beyond the book).</p></details>
+  <details><summary>14. Deeper: the setup misses entire big moves. Why is that a feature of the design and not a bug to fix with wider bands?</summary><p>It's designed for quiet trends and ranges, where pullbacks to the mean happen and 1 ATR is reachable quickly. Widening the bands would make entries rarer and slower without catching momentum. Carter covers big moves with a different tool, the squeeze, and runs the two as a pair (sections 04 and 06).</p></details>
+</section>
+
+<footer>Built from John F. Carter, <i>Mastering the Trade</i>, 3rd edition, Chapter 10, "Reverting Back to the Mean, or, 'When Is the Best Time to Take a Profit?'" (PDF pages 233–243; printed page numbers match the PDF indexes in this copy), summarised in my own words. Figures 10.1–10.9 are blank in this PDF copy, so every chart is rebuilt from the text. Every chart uses simulated prices; pooled results use fixed seeds and show how the rules behave in model markets, not real-market evidence. The squeeze indicator settings (Bollinger 20/2 inside Keltner 20/1.5, linear-regression momentum) are the commonly published TTM ones, not from this chapter. Anything marked "beyond the book" is my addition. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+
+  function xyPlot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 8, padR = 56, padT = 12, padB = 26;
+    let lo = Infinity, hi = -Infinity;
+    (sp.series || []).forEach((s) => s.pts.forEach(([, y]) => { if (isFinite(y)) { lo = Math.min(lo, y); hi = Math.max(hi, y); } }));
+    (sp.rects || []).forEach((r) => { lo = Math.min(lo, r.y0, r.y1); hi = Math.max(hi, r.y0, r.y1); });
+    (sp.dots || []).forEach((d) => { lo = Math.min(lo, d.y); hi = Math.max(hi, d.y); });
+    (sp.hy || []).forEach((h) => { lo = Math.min(lo, h.y); hi = Math.max(hi, h.y); });
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    const pad = (hi - lo) * 0.08 || 1; lo = sp.ymin != null ? sp.ymin : lo - pad; hi = sp.ymax != null ? sp.ymax : hi + pad;
+    const X = (x) => padL + (x - sp.xmin) / (sp.xmax - sp.xmin) * (W - padL - padR);
+    const Y = (y) => padT + (hi - y) / (hi - lo) * (H - padT - padB);
+    const font = '11px ' + css('mono'); g.font = font; g.lineWidth = 1;
+    (sp.shadeX || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a), padT, X(s.b) - X(s.a), H - padT - padB); });
+    const yf = sp.yfmt || fmt;
+    niceTicks(lo, hi, H > 240 ? 5 : 3).forEach((t) => { const y = Y(t); g.strokeStyle = colorOf('rule', 0.9); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(yf(t), W - padR + 5, y + 4); });
+    const xt = sp.xticks || niceTicks(sp.xmin, sp.xmax, Math.max(3, Math.floor(W / 90)));
+    const xf = sp.xfmt || fmt;
+    g.fillStyle = colorOf('muted'); g.textAlign = 'center';
+    xt.forEach((t) => { const x = X(t); if (x < padL - 1 || x > W - padR + 1) return; g.fillText(xf(t), x, H - 8); g.strokeStyle = colorOf('rule', 0.5); g.beginPath(); g.moveTo(x, H - padB); g.lineTo(x, H - padB + 4); g.stroke(); });
+    g.textAlign = 'left';
+    if (lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.85); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+    (sp.rects || []).forEach((r) => { g.fillStyle = colorOf(r.col, r.alpha != null ? r.alpha : 0.8); const x0 = X(r.x0), x1 = X(r.x1), y0 = Y(r.y0), y1 = Y(r.y1); g.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.max(1, Math.abs(y1 - y0))); });
+    (sp.hy || []).forEach((h) => { g.strokeStyle = colorOf(h.col || 'muted', 0.9); g.setLineDash(h.dash || [5, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(padL, Y(h.y)); g.lineTo(W - padR, Y(h.y)); g.stroke(); g.setLineDash([]); if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); g.fillText(h.label, padL + 4, Y(h.y) - 4); } });
+    (sp.series || []).forEach((s) => {
+      g.strokeStyle = colorOf(s.col, s.alpha != null ? s.alpha : 1); g.lineWidth = s.w || 2; g.setLineDash(s.dash || []); g.beginPath(); let pen = false;
+      s.pts.forEach(([x, y]) => { if (!isFinite(y)) { pen = false; return; } const px = X(x), py = Y(Math.max(lo, Math.min(hi, y))); if (!pen) { g.moveTo(px, py); pen = true; } else g.lineTo(px, py); });
+      g.stroke(); g.setLineDash([]);
+    });
+    (sp.vx || []).forEach((v) => { const x = X(v.x); g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(x, padT); g.lineTo(x, H - padB); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); const tw = g.measureText(v.label).width; let tx = x + 4; if (tx + tw > W - padR) tx = x - tw - 4; g.fillText(v.label, tx, padT + 11 + (v.row || 0) * 14); } });
+    (sp.dots || []).forEach((d) => { g.fillStyle = colorOf(d.col || 'c1'); g.beginPath(); g.arc(X(d.x), Y(d.y), d.r || 4, 0, Math.PI * 2); g.fill(); if (d.label) { g.fillText(d.label, X(d.x) + 6, Y(d.y) - 6); } });
+    const L = $(id + 'L');
+    if (L) {
+      const items = []; (sp.series || []).forEach((s) => s.label && items.push([s.label, s.col])); (sp.legend || []).forEach((x) => items.push(x));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+  // candlestick chart with optional sub-panel. spec: {bars, upto, lines:[{d,col,label,dash,w}], hlines:[{v,col,label,dash,i0,i1}],
+  //   vlines:[{i,col,label,row}], marks:[{i,v,kind}], shade:[{a,b,col,alpha}], sub:{hist,histCol,dots,lines,hl,label}, legend}
+  function candlePlot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const bars = sp.bars, n = bars.length, upto = sp.upto == null ? n - 1 : Math.min(n - 1, sp.upto);
+    const padL = 6, padR = 52, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.3) : 0; const gap = sp.sub ? 16 : 0; const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i + 0.5) / n * (W - padL - padR);
+    const font = '11px ' + css('mono'); g.font = font;
+    function rangeOf(arrs, extra) { let lo = Infinity, hi = -Infinity; arrs.forEach((a) => a.forEach((v) => { if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } })); (extra || []).forEach((v) => { lo = Math.min(lo, v); hi = Math.max(hi, v); }); if (!isFinite(lo)) { lo = 0; hi = 1; } const p = (hi - lo) * 0.07 || 1; return [lo - p, hi + p]; }
+    const [lo, hi] = rangeOf([bars.map((b) => b.h), bars.map((b) => b.l)].concat((sp.lines || []).map((l) => l.d)), (sp.hlines || []).map((h) => h.v));
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 2, padT, X(s.b) - X(s.a) + 4, mainH); });
+    niceTicks(lo, hi, mainH > 150 ? 4 : 3).forEach((t) => { const y = Y(t); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    (sp.lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, 0, upto, colorOf(l.col, l.alpha != null ? l.alpha : 0.9), l.w || 1.3, l.dash));
+    const bw = Math.max(1.5, (W - padL - padR) / n * 0.62);
+    for (let i = 0; i <= upto; i++) {
+      const b = bars[i]; const up = b.c >= b.o; const col = colorOf(up ? 'buy' : 'sell');
+      g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(X(i), Y(b.h)); g.lineTo(X(i), Y(b.l)); g.stroke();
+      g.fillStyle = up ? colorOf('buy', 0.55) : col; const y0 = Y(Math.max(b.o, b.c)), y1 = Y(Math.min(b.o, b.c));
+      g.fillRect(X(i) - bw / 2, y0, bw, Math.max(1, y1 - y0));
+    }
+    (sp.hlines || []).forEach((h) => { const a = h.i0 != null ? X(h.i0) - bw : padL, b = h.i1 != null ? X(h.i1) + bw : W - padR; g.strokeStyle = colorOf(h.col || 'muted', 0.95); g.setLineDash(h.dash || [5, 4]); g.lineWidth = 1.4; g.beginPath(); g.moveTo(a, Y(h.v)); g.lineTo(b, Y(h.v)); g.stroke(); g.setLineDash([]); if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); const tw = g.measureText(h.label).width; let tx = a + 3; if (tx + tw > W - padR) tx = W - padR - tw - 2; g.fillText(h.label, tx, Y(h.v) - 4); } });
+    (sp.vlines || []).forEach((v) => { if (v.i > upto) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.1; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => { if (m.i > upto) return; const x = X(m.i), y = Y(m.v), s = 6; if (m.kind === 'buy') { g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); g.fill(); } else if (m.kind === 'sell') { g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); g.fill(); } else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill(); } });
+    if (sp.sub) {
+      const s = sp.sub; const top = padT + mainH + gap;
+      g.strokeStyle = colorOf('rule'); g.lineWidth = 1; g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke();
+      const [slo, shi] = rangeOf([s.hist || []].concat((s.lines || []).map((l) => l.d)), (s.hl || []).map((h) => h.v).concat(s.zero ? [0] : []));
+      const SY = (v) => top + (shi - v) / (shi - slo) * subH;
+      niceTicks(slo, shi, 2).forEach((t) => { const y = SY(t); g.strokeStyle = colorOf('rule', 0.7); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (s.hist) { const base = SY(slo < 0 && shi > 0 ? 0 : slo); for (let i = 0; i <= upto; i++) { const v = s.hist[i]; if (v == null) continue; const [tok, a] = s.histCol(i, v); g.fillStyle = colorOf(tok, a); const yv = SY(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.max(1, Math.abs(base - yv))); } }
+      (s.lines || []).forEach((l) => strokeSeries(g, l.d, X, SY, 0, upto, colorOf(l.col), l.w || 1.8, l.dash));
+      (s.hl || []).forEach((h) => { g.strokeStyle = colorOf(h.col || 'muted', 0.9); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(padL, SY(h.v)); g.lineTo(W - padR, SY(h.v)); g.stroke(); g.setLineDash([]); if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); g.fillText(h.label, padL + 4, SY(h.v) - 3); } });
+      if (s.dots) { const dy = slo < 0 && shi > 0 ? SY(0) : top + subH - 4; for (let i = 0; i <= upto; i++) { if (s.dots[i] == null) continue; g.fillStyle = s.dots[i] ? colorOf('ink', 0.9) : colorOf('muted', 0.35); g.beginPath(); g.arc(X(i), dy, Math.max(1.5, Math.min(3, bw / 2)), 0, Math.PI * 2); g.fill(); } }
+      if (s.label) { g.fillStyle = colorOf('muted'); g.fillText(s.label, padL + 4, top + 11); }
+    }
+    const L = $(id + 'L');
+    if (L) L.innerHTML = (sp.legend || []).map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+  }
+
+
+  // indicators for the squeeze reconstruction
+  function atr(bars, n) { const tr = bars.map((b, i) => i ? Math.max(b.h - b.l, Math.abs(b.h - bars[i - 1].c), Math.abs(b.l - bars[i - 1].c)) : b.h - b.l); return sma(tr, n); }
+  function highest(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = -Infinity; for (let k = 0; k < n; k++) m = Math.max(m, a[i - k]); o[i] = m; } return o; }
+  function lowest(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = Infinity; for (let k = 0; k < n; k++) m = Math.min(m, a[i - k]); o[i] = m; } return o; }
+  function linregEnd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let sx = 0, sy = 0, sxy = 0, sxx = 0, ok = true; for (let k = 0; k < n; k++) { const y = a[i - n + 1 + k]; if (y == null) { ok = false; break; } sx += k; sy += y; sxy += k * y; sxx += k * k; } if (!ok) continue; const b = (n * sxy - sx * sy) / (n * sxx - sx * sx); const a0 = (sy - b * sx) / n; o[i] = a0 + b * (n - 1); } return o; }
+  function squeeze(bars) {
+    const c = bars.map((b) => b.c), h = bars.map((b) => b.h), l = bars.map((b) => b.l); const n = 20;
+    const m = sma(c, n), sd = rollStd(c, n), at = atr(bars, n);
+    const bbU = m.map((v, i) => v == null ? null : v + 2 * sd[i]), bbL = m.map((v, i) => v == null ? null : v - 2 * sd[i]);
+    const kcU = m.map((v, i) => v == null || at[i] == null ? null : v + 1.5 * at[i]), kcL = m.map((v, i) => v == null || at[i] == null ? null : v - 1.5 * at[i]);
+    const on = c.map((_, i) => bbU[i] == null || kcU[i] == null ? null : (bbU[i] < kcU[i] && bbL[i] > kcL[i]));
+    const hh = highest(h, n), ll = lowest(l, n);
+    const src = c.map((v, i) => hh[i] == null || m[i] == null ? null : v - ((hh[i] + ll[i]) / 2 + m[i]) / 2);
+    const mom = linregEnd(src, n);
+    return { m, bbU, bbL, kcU, kcL, on, mom };
+  }
+
+
+  // =====================================================================
+  // chapter 10 engine: simulated markets, ATR, bands, squeeze windows, RTM trades
+  // =====================================================================
+  // Wilder's ATR (standard; the book only says "average range of the prior 14 periods")
+  function trueRange(bars) { return bars.map((b, i) => i ? Math.max(b.h - b.l, Math.abs(b.h - bars[i - 1].c), Math.abs(b.l - bars[i - 1].c)) : b.h - b.l); }
+  function wilderATR(bars, n) {
+    const tr = trueRange(bars); const o = nulls(bars.length); let a = null;
+    for (let i = 0; i < tr.length; i++) {
+      if (i === n - 1) { let s = 0; for (let k = 0; k < n; k++) s += tr[k]; a = s / n; o[i] = a; }
+      else if (i >= n) { a = (a * (n - 1) + tr[i]) / n; o[i] = a; }
+    }
+    return o;
+  }
+  // price = slowly moving "fair" line m + a deviation d. theta pulls d back to 0 (theta = 0 → pure random walk).
+  // segs: {n, slope (fraction of start per bar), theta, sig (fraction of start), kind}
+  function genPath(seed, segs, start) {
+    const r = rng(seed); const bars = []; let m = start, d = 0, pc = start;
+    for (const s of segs) {
+      for (let t = 0; t < s.n; t++) {
+        m += s.slope * start; d = d * (1 - s.theta) + s.sig * start * gauss(r);
+        const c = Math.max(start * 0.05, m + d);
+        const o = Math.max(start * 0.05, pc + s.sig * start * 0.25 * gauss(r));
+        const wick = s.sig * start * 0.55;
+        const h = Math.max(o, c) + Math.abs(gauss(r)) * wick, l = Math.max(start * 0.04, Math.min(o, c) - Math.abs(gauss(r)) * wick);
+        bars.push({ o, h, l, c, k: s.kind || 'quiet' }); pc = c;
+      }
+    }
+    return bars;
+  }
+  const SEG = {
+    quiet: (sg, n) => ({ n: n || 320, slope: 0.0006 * sg, theta: 0.12, sig: 0.006, kind: 'quiet' }),
+    rw: (sg, n) => ({ n: n || 320, slope: 0.0006 * sg, theta: 0, sig: 0.006, kind: 'random walk' }),
+    coil: (n) => ({ n: n || 28, slope: 0, theta: 0.3, sig: 0.0022, kind: 'squeeze (coil)' }),
+    burst: (bs, n) => ({ n: n || 45, slope: 0.0065 * bs, theta: 0.02, sig: 0.011, kind: 'breakout' })
+  };
+  function regimeSegs(regime, sg, bs) {
+    if (regime === 'quiet') return [SEG.quiet(sg)];
+    if (regime === 'rw') return [SEG.rw(sg)];
+    return [SEG.quiet(sg, 130), SEG.coil(), SEG.burst(bs), SEG.quiet(sg, 117)];
+  }
+  // all indicators the chapter uses, computed once per market
+  function indicators(bars) {
+    const c = bars.map((b) => b.c);
+    const e13 = ema(c, 13), e21 = ema(c, 21), A = wilderATR(bars, 14);
+    const up = e13.map((v, i) => v == null || A[i] == null ? null : v + 1.5 * A[i]);
+    const lo = e13.map((v, i) => v == null || A[i] == null ? null : v - 1.5 * A[i]);
+    const sq = squeeze(bars);
+    // squeeze windows: run of "on" (BB inside KC) → first "off" bar = fire → in play while momentum keeps building
+    const inPlay = new Array(bars.length).fill(false); const sqs = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (sq.on[i - 1] === true && sq.on[i] === false && sq.mom[i] != null && sq.mom[i - 1] != null) {
+        let s = i - 1; while (s > 0 && sq.on[s - 1] === true) s--;
+        const dir = sq.mom[i] >= 0 ? 1 : -1; let j = i + 1;
+        while (j < bars.length && sq.mom[j] != null && (dir > 0 ? sq.mom[j] >= sq.mom[j - 1] : sq.mom[j] <= sq.mom[j - 1])) j++;
+        for (let k = i; k < Math.min(j, bars.length); k++) inPlay[k] = true;
+        sqs.push({ start: s, fire: i, end: Math.min(j, bars.length - 1), dir, run: i - s });
+      }
+    }
+    return { c, e13, e21, A, up, lo, sq, inPlay, sqs };
+  }
+  // reversion-to-the-mean trades.
+  // o: {side:'with'|'against', tgt (ATR), stop (ATR from entry), near:'none'|'bail'|'double', sqf (skip while a squeeze is in play), maxHold}
+  function rtmRun(bars, I, o) {
+    const n = bars.length; const trades = []; const maxHold = o.maxHold || 60;
+    for (let i = 25; i < n - 1; i++) {
+      const m = I.e13[i], a = I.A[i]; if (m == null || a == null || I.e13[i - 5] == null) continue;
+      if (o.sqf && I.inPlay[i]) continue;
+      const dir = I.e13[i] > I.e13[i - 5] ? 1 : -1; const j = i + 1, b = bars[j];
+      let s = 0, entry = 0;
+      if (o.side === 'with') {
+        if (dir > 0 && b.l <= m) { s = 1; entry = Math.min(b.o, m); }
+        else if (dir < 0 && b.h >= m) { s = -1; entry = Math.max(b.o, m); }
+      } else {
+        if (dir > 0 && b.h >= m + 1.5 * a) { s = -1; entry = Math.max(b.o, m + 1.5 * a); }
+        else if (dir < 0 && b.l <= m - 1.5 * a) { s = 1; entry = Math.min(b.o, m - 1.5 * a); }
+      }
+      if (!s || (o.only && s !== o.only)) continue;
+      const tgtP = entry + s * o.tgt * a, stopP = entry - s * o.stop * a, nearP = entry - s * 1.25 * a;
+      const useNear = o.side === 'with' && o.near !== 'none';
+      let size = useNear && o.near === 'double' ? 0.5 : 1; const fills = [[entry, size]];
+      let touched = false, exit = null, why = '', k = j;
+      const fav = (x, y) => s > 0 ? x >= y : x <= y; // x at or beyond y in our favour
+      const adv = (x, y) => s > 0 ? x <= y : x >= y; // x at or beyond y against us
+      for (k = j; k < n; k++) {
+        const B = bars[k]; const lowS = s > 0 ? B.l : B.h, highS = s > 0 ? B.h : B.l;
+        if (k > j && adv(B.o, stopP)) { exit = B.o; why = 'stop (gap)'; break; }
+        if (adv(lowS, stopP)) { exit = stopP; why = 'stop'; break; }
+        if (k > j) {
+          const meanPrev = I.e13[k - 1];
+          if (useNear && touched && fav(highS, meanPrev)) { exit = fav(B.o, meanPrev) ? B.o : meanPrev; why = o.near === 'double' ? 'back to mean (doubled)' : 'bail at mean'; break; }
+          if (!(useNear && touched) && fav(highS, tgtP)) { exit = fav(B.o, tgtP) ? B.o : tgtP; why = 'target'; break; }
+        }
+        if (useNear && !touched && adv(lowS, nearP)) { touched = true; if (o.near === 'double') fills.push([adv(B.o, nearP) ? B.o : nearP, 0.5]); }
+        if (k - j >= maxHold) { exit = B.c; why = 'time (' + maxHold + ' bars)'; break; }
+      }
+      if (exit == null) { k = n - 1; exit = bars[k].c; why = 'open at end'; }
+      const pnl = fills.reduce((t, [p, z]) => t + s * (exit - p) * z, 0) / a;
+      trades.push({ a: j, b: k, s, entry, exit, tgtP, stopP, nearP, atr: a, pnl, why, kind: b.k, add: fills.length > 1 ? fills[1][0] : null });
+      i = k; // flat again after the exit bar
+    }
+    return trades;
+  }
+  function summarize(trades) {
+    const w = trades.filter((t) => t.pnl > 0), l = trades.filter((t) => t.pnl <= 0);
+    const sum = (a) => a.reduce((x, t) => x + t.pnl, 0);
+    let streak = 0, worst = 0; trades.forEach((t) => { streak = t.pnl <= 0 ? streak + 1 : 0; worst = Math.max(worst, streak); });
+    return { n: trades.length, win: trades.length ? w.length / trades.length : 0, avgW: w.length ? sum(w) / w.length : 0, avgL: l.length ? sum(l) / l.length : 0, exp: trades.length ? sum(trades) / trades.length : 0, total: sum(trades), worst, hold: trades.length ? trades.reduce((x, t) => x + (t.b - t.a), 0) / trades.length : 0 };
+  }
+  // pooled run over fixed seeds 1..N (never hand-picked)
+  const poolCache = new Map();
+  function pooled(regime, o, N) {
+    const key = regime + JSON.stringify(o) + N; if (poolCache.has(key)) return poolCache.get(key);
+    const all = [];
+    for (let s = 1; s <= N; s++) {
+      const r = rng(9000 + s); const sg = r() < 0.5 ? 1 : -1, bs = r() < 0.5 ? 1 : -1;
+      const bars = genPath(1000 + s, regimeSegs(regime, sg, bs), 100);
+      const I = indicators(bars); rtmRun(bars, I, o).forEach((t) => all.push(t));
+    }
+    poolCache.set(key, all); return all;
+  }
+
+
+  // ---------- shared state ----------
+  let seed = 7;
+  let G, IG, S, IS, Q, IQ, D, ID;
+  const GSEGS = [{ n: 120, slope: 0.0005, theta: 0.12, sig: 0.0068, kind: 'quiet' }, { n: 40, slope: -0.0004, theta: 0.12, sig: 0.008, kind: 'quiet' }, { n: 100, slope: 0.0008, theta: 0.1, sig: 0.021, kind: 'wild' }];
+  const SSEGS = [{ n: 200, slope: 0.0006, theta: 0.12, sig: 0.0055, kind: 'quiet' }];
+  const DSEGS = [{ n: 120, slope: -0.0007, theta: 0.12, sig: 0.006, kind: 'quiet' }, { n: 26, slope: 0, theta: 0.3, sig: 0.0022, kind: 'squeeze (coil)' }, { n: 22, slope: -0.0025, theta: 0.1, sig: 0.0055, kind: 'quiet break' }, { n: 90, slope: -0.0007, theta: 0.12, sig: 0.006, kind: 'quiet' }];
+  function buildData() {
+    G = genPath(seed, GSEGS, 1650); IG = indicators(G);
+    S = genPath(seed + 1, SSEGS, 1.0); IS = indicators(S);
+    Q = genPath(seed + 2, regimeSegs('mix', 1, 1), 125); IQ = indicators(Q);
+    D = genPath(seed + 3, DSEGS, 150); ID = indicators(D);
+    $('seedOut').textContent = seed;
+    idx2 = G.length - 1; idx4 = 0; st5 = 0;
+  }
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+  const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
+  const pct = (x) => (x * 100).toFixed(0) + '%';
+  const sgnf = (x, d = 2) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d);
+  const money = (x, d = 0) => (x < 0 ? '−$' : '$') + Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const zoneOf = (I, i) => I.e13[i] == null || I.e21[i] == null ? null : [Math.min(I.e13[i], I.e21[i]), Math.max(I.e13[i], I.e21[i])];
+  function distATR(I, i) { const z = zoneOf(I, i); if (!z || I.A[i] == null) return null; const c = I.c[i]; return c > z[1] ? (c - z[1]) / I.A[i] : c < z[0] ? (c - z[0]) / I.A[i] : 0; }
+  const toBars = (B) => B.map((b) => ({ o: b.o, h: b.h, l: b.l, c: b.c }));
+  function statsTable(rows) {
+    return '<div class="tablewrap"><table><thead><tr><th>group</th><th>trades</th><th>win rate</th><th>avg win</th><th>avg loss</th><th>per trade</th><th>total</th><th>worst losing run</th></tr></thead><tbody>' +
+      rows.map(([lab, s]) => `<tr><td>${lab}</td><td class="num">${s.n}</td><td class="num">${s.n ? pct(s.win) : '–'}</td><td class="num">${s.n ? sgnf(s.avgW) : '–'}</td><td class="num">${s.n ? sgnf(s.avgL) : '–'}</td><td class="num" style="color:var(--${s.exp >= 0 ? 'buy' : 'sell'})">${s.n ? sgnf(s.exp, 3) : '–'}</td><td class="num">${s.n ? sgnf(s.total, 1) : '–'}</td><td class="num">${s.worst}</td></tr>`).join('') +
+      '</tbody></table></div><p class="note">All P&amp;L in ATRs (per full-size position, measured with the ATR on the day before entry). Simulated markets, fixed seeds 1–150, not evidence about real markets.</p>';
+  }
+
+  // =====================================================================
+  // 01 · expanding away from / reverting to the average price
+  // =====================================================================
+  const d1 = reg(() => {
+    const which = $('sel1').value; const n = G.length;
+    const dist = G.map((_, i) => {
+      if (which === 'zone') return distATR(IG, i);
+      const m = which === '13' ? IG.e13[i] : IG.e21[i]; return m == null || IG.A[i] == null ? null : (IG.c[i] - m) / IG.A[i];
+    });
+    const lines = [{ d: IG.c, col: 'price', w: 1.2, label: 'close (simulated)' }];
+    if (which !== '21') lines.push({ d: IG.e13, col: 'c1', w: 2, label: '13-day EMA' });
+    if (which !== '13') lines.push({ d: IG.e21, col: 'c2', w: 2, label: '21-day EMA' });
+    const away = dist.map((v, i) => v != null && dist[i - 1] != null && Math.abs(v) > Math.abs(dist[i - 1]));
+    let exp = 0, rev = 0; dist.forEach((v, i) => { if (v == null || dist[i - 1] == null) return; away[i] ? exp++ : rev++; });
+    plot('c1', { n, lines, sub: { bars: [{ d: dist, col: (i) => colorOf(away[i] ? 'c1' : 'c2', 0.75) }], zero: true, label: 'distance from the average, in ATRs' }, legend: [['bar grows: expanding away', 'c1'], ['bar shrinks: reverting', 'c2']] });
+    const big = dist.filter((v) => v != null && Math.abs(v) > 1).length, tot = dist.filter((v) => v != null).length;
+    $('r1').innerHTML = `days moving away from the average <b>${exp}</b> · days moving back toward it <b>${rev}</b> · days more than 1 ATR away <b>${big}</b> of <b>${tot}</b>`;
+  });
+  $('sel1').addEventListener('change', d1);
+
+  // =====================================================================
+  // 02 · ATR and the gold example
+  // =====================================================================
+  let idx2 = 0;
+  const pool2 = new Map();
+  function excursions(regime, k) {
+    const key = regime + k; if (pool2.has(key)) return pool2.get(key);
+    let inside = 0, total = 0, ex = 0, back = 0, meanShare = 0, shareN = 0;
+    for (let s = 1; s <= 100; s++) {
+      const r = rng(7000 + s); const sg = r() < 0.5 ? 1 : -1;
+      const B = genPath(500 + s, regimeSegs(regime, sg, 1), 100); const I = indicators(B);
+      let armed = true;
+      for (let i = 30; i < B.length; i++) {
+        const d = distATR(I, i); if (d == null) continue; total++; if (Math.abs(d) <= k) inside++;
+        if (d === 0) armed = true;
+        if (armed && Math.abs(d) > k && i + 10 < B.length) {
+          armed = false; ex++; const z0 = zoneOf(I, i); const side = d > 0 ? 1 : -1; const edge0 = side > 0 ? z0[1] : z0[0]; const gap = Math.abs(I.c[i] - edge0);
+          for (let t = i + 1; t <= i + 10; t++) {
+            if (distATR(I, t) === 0) { back++; const z1 = zoneOf(I, t); const edge1 = side > 0 ? z1[1] : z1[0]; const moved = side * (edge1 - edge0); meanShare += Math.max(0, Math.min(1, moved / gap)); shareN++; break; }
+          }
+        }
+      }
+    }
+    const o = { inside: inside / total, ex, back: ex ? back / ex : 0, meanShare: shareN ? meanShare / shareN : 0 }; pool2.set(key, o); return o;
+  }
+  const d2 = reg(() => {
+    const k = val('k2'), n = G.length, nA = val('n2');
+    const Aw = wilderATR(G, nA); const As = atr(G, nA);
+    const zHi = G.map((_, i) => { const z = zoneOf(IG, i); return z && Aw[i] != null ? z[1] + k * Aw[i] : null; });
+    const zLo = G.map((_, i) => { const z = zoneOf(IG, i); return z && Aw[i] != null ? z[0] - k * Aw[i] : null; });
+    idx2 = Math.max(nA + 2, Math.min(n - 1, idx2));
+    candlePlot('c2', { bars: toBars(G), lines: [{ d: IG.e13, col: 'c1', w: 1.8 }, { d: IG.e21, col: 'c2', w: 1.8 }, { d: zHi, col: 'c3', dash: [4, 3], w: 1.2 }, { d: zLo, col: 'c3', dash: [4, 3], w: 1.2 }],
+      vlines: [{ i: idx2, col: 'muted', label: 'table day' }],
+      sub: { lines: [{ d: Aw, col: 'c3', w: 1.8 }, { d: As, col: 'muted', w: 1.2, dash: [3, 3] }], label: nA + '-day ATR' },
+      legend: [['simulated daily bars', 'price'], ['13 EMA', 'c1'], ['21 EMA', 'c2'], [`zone ± ${k} ATR`, 'c3'], ['ATR (Wilder)', 'c3'], ['ATR (simple average)', 'muted']] });
+    const early = Aw[100], late = Aw[n - 1];
+    const ex = excursions($('reg2').value, k);
+    $('r2').innerHTML = `ATR on day 100 <b>${early ? early.toFixed(1) : '–'}</b> · on the last day <b>${late ? late.toFixed(1) : '–'}</b> (same rubber band, ${early && late ? (late / early).toFixed(1) : '–'}× longer) · ` +
+      `<br>pooled over 100 simulated markets (${$('reg2').selectedOptions ? ($('reg2').selectedOptions[0] || {}).text || '' : ''}): closes within ${k} ATR of the 13/21 zone <b>${pct(ex.inside)}</b> · excursions beyond ${k} ATR <b>${ex.ex}</b> · back in the zone within 10 days <b>${pct(ex.back)}</b> · share of that gap closed by the <i>average moving</i>, not price <b>${pct(ex.meanShare)}</b>`;
+    // true-range table
+    const rows = []; for (let i = idx2 - 5; i <= idx2; i++) {
+      const b = G[i], pc = G[i - 1].c; const a1 = b.h - b.l, a2 = Math.abs(b.h - pc), a3 = Math.abs(b.l - pc); const tr = Math.max(a1, a2, a3);
+      const cell = (v) => `<td class="num"${v === tr ? ' style="font-weight:700;color:var(--c1)"' : ''}>${v.toFixed(1)}</td>`;
+      rows.push(`<tr><td class="num">${i}</td><td class="num">${b.h.toFixed(1)}</td><td class="num">${b.l.toFixed(1)}</td><td class="num">${pc.toFixed(1)}</td>${cell(a1)}${cell(a2)}${cell(a3)}<td class="num"><b>${tr.toFixed(1)}</b></td></tr>`);
+    }
+    $('t2').innerHTML = '<div class="tablewrap"><table><thead><tr><th>day</th><th>high</th><th>low</th><th>prev close</th><th>H − L</th><th>|H − prev C|</th><th>|L − prev C|</th><th>true range</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+    const trs = trueRange(G); const prevW = Aw[idx2 - 1];
+    $('r2b').innerHTML = `day <b>${idx2}</b> · true range <b>${trs[idx2].toFixed(1)}</b> · simple ${nA}-day average <b>${As[idx2].toFixed(1)}</b> · Wilder: (${prevW.toFixed(1)} × ${nA - 1} + ${trs[idx2].toFixed(1)}) ÷ ${nA} = <b>${Aw[idx2].toFixed(1)}</b>`;
+  });
+  bindRange('k2', d2); bindRange('n2', d2); $('reg2').addEventListener('change', d2);
+  $('prev2').addEventListener('click', () => { idx2 = Math.max(20, idx2 - 1); d2(); });
+  $('next2').addEventListener('click', () => { idx2 = Math.min(G.length - 1, idx2 + 1); d2(); });
+
+  // =====================================================================
+  // 03 · modified Keltner bands
+  // =====================================================================
+  const d3 = reg(() => {
+    const mult = val('m3'); const n = S.length;
+    const up = S.map((_, i) => IS.e13[i] == null || IS.A[i] == null ? null : IS.e13[i] + mult * IS.A[i]);
+    const lo = S.map((_, i) => IS.e13[i] == null || IS.A[i] == null ? null : IS.e13[i] - mult * IS.A[i]);
+    let out = 0, cnt = 0; for (let i = 20; i < n; i++) { if (up[i] == null) continue; cnt++; if (S[i].c > up[i] || S[i].c < lo[i]) out++; }
+    candlePlot('c3', { bars: toBars(S), lines: [{ d: IS.e13, col: 'c1', w: 1.6, dash: [2, 3] }, { d: up, col: 'c2', w: 1.6 }, { d: lo, col: 'c2', w: 1.6 }],
+      legend: [['simulated daily bars (a Swiss-franc-like quiet uptrend)', 'price'], ['middle: 13-day EMA (dotted)', 'c1'], [`bands: ± ${mult} × ATR(14)`, 'c2']] });
+    const a = IS.A[n - 1];
+    $('r3').innerHTML = `ATR today <b>${a.toFixed(4)}</b> = <b>${(a / 0.0001).toFixed(0)}</b> ticks · band offset ${mult} × ATR = <b>${(mult * a / 0.0001).toFixed(0)}</b> ticks · closes outside the bands <b>${out}</b> of <b>${cnt}</b> days (${pct(out / cnt)})`;
+  });
+  bindRange('m3', d3);
+  const d3b = () => {
+    const a = num('atr3', 0.01), t = num('tick3', 0.0001), m = num('mult3', 1.5);
+    $('r3b').innerHTML = `ATR = <b>${(a / t).toFixed(0)}</b> ticks · band distance = ${m} × ${(a / t).toFixed(0)} = <b>${(m * a / t).toFixed(0)}</b> ticks from the middle line · band width top to bottom <b>${(2 * m * a / t).toFixed(0)}</b> ticks`;
+  };
+  ['atr3', 'tick3', 'mult3'].forEach((id) => $(id).addEventListener('input', d3b)); d3b();
+
+  // =====================================================================
+  // 04 · trading the bands: step-through, pooled test, stop rule
+  // =====================================================================
+  let idx4 = 0;
+  const d4 = reg(() => {
+    const tr = rtmRun(S, IS, { side: 'with', tgt: 1, stop: 1.75, near: 'none', only: 1 });
+    const fade = rtmRun(S, IS, { side: 'against', tgt: 1, stop: 1.75, near: 'none', only: -1 });
+    if (!tr.length) { $('r4').innerHTML = 'No pullback to the mean in this market. Roll a new one.'; return; }
+    idx4 = Math.max(0, Math.min(tr.length - 1, idx4)); const t = tr[idx4];
+    const upto = Math.min(S.length - 1, t.b + 4);
+    const T = (v) => (v / 0.0001).toFixed(0);
+    candlePlot('c4', { bars: toBars(S), upto, lines: [{ d: IS.e13, col: 'c1', w: 1.5, dash: [2, 3] }, { d: IS.up, col: 'c2', w: 1.3 }, { d: IS.lo, col: 'c2', w: 1.3 }],
+      hlines: [{ v: t.entry, col: 'c1', label: 'entry at the mean', i0: t.a, i1: t.b }, { v: t.tgtP, col: 'buy', label: 'target +1 ATR', i0: t.a, i1: t.b }, { v: t.stopP, col: 'sell', label: 'stop 1.75 ATR (outside band)', i0: t.a, i1: t.b }],
+      marks: [{ i: t.a, v: t.entry, kind: t.s > 0 ? 'buy' : 'sell' }, { i: t.b, v: t.exit, kind: t.s > 0 ? 'sell' : 'buy' }],
+      shade: [{ a: t.a, b: t.b, col: t.pnl > 0 ? 'buy' : 'sell', alpha: 0.08 }],
+      legend: [['simulated bars', 'price'], ['13 EMA (mean)', 'c1'], ['1.5 ATR bands', 'c2'], ['target', 'buy'], ['stop', 'sell']] });
+    const sm = summarize(tr), sf = summarize(fade);
+    $('r4').innerHTML = `trade <b>${idx4 + 1}</b> of <b>${tr.length}</b> · ${t.s > 0 ? 'long' : 'short'} · ATR at entry <b>${T(t.atr)}</b> ticks · entry ${t.entry.toFixed(4)} · target ${t.tgtP.toFixed(4)} (+${T(t.atr)} ticks) · stop ${t.stopP.toFixed(4)} (−${T(1.75 * t.atr)} ticks) · exit: <b>${t.why}</b> after <b>${t.b - t.a}</b> days · result <b class="${t.pnl > 0 ? 'good' : 'bad'}">${sgnf(t.pnl)} ATR (${t.pnl >= 0 ? '+' : '−'}${T(Math.abs(t.pnl * t.atr))} ticks)</b>` +
+      `<br>this market: long-only mean buys won <b>${sm.n ? pct(sm.win) : '–'}</b> of ${sm.n}, net <b>${sgnf(sm.total, 1)}</b> ATR · fading the upper band instead won <b>${sf.n ? pct(sf.win) : '–'}</b> of ${sf.n}, net <b>${sgnf(sf.total, 1)}</b> ATR`;
+  });
+  $('prev4').addEventListener('click', () => { idx4 = Math.max(0, idx4 - 1); d4(); });
+  $('next4').addEventListener('click', () => { idx4 += 1; d4(); });
+  const p4 = () => {
+    const o = { side: $('side4').value, tgt: +$('tgt4').value, stop: +$('stop4').value, near: $('near4').value, sqf: $('sq4').checked };
+    const regime = $('reg4').value; const all = pooled(regime, o, 150);
+    const kinds = [...new Set(all.map((t) => t.kind))];
+    const rows = [['all trades', summarize(all)]].concat(kinds.length > 1 ? kinds.map((k) => ['entered during: ' + k, summarize(all.filter((t) => t.kind === k))]) : []);
+    $('t4').innerHTML = statsTable(rows);
+  };
+  ['reg4', 'side4', 'tgt4', 'stop4', 'near4', 'sq4'].forEach((id) => $(id).addEventListener('change', p4)); p4();
+  const d4c = () => {
+    const a = num('atrS4', 0.01), t = num('tickS4', 0.0001), p = num('pxS4', 1.05);
+    $('r4c').innerHTML = `stop distance = 2 × ${a} = <b>${(2 * a).toPrecision(3)}</b> (<b>${(2 * a / t).toFixed(0)}</b> ticks) · long from ${p} → stop at <b>${(p - 2 * a).toPrecision(5)}</b> · short from ${p} → stop at <b>${(p + 2 * a).toPrecision(5)}</b>`;
+  };
+  ['atrS4', 'tickS4', 'pxS4'].forEach((id) => $(id).addEventListener('input', d4c)); d4c();
+
+  // =====================================================================
+  // 05 · rule 1 (go with the trend) and rule 2 (squeeze), squeeze step-through
+  // =====================================================================
+  let st5 = 0;
+  function pickSqueeze(I) { if (!I.sqs.length) return null; return I.sqs.reduce((b, s) => (s.end - s.fire >= b.end - b.fire ? s : b), I.sqs[0]); }
+  function histCol(I) { return (i, v) => { const p = I.sq.mom[i - 1]; const building = p == null ? true : v >= 0 ? v >= p : v <= p; return [v >= 0 ? 'buy' : 'sell', building ? 0.9 : 0.35]; }; }
+  const d5 = reg(() => {
+    const s = pickSqueeze(IQ); const n = Q.length;
+    if (!s) { $('r5').innerHTML = 'No squeeze fired in this market. Roll a new one.'; candlePlot('c5', { bars: toBars(Q) }); return; }
+    st5 = Math.max(0, Math.min(3, st5));
+    const stages = [
+      { upto: s.fire - 1, text: `<b>Compression.</b> ${s.run} dark dots in a row: the Bollinger Bands sit inside the Keltner Channel, volatility is coiled. (Carter's Figure 10.4 example ran for 13 bars.)` },
+      { upto: s.fire, text: `<b>Fire.</b> The first light dot after the dark run, on day ${s.fire}. The histogram is ${s.dir > 0 ? 'above' : 'below'} zero, so the trade is <b>${s.dir > 0 ? 'long' : 'short'}</b>. From here the bands are off the chart.` },
+      { upto: s.end - 1, text: `<b>In play.</b> The histogram keeps ${s.dir > 0 ? 'rising' : 'falling'} for ${s.end - s.fire} day(s). Price moves ${sgnf((Q[s.end - 1].c - Q[s.fire].c) / IQ.A[s.fire], 1)} ATR from the fire close.` },
+      { upto: Math.min(n - 1, s.end + 12), text: `<b>Over.</b> On day ${s.end} the histogram loses momentum (a faded bar). The squeeze is no longer in play; the bands go back on and reversion trades are allowed again.` }
+    ];
+    const S5 = stages[st5];
+    const showBand = (i) => i < s.fire || i >= s.end;
+    candlePlot('c5', { bars: toBars(Q), upto: S5.upto, lines: [{ d: IQ.e13, col: 'c1', w: 1.4, dash: [2, 3] }, { d: IQ.up.map((v, i) => showBand(i) ? v : null), col: 'c2', w: 1.3 }, { d: IQ.lo.map((v, i) => showBand(i) ? v : null), col: 'c2', w: 1.3 }],
+      shade: [{ a: s.start, b: s.fire - 1, col: 'muted', alpha: 0.1 }].concat(st5 >= 2 ? [{ a: s.fire, b: s.end - 1, col: s.dir > 0 ? 'buy' : 'sell', alpha: 0.1 }] : []),
+      vlines: [{ i: s.fire, col: 'c1', label: 'fire' }].concat(st5 >= 3 ? [{ i: s.end, col: 'muted', label: 'momentum fades', row: 1 }] : []),
+      sub: { hist: IQ.sq.mom, histCol: histCol(IQ), dots: IQ.sq.on, label: 'squeeze: dots on the zero line, momentum histogram' },
+      legend: [['simulated bars', 'price'], ['13 EMA', 'c1'], ['1.5 ATR bands (hidden while the squeeze is in play)', 'c2'], ['dark dot = compression · light dot = released', 'ink'], ['bright bar = building · faded bar = losing momentum', 'buy']] });
+    $('r5').innerHTML = `stage ${st5 + 1} of 4 · ` + S5.text;
+  });
+  $('prev5').addEventListener('click', () => { st5 = Math.max(0, st5 - 1); d5(); });
+  $('next5').addEventListener('click', () => { st5 = Math.min(3, st5 + 1); d5(); });
+  const p5 = () => {
+    const reg5 = $('reg5').value; const o = { tgt: 1, stop: 1.75, near: 'none', sqf: false };
+    const w = summarize(pooled(reg5, Object.assign({ side: 'with' }, o), 150)), a = summarize(pooled(reg5, Object.assign({ side: 'against' }, o), 150));
+    $('t5').innerHTML = statsTable([['with the trend: buy the mean (uptrend) / short the mean (downtrend)', w], ['against the trend: short the upper band (uptrend) / buy the lower band (downtrend)', a]]);
+  };
+  $('reg5').addEventListener('change', p5); p5();
+
+  // =====================================================================
+  // 06 · squeeze vs RTM: ATR expansion, the 70/30 trap, scale-out plan
+  // =====================================================================
+  const d6 = reg(() => {
+    const n = Q.length; const shade = IQ.sqs.map((s) => ({ a: s.fire, b: Math.max(s.fire, s.end - 1), col: s.dir > 0 ? 'buy' : 'sell', alpha: 0.14 }));
+    plot('c6', { n, lines: [{ d: IQ.A, col: 'c3', w: 2, label: 'ATR(14), simulated' }], shade, legend: [['squeeze in play (fire → momentum fades)', 'buy']] });
+    const s = pickSqueeze(IQ);
+    const coil = Q.findIndex((b) => b.k === 'squeeze (coil)'), burst = Q.findIndex((b) => b.k === 'breakout');
+    let peak = 0; for (let i = burst; i < Math.min(n, burst + 45); i++) peak = Math.max(peak, IQ.A[i] || 0);
+    $('r6').innerHTML = `ATR at the end of the quiet coil (day ${burst - 1}) <b>${IQ.A[burst - 1].toFixed(2)}</b> · peak ATR during the breakout <b>${peak.toFixed(2)}</b> (${(peak / IQ.A[burst - 1]).toFixed(1)}×) · squeezes that fired in this market <b>${IQ.sqs.length}</b>` + (s ? ` · longest in play: day ${s.fire}–${s.end - 1}` : '') + ` · the coil was built in on days ${coil}–${burst - 1}`;
+  });
+  const p6 = () => {
+    const side = $('side6').value; const base = { side, tgt: 1, stop: 1.75, near: 'none' };
+    const off = pooled('mix', Object.assign({ sqf: false }, base), 150), on = pooled('mix', Object.assign({ sqf: true }, base), 150);
+    const by = (arr, k) => summarize(arr.filter((t) => t.kind === k));
+    $('t6').innerHTML = statsTable([
+      ['ignore squeezes: all', summarize(off)], ['ignore squeezes: entered in quiet trend', by(off, 'quiet')], ['ignore squeezes: entered in coil', by(off, 'squeeze (coil)')], ['ignore squeezes: entered in breakout', by(off, 'breakout')],
+      ['bands off while a squeeze is in play: all', summarize(on)], ['bands off: entered in breakout', by(on, 'breakout')]]);
+  };
+  $('side6').addEventListener('change', p6); p6();
+  const d6b = () => {
+    const mx = val('mx6'), rb = Math.min(val('rb6'), mx), tk = num('tk6', 120);
+    const steps = []; let pnl = 0, left = 4, stop = -2;
+    if (mx < 1) {
+      const ex = Math.max(-2, rb); steps.push(`Momentum fades before +1 ATR: bail on all 4 quarters at ${sgnf(ex)} ATR.`); pnl = 4 * ex; left = 0;
+    } else {
+      [1, 2, 3].forEach((lv) => { if (mx >= lv && left > 1) { pnl += lv; left--; steps.push(`+${lv} ATR (${lv * tk} ticks) reached: sell a quarter.` + (lv === 2 ? ' Stop on the rest moves to entry.' : '')); if (lv === 2) stop = 0; } });
+      const ex = Math.max(stop, rb); pnl += left * ex;
+      steps.push(`Momentum rolls over at ${sgnf(rb)} ATR: ${left} quarter(s) out at ${ex === stop && rb < stop ? 'the stop, ' : ''}${sgnf(ex)} ATR.`);
+    }
+    const all1 = mx >= 1 ? 1 : Math.max(-2, rb);
+    $('t6b').innerHTML = '<ol class="plain">' + steps.map((s) => `<li>${s}</li>`).join('') + '</ol>';
+    $('r6b').innerHTML = `scale-out plan: average <b>${sgnf(pnl / 4)}</b> ATR per unit = <b>${sgnf(pnl / 4 * tk, 0)}</b> ticks · all out at the first +1 ATR instead: <b>${sgnf(all1)}</b> ATR = <b>${sgnf(all1 * tk, 0)}</b> ticks`;
+  };
+  bindRange('mx6', d6b); bindRange('rb6', d6b); $('tk6').addEventListener('input', d6b); d6b();
+
+  // =====================================================================
+  // 07 · AMZN: squeeze calls and RTM calls
+  // =====================================================================
+  function scaleOutTrade(B, I, s) {
+    const e = B[s.fire].c, a = I.A[s.fire], dir = s.dir; let left = 4, pnl = 0, stop = e - dir * 2 * a, lv = 1, out = [];
+    for (let k = s.fire + 1; k < B.length; k++) {
+      const b = B[k];
+      if (dir > 0 ? b.l <= stop : b.h >= stop) { pnl += left * dir * (stop - e); out.push(`${left} quarter(s) stopped at ${stop.toFixed(2)} on day ${k}`); left = 0; break; }
+      while (lv <= 3 && left > 1 && (dir > 0 ? b.h >= e + lv * a : b.l <= e - lv * a)) { pnl += lv * a; left--; out.push(`¼ at +${lv} ATR on day ${k}`); if (lv === 2) stop = e; lv++; }
+      if (k >= s.end) { pnl += left * dir * (b.c - e); out.push(`${left} quarter(s) out at ${b.c.toFixed(2)} on day ${k} (momentum faded)`); left = 0; break; }
+    }
+    return { e, a, pnl: pnl / 4, out };
+  }
+  const d7 = reg(() => {
+    const n = Q.length; const tr = rtmRun(Q, IQ, { side: 'with', tgt: 1, stop: 1.75, near: 'none', sqf: true });
+    const off = (i) => IQ.inPlay[i];
+    const marks = []; tr.forEach((t) => { marks.push({ i: t.a, v: t.entry, kind: t.s > 0 ? 'buy' : 'sell' }); marks.push({ i: t.b, v: t.exit, kind: t.s > 0 ? 'sell' : 'buy' }); });
+    candlePlot('c7', { bars: toBars(Q), lines: [{ d: IQ.e13, col: 'c1', w: 1.4, dash: [2, 3] }, { d: IQ.up.map((v, i) => off(i) ? null : v), col: 'c2', w: 1.3 }, { d: IQ.lo.map((v, i) => off(i) ? null : v), col: 'c2', w: 1.3 }],
+      shade: IQ.sqs.map((s) => ({ a: s.fire, b: Math.max(s.fire, s.end - 1), col: s.dir > 0 ? 'buy' : 'sell', alpha: 0.13 })), marks,
+      sub: { hist: IQ.sq.mom, histCol: histCol(IQ), dots: IQ.sq.on, label: 'squeeze' },
+      legend: [['simulated bars, AMZN-like start at $125', 'price'], ['13 EMA', 'c1'], ['RTM bands (removed while a squeeze is in play)', 'c2'], ['RTM entry / exit', 'buy'], ['squeeze in play (shaded)', 'sell']] });
+    const sm = summarize(tr); const s = pickSqueeze(IQ); let sq = '';
+    if (s) { const r = scaleOutTrade(Q, IQ, s); sq = ` · longest squeeze (fired day ${s.fire}, ${s.dir > 0 ? 'long' : 'short'} at ${r.e.toFixed(2)}, ATR ${r.a.toFixed(2)}): ${r.out.join('; ')} → average <b class="${r.pnl >= 0 ? 'good' : 'bad'}">${sgnf(r.pnl / r.a)} ATR</b> per unit of stock`; }
+    $('r7').innerHTML = `RTM trades with bands off during squeezes <b>${sm.n}</b> · won <b>${sm.n ? pct(sm.win) : '–'}</b> · net <b>${sgnf(sm.total, 1)}</b> ATR` + sq;
+  });
+  const d7b = () => {
+    const bd = num('bd7', 6), mu = num('mu7', 1.5), mv = num('mv7', 4.5), de = num('de7', 0.7), cp = num('cp7', 9);
+    const a = bd / mu, opt = mv * de;
+    $('r7b').innerHTML = `1 ATR = ${bd} ÷ ${mu} = <b>$${a.toFixed(2)}</b> · the move taken = <b>${(mv / a).toFixed(2)} ATR</b> · option gain ≈ ${mv} × ${de} = <b>$${opt.toFixed(2)}</b> per share (<b>${money(opt * 100)}</b> per contract) · call ${money(cp, 2)} → <b>${money(cp + opt, 2)}</b> (<b>+${(opt / cp * 100).toFixed(0)}%</b>) · the stock itself moved <b>+${(mv / 125 * 100).toFixed(1)}%</b> if it was near $125`;
+  };
+  ['bd7', 'mu7', 'mv7', 'de7', 'cp7'].forEach((id) => $(id).addEventListener('input', d7b)); d7b();
+  const d7c = () => {
+    const dte = val('dte7');
+    $('r7c').innerHTML = dte <= 7 ? `<b>${dte} days</b> to expiry: within a week, so buy the <b>next month's</b> options. A daily squeeze trade can last 1–3 weeks.` : `<b>${dte} days</b> to expiry: more than a week, so the front month is fine${dte < 21 ? ', though a 3-week trade would run into expiry week' : ''}.`;
+  };
+  bindRange('dte7', d7c); d7c();
+
+  // =====================================================================
+  // 08 · GS downtrend: puts
+  // =====================================================================
+  const d8 = reg(() => {
+    const tr = rtmRun(D, ID, { side: 'with', tgt: 1.5, stop: 1.75, near: 'none', sqf: true, only: -1 });
+    const marks = []; tr.forEach((t) => { marks.push({ i: t.a, v: t.entry, kind: 'sell' }); marks.push({ i: t.b, v: t.exit, kind: 'buy' }); });
+    candlePlot('c8', { bars: toBars(D), lines: [{ d: ID.e13, col: 'c1', w: 1.4, dash: [2, 3] }, { d: ID.up.map((v, i) => ID.inPlay[i] ? null : v), col: 'c2', w: 1.3 }, { d: ID.lo.map((v, i) => ID.inPlay[i] ? null : v), col: 'c2', w: 1.3 }],
+      shade: ID.sqs.map((s) => ({ a: s.fire, b: Math.max(s.fire, s.end - 1), col: s.dir > 0 ? 'buy' : 'sell', alpha: 0.13 })), marks,
+      sub: { hist: ID.sq.mom, histCol: histCol(ID), dots: ID.sq.on, label: 'squeeze' },
+      legend: [['simulated bars, GS-like downtrend from $150', 'price'], ['13 EMA', 'c1'], ['bands', 'c2'], ['short the mean (buy puts)', 'sell'], ['cover at the lower band', 'buy']] });
+    const sm = summarize(tr);
+    $('t8').innerHTML = '<div class="seq">' + tr.map((t, k) => `<div class="bt"><i class="${t.pnl > 0 ? 'w' : 'l'}"></i><span>#${k + 1} · day ${t.a} · held ${t.b - t.a} day(s) · ${t.why} · <b class="${t.pnl > 0 ? 'good' : 'bad'}">${sgnf(t.pnl)} ATR</b></span></div>`).join('') + '</div>';
+    const quick = tr.filter((t) => t.pnl > 0 && t.b - t.a <= 3).length, wins = tr.filter((t) => t.pnl > 0).length;
+    $('r8').innerHTML = `short-only mean trades <b>${sm.n}</b> · won <b>${sm.n ? pct(sm.win) : '–'}</b> · winners that hit the lower band within 1–3 days <b>${quick}</b> of <b>${wins}</b> · longest winner <b>${Math.max(0, ...tr.filter((t) => t.pnl > 0).map((t) => t.b - t.a))}</b> days · built-in reversion speed: half-life ≈ ln 2 ÷ 0.12 ≈ <b>5.8</b> days`;
+  });
+
+  // =====================================================================
+  // 09 · the 240/245 call vertical credit spread
+  // =====================================================================
+  const d9 = reg(() => {
+    const px = val('px9'), ct = num('ct9', 100), cr = num('cr9', 2.3), sv = num('sv9', 1.56), K1 = 240, K2 = 245, w = K2 - K1;
+    const pay = (P) => (cr - (Math.max(0, P - K1) - Math.max(0, P - K2))) * 100 * ct;
+    const pts = []; for (let P = 230; P <= 255.001; P += 0.25) pts.push([P, pay(P)]);
+    const be = K1 + cr;
+    xyPlot('c9', { xmin: 230, xmax: 255, series: [{ pts, col: 'c2', w: 2.4, label: `P&L at expiry, ${ct} spreads (formula, beyond the book's text)` }],
+      dots: [{ x: px, y: pay(px), col: 'c1', r: 5 }], vx: [{ x: K1, col: 'sell', label: 'short 240 C' }, { x: K2, col: 'buy', label: 'long 245 C', row: 1 }, { x: be, col: 'c1', label: 'break-even ' + be.toFixed(2), row: 2 }, { x: 241.84, col: 'muted', label: 'Oct 12 high 241.84', row: 3 }],
+      xfmt: (v) => '$' + v.toFixed(0), yfmt: (v) => (v < 0 ? '−$' : '$') + Math.abs(v / 1000).toFixed(0) + 'k', hy: [{ y: 0, col: 'muted' }] });
+    const maxP = cr * 100 * ct, maxL = (w - cr) * 100 * ct;
+    $('r9').innerHTML = `AMZN at expiry <b>$${px.toFixed(2)}</b> → P&amp;L <b class="${pay(px) >= 0 ? 'good' : 'bad'}">${money(pay(px))}</b> · max profit (below 240) <b>${money(maxP)}</b> = $${(cr * 100).toFixed(0)} a spread · max loss (above 245) <b>${money(-maxL)}</b> = ($${w}.00 − $${cr.toFixed(2)}) × 100 = $${((w - cr) * 100).toFixed(0)} a spread · reward : risk <b>${(cr / (w - cr)).toFixed(2)} : 1</b>`;
+    const now = (cr - sv) * 100 * ct, atStop = (cr - 3.5) * 100 * ct;
+    $('r9b').innerHTML = `buy it back now at ${sv.toFixed(2)} → <b class="${now >= 0 ? 'good' : 'bad'}">${money(now)}</b> · at the 3.50 stop → <b class="bad">${money(atStop)}</b> · Fig 10.8's +$14,150 on ${ct} spreads implies the spread was worth <b>${(cr - 14150 / (100 * ct)).toFixed(3)}</b> at that moment`;
+  });
+  bindRange('px9', d9); ['ct9', 'cr9', 'sv9'].forEach((id) => $(id).addEventListener('input', d9));
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { redrawAll(); }); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

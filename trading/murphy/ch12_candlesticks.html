@@ -1,0 +1,1534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.12 Japanese Candlesticks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.plate > * { min-width: 0; }
+.readout, .checks { overflow-wrap: anywhere; }
+.checks { font-family: var(--mono); font-size: 13px; display: grid; gap: 3px; }
+.checks .ok { color: var(--buy); } .checks .no { color: var(--sell); }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr)); gap: 8px; }
+select { max-width: 100%; }
+.pcard { min-width: 0; overflow: hidden; display: grid; gap: 2px; text-align: left; padding: 6px; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; font-family: var(--mono); }
+.pcard svg { width: 100%; height: 84px; display: block; }
+.pcard .pname { font-size: 12px; color: var(--ink); font-weight: 600; line-height: 1.25; }
+.pcard .pmeta { font-size: 11px; color: var(--muted); }
+.pcard.sel { border-color: var(--c1); outline: 1px solid var(--c1); }
+.pcard[hidden] { display: none; }
+.big svg { width: 100%; height: auto; display: block; }
+.readout .full { flex-basis: 100%; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch11_point_and_figure.html">← Ch.11</a><a href="ch13_elliott_wave.html">Ch.13 →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John J. Murphy · Technical Analysis of the Financial Markets · Chapter 12 · pdf p342–364</div>
+  <h1>Japanese candlesticks, <em>read as a tug-of-war</em></h1>
+  <p class="lede">The chapter in plain words and in the book's order: how one candle is drawn from the same four prices as a bar, what each basic candle shape means, the few patterns the chapter explains step by step, the computer and filtering ideas, and the full library of 68 named patterns at the end. Murphy didn't write this chapter himself: a footnote says it was contributed by <b>Gregory L. Morris</b>. Every chart here is drawn from simulated prices, built to show one idea.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b> · feeds the bar/candle chart, the trend chart, the pixel test, the filter chart and the trade lab</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Two subjects share one name: a way of <em>drawing</em> prices, and the art of <em>reading combinations</em> of candles. The second sits on top of the first.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Draw</span><span class="node key">Open, High, Low, Close</span><span class="arr">→</span><span class="node">body (open↔close) + shadows (high, low)</span><span class="arr">→</span><span class="node">white = up day, black = down day</span></div>
+    <div class="row"><span class="tag">Alphabet</span><span class="node">long / short days</span><span class="node">spinning tops</span><span class="node">doji: long-legged · gravestone · dragonfly</span></div>
+    <div class="row"><span class="tag">Words</span><span class="node key">Patterns of 1–5 candles</span><span class="arr">→</span><span class="node">reversal (≈40)</span><span class="node">continuation (16)</span></div>
+    <div class="row"><span class="tag">Rule zero</span><span class="node key">Know the trend first (a ~10-period MA works)</span><span class="arr">→</span><span class="node">a bullish reversal can't exist in an uptrend</span></div>
+    <div class="row"><span class="tag">Worked</span><span class="node">Dark Cloud Cover / Piercing Line</span><span class="node">Evening / Morning Star</span><span class="node">Rising / Falling Three Methods</span></div>
+    <div class="row"><span class="tag">Tools</span><span class="node">computers: exact rules, beware pixels</span><span class="arr">→</span><span class="node key">filter: act only when %D is above 80 or below 20</span></div>
+    <div class="row"><span class="tag">Test (mine)</span><span class="node">entry / stop / target per pattern</span><span class="arr">→</span><span class="node">pooled vs a random-entry control</span><span class="arr">→</span><span class="node">what "no edge" looks like</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Introduction</a>
+    <a href="#s2"><span>02</span>Candlestick charting</a>
+    <a href="#s3"><span>03</span>Basic candlesticks</a>
+    <a href="#s4"><span>04</span>Candle pattern analysis</a>
+    <a href="#s5"><span>05</span>Reversal patterns: trend first</a>
+    <a href="#s6"><span>06</span>Dark Cloud Cover &amp; Piercing Line</a>
+    <a href="#s7"><span>07</span>Evening &amp; Morning Star</a>
+    <a href="#s8"><span>08</span>Continuation: Three Methods</a>
+    <a href="#s9"><span>09</span>Computers &amp; the pixel trap</a>
+    <a href="#s10"><span>10</span>Filtered candle patterns</a>
+    <a href="#s11"><span>11</span>Conclusion</a>
+    <a href="#s12"><span>12</span>The pattern library (68)</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · INTRODUCTION</div><h2>One word, two subjects</h2></div><span class="chip">pdf p342</span></div>
+  <p>The Japanese have used candlesticks for centuries, but the West only picked them up recently (the book is from the late 1990s). The word "candlesticks" means two different but related things:</p>
+  <ul class="plain">
+    <li><b>A way to display</b> stock and futures prices on a chart. The chapter says this is possibly the more popular use.</li>
+    <li><b>The art of spotting certain combinations</b> of candles, in defined combinations the chapter calls proven.</li>
+  </ul>
+  <p>You can use either one alone, or both together.</p>
+  <p>Murphy hands this chapter to its contributor at the end of Chapter 11 (pdf p341): point and figure isn't the oldest charting method, he says; candlesticks, used in Japan for centuries, are. He introduces Greg Morris as the author of two books on candlesticks and notes the technique's new popularity among Western analysts.</p>
+  <div class="box picture"><b>Picture it</b><p>The first subject is the alphabet; the second is reading words. You can write a letter in a new alphabet without knowing any words (just draw your charts as candles), or you can learn the words and look for them on any chart.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 3 introduced the candlestick chart as one way to draw prices: <a href="ch03_chart_construction.html">ch03_chart_construction</a>.</li>
+    <li>The full treatment is Steve Nison's <i>Japanese Candlestick Charting Techniques</i>, in your library: history ch.2 (pdf p28), constructing candle lines ch.3 (pdf p34).</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · CANDLESTICK CHARTING</div><h2>Same four prices, drawn so they jump out</h2></div><span class="chip">pdf p342–344 · Fig 12.1, 12.2</span></div>
+  <p>A candlestick chart uses exactly the data of a bar chart: open, high, low and close. Nothing new is added. The chapter's claim is that the candle form is more visually appealing and easier to read: information seems to jump off the screen. The name comes from the look: a rectangle with a thin line above and below, like a candle with a wick.</p>
+  <ul class="plain">
+    <li><b>Body:</b> the rectangle between the open and the close.</li>
+    <li><b>White body:</b> the close was higher than the open. It's really drawn hollow (not filled), a Western change that prints and displays well on computers. The Japanese draw this body in <b>red</b>.</li>
+    <li><b>Black body:</b> the close was lower than the open.</li>
+    <li><b>Shadows</b> (also called <b>wicks</b> or <b>hairs</b>): the thin lines above and below the body, reaching to the high and the low. Japanese books use many names for them, which the chapter finds odd, because the Japanese don't normally treat the high and low as vital. The open and the close carry the weight.</li>
+  </ul>
+  <div class="fig big">
+    <h3>Figure 12.1 idea: one day as a bar, then as a candle</h3>
+    <svg viewBox="0 0 560 230" role="img" aria-label="A price bar, a white candle and a black candle built from the same high and low">
+      <!-- bar -->
+      <line x1="70" y1="30" x2="70" y2="200" stroke="var(--price)" stroke-width="3"/>
+      <line x1="50" y1="160" x2="70" y2="160" stroke="var(--price)" stroke-width="3"/>
+      <line x1="70" y1="60" x2="90" y2="60" stroke="var(--price)" stroke-width="3"/>
+      <text x="100" y="34">High</text><text x="100" y="64">Close</text><text x="4" y="164">Open</text><text x="100" y="204">Low</text>
+      <text x="40" y="224">bar</text>
+      <!-- white candle -->
+      <line x1="270" y1="30" x2="270" y2="60" stroke="var(--price)" stroke-width="2"/>
+      <rect x="250" y="60" width="40" height="100" fill="var(--plate)" stroke="var(--price)" stroke-width="2"/>
+      <line x1="270" y1="160" x2="270" y2="200" stroke="var(--price)" stroke-width="2"/>
+      <text x="298" y="64">close (top)</text><text x="298" y="164">open (bottom)</text>
+      <text x="300" y="40" fill="var(--muted)">upper shadow</text><text x="300" y="196">lower shadow</text>
+      <text x="214" y="224">white: close &gt; open</text>
+      <!-- black candle -->
+      <line x1="470" y1="30" x2="470" y2="60" stroke="var(--price)" stroke-width="2"/>
+      <rect x="450" y="60" width="40" height="100" fill="var(--price)" stroke="var(--price)" stroke-width="2"/>
+      <line x1="470" y1="160" x2="470" y2="200" stroke="var(--price)" stroke-width="2"/>
+      <text x="420" y="224">black: close &lt; open</text>
+      <text x="496" y="64">open</text><text x="496" y="164">close</text>
+      <text x="208" y="114" fill="var(--c1)">body</text>
+    </svg>
+  </div>
+  <p>What matters is hollow = up day, filled = down day. (In dark mode the filled body is drawn in the light ink colour, so "black" candles look light.)</p>
+  <div class="fig">
+    <h3>Figure 12.2 recreated: the same simulated market as bars and as candles</h3>
+    <canvas id="c2" class="tall" aria-label="Simulated prices drawn as bars or candles"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="sel2m">Draw as <select id="sel2m"><option value="candle">candlesticks</option><option value="bar">OHLC bars</option></select></label>
+      <label for="sel2c">Colours <select id="sel2c"><option value="book">book: hollow up</option><option value="color">green/red (not in book)</option><option value="japan">Japanese: red up</option></select></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <p>The chapter admits candles take some getting used to, but says that after a while you may prefer them.</p>
+  <div class="box picture"><b>Picture it</b><p>The bar version draws the open as a tick to the left and the close as a tick to the right. A bar chart is a list of numbers; a candle chart is the same list with a highlighter run between open and close. Your eye no longer has to find two little ticks on each bar to know who won the day. The colour setting changes every candle on this page.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The body is the fight between the open and the close: who controlled the session from start to finish. A tall white body means buyers pushed all day; a tall black body means sellers did. The shadows show how far the price wandered and was pushed back. That's why the Japanese stress the body: it is the net result.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): two days, both ways</b>
+    <p><b>Day A:</b> open 100, high 108, low 97, close 106. Close &gt; open, so the body is <b>white</b>, from 100 up to 106 (6 points). Upper shadow = high − top of body = 108 − 106 = <b>2</b>. Lower shadow = bottom of body − low = 100 − 97 = <b>3</b>.</p>
+    <p><b>Day B:</b> open 106, high 107, low 99, close 100. Close &lt; open, so the body is <b>black</b>, from 106 down to 100 (6 points). Shadows: 107 − 106 = <b>1</b> on top, 100 − 99 = <b>1</b> below.</p>
+    <p>As bars, the two days look alike: vertical lines of length 11 and 8, with little ticks you have to compare. As candles, the eye sees at once that day B gave back <em>all</em> of day A's gain (same body size, opposite colour, body sitting in exactly the same 100–106 band). Same eight numbers; only the drawing changed.</p></div>
+  <div class="box connect"><b>How it's used in practice (beyond the book)</b><p>Every charting platform (TradingView, your FYERS terminal) offers candles as a chart type, and most traders today use them by default, usually with green/red instead of hollow/filled. In code, a candle is just a row <code>{open, high, low, close}</code>; body = <code>|close − open|</code>, upper shadow = <code>high − max(open, close)</code>, lower shadow = <code>min(open, close) − low</code>. Those three numbers are what every pattern rule later on this page is built from.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Bar charts and the OHLC data behind them: <a href="ch03_chart_construction.html">Chapter 3</a>.</li>
+    <li>Nison ch.3 "Constructing the candle lines" (pdf p34) goes through the same anatomy in more detail.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · BASIC CANDLESTICKS</div><h2>The alphabet: long days, short days, spinning tops, doji</h2></div><span class="chip">pdf p344–346 · Fig 12.3, 12.4, 12.5</span></div>
+  <p>The Japanese defined a set of primary candles from how the open, high, low and close relate to each other; understanding them is where candle analysis begins (pdf p344). Different body and shadow combinations mean different things. The primary candles:</p>
+  <ul class="plain">
+    <li><b>Long days:</b> a big difference between open and close. <b>Short days:</b> a small difference. This is about the <em>body only</em>; the high and low play no part (Fig 12.3).</li>
+    <li><b>Spinning tops:</b> small bodies with upper and lower shadows longer than the body. The body's colour hardly matters. They are days of <b>indecision</b> (Fig 12.4).</li>
+    <li><b>Doji:</b> the open and close are equal. Shadows can be any length. Strict equality is debated: the chapter says the two must be <em>almost</em> equal, especially when prices move in large steps.</li>
+    <li><b>Long-legged doji:</b> long upper and lower shadows. Considerable indecision among traders.</li>
+    <li><b>Gravestone doji:</b> only a long upper shadow, no lower shadow. The longer the upper shadow, the more bearish.</li>
+    <li><b>Dragonfly doji:</b> the opposite: a long lower shadow and no upper shadow. Usually considered quite bullish.</li>
+  </ul>
+  <p>These single lines matter because <b>every</b> Japanese candle pattern is built from combinations of them. (Figure 12.5 also draws a plain flat dash, where open, high, low and close are all the same; the text doesn't name it.)</p>
+  <div class="fig">
+    <h3>Build a candle</h3>
+    <canvas id="c3" aria-label="One candle built from the sliders, with its bar version"></canvas>
+    <div class="controls">
+      <label for="bo3">Open <input id="bo3" type="range" min="0" max="100" value="35"><output id="bo3o">35</output></label>
+      <label for="bh3">High <input id="bh3" type="range" min="0" max="100" value="90"><output id="bh3o">90</output></label>
+      <label for="bl3">Low <input id="bl3" type="range" min="0" max="100" value="25"><output id="bl3o">25</output></label>
+      <label for="bc3">Close <input id="bc3" type="range" min="0" max="100" value="80"><output id="bc3o">80</output></label>
+    </div>
+    <div class="controls">
+      <span>presets</span>
+      <button id="p3a" type="button">long white</button><button id="p3b" type="button">long black</button><button id="p3c" type="button">short day</button><button id="p3d" type="button">spinning top</button>
+      <button id="p3e" type="button">long-legged doji</button><button id="p3f" type="button">gravestone</button><button id="p3g" type="button">dragonfly</button><button id="p3h" type="button">hammer shape</button>
+    </div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: the thresholds</b><p>The chapter gives no numbers for "long", "small" or "almost equal". To make the classifier work I chose: the slider scale 0–100 stands for a market whose typical body is about 20 points; long day = body ≥ 30, short day = body ≤ 12; doji = body ≤ 5% of the day's range; gravestone/dragonfly = the missing shadow is ≤ 5% of the range and the other is ≥ 60%; spinning top = short body with both shadows longer than the body. Change them in your head and the names change too; that fuzziness is real.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch12_rope_tug_candle_day.svg" alt="A village tug-of-war on a vertical rope, with buyers pulling up and sellers pulling down, the rope&#x27;s highest and lowest positions marked like shadows and its start and end like a body." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Each day is a rope tug between buyers (pulling up) and sellers (pulling down). The shadows show how far each side dragged the rope during the day; the body shows where the rope ended compared with where it started. A doji is a draw. A gravestone is a day when buyers dragged the rope far up, then sellers dragged it all the way back.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Shadows are rejected prices. A long upper shadow means prices up there were tried and refused; a long lower shadow means low prices were refused. That's why the gravestone (refusal of high prices, close at the low) reads bearish and the dragonfly (refusal of low prices, close at the high) reads bullish.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): three candles through the classifier above</b>
+    <ul>
+      <li><b>O 50, H 85, L 15, C 51.</b> Range 70, body 1. Is the body ≤ 5% of the range (3.5)? Yes → a doji. Upper shadow 85 − 51 = 34, lower 50 − 15 = 35; both ≥ 30% of the range (21) → <b>long-legged doji</b>. Buyers and sellers each dragged price 35 points away and both got pushed back to the start.</li>
+      <li><b>O 52, H 75, L 30, C 47.</b> Range 45, body 5. 5% of the range is 2.25, so not a doji. Body 5 ≤ 12 → short day; shadows 23 and 17 are both longer than the body → <b>spinning top</b> (black, but the colour hardly matters).</li>
+      <li><b>O 20, H 85, L 20, C 21.</b> Range 65, body 1 → doji. Lower shadow 0 (≤ 3.25) and upper 64 (≥ 39) → <b>gravestone doji</b>: a 65-point rally completely refused within the day.</li>
+    </ul>
+    <p>Why the doji tolerance has to be relative (my reasoning, not the book's): suppose the smallest price step is 0.25. Open and close one step apart is a body of 0.25. On a day with a 2.00 range that's 12.5% of the range, a real (small) body. On a day with a 10.00 range it's 2.5%, and calling it a doji is fair. That's the chapter's point about markets that move in large steps: "equal" must mean "equal relative to the day's size".</p></div>
+  <div class="box connect"><b>How to build it (code not in the book)</b><p>The classifier this plate runs, trimmed to its core. Every vague word ("long", "small", "almost equal") has become a number you can see and change.</p>
+<pre class="formula">function classify(o, h, l, c) {
+  const range = h - l, body = Math.abs(c - o);
+  const upper = h - Math.max(o, c), lower = Math.min(o, c) - l;
+  if (body &lt;= 0.05 * range) {                       // "almost equal"
+    if (lower &lt;= 0.05 * range &amp;&amp; upper &gt;= 0.6 * range) return 'gravestone doji';
+    if (upper &lt;= 0.05 * range &amp;&amp; lower &gt;= 0.6 * range) return 'dragonfly doji';
+    if (upper &gt;= 0.3 * range &amp;&amp; lower &gt;= 0.3 * range) return 'long-legged doji';
+    return 'doji';
+  }
+  if (body &lt;= SHORT &amp;&amp; upper &gt; body &amp;&amp; lower &gt; body) return 'spinning top';
+  return body &gt;= LONG ? 'long day' : body &lt;= SHORT ? 'short day' : 'medium';
+}   // SHORT = 12, LONG = 30 on this plate's 0–100 scale</pre>
+    <p>On real data you would not use fixed points: compare the body with an average of recent bodies (or with ATR) so "long" adapts to the stock's normal size. The pattern scanner in section 10 does that with a 10-bar average body.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Nison devotes a whole chapter to doji: ch.8 "The magic doji" (pdf p163).</li>
+    <li>The "hammer shape" preset isn't named here; it becomes a hammer or a hanging man depending on the trend (section 05 and the library, section 12).</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · CANDLE PATTERN ANALYSIS</div><h2>Patterns are crowd psychology, one to five candles long</h2></div><span class="chip">pdf p346</span></div>
+  <p>A candle pattern is a picture of traders' state of mind at that moment; it shows what they did as time unfolded. Why should it work? Because humans tend to react the same way in similar situations.</p>
+  <ul class="plain">
+    <li>A pattern can be <b>one candle</b> or a combination of several, normally <b>never more than five</b>.</li>
+    <li>Most patterns mark possible <b>reversal</b> points. A few mark <b>continuation</b> of the trend.</li>
+    <li>Patterns come in mirror pairs: if a reversal pattern is bullish, its inverse is bearish; the same goes for continuation patterns.</li>
+    <li>Pairs usually share one name (e.g. bullish and bearish Engulfing). In a few cases the two halves have completely different names (Piercing Line vs Dark Cloud Cover, section 06).</li>
+  </ul>
+  <div class="fig big">
+    <svg viewBox="0 0 560 150" role="img" aria-label="A bullish pattern and its mirror image bearish pattern">
+      <text x="10" y="18">bullish Engulfing (in a downtrend)</text>
+      <line x1="30" y1="30" x2="30" y2="52" stroke="var(--muted)" stroke-width="2"/><line x1="44" y1="40" x2="44" y2="62" stroke="var(--muted)" stroke-width="2"/><line x1="58" y1="50" x2="58" y2="72" stroke="var(--muted)" stroke-width="2"/>
+      <line x1="90" y1="74" x2="90" y2="110" stroke="var(--price)" stroke-width="2"/><rect x="80" y="80" width="20" height="24" fill="var(--price)"/>
+      <line x1="130" y1="62" x2="130" y2="128" stroke="var(--price)" stroke-width="2"/><rect x="118" y="70" width="24" height="50" fill="var(--plate)" stroke="var(--price)" stroke-width="2"/>
+      <line x1="280" y1="10" x2="280" y2="140" stroke="var(--rule)"/>
+      <text x="300" y="18">mirror: bearish Engulfing (in an uptrend)</text>
+      <line x1="320" y1="120" x2="320" y2="98" stroke="var(--muted)" stroke-width="2"/><line x1="334" y1="110" x2="334" y2="88" stroke="var(--muted)" stroke-width="2"/><line x1="348" y1="100" x2="348" y2="78" stroke="var(--muted)" stroke-width="2"/>
+      <line x1="380" y1="40" x2="380" y2="76" stroke="var(--price)" stroke-width="2"/><rect x="370" y="46" width="20" height="24" fill="var(--plate)" stroke="var(--price)" stroke-width="2"/>
+      <line x1="420" y1="22" x2="420" y2="88" stroke="var(--price)" stroke-width="2"/><rect x="408" y="30" width="24" height="50" fill="var(--price)"/>
+    </svg>
+  </div>
+  <div class="box behind"><b>Worked example (own numbers): making the mirror image</b><p>Flip every price around a line, here 100: new price = 200 − old price. That turns opens into opens and closes into closes, but swaps highs with lows, and white with black.</p>
+    <ul>
+      <li>Bullish Engulfing after a fall: day 1 black, O 104 → C 100; day 2 white, O 99 → C 106 (its body 99–106 swallows 100–104).</li>
+      <li>Flipped: day 1 becomes O 96 → C 100 (white); day 2 becomes O 101 → C 94 (black, body 94–101 swallows 96–100), and the prior fall becomes a rise. That is exactly the bearish Engulfing.</li>
+    </ul>
+    <p>This is why the library (section 12) comes in pairs: one rule, flipped. The page's own pattern builders (sections 07 and 08) draw one side and get the other with the same kind of flip (new = 100 − old).</p></div>
+  <div class="box picture"><b>Picture it</b><p>A single candle is one sentence of a conversation in the trading pit. A pattern is the whole exchange: "We're going higher!" (long white) — "Are we?" (small star) — "No." (long black). The words only mean something because the same exchanges keep repeating among people.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The same "psychology repeats" argument underlies all chart patterns: <a href="ch05_reversal_patterns.html">Chapter 5 reversal patterns</a> and <a href="ch06_continuation_patterns.html">Chapter 6 continuation patterns</a>. Candle patterns are the same idea over 1–5 days.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · REVERSAL PATTERNS</div><h2>The trend decides what a shape means</h2></div><span class="chip">pdf p346–347</span></div>
+  <p>A reversal pattern is a combination of candles that normally signals the trend is turning. The big condition: <b>you must look at the trend before the pattern</b>. You cannot have a bullish reversal pattern in an uptrend. Candles that look exactly like the bullish pattern, but come after a rise, are <em>not</em> that pattern. Likewise, no bearish reversal pattern can appear in a downtrend.</p>
+  <p>That raises the age-old question: what is the trend? Volumes have been written about it, but the chapter says a <b>moving average</b> works quite well with candle patterns. Once the <b>short-term trend (about ten periods)</b> is known, candle patterns help a lot in spotting its reversal.</p>
+  <p>Japanese literature refers to about <b>forty</b> reversal patterns, from single candles up to five-candle patterns. Since many good references exist, the chapter discusses only a few popular ones (sections 06–07); the library in section 12 names the rest.</p>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Simulated candles with a moving average; hammer-shaped candles labelled by trend"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls"><label for="n5">Trend MA length <input id="n5" type="range" min="4" max="30" value="10"><output id="n5o">10</output></label></div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: how this chart decides</b><p>"Hammer shape" here = lower shadow at least 2× the body, upper shadow at most a quarter of the range, body at most a third of the range. "Downtrend" = the previous close is below the MA and the MA is lower than 3 bars earlier ("uptrend" the mirror). Both rules are mine; the chapter only says to use a moving average of about ten periods.</p></div>
+  <div class="box picture"><b>Picture it</b><p>The same shape is a different word depending on the sentence it's in. A small body hanging off a long lower shadow after a fall is a <b>hammer</b>, the market hammering out a bottom. The identical candle after a rise is a <b>hanging man</b>, a warning. On the chart, green triangles are hammers, red are hanging men, and grey dots are the same shape with no clear trend, which the rule says to ignore. Drag the MA length and watch names flip.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A reversal needs something to reverse. The pattern only describes a shift in who's winning; whether that shift matters depends on who was winning before. That's why the chapter puts the trend check before the pattern, and why it reaches for a moving average, the tool built to answer "what's the trend?" mechanically.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): the trend check itself runs late</b><p>Closes fall 2 points a day from 110 to a low of 92, then rise 2 a day. The 10-day simple average and this chart's rule ("uptrend" = close above the MA <em>and</em> the MA higher than 3 bars ago):</p>
+    <div class="tablewrap"><table>
+      <tr><th>day</th><th>close</th><th>10-day SMA</th><th>trend by the rule</th></tr>
+      <tr><td class="num">low</td><td class="num">92</td><td class="num">101.0</td><td>down</td></tr>
+      <tr><td class="num">+1</td><td class="num">94</td><td class="num">99.4</td><td>down (close still below MA)</td></tr>
+      <tr><td class="num">+2</td><td class="num">96</td><td class="num">98.2</td><td>down</td></tr>
+      <tr><td class="num">+3</td><td class="num">98</td><td class="num">97.4</td><td>unclear (close above, MA still falling)</td></tr>
+      <tr><td class="num">+4</td><td class="num">100</td><td class="num">97.0</td><td>unclear</td></tr>
+      <tr><td class="num">+5</td><td class="num">102</td><td class="num">97.0</td><td>unclear (MA still below 3 bars ago)</td></tr>
+      <tr><td class="num">+6</td><td class="num">104</td><td class="num">97.4</td><td>unclear (MA equal to 3 bars ago)</td></tr>
+      <tr><td class="num">+7</td><td class="num">106</td><td class="num">98.2</td><td><b>up</b></td></tr>
+    </table></div>
+    <p>A 10-bar simple average lags price by about (10 − 1) ÷ 2 = 4.5 bars, so the rule only says "uptrend" 7 bars and 14 points (15%) after the turn. Two consequences: a bullish pattern on days +1 or +2 still counts as coming "after a downtrend" (good), but a bearish pattern on day +5 is ignored because there's officially no uptrend yet. A shorter MA reacts faster but flips on noise; that's the same trade-off as Chapter 9's MA length. Drag the slider above and watch the grey "no clear trend" dots appear and disappear.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Moving averages as the trend tool: <a href="ch09_moving_averages.html#s6">Chapter 9, section 06</a>. Nison ch.13 (pdf p220) combines candles with moving averages.</li>
+    <li>Hammer and hanging man: Nison ch.4 (pdf p42).</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · DARK CLOUD COVER · PIERCING LINE</div><h2>Two-day reversals with different names</h2></div><span class="chip">pdf p347–348 · Fig 12.6, 12.7</span></div>
+  <p>From here on the book's captions carry a sign: <b>+</b> means a bullish pattern, <b>−</b> a bearish one (Fig 12.6 is captioned "Dark cloud cover −", Fig 12.7 "Piercing line +"). The same signs label every drawing in the library (section 12).</p>
+  <p><b>Dark Cloud Cover</b> is a two-day reversal pattern with only bearish meaning. Its bullish counterpart exists but has a different name (Piercing Line). Step by step, in an uptrend:</p>
+  <ul class="plain">
+    <li><b>Day 1:</b> a long white candle. It reflects the uptrend and reassures traders.</li>
+    <li><b>Day 2:</b> opens <b>above the high</b> of day 1, adding to the bullish mood. But the rest of the day trades lower, and it closes <b>at least below the midpoint of day 1's body</b>. Since it closes below its open, its body is black: the "dark cloud". It's a serious blow to the bulls and pushes many to exit.</li>
+  </ul>
+  <p><b>Piercing Line</b> is the mirror, with bullish meaning. In a downtrend: day 1 is a long black candle that strengthens confidence in the downtrend. Day 2 opens at a <b>new low</b>, then trades higher all day and closes <b>above the midpoint of day 1's body</b>. That's a significant change in the bearish mood, and many reverse or exit their positions.</p>
+  <div class="fig">
+    <canvas id="c6" aria-label="Two-candle pattern builder with midpoint line"></canvas>
+    <div class="controls">
+      <label for="sel6">Pattern <select id="sel6"><option value="dcc">Dark Cloud Cover</option><option value="pl">Piercing Line</option></select></label>
+      <label for="k6">Day-2 close, % into day-1 body <input id="k6" type="range" min="0" max="100" value="65"><output id="k6o">65</output></label>
+      <label for="g6">Day-2 open beyond day-1 extreme <input id="g6" type="range" min="-6" max="6" value="3"><output id="g6o">3</output></label>
+    </div>
+    <div class="checks" id="r6"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch12_party_dark_cloud_exit.svg" alt="A wedding reception in full swing at night, more guests arriving early next morning, and through the day the hall emptying below its midnight crowd as late arrivals head for the exit." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A party is in full swing (long white day). Next morning even more people arrive early (gap up above yesterday's high). Then, all day, guests quietly leave, until the room is emptier than halfway through last night's party. Everyone who arrived this morning is now losing, and they head for the exit.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The midpoint is the line in the sand. Closing below it means sellers didn't just stop the rise, they erased more than half of yesterday's gain. The higher the open and the deeper the close, the more traders are trapped on the wrong side. Slide the close to 30% and watch the pattern fail the test.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): checking a Dark Cloud Cover</b>
+    <p>Uptrend. <b>Day 1:</b> O 100, H 111, L 99, C 110: a long white body of 10. Body midpoint = (100 + 110) ÷ 2 = <b>105</b>.</p>
+    <p><b>Day 2:</b> O 112, H 112.5, L 103.5, C 104.</p>
+    <ul>
+      <li>Opens above day 1's high? 112 &gt; 111 ✓ (everyone who bought day 1 is happy at the open).</li>
+      <li>Closes below the midpoint? 104 &lt; 105 ✓. Black body (104 &lt; 112) ✓ → <b>Dark Cloud Cover</b>.</li>
+      <li>Same day closing at 106 instead: 106 &gt; 105 ✗ → not the pattern, even though it looks almost the same.</li>
+    </ul>
+    <p>Who is hurt: anyone who bought between 112 and the close is down up to 8 points, and buyers from day 1's second half (105–110) have lost their gain. That's the "pushes many to exit" in the text, in numbers.</p></div>
+  <div class="box behind"><b>Worked example (own numbers, beyond the book): what the trade looks like</b><p>The chapter gives no entry or stop. A common way to turn the pattern into a trade: sell at the next day's open, put the stop just above the pattern's highest price, and aim for a multiple of the risk.</p>
+    <ul>
+      <li>Next open 104 → entry 104. Pattern high = 112.5 → stop 112.5. Risk = <b>8.5</b> per share.</li>
+      <li>A 2R target = 104 − 2 × 8.5 = <b>87</b>, a fall bigger than day 1's whole rise plus most of the trend before it.</li>
+    </ul>
+    <p>The failure mode hiding here: because day 2 <em>gapped above</em> day 1's high, the pattern's own high is far from the close, so the protective stop is wide. Wide stop → small position for a fixed rupee risk, and a far target. Piercing Line has the same geometry upside down. The trade lab in section 10 uses exactly this stop rule so you can see what it does over hundreds of simulated trades.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Nison ch.4 (pdf p42) covers dark-cloud cover and the piercing pattern with real charts.</li>
+    <li>The Piercing Line reappears in section 10, where the filter accepts one because %D is below 20 (the book's Fig 12.12).</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · EVENING STAR AND MORNING STAR</div><h2>Three-day stars, and the problem of "perfect"</h2></div><span class="chip">pdf p348–349 · Fig 12.8, 12.9</span></div>
+  <p>The Evening Star and its cousin the Morning Star are two powerful three-day reversal patterns that, the chapter says, work exceptionally well. It explains the Evening Star (bearish); the Morning Star is the opposite.</p>
+  <ul class="plain">
+    <li><b>Day 1:</b> a long white candle that fully supports the uptrend.</li>
+    <li><b>Day 2:</b> prices gap up above day 1's body. Trading is somewhat restricted and the close ends near the open, still above day 1's body. The body is small. A small-bodied day that gaps away from a long-bodied day is called a <b>star</b>.</li>
+    <li><b>Day 3:</b> opens with a gap below the star's body and closes lower, below the midpoint of day 1.</li>
+  </ul>
+  <p>That is the <em>perfect</em> scenario. Many references accept an Evening Star that misses a detail: day 3 may not gap down, or its close may not get quite below day 1's midpoint. Judging that by eye is subjective. A computer can't judge; it needs explicit rules and allows no interpretation.</p>
+  <div class="fig">
+    <canvas id="c7" aria-label="Three-candle star pattern builder"></canvas>
+    <div class="controls">
+      <label for="sel7">Pattern <select id="sel7"><option value="es">Evening Star</option><option value="ms">Morning Star</option></select></label>
+      <label><input id="chk7a" type="checkbox" checked> star gaps away from day-1 body</label>
+      <label><input id="chk7b" type="checkbox" checked> day 3 gaps away from the star</label>
+      <label><input id="chk7c" type="checkbox" checked> day 3 closes past day-1 midpoint</label>
+    </div>
+    <div class="checks" id="r7"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: the "accepted" rule</b><p>The chapter names only the two allowed misses (no gap on day 3; close not quite past the midpoint). My lenient checker still demands day 1 long, a gapped star, and a day-3 close at least inside day 1's body. Untick boxes to see where strict and lenient disagree.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch12_evening_star_sunset.svg" alt="A three-stage sunset over the sea: the sun high, a small bright star alone above the horizon, then darkness falling, showing the evening star pattern." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Evening: the sun (day 1) is high, a small star appears above the horizon line (day 2), then darkness falls (day 3). The star is a pause: buyers gapped prices up but couldn't push further, and sellers couldn't push down either. Day 3 says the pause ended in the sellers' favour.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The chapter's real lesson is about definitions. Every "flexible" rule a human uses must become a hard yes/no for software. Loosen it and you catch more patterns, including weaker ones; tighten it and you catch fewer, better ones. Section 09 comes back to computers.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): an Evening Star, and why the gaps matter</b>
+    <ul>
+      <li><b>Day 1:</b> O 100, H 111, L 99, C 110. Long white, midpoint 105.</li>
+      <li><b>Star:</b> O 113, H 115, L 112, C 113.5. Body 0.5 (small), and the whole body sits above 110, day 1's body top → a star ✓.</li>
+      <li><b>Day 3:</b> O 111, H 111.5, L 103, C 104. Opens below the star's body (111 &lt; 113) ✓ and closes below day 1's midpoint (104 &lt; 105) ✓ → the perfect Evening Star.</li>
+    </ul>
+    <p>The mechanism in numbers: every trade on the star day happened between 112 and 115. Day 3 opens at 111, already below all of them, so <em>every</em> star-day buyer is losing from the first minute, and by the close they're down 8 to 11. The gap is what makes the trap complete. If day 3 had opened at 114 instead (no gap), some star-day buyers would still be in profit at the open, and the pressure to sell builds more slowly; that's why the strict rule wants the gap and the lenient rule lets it go.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Nison ch.5 "Stars" (pdf p71) covers morning/evening stars, doji stars, the shooting star and the inverted hammer.</li>
+    <li>This is the same strict-vs-loose trade-off you hit when coding chart patterns for your backtests: a rule must be exact before a computer can test it.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · CONTINUATION PATTERNS · RISING AND FALLING THREE METHODS</div><h2>A rest inside the trend</h2></div><span class="chip">pdf p349–350 · Fig 12.10, 12.11</span></div>
+  <p>Every trading day you decide: exit, enter, or stay in. A pattern that says "the trend will continue" is more valuable than it first looks, because it answers "should I stay in?". Japanese literature refers to <b>16</b> continuation patterns. One pair is particularly good: the <b>Rising</b> and <b>Falling Three Methods</b>.</p>
+  <p>Like reversal patterns, they depend on the trend: a bullish continuation pattern can only occur in an uptrend, a bearish one only in a downtrend. The Rising Three Methods (bullish), the perfect version:</p>
+  <ul class="plain">
+    <li><b>Day 1:</b> a long white day that fully supports the uptrend.</li>
+    <li><b>Days 2–4:</b> small-bodied days that, as a group, drift downward. All stay within the range of day 1's long white <b>body</b>, and at least two of the three have black bodies. The Japanese call this stretch, where the market seems to go nowhere, a <b>"period of rest"</b>.</li>
+    <li><b>Day 5:</b> another long white day that closes at a <b>new high</b>. Prices have broken out of the short range; the uptrend continues.</li>
+  </ul>
+  <p>A five-day pattern needs a lot of detail to define. With experience, some flexibility works: the small days may stay within day 1's <b>high–low range</b> instead of its body; they don't always have to be mostly black; and the rest can last <b>more than three</b> days. The chapter's advice: don't ignore this pattern; it can be a comfort when you're worried about protecting profits in a trade.</p>
+  <div class="fig">
+    <canvas id="c8" aria-label="Rising or Falling Three Methods builder"></canvas>
+    <div class="controls">
+      <label for="sel8">Pattern <select id="sel8"><option value="r">Rising Three Methods</option><option value="f">Falling Three Methods</option></select></label>
+      <label for="n8">rest days <input id="n8" type="range" min="2" max="6" value="3"><output id="n8o">3</output></label>
+      <label><input id="chk8a" type="checkbox" checked> rest days inside day-1 body</label>
+      <label><input id="chk8b" type="checkbox" checked> rest days mostly counter-coloured</label>
+      <label><input id="chk8c" type="checkbox" checked> last day closes at a new extreme</label>
+    </div>
+    <div class="checks" id="r8"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch12_hiker_rests_on_ledge.svg" alt="A hiker climbs a steep rock face, rests on a ledge for a few minutes shuffling back slightly, then climbs past the previous high point." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A hiker climbs hard (day 1), sits on a ledge for a few minutes, even shuffling back a little (rest days), then climbs past the previous high point (day 5). The ledge never drops below where the climb started that morning; that's what "inside day 1's body" protects.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The rest days are profit-taking that fails to undo the big day. Sellers had three sessions to push below day 1's open and couldn't. When day 5 closes at a new high, the sellers' attempt is officially over. It is a tiny version of a bull flag: a pause against the trend, inside a boundary, then a breakout.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): a perfect Rising Three Methods</b>
+    <div class="tablewrap"><table>
+      <tr><th>day</th><th>open</th><th>high</th><th>low</th><th>close</th><th>check</th></tr>
+      <tr><td>1</td><td class="num">100</td><td class="num">111</td><td class="num">99</td><td class="num">110</td><td>long white; body 100–110</td></tr>
+      <tr><td>2</td><td class="num">109.5</td><td class="num">110</td><td class="num">106.5</td><td class="num">107</td><td>small black, inside 100–110 ✓</td></tr>
+      <tr><td>3</td><td class="num">107</td><td class="num">108.5</td><td class="num">106</td><td class="num">108</td><td>small white, inside ✓</td></tr>
+      <tr><td>4</td><td class="num">108</td><td class="num">108.5</td><td class="num">104.5</td><td class="num">105</td><td>small black, inside ✓ (2 of 3 black ✓)</td></tr>
+      <tr><td>5</td><td class="num">105.5</td><td class="num">113.5</td><td class="num">105</td><td class="num">113</td><td>long white, close 113 &gt; 111 = new high ✓</td></tr>
+    </table></div>
+    <p>Sellers had three sessions and got price only from 110 to 105, half of day 1's body. The lowest rest-day low (104.5) never reached day 1's open (100). How a trader might use it (beyond the book): if you're already long from below 100, the pattern says "stay in"; a natural place to tighten the stop is under the rest days' low (104.5) or under day 1's low (99), because a close back below those would mean the rest turned into a real reversal.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Flags and rectangles in <a href="ch06_continuation_patterns.html">Chapter 6</a> are the same "pause, then continue" idea over weeks instead of days.</li>
+    <li>Nison ch.7 "Continuation patterns" (pdf p134): windows, tasuki gaps, rising/falling three methods.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · USING COMPUTERS FOR CANDLE PATTERN IDENTIFICATION</div><h2>When a screen invents doji</h2></div><span class="chip">pdf p351</span></div>
+  <p>Software that recognises candle patterns is a great way to remove emotion, especially during a trade. The chapter says there are a couple of things to keep in mind when viewing candles on a screen, but explains only one: pixels. A screen is made of a limited number of pixels (how many depends on your video card and monitor). If the chart squeezes a large price range into a short time window, each pixel stands for a range of prices. Small bodies then collapse to a single line, and you think you see many doji (open = close) when there are none. Software that identifies patterns from the numbers, not the picture, isn't fooled. So if your software doesn't flag "doji" you can see, it isn't broken.</p>
+  <div class="fig">
+    <canvas id="c9" aria-label="The same candles drawn with fewer pixels and a larger price range"></canvas>
+    <div class="controls">
+      <label for="q9">price range on screen ×<input id="q9" type="range" min="1" max="30" value="1"><output id="q9o">1</output></label>
+      <label for="v9">screen rows (pixels) <input id="v9" type="range" min="60" max="400" step="10" value="400"><output id="v9o">400</output></label>
+    </div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A ruler marked only in whole centimetres: anything shorter than a centimetre reads as zero. Squeeze ten years of prices onto one screen and a ₹2 body is far smaller than one pixel step, so it's drawn as a flat line. Push both sliders and count the "doji" multiply while the true count doesn't move.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The screen rounds every price to the nearest pixel row. Price per row = (price range shown) ÷ (rows). Any body smaller than that rounds to zero height. The chart here simulates that rounding; a pattern scanner compares open and close as numbers, so it never sees the rounding.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): when does a body vanish?</b>
+    <ul>
+      <li>A stock between ₹2,000 and ₹3,000 shown on a chart 400 pixel rows tall: ₹1,000 ÷ 400 = <b>₹2.50 per row</b>. A day with open 2,450.00 and close 2,451.20 has a ₹1.20 body, less than half a row (₹1.25), so both ends round to the same row: it's drawn as a flat dash, a fake doji.</li>
+      <li>Zoom to a ₹100 window on the same 400 rows: ₹0.25 per row. The same ₹1.20 body is now about 5 rows tall, an obvious small white body.</li>
+    </ul>
+    <p>The readout under the chart uses exactly this test: a body looks like a doji when it's under half a row.</p></div>
+  <div class="box connect"><b>How to build it (code not in the book): a pattern as predicates</b><p>A scanner reads numbers, so every flexible word in sections 06–07 must become a test. This is the Dark Cloud Cover / Piercing Line part of the scanner used in section 10 (<code>trend</code> is +1 up, −1 down, 0 unclear, from the 10-bar MA rule in section 05; <code>avgBody</code> is the mean body of the last 10 bars).</p>
+<pre class="formula">// i = day 2, a = day 1
+const white = (j) =&gt; c[j] &gt; o[j], black = (j) =&gt; c[j] &lt; o[j];
+const body  = (j) =&gt; Math.abs(c[j] - o[j]);
+const mid   = (o[a] + c[a]) / 2;              // midpoint of day-1 body
+const long1 = body(a) &gt; avgBody(i, 10);       // "long" = bigger than usual
+
+if (trend(a - 1) &gt; 0 &amp;&amp; white(a) &amp;&amp; long1 &amp;&amp; black(i)
+    &amp;&amp; o[i] &gt; h[a]                             // opens above day-1 high
+    &amp;&amp; c[i] &lt; mid &amp;&amp; c[i] &gt; o[a])             // closes inside, below mid
+  found('Dark Cloud Cover', -1);
+
+if (trend(a - 1) &lt; 0 &amp;&amp; black(a) &amp;&amp; long1 &amp;&amp; white(i)
+    &amp;&amp; o[i] &lt; l[a]                             // opens at a new low
+    &amp;&amp; c[i] &gt; mid &amp;&amp; c[i] &lt; o[a])             // closes inside, above mid
+  found('Piercing Line', +1);</pre>
+    <p>Two choices here are mine, not the book's: "long" means bigger than the recent average body, and day 2 must close <em>inside</em> day 1's body (if it closed beyond it, it would be an Engulfing instead, which the scanner checks first).</p></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · FILTERED CANDLE PATTERNS</div><h2>Only listen when the oscillator is at an extreme</h2></div><span class="chip">pdf p351–352 · Fig 12.12</span></div>
+  <p><b>Candle pattern filtering</b>, developed by Greg Morris in <b>1991</b>, is a simple way to improve the reliability of candle patterns. You still must know the short-term trend before a pattern can exist. On top of that, you check whether the market is <b>overbought or oversold</b> using a traditional indicator. This improves a pattern's predictive power and helps throw out bad or premature patterns.</p>
+  <ul class="plain">
+    <li>The example uses <b>stochastics %D</b>. It swings between <b>0 and 100</b>; <b>20</b> is oversold and <b>80</b> overbought.</li>
+    <li>Its own signals: %D rises above 80 then falls below 80 → <b>sell</b>. %D drops below 20 then rises above 20 → <b>buy</b>. (Chapter 10 has more on stochastics.)</li>
+    <li>Once %D enters the zone above 80 or below 20, it will eventually give a signal; it's only a matter of time. Those zones are the <b>presignal area</b>.</li>
+    <li><b>The filter:</b> consider candle patterns <b>only</b> when %D is in its presignal area. A pattern that appears with %D at, say, <b>65</b> is ignored. Only <b>reversal</b> patterns are used this way.</li>
+    <li>Any oscillator you normally use can filter: <b>Wilder's RSI</b>, <b>Lambert's CCI</b> and <b>Williams' %R</b> work equally well.</li>
+  </ul>
+  <p>Before applying any filter, the chapter says, you must first understand how the indicator itself responds to prices; that's why it spells out %D's own signals above. The book's Figure 12.12 is a real chart of <b>3Com Corp (COMS)</b> from 13 June to 28 August 1996 (daily, judging by its date axis: weekly ticks about five candles apart; the text doesn't say), with %D in a panel below. In the late-July low it marks a Piercing Line forming while %D sits in its presignal buy area below 20; later, in August, %D climbs into the presignal sell area above 80. The chart below recreates the mechanics on simulated prices.</p>
+  <div class="fig">
+    <canvas id="c10" class="tall" aria-label="Simulated candles, detected reversal patterns, and stochastic %D below"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls"><label><input id="chk10" type="checkbox" checked> apply the %D filter</label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: settings and honesty</b><p>%K = where today's close sits in the last 14 bars' high–low range; %D = 3-bar average of %K (my settings). The pattern detector looks for simplified Hammer/Hanging Man, Engulfing, Piercing Line/Dark Cloud Cover and Morning/Evening Star (my rules, trend from a 10-bar MA). Bullish patterns are kept only below 20, bearish only above 80, following the figure's labels. The "next 5 bars agreed" number is on <b>random simulated prices</b>, which have no crowd psychology, and they contain trending stretches that persist by construction, so reversal patterns often agree <em>less</em> than half the time here, with or without the filter. This shows how the filter works, not whether it works.</p></div>
+  <div class="box picture"><b>Picture it</b><p>A smoke alarm (the candle pattern) that goes off whenever someone makes toast is useless. Wire it so it only sounds when the room is also hot (the oscillator at an extreme) and false alarms drop. The filter doesn't make the alarm smarter; it just ignores it in rooms that aren't hot.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An oscillator at an extreme says the move is stretched. A reversal pattern says the crowd is changing its mind. Each alone fires too often; requiring both cuts the count sharply (compare the readout with the filter on and off). And because %D in its presignal area hasn't yet signalled, the candle pattern often arrives first: the readout's "lead" counts how many bars before %D's own signal each kept pattern came.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): where %D comes from, and what the filter does with it</b>
+    <p>%K (standard construction, Chapter 10): where today's close sits inside the last 14 days' range. Highest high 120, lowest low 100, close 104 → %K = (104 − 100) ÷ (120 − 100) × 100 = <b>20</b>. %D = the average of the last three %K values.</p>
+    <div class="tablewrap"><table>
+      <tr><th>day</th><th>%K</th><th>%D = avg of last 3 %K</th><th>meaning</th></tr>
+      <tr><td class="num">1</td><td class="num">20</td><td class="num">—</td><td></td></tr>
+      <tr><td class="num">2</td><td class="num">15</td><td class="num">—</td><td></td></tr>
+      <tr><td class="num">3</td><td class="num">10</td><td class="num">15.0</td><td>below 20: presignal buy area</td></tr>
+      <tr><td class="num">4</td><td class="num">25</td><td class="num">16.7</td><td>still in the area</td></tr>
+      <tr><td class="num">5</td><td class="num">35</td><td class="num">23.3</td><td>%D rises back above 20: %D's own buy signal</td></tr>
+    </table></div>
+    <p>A Piercing Line completing on day 3 or 4 is <b>kept</b> (%D under 20) and arrives 1–2 days before %D's own signal on day 5. The identical Piercing Line on a day when %D reads 65 is <b>ignored</b>. Note what %D is measuring: "the close is near the bottom of its recent range". That's a stretched market, which is the setting where a reversal story makes sense.</p></div>
+  <div class="fig">
+    <h3>Trade the filter, one pattern at a time (trade rules are beyond the book)</h3>
+    <canvas id="c10t" class="tall" aria-label="One detected pattern with its entry, stop and target lines, stepped bar by bar"></canvas>
+    <div class="legend" id="c10tL"></div>
+    <div class="controls">
+      <button id="t10p" type="button">◀ previous trade</button><button id="t10n" type="button">next trade ▶</button>
+      <label for="s10s">bars after entry <input id="s10s" type="range" min="0" max="20" value="20"><output id="s10so">20</output></label>
+      <button id="b10s" type="button">step +1 bar</button><button id="b10r" type="button">back to entry</button>
+    </div>
+    <div class="controls">
+      <label for="sel10r">target <select id="sel10r"><option value="2">2 × risk (2R)</option><option value="1">1R</option><option value="1.5">1.5R</option><option value="3">3R</option></select></label>
+      <label for="m10">time exit after <input id="m10" type="range" min="5" max="40" step="5" value="20"><output id="m10o">20</output> bars</label>
+      <label for="k10">cost per round trip <input id="k10" type="range" min="0" max="50" step="5" value="10"><output id="k10o">10</output> bp</label>
+    </div>
+    <div class="readout" id="r10t"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: the trade rules used here</b><p>The chapter stops at "the pattern is valid". To test anything you need a full trade, so I added the commonest simple plan: <b>enter</b> at the open of the bar after the pattern completes, in the pattern's direction; <b>stop</b> just beyond the pattern's own extreme (lowest low of its bars for a bullish pattern, highest high for a bearish one); <b>target</b> at the chosen multiple of the risk; if neither is hit, <b>exit at the close</b> after the time limit. If a bar opens beyond the stop or target (a gap), the fill is that open. If one bar touches both stop and target, I count the stop (the pessimistic choice, since daily bars don't tell you which came first). Patterns whose stop would sit less than 0.3% from the entry are skipped (and so are those where the next open is already past the stop): with stops that tight, costs and small gaps alone produce losses of several R and swamp everything else. Cost is a percentage of price per round trip (10 bp = 0.10%), converted into R. Results are in <b>R</b>: profit ÷ the risk you took, so +2R means you made twice what you risked. The step-through uses the patterns on the chart above (only kept ones when the filter box is ticked).</p></div>
+  <div class="fig">
+    <h3>Pooled over 150 simulated markets: all patterns vs filtered vs random entries (beyond the book)</h3>
+    <div class="tablewrap" id="r10p"></div>
+    <div class="readout" id="r10q"></div>
+  </div>
+  <div class="box behind"><b>How to read the pooled table</b><p>Each row is the same trade plan applied to a different set of entries, over 150 simulated markets (their shapes follow the chart above: a fall, a range, a rise, a fall, each with random noise; the set changes with "Roll a new market"). <b>All patterns</b>: every reversal the scanner finds. <b>Filtered</b>: only those with %D beyond 20/80, Morris's rule. <b>Random entries</b>: for every pattern trade, a random bar in the same market traded in the same direction with the same stop distance (as a % of price): the control group. A pattern only shows an edge if it beats its own random control.</p>
+    <p>Two things are built in by the rules, not discovered: with a 2R target, a trade with no edge wins about 1 time in 3, because the target is twice as far as the stop (in general about 1 ÷ (1 + R)); and costs push every row a little below zero. So a win rate near 33% at 2R is "no edge", not "bad pattern". These simulated prices contain trend stretches (built-in drift) and no crowd psychology, so reversal patterns here have nothing real to detect, and trading <em>against</em> a drifting stretch can lose. In the seeds I checked, the patterns did a little worse than their random control and the filtered row worse than the unfiltered one. That fits the simulation, not Morris: here trends persist by construction, and %D sits beyond 20/80 mostly <em>inside</em> such persistent stretches, so the filter picks exactly the pinned cases below. <b>This table shows what no edge looks like and how a test is built. It is not evidence for or against Morris's filter.</b> The real test needs real prices.</p></div>
+  <div class="box behind"><b>Failure modes to watch for</b><ul>
+    <li><b>%D pinned at the extreme.</b> In a strong move %D can sit above 80 (or below 20) for many bars. Every bearish pattern in that stretch passes the filter, and each one gets run over by the trend. The readout under the table counts kept losers where %D stayed in the zone for the next 5 bars.</li>
+    <li><b>Wide stops from gap patterns.</b> Section 06's arithmetic: patterns that gap beyond the prior bar put the stop far away, so a fixed rupee risk buys a small position and the target sits far off. Watch the risk column in the step-through readout.</li>
+    <li><b>Late trend, early pattern.</b> Section 05's MA lag: right after a turn the trend rule says "unclear" and the scanner ignores patterns, including good ones.</li>
+    <li><b>Few trades.</b> The filter keeps a small fraction of patterns. On one market that's a handful of trades, far too few to judge; that's why the table pools 150 markets, and why a single real chart (like Fig 12.12) can illustrate the idea but can't prove it.</li>
+  </ul></div>
+  <div class="box connect"><b>How it's used in practice (beyond the book)</b><p>TradingView ships ready-made candlestick-pattern indicators, and in Pine Script you can write the pattern test yourself (predicates like those in section 09) next to the built-in stochastic, so Morris's rule is a short strategy: <code>longCondition = bullishPattern and ta.sma(ta.stoch(close, high, low, 14), 3) &lt; 20</code>, with the stop and target plan above. The honest way to evaluate it is the one in the table: compare against random entries with the same stops, on many symbols, with costs, and keep some data aside you didn't tune on.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Stochastics, RSI, CCI and %R: <a href="ch10_oscillators.html">Chapter 10</a>. Nison ch.14 (pdf p228) combines candles with RSI, stochastics and MACD.</li>
+    <li>Your <code>stoch_rsi_macd_strategy.md</code> tried two cousins of this idea on Nifty 50/200. First run: requiring the Stoch RSI cross to come from below 20 / above 80 is listed under "didn't help". Final rules: buy only when <em>not</em> overbought (both lines ≤ 80), sell only when <em>not</em> oversold (≥ 20); that re-test lost on Nifty 50 on every timeframe/side/mode except 2 of 168 versions (<code>backtest_results_summary.md</code>). Both filtered Stoch RSI crosses, not candle patterns; Morris's exact rule (a reversal candle pattern while %D is already beyond 20 or 80) hasn't been tested on your data.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · CONCLUSION</div><h2>A timing tool for reading psychology</h2></div><span class="chip">pdf p353</span></div>
+  <p>The chapter's closing view: candlestick charting and candle pattern analysis are essential tools for <b>market timing</b>. Use candle patterns the way you use any technical tool: to study the psychology of market participants. Once you're used to seeing charts as candles, you may never want bar charts again. Its strongest claim: candle patterns used with other indicators in the <b>filtering</b> concept will almost always give a trading signal <b>before</b> other price-based indicators do.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>"Earlier" is plausible for a structural reason: a pattern needs 1–5 bars, while an oscillator or moving average needs many bars of data to turn. But earlier is not the same as more accurate; the chapter states the claim without test results.</p></div>
+  <div class="box behind"><b>Measuring "earlier" (own simulation, beyond the book)</b><p>The trade lab in section 10 measures the timing half of the claim: for every kept pattern it counts the bars until %D gives its own signal (crossing back out of the 20 or 80 zone). Over the 150 simulated markets the kept pattern typically came about 5–6 bars before %D's signal in the seeds I checked (the readout under the pooled table shows the live number). So "earlier" holds mechanically, for the structural reason above. The same table shows the other half: on those prices, arriving earlier did not make the trades profitable. Timing and accuracy are separate questions, and the chapter only gives evidence-free claims for both.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your own data point: in the VWAP-course backtests, each confluence added (a candle pattern, a horizontal level) made the setups <em>less bad</em>, but every setup's median Sharpe stayed negative (<code>backtest_results_summary.md</code>). Candles helped as a filter; they didn't create an edge on their own.</li>
+    <li>Your playbook's untested VWAP pullback (I-3) enters on a bullish engulfing or hammer at VWAP (<code>intraday_swing_playbook.md</code>), the same "pattern + context" idea.</li>
+    <li>Nison's Part 2 "Convergence" (pdf p187) is a whole book-half on combining candles with Western tools.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · CANDLE PATTERNS (THE LIBRARY)</div><h2>All 68 named patterns, drawn from constructed prices</h2></div><span class="chip">pdf p354–364</span></div>
+  <p>The chapter ends with the library used to identify candle signals (pdf p354). The number after each name is how many candles define it. It's split into bullish and bearish, reversal and continuation: <b>26 bullish reversals, 26 bearish reversals, 8 bullish and 8 bearish continuations</b>. The 16 continuation entries match the 16 continuation patterns of section 08. The text's "about forty" reversal patterns doesn't match the 52 reversal entries; the book doesn't reconcile the two. My own count (not in the book): ten names appear on both sides (Belt Hold, Engulfing, Harami, Harami Cross, Doji Star, Meeting Lines, Abandoned Baby, Tri-Star, Breakaway, Kicking), so the reversal list holds <b>42 distinct names</b>, close to "about forty", while the 16 continuations count bullish and bearish separately. As in Figures 12.6–12.11, each drawing's caption ends in <b>+</b> (bullish) or <b>−</b> (bearish). The next pages (pdf p355–364; p357, p358 and p359 are three scans of the same printed page) draw almost every one; the gallery below redraws each from OHLC numbers I constructed to match those drawings.</p>
+  <div class="box beyond"><b>Beyond the book: the one-line definitions</b><p>The chapter defines only the patterns in sections 03 and 06–08; the rest are just a name and a drawing. The definition shown when you click a card is the standard one (as in Nison's book and Morris's own work), not Murphy's text; cards marked "in text" are explained in this chapter. Nison: hammer/hanging man/engulfing/dark cloud/piercing ch.4 (pdf p42) · stars, shooting star, inverted hammer ch.5 (pdf p71) · harami, belt-hold, three crows/soldiers ch.6 (pdf p90) · tasuki, three methods ch.7 (pdf p134) · doji ch.8 (pdf p163).</p></div>
+  <div class="controls">
+    <span>show</span>
+    <button id="g12all" type="button" class="on">all 68</button><button id="g12br" type="button">bullish reversal</button><button id="g12sr" type="button">bearish reversal</button><button id="g12bc" type="button">bullish continuation</button><button id="g12sc" type="button">bearish continuation</button>
+  </div>
+  <div class="fig">
+    <canvas id="c12v" class="short" aria-label="Selected pattern drawn large"></canvas>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="pgrid" id="gal12"></div>
+  <div class="box beyond"><b>Small inconsistencies in the book's library (kept, not fixed)</b><ul>
+    <li>The list says "Latter Top (5)"; the drawing (pdf p362) is labelled "Ladder Top", the mirror of Ladder Bottom.</li>
+    <li>The list says "Concealing Swallow (4)"; the drawing (pdf p361) says "Concealing Baby Swallow".</li>
+    <li>"Unique Three Rivers Bottom" is drawn as "Unique Three River" with no + or − (pdf p361); "Three Outside Down" also has no sign (pdf p360).</li>
+    <li>"Downside Gap Three Methods" is listed as a <em>bearish</em> continuation but its drawing is marked "+" (pdf p363).</li>
+    <li>Long White Body and Long Black Body have no drawing in the library; Figure 12.3 (pdf p345) shows long days.</li>
+    <li>The library's Rising Three Methods drawing (pdf p362) shows only four candles; Figure 12.10 (pdf p350) shows all five.</li>
+    <li>Drawing labels use singular forms in two places: "Three White Soldier" and "Meeting Line" (pdf p356–357).</li>
+    <li>On Neck Line + and In Neck Line + (pdf p363–364) are drawn almost identically: a small black day gapping above a long white day.</li>
+    <li>Kicking (both) is drawn without any prior-trend lines.</li>
+  </ul></div>
+  <div class="box picture"><b>Picture it</b><p>A phrasebook at the back of a language course. You don't memorise all 68; you learn the alphabet (section 03), the grammar rule "check the trend first" (section 05), and a handful of common phrases (06–08). The rest you look up when you meet them.</p></div>
+  <div class="box behind"><b>What's happening behind it: why a big library is a statistical trap (beyond the book)</b><p>Suppose none of the 68 patterns has any edge, and you test each one on the same data at the usual 5% significance level. By luck alone you should expect about 68 × 0.05 ≈ <b>3 or 4</b> patterns to look "significant". The more patterns (and the more settings per pattern) you try, the more certain it is that some will look good by accident. That's the multiple-comparisons problem, and it's the main reason candle-pattern backtests disagree with each other. The defences: decide the few patterns you'll test before looking, test on data you didn't tune on, and compare against a random-entry control like the one in section 10.</p></div>
+  <div class="box behind"><b>Worked example (own numbers): reading one library card</b><p>Click "Engulfing Pattern +" in the gallery. The drawing shows three thin lead-in lines falling (the prior downtrend the pattern needs), then day 1: O 52, H 54, L 44, C 46 (a black body 46–52) and day 2: O 42, H 58, L 41, C 56 (a white body 42–56 that covers all of 46–52). The "+" says bullish; the "2" says two candles define it; "bullish reversal" is its group; pdf p355 is where the book draws it. Then apply section 05 yourself: only if your own trend check says "downtrend" before day 1 is this an Engulfing at all. Body sizes are 6 then 14, so day 2 is more than twice day 1, which is why it reads as a strong shift.</p></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. A candle has a hollow body. What do you know about its open and close?</summary><p>The close was above the open (a "white" day). The body is drawn hollow so it prints well; the Japanese colour it red (section 02).</p></details>
+  <details><summary>2. Is a "long day" judged by its high–low range?</summary><p>No. Long and short days are about the body only: the distance between open and close (section 03).</p></details>
+  <details><summary>3. Gravestone or dragonfly: which one is usually bearish, and why?</summary><p>Gravestone: a long upper shadow and no lower shadow, so high prices were tried and rejected and it closed at the low. The longer the upper shadow, the more bearish (section 03).</p></details>
+  <details><summary>4. You find a perfect Piercing Line shape at the top of a strong rally. Bullish?</summary><p>It isn't a Piercing Line at all. A bullish reversal pattern can't occur in an uptrend; establish the trend first, for example with a ~10-period moving average (section 05).</p></details>
+  <details><summary>5. Dark Cloud Cover: where must day 2 open, and where must it close?</summary><p>Open above day 1's high; close at least below the midpoint of day 1's long white body (section 06).</p></details>
+  <details><summary>6. What makes day 2 of an Evening Star a "star"?</summary><p>It has a small body and gaps away from the long body of day 1 (section 07).</p></details>
+  <details><summary>7. Why does the chapter say computers change how you define a star?</summary><p>By eye, a missing gap or a close just short of the midpoint can be "accepted". Software needs explicit rules and allows no interpretation (section 07).</p></details>
+  <details><summary>8. Rising Three Methods: what are the two "perfect" conditions on the rest days, and which flexibilities does the chapter allow?</summary><p>Perfect: three small days staying within day 1's body, at least two of them black. Flexible: within day 1's high–low range, not mostly black, more than three rest days (section 08).</p></details>
+  <details><summary>9. Your chart shows dozens of doji but your scanner finds none. Who's right?</summary><p>Probably the scanner. With a large price range per pixel, small bodies round to a flat line (section 09).</p></details>
+  <details><summary>10. Under Morris's filter, a bearish Engulfing appears with %D at 65. What do you do?</summary><p>Ignore it. Patterns count only when %D is in its presignal area (above 80 or below 20), and only reversal patterns are filtered this way (section 10).</p></details>
+  <details><summary>11. How many continuation patterns does the Japanese literature list, and how does the library split them?</summary><p>16: eight bullish and eight bearish, mostly mirror pairs with the same name (sections 08 and 12).</p></details>
+  <details><summary>12. In a Rising Three Methods, the rest days dip below day 1's open but stay above its low. Is it still the pattern?</summary><p>Not the perfect version, which keeps the rest days inside day 1's body. The chapter allows, with experience, rest days that stay within day 1's high–low range instead (section 08).</p></details>
+  <details><summary>13. A Dark Cloud Cover's day 2 opened above day 1's high. Why does that make a trade based on it hard to size?</summary><p>A stop just above the pattern's high sits far from the close-based entry (8.5 points in section 06's example, against a 10-point day-1 body). A wide stop means a small position for a fixed rupee risk, and a 2R target lies far away. Gap patterns have this geometry built in (sections 06 and 10).</p></details>
+  <details><summary>14. Your trend rule uses a 10-bar SMA. Price bottoms and rises 2 points a day. Roughly when does the rule first call it an uptrend, and what does that do to bearish patterns in between?</summary><p>A 10-bar SMA lags by about 4.5 bars; in section 05's example the rule says "up" only 7 bars after the low. Until then the trend is "unclear", so a bearish reversal pattern in those bars is ignored because there's no uptrend for it to reverse.</p></details>
+  <details><summary>15. A pattern-based trade plan wins 34% of the time with a 2R target. Good or bad? What do you compare it with?</summary><p>Neither, yet. With a 2R target, a trade with no edge wins about 1 in 3 (1 ÷ (1 + R)), so 34% is roughly "no edge" before costs. Compare it with random entries using the same direction and stop distance on the same data (the control row in section 10), and judge on R after costs, not on win rate.</p></details>
+</section>
+
+<footer>Built from Murphy, <i>Technical Analysis of the Financial Markets</i>, Chapter 12 "Japanese Candlesticks" (contributed by Gregory L. Morris; printed pp. 297–317, PDF pages 342–364), summarised in my own words. Charts and pattern drawings use simulated or constructed prices, not real market data. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  let M;
+  function buildData() {
+    M = genMarket([
+      { n: 70, drift: 0.0042, vol: 0.010, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.0046, vol: 0.011, kind: 'trend' }
+    ], seed);
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // ---------- candlestick helpers (added for Ch.12) ----------
+  // OHLC generator: guarantees low <= min(open, close) <= max(open, close) <= high
+  function genOHLC(segs, sd, start = 100) {
+    const r = rng(sd); const o = [], h = [], l = [], c = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        const op = Math.max(1, p * (1 + (s.gap != null ? s.gap : 0.002) * gauss(r)));
+        let ret = s.drift + s.vol * gauss(r); if (s.revert) ret += s.revert * (center - op) / op;
+        const cl = Math.max(1, op * (1 + ret));
+        const top = Math.max(op, cl), bot = Math.min(op, cl); const rg = op * (s.vol * 0.7 + 0.002);
+        o.push(op); c.push(cl); h.push(top + rg * r() * r() * 1.8); l.push(Math.min(bot, Math.max(0.5, bot - rg * r() * r() * 1.8)));
+        p = cl;
+      }
+    }
+    return { o, h, l, c, n: c.length };
+  }
+  let cstyle = 'book';
+  function candleCols(up) {
+    if (cstyle === 'color') return up ? { fill: colorOf('buy'), stroke: colorOf('buy') } : { fill: colorOf('sell'), stroke: colorOf('sell') };
+    if (cstyle === 'japan') return up ? { fill: colorOf('sell'), stroke: colorOf('sell') } : { fill: colorOf('price'), stroke: colorOf('price') };
+    return up ? { fill: colorOf('plate'), stroke: colorOf('price') } : { fill: colorOf('price'), stroke: colorOf('price') };
+  }
+  function cssCols(up) {
+    if (cstyle === 'color') return up ? ['var(--buy)', 'var(--buy)'] : ['var(--sell)', 'var(--sell)'];
+    if (cstyle === 'japan') return up ? ['var(--sell)', 'var(--sell)'] : ['var(--price)', 'var(--price)'];
+    return up ? ['var(--plate)', 'var(--price)'] : ['var(--price)', 'var(--price)'];
+  }
+  // one candle (or OHLC bar) at x; quant > 0 rounds y to a pixel grid of that step
+  function drawCandleAt(g, x, w, Y, o, h, l, c, mode, quant) {
+    const q = (y) => (quant ? Math.round(y / quant) * quant : y);
+    const up = c >= o; const col = candleCols(up);
+    if (mode === 'bar') {
+      g.strokeStyle = colorOf('price'); g.lineWidth = Math.max(1, Math.min(2, w * 0.25)); g.beginPath();
+      g.moveTo(x, q(Y(h))); g.lineTo(x, q(Y(l))); g.moveTo(x - w / 2, q(Y(o))); g.lineTo(x, q(Y(o))); g.moveTo(x, q(Y(c))); g.lineTo(x + w / 2, q(Y(c))); g.stroke(); return;
+    }
+    const yT = q(Y(Math.max(o, c))), yB = q(Y(Math.min(o, c))), yH = q(Y(h)), yL = q(Y(l));
+    g.strokeStyle = col.stroke; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, yH); g.lineTo(x, yT); g.moveTo(x, yB); g.lineTo(x, yL); g.stroke();
+    const bh = yB - yT;
+    if (bh < 1) { g.lineWidth = 1.5; g.beginPath(); g.moveTo(x - w / 2, yT); g.lineTo(x + w / 2, yT); g.stroke(); return; }
+    g.fillStyle = col.fill; g.fillRect(x - w / 2, yT, w, bh);
+    if (w > 3) { g.lineWidth = 1; g.strokeRect(x - w / 2 + 0.5, yT + 0.5, Math.max(0, w - 1), Math.max(0, bh - 1)); }
+  }
+  // candle chart: sp = {x0, x1, mode, quant, ymin, ymax, lines:[{d,col,w,dash,label}], marks:[{i,dir,col,hollow}], sub:{lines,ymin,ymax,hl,label}, legend}
+  function candlePlot(id, D, sp) {
+    const cv = $(id); if (!cv) return null;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : D.c.length - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0, gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const slot = (W - padL - padR) / (x1 - x0 + 1);
+    const X = (i) => padL + (i - x0 + 0.5) * slot;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = x0; i <= x1; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    (sp.lines || []).forEach((ln) => { for (let i = x0; i <= x1; i++) { const v = ln.d[i]; if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } });
+    if (sp.ymin != null) lo = sp.ymin; if (sp.ymax != null) hi = sp.ymax;
+    const pad = (hi - lo) * 0.08 || 1; if (sp.ymin == null) lo -= pad; if (sp.ymax == null) hi += pad;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    const font = '11px ' + css('mono');
+    g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); if (y < padT - 1 || y > padT + mainH + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    const w = Math.max(1, slot * 0.62);
+    for (let i = x0; i <= x1; i++) drawCandleAt(g, X(i), w, Y, D.o[i], D.h[i], D.l[i], D.c[i], sp.mode, sp.quant);
+    (sp.lines || []).forEach((ln) => strokeSeries(g, ln.d, X, Y, x0, x1, colorOf(ln.col, ln.alpha != null ? ln.alpha : 1), ln.w || 1.6, ln.dash));
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1) return; const x = X(m.i), s = Math.max(4, Math.min(7, slot * 0.9));
+      g.fillStyle = colorOf(m.col); g.strokeStyle = colorOf(m.col); g.lineWidth = 1.4; g.beginPath();
+      if (m.dir > 0) { const y = Y(D.l[m.i]) + 4; g.moveTo(x, y); g.lineTo(x - s, y + s * 1.5); g.lineTo(x + s, y + s * 1.5); g.closePath(); }
+      else if (m.dir < 0) { const y = Y(D.h[m.i]) - 4; g.moveTo(x, y); g.lineTo(x - s, y - s * 1.5); g.lineTo(x + s, y - s * 1.5); g.closePath(); }
+      else { g.arc(x, Y(D.l[m.i]) + 8, 3, 0, Math.PI * 2); }
+      m.hollow ? g.stroke() : g.fill();
+    });
+    if (sp.sub) {
+      const top = padT + mainH + gap; const s = sp.sub; const slo = s.ymin, shi = s.ymax;
+      const Ys = (v) => top + (shi - v) / (shi - slo) * subH;
+      g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke();
+      (s.hl || []).forEach((v) => { g.fillStyle = colorOf(v > 50 ? 'sell' : 'buy', 0.08); if (v > 50) g.fillRect(padL, Ys(shi), W - padL - padR, Ys(v) - Ys(shi)); else g.fillRect(padL, Ys(v), W - padL - padR, Ys(slo) - Ys(v)); g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Ys(v)); g.lineTo(W - padR, Ys(v)); g.stroke(); g.setLineDash([]); g.fillStyle = colorOf('muted'); g.font = font; g.fillText(String(v), W - padR + 5, Ys(v) + 4); });
+      (s.lines || []).forEach((ln) => strokeSeries(g, ln.d, X, Ys, x0, x1, colorOf(ln.col), ln.w || 1.5, ln.dash));
+      if (s.label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(s.label, padL + 4, top + 12); }
+    }
+    if (sp.label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(sp.label, padL + 4, padT + 12); }
+    const L = $(id + 'L');
+    if (L) {
+      const items = []; (sp.lines || []).forEach((ln) => ln.label && items.push([ln.label, ln.col])); (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).forEach((ln) => ln.label && items.push([ln.label, ln.col]));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+    return { X, Y, slot };
+  }
+  // small pattern canvas: cands [[o,h,l,c],...], trend 'up' | 'down' | 'none' draws the book's thin lead-in lines
+  function leadTicks(C, t) {
+    if (t !== 'up' && t !== 'down') return [];
+    let lo = Infinity, hi = -Infinity; C.forEach((q) => { lo = Math.min(lo, q[2]); hi = Math.max(hi, q[1]); });
+    const span = Math.max(10, hi - lo), out = [];
+    for (let k = 0; k < 3; k++) {
+      if (t === 'down') { const top = C[0][1] + (3 - k) * 0.11 * span + 0.04 * span; out.push({ top, bot: top - 0.16 * span }); }
+      else { const bot = C[0][2] - (3 - k) * 0.11 * span - 0.04 * span; out.push({ top: bot + 0.16 * span, bot }); }
+    }
+    return out;
+  }
+  function patPlot(id, C, opts) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const lead = leadTicks(C, opts.trend); const hl = opts.hlines || [];
+    let lo = Infinity, hi = -Infinity;
+    C.forEach((q) => { lo = Math.min(lo, q[2]); hi = Math.max(hi, q[1]); }); lead.forEach((t) => { lo = Math.min(lo, t.bot); hi = Math.max(hi, t.top); }); hl.forEach((h) => { lo = Math.min(lo, h.v); hi = Math.max(hi, h.v); });
+    const pd = (hi - lo) * 0.1 || 1; lo -= pd; hi += pd;
+    const padL = 10, padR = 150, padT = 14, padB = 14;
+    const slots = C.length + lead.length + 1; const sw = Math.min(70, (W - padL - padR) / slots);
+    const Y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+    const font = '11px ' + css('mono'); g.font = font;
+    hl.forEach((h) => { g.strokeStyle = colorOf(h.col || 'muted', 0.9); g.setLineDash(h.dash ? [5, 4] : []); g.lineWidth = 1.2; g.beginPath(); g.moveTo(padL, Y(h.v)); g.lineTo(padL + slots * sw + 8, Y(h.v)); g.stroke(); g.setLineDash([]); g.fillStyle = colorOf(h.col || 'muted'); g.fillText(h.label, padL + slots * sw + 12, Y(h.v) + 4); });
+    lead.forEach((t, k) => { const x = padL + (k + 0.5) * sw; g.strokeStyle = colorOf('muted'); g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, Y(t.top)); g.lineTo(x, Y(t.bot)); g.stroke(); });
+    C.forEach((q, k) => {
+      const x = padL + (lead.length + 1 + k + 0.5) * sw - sw * 0.5;
+      drawCandleAt(g, x, sw * 0.5, Y, q[0], q[1], q[2], q[3]);
+      if (opts.labels && opts.labels[k]) { g.fillStyle = colorOf('muted'); g.font = font; const tw = g.measureText(opts.labels[k]).width; g.fillText(opts.labels[k], x - tw / 2, H - 2); }
+    });
+  }
+  const tick = (ok, txt) => `<div class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} ${txt}</div>`;
+
+  // ---------- shared OHLC market ----------
+  let OH = null, ohSeed = null;
+  function getOH() {
+    if (ohSeed !== seed) {
+      OH = genOHLC([
+        { n: 45, drift: -0.004, vol: 0.012 },
+        { n: 40, drift: 0, vol: 0.012, revert: 0.08 },
+        { n: 45, drift: 0.0045, vol: 0.012 },
+        { n: 30, drift: -0.0035, vol: 0.013 }
+      ], seed * 13 + 5);
+      ohSeed = seed;
+    }
+    return OH;
+  }
+  function stoch(D, n, m) {
+    const k = nulls(D.c.length);
+    for (let i = n - 1; i < D.c.length; i++) { let hh = -Infinity, ll = Infinity; for (let j = i - n + 1; j <= i; j++) { hh = Math.max(hh, D.h[j]); ll = Math.min(ll, D.l[j]); } k[i] = hh > ll ? (D.c[i] - ll) / (hh - ll) * 100 : 50; }
+    const d = nulls(D.c.length);
+    for (let i = n - 1 + m - 1; i < D.c.length; i++) { let s = 0; for (let j = 0; j < m; j++) s += k[i - j]; d[i] = s / m; }
+    return { k, d };
+  }
+  // trend before bar k: +1 up, -1 down, 0 unclear (my rule)
+  function trendAt(D, ma, k) {
+    if (k < 3 || ma[k] == null || ma[k - 3] == null) return 0;
+    if (D.c[k] > ma[k] && ma[k] > ma[k - 3]) return 1;
+    if (D.c[k] < ma[k] && ma[k] < ma[k - 3]) return -1;
+    return 0;
+  }
+  const bodyOf = (D, i) => Math.abs(D.c[i] - D.o[i]);
+  function isHammerShape(D, i) {
+    const rg = D.h[i] - D.l[i]; if (rg <= 0) return false; const b = bodyOf(D, i);
+    const up = D.h[i] - Math.max(D.o[i], D.c[i]), dn = Math.min(D.o[i], D.c[i]) - D.l[i];
+    return dn >= 2 * Math.max(b, rg * 0.02) && up <= rg * 0.25 && b <= rg / 3;
+  }
+  function avgBody(D, i, n) { let s = 0, k = 0; for (let j = Math.max(0, i - n); j < i; j++) { s += bodyOf(D, j); k++; } return k ? s / k : 0; }
+  // simplified reversal-pattern scanner (my rules)
+  function findPatterns(D, ma) {
+    const out = []; const n = D.c.length;
+    for (let i = 3; i < n; i++) {
+      const ab = avgBody(D, i, 10); const white = (j) => D.c[j] > D.o[j], black = (j) => D.c[j] < D.o[j];
+      const t1 = trendAt(D, ma, i - 1), t2 = trendAt(D, ma, i - 2), t3 = trendAt(D, ma, i - 3);
+      if (isHammerShape(D, i) && t1 !== 0) { out.push({ i, dir: t1 < 0 ? 1 : -1, len: 1, name: t1 < 0 ? 'Hammer' : 'Hanging Man' }); continue; }
+      const a = i - 1;
+      if (t2 < 0 && black(a) && white(i) && D.o[i] <= D.c[a] && D.c[i] >= D.o[a] && bodyOf(D, i) > bodyOf(D, a)) { out.push({ i, dir: 1, len: 2, name: 'Engulfing +' }); continue; }
+      if (t2 > 0 && white(a) && black(i) && D.o[i] >= D.c[a] && D.c[i] <= D.o[a] && bodyOf(D, i) > bodyOf(D, a)) { out.push({ i, dir: -1, len: 2, name: 'Engulfing −' }); continue; }
+      const midA = (D.o[a] + D.c[a]) / 2;
+      if (t2 < 0 && black(a) && bodyOf(D, a) > ab && white(i) && D.o[i] < D.l[a] && D.c[i] > midA && D.c[i] < D.o[a]) { out.push({ i, dir: 1, len: 2, name: 'Piercing Line' }); continue; }
+      if (t2 > 0 && white(a) && bodyOf(D, a) > ab && black(i) && D.o[i] > D.h[a] && D.c[i] < midA && D.c[i] > D.o[a]) { out.push({ i, dir: -1, len: 2, name: 'Dark Cloud Cover' }); continue; }
+      const f = i - 2, s = i - 1, midF = (D.o[f] + D.c[f]) / 2, small = bodyOf(D, s) < 0.5 * ab;
+      if (t3 < 0 && black(f) && bodyOf(D, f) > ab && small && Math.max(D.o[s], D.c[s]) < D.c[f] && white(i) && D.c[i] > midF) { out.push({ i, dir: 1, len: 3, name: 'Morning Star' }); continue; }
+      if (t3 > 0 && white(f) && bodyOf(D, f) > ab && small && Math.min(D.o[s], D.c[s]) > D.c[f] && black(i) && D.c[i] < midF) { out.push({ i, dir: -1, len: 3, name: 'Evening Star' }); continue; }
+    }
+    return out;
+  }
+
+  const narrow = (id) => { const cv = $(id); return !!(cv && cv.clientWidth && cv.clientWidth < 560); };
+  // ---------- section 2: bar vs candle ----------
+  const d2 = reg(() => {
+    const D = getOH(); const mode = $('sel2m').value;
+    const x02 = narrow('c2') ? D.c.length - 70 : 40;
+    candlePlot('c2', D, { x0: x02, x1: D.c.length - 1, mode, legend: [[mode === 'bar' ? 'OHLC bars (simulated)' : 'candles (simulated)', 'price']] });
+    let up = 0; for (let i = x02; i < D.c.length; i++) if (D.c[i] > D.o[i]) up++;
+    $('r2').innerHTML = `bars shown <b>${D.c.length - x02}</b> · up days (close &gt; open) <b>${up}</b> · down days <b>${D.c.length - x02 - up}</b> · same four numbers per day either way`;
+  });
+  $('sel2m').addEventListener('change', d2);
+  $('sel2c').addEventListener('change', () => { cstyle = $('sel2c').value; redrawAll(); });
+
+  // ---------- section 3: build a candle ----------
+  const ids3 = ['bo3', 'bh3', 'bl3', 'bc3'];
+  function set3(o, h, l, c) { $('bo3').value = o; $('bh3').value = h; $('bl3').value = l; $('bc3').value = c; d3(); }
+  function clamp3(changed) {
+    let o = val('bo3'), h = val('bh3'), l = val('bl3'), c = val('bc3');
+    if (changed === 'bh3') h = Math.max(h, o, c);
+    else if (changed === 'bl3') l = Math.min(l, o, c);
+    else { h = Math.max(h, o, c); l = Math.min(l, o, c); }
+    $('bh3').value = h; $('bl3').value = l;
+  }
+  function classify(o, h, l, c) {
+    const rg = h - l, b = Math.abs(c - o), up = h - Math.max(o, c), dn = Math.min(o, c) - l; const names = [];
+    if (rg === 0) return ['a flat dash: open = high = low = close (drawn in Fig 12.5, not named in the text)'];
+    if (b <= 0.05 * rg) {
+      if (dn <= 0.05 * rg && up >= 0.6 * rg) names.push('<b>gravestone doji</b> (bearish; longer upper shadow = more bearish)');
+      else if (up <= 0.05 * rg && dn >= 0.6 * rg) names.push('<b>dragonfly doji</b> (usually quite bullish)');
+      else if (up >= 0.3 * rg && dn >= 0.3 * rg) names.push('<b>long-legged doji</b> (considerable indecision)');
+      else names.push('<b>doji</b> (open ≈ close)');
+      return names;
+    }
+    const colour = c > o ? 'white' : 'black';
+    if (b >= 30) names.push(`<b>long day</b> (${colour})`);
+    else if (b <= 12) names.push(`<b>short day</b> (${colour})`);
+    else names.push(`medium body (${colour})`);
+    if (b <= 12 && up > b && dn > b) names.push('<b>spinning top</b> (indecision; colour unimportant)');
+    if (dn >= 2 * b && up <= 0.25 * rg && b <= rg / 3) names.push('hammer shape: <b>hammer</b> in a downtrend, <b>hanging man</b> in an uptrend (s05)');
+    if (up >= 2 * b && dn <= 0.25 * rg && b <= rg / 3) names.push('inverted shape: <b>inverted hammer</b> / <b>shooting star</b> by trend (library)');
+    return names;
+  }
+  function d3() {
+    ids3.forEach((k) => { const out = $(k + 'o'); if (out) out.textContent = $(k).value; });
+    const o = val('bo3'), h = val('bh3'), l = val('bl3'), c = val('bc3');
+    const cv = $('c3'); if (cv) {
+      const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight;
+      if (W && H) {
+        cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+        const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+        const Y = (v) => 18 + (100 - v) / 100 * (H - 36); const font = '12px ' + css('mono'); g.font = font;
+        const xb = W * 0.22, xc = W * 0.52, bw = Math.min(70, W * 0.12);
+        drawCandleAt(g, xb, bw * 0.6, Y, o, h, l, c, 'bar');
+        drawCandleAt(g, xc, bw, Y, o, h, l, c);
+        g.fillStyle = colorOf('muted'); g.fillText('bar', xb - 10, H - 4); g.fillText('candle', xc - 20, H - 4);
+        const lab = [['High ' + h, h, 'muted'], ['Low ' + l, l, 'muted'], ['Open ' + o, o, 'c1'], ['Close ' + c, c, 'c1']].map((x) => [x[0], Y(x[1]), x[2]]).sort((a, b) => a[1] - b[1]);
+        for (let k = 1; k < lab.length; k++) if (lab[k][1] - lab[k - 1][1] < 14) lab[k][1] = lab[k - 1][1] + 14;
+        lab.forEach(([t, y, col]) => { g.fillStyle = colorOf(col); g.fillText(t, xc + bw / 2 + 14, y + 4); });
+      }
+    }
+    const names = classify(o, h, l, c); const rg = h - l;
+    $('r3').innerHTML = `body <b>${Math.abs(c - o)}</b> · upper shadow <b>${h - Math.max(o, c)}</b> · lower shadow <b>${Math.min(o, c) - l}</b> · range <b>${rg}</b><span class="full">reads as: ${names.join(' · ')}</span>`;
+  }
+  reg(d3);
+  ids3.forEach((k) => $(k).addEventListener('input', () => { clamp3(k); d3(); }));
+  $('p3a').addEventListener('click', () => set3(25, 85, 20, 80));
+  $('p3b').addEventListener('click', () => set3(80, 85, 20, 25));
+  $('p3c').addEventListener('click', () => set3(48, 60, 42, 56));
+  $('p3d').addEventListener('click', () => set3(52, 75, 30, 47));
+  $('p3e').addEventListener('click', () => set3(50, 85, 15, 50));
+  $('p3f').addEventListener('click', () => set3(20, 85, 20, 20));
+  $('p3g').addEventListener('click', () => set3(80, 80, 15, 80));
+  $('p3h').addEventListener('click', () => set3(72, 76, 25, 78));
+
+  // ---------- section 5: trend decides the name ----------
+  const d5 = reg(() => {
+    const D = getOH(); const n = val('n5'); const ma = sma(D.c, n); const x0 = narrow('c5') ? D.c.length - 75 : 15;
+    const marks = []; let ham = 0, hang = 0, none = 0;
+    for (let i = x0; i < D.c.length; i++) {
+      if (!isHammerShape(D, i)) continue; const t = trendAt(D, ma, i - 1);
+      if (t < 0) { ham++; marks.push({ i, dir: 1, col: 'buy' }); } else if (t > 0) { hang++; marks.push({ i, dir: -1, col: 'sell' }); } else { none++; marks.push({ i, dir: 0, col: 'muted' }); }
+    }
+    candlePlot('c5', D, { x0, lines: [{ d: ma, col: 'c1', w: 2, label: n + '-period SMA (trend)' }], marks, legend: [['▲ hammer (after a fall)', 'buy'], ['▼ hanging man (after a rise)', 'sell'], ['● same shape, no clear trend', 'muted']] });
+    $('r5').innerHTML = `hammer-shaped candles <b>${ham + hang + none}</b> · named hammer <b class="good">${ham}</b> · named hanging man <b class="bad">${hang}</b> · ignored (no clear trend) <b>${none}</b>`;
+  });
+  bindRange('n5', d5);
+
+  // ---------- section 6: dark cloud cover / piercing line ----------
+  const d6 = reg(() => {
+    const bear = $('sel6').value === 'dcc'; const k = val('k6') / 100; const gp = val('g6');
+    let C, mid, ext, checks;
+    if (bear) {
+      const d1 = [40, 72, 38, 70]; mid = (d1[0] + d1[3]) / 2; ext = d1[1];
+      const op = d1[1] + gp, cl = d1[3] - k * (d1[3] - d1[0]); const d2 = [op, Math.max(op, cl) + 1, Math.min(op, cl) - 2, cl];
+      C = [d1, d2];
+      checks = [tick(true, 'prior trend up (lead-in lines)'), tick(true, 'day 1: long white body'), tick(op > d1[1], `day 2 opens above day-1 high (${fmt(op)} vs ${d1[1]})`), tick(cl < mid, `day 2 closes below the midpoint of day-1 body (${fmt(cl)} vs ${mid})`), tick(cl < op, 'day 2 body is black (close &lt; open)')];
+    } else {
+      const d1 = [70, 72, 38, 40]; mid = (d1[0] + d1[3]) / 2; ext = d1[2];
+      const op = d1[2] - gp, cl = d1[3] + k * (d1[0] - d1[3]); const d2 = [op, Math.max(op, cl) + 2, Math.min(op, cl) - 1, cl];
+      C = [d1, d2];
+      checks = [tick(true, 'prior trend down (lead-in lines)'), tick(true, 'day 1: long black body'), tick(op < d1[2], `day 2 opens at a new low, below day-1 low (${fmt(op)} vs ${d1[2]})`), tick(cl > mid, `day 2 closes above the midpoint of day-1 body (${fmt(cl)} vs ${mid})`), tick(cl > op, 'day 2 body is white (close &gt; open)')];
+    }
+    patPlot('c6', C, { trend: bear ? 'up' : 'down', labels: ['day 1', 'day 2'], hlines: [{ v: mid, label: 'day-1 body midpoint', col: 'c1', dash: true }, { v: ext, label: bear ? 'day-1 high' : 'day-1 low', col: 'muted', dash: true }] });
+    const all = checks.every((x) => x.indexOf('class="ok"') > 0);
+    $('r6').innerHTML = checks.join('') + `<div>${all ? '<b>→ valid ' + (bear ? 'Dark Cloud Cover' : 'Piercing Line') + '</b>' : '<b>→ not the pattern</b> (the book gives no partial credit here)'}</div>`;
+  });
+  $('sel6').addEventListener('change', d6); bindRange('k6', d6); bindRange('g6', d6);
+
+  // ---------- section 7: stars ----------
+  const d7 = reg(() => {
+    const bear = $('sel7').value === 'es'; const ga = $('chk7a').checked, gb = $('chk7b').checked, gc = $('chk7c').checked;
+    // build in "bearish" orientation then mirror for the morning star
+    const d1 = [40, 62, 38, 60]; const mid1 = 50;
+    const sB = ga ? 66 : 58; const star = [sB + 2, sB + 4, sB - 1, sB];           // small black star
+    const o3 = gb ? sB - 3 : sB + 1; const c3 = gc ? 46 : 55;                    // day 3 black
+    const d3c = [o3, o3 + 1, c3 - 2, c3];
+    const mir = (q) => [100 - q[0], 100 - q[2], 100 - q[1], 100 - q[3]];
+    const C = bear ? [d1, star, d3c] : [mir(d1), mir(star), mir(d3c)];
+    const midV = bear ? mid1 : 100 - mid1;
+    patPlot('c7', C, { trend: bear ? 'up' : 'down', labels: ['day 1', 'star', 'day 3'], hlines: [{ v: midV, label: 'day-1 midpoint', col: 'c1', dash: true }] });
+    const strict = ga && gb && gc; const lenient = ga; // day-3 close always lands inside day-1 body here
+    $('r7').innerHTML = tick(true, 'day 1: long ' + (bear ? 'white' : 'black') + ' body in an ' + (bear ? 'up' : 'down') + 'trend') +
+      tick(ga, 'day 2 is a star: small body gapping ' + (bear ? 'above' : 'below') + ' day-1 body') +
+      tick(gb, 'day 3 opens with a gap ' + (bear ? 'below' : 'above') + ' the star body') +
+      tick(gc, 'day 3 closes past day-1 midpoint') +
+      `<div>strict computer rule (the "perfect" scenario): <b class="${strict ? 'ok' : 'no'}">${strict ? 'PASS' : 'FAIL'}</b> · lenient human reading: <b class="${lenient ? 'ok' : 'no'}">${lenient ? 'PASS' : 'FAIL'}</b></div>`;
+  });
+  ['sel7', 'chk7a', 'chk7b', 'chk7c'].forEach((k) => $(k).addEventListener('change', d7));
+
+  // ---------- section 8: rising / falling three methods ----------
+  const d8 = reg(() => {
+    const bull = $('sel8').value === 'r'; const n = val('n8'); const inBody = $('chk8a').checked, counter = $('chk8b').checked, newHi = $('chk8c').checked;
+    $('n8o').textContent = n;
+    const d1 = [40, 62, 38, 60]; const C = [d1]; let blacks = 0;
+    for (let k = 0; k < n; k++) {
+      const topB = 58 - k * (10 / Math.max(1, n - 1)); const isBlack = counter ? k % 3 !== 1 : k % 3 === 1;
+      const o = isBlack ? topB : topB - 5, c = isBlack ? topB - 5 : topB;
+      const lo = (!inBody && k === n - 1) ? 38.6 : Math.min(o, c) - 1.5, hi = Math.max(o, c) + 1.5;
+      if (isBlack) blacks++; C.push([o, hi, lo, c]);
+    }
+    const inside = C.slice(1).every((q) => q[2] >= 40 && q[1] <= 60);
+    const inRange = C.slice(1).every((q) => q[2] >= 38 && q[1] <= 62);
+    const last = newHi ? [Math.min(...C.slice(1).map((q) => q[3])) + 1, 72, Math.min(...C.slice(1).map((q) => q[3])), 70] : [50, 59, 49, 58];
+    C.push(last);
+    const mir = (q) => [100 - q[0], 100 - q[2], 100 - q[1], 100 - q[3]];
+    const CC = bull ? C : C.map(mir);
+    const labels = CC.map((q, k) => (k === 0 ? 'day 1' : k === CC.length - 1 ? 'last' : 'rest'));
+    const v1 = bull ? 60 : 40, v0 = bull ? 40 : 60;
+    patPlot('c8', CC, { trend: bull ? 'up' : 'down', labels, hlines: [{ v: v1, label: 'day-1 close', col: 'c2', dash: true }, { v: v0, label: 'day-1 open', col: 'c2', dash: true }, { v: bull ? 62 : 38, label: bull ? 'day-1 high' : 'day-1 low', col: 'muted', dash: true }] });
+    const strict = n === 3 && inside && blacks >= 2 && newHi;
+    const flexible = newHi && inRange;
+    const cName = bull ? 'black' : 'white';
+    $('r8').innerHTML = tick(true, 'day 1: long ' + (bull ? 'white' : 'black') + ' day in the trend') +
+      tick(n === 3, `exactly three rest days (now ${n}; flexible: more than three is allowed)`) +
+      tick(inside, 'rest days stay inside day-1 <b>body</b> (flexible: inside its high–low range)') +
+      tick(blacks >= 2, `at least two rest days ${cName} (${blacks} of ${n}; flexible: not always)`) +
+      tick(newHi, 'last day closes at a new ' + (bull ? 'high' : 'low')) +
+      `<div>perfect (book's scenario): <b class="${strict ? 'ok' : 'no'}">${strict ? 'YES' : 'NO'}</b> · with the book's flexibility: <b class="${flexible ? 'ok' : 'no'}">${flexible ? 'YES' : 'NO'}</b>${newHi ? '' : ' (no breakout = no continuation signal)'}</div>`;
+  });
+  ['sel8', 'chk8a', 'chk8b', 'chk8c'].forEach((k) => $(k).addEventListener('change', d8)); $('n8').addEventListener('input', d8);
+
+  // ---------- section 9: pixel trap ----------
+  const d9 = reg(() => {
+    const D = getOH(); const zoom = val('q9'), rows = val('v9'); const x0 = D.c.length - 80;
+    let lo = Infinity, hi = -Infinity; for (let i = x0; i < D.c.length; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    const midp = (lo + hi) / 2, half = (hi - lo) / 2 * 1.1 * zoom;
+    const cv = $('c9'); const H = cv ? cv.clientHeight || 300 : 300; const mainH = H - 18; const q = mainH / rows;
+    candlePlot('c9', D, { x0, ymin: midp - half, ymax: midp + half, quant: q });
+    const perRow = (2 * half) / rows; let fake = 0, real = 0;
+    for (let i = x0; i < D.c.length; i++) { const b = bodyOf(D, i); if (b < perRow * 0.5) fake++; if (b <= D.c[i] * 0.001) real++; }
+    $('r9').innerHTML = `one pixel row ≈ <b>${perRow.toFixed(2)}</b> price units · candles that <em>look</em> like doji <b class="${fake > real ? 'bad' : ''}">${fake}</b> of 80 · true near-doji (body ≤ 0.1% of price, my rule) <b>${real}</b>`;
+  });
+  bindRange('q9', d9); bindRange('v9', d9);
+
+  // ---------- section 10: filtered candle patterns ----------
+  const d10 = reg(() => {
+    const D = getOH(); const ma = sma(D.c, 10); const st = stoch(D, 14, 3); const filt = $('chk10').checked;
+    const pats = findPatterns(D, ma).filter((p) => st.d[p.i] != null);
+    const kept = pats.filter((p) => (p.dir > 0 ? st.d[p.i] < 20 : st.d[p.i] > 80));
+    const marks = pats.map((p) => { const k = kept.indexOf(p) >= 0; return { i: p.i, dir: p.dir, col: k ? (p.dir > 0 ? 'buy' : 'sell') : 'muted', hollow: !k }; }).filter((m) => !filt || m.col !== 'muted');
+    candlePlot('c10', D, { x0: narrow('c10') ? D.c.length - 75 : 14, marks, lines: [{ d: ma, col: 'c1', w: 1.4, alpha: 0.7, label: '10-bar SMA (trend)' }], sub: { lines: [{ d: st.d, col: 'c2', w: 1.6, label: 'stochastic %D' }], ymin: 0, ymax: 100, hl: [80, 20], label: '%D (presignal zones shaded)' }, legend: [['▲ bullish kept (%D < 20)', 'buy'], ['▼ bearish kept (%D > 80)', 'sell']].concat(filt ? [] : [['△▽ ignored by the filter', 'muted']]) });
+    const agree = (arr) => { let a = 0, k = 0; arr.forEach((p) => { const j = p.i + 5; if (j < D.c.length) { k++; if ((D.c[j] - D.c[p.i]) * p.dir > 0) a++; } }); return k ? `${a}/${k} (${Math.round(a / k * 100)}%)` : 'n/a'; };
+    // lead: bars from a kept pattern to %D's own signal (leaving the zone)
+    const leads = [];
+    kept.forEach((p) => { for (let j = p.i + 1; j < D.c.length; j++) { if (st.d[j] == null || st.d[j - 1] == null) continue; if (p.dir > 0 && st.d[j - 1] < 20 && st.d[j] >= 20) { leads.push(j - p.i); break; } if (p.dir < 0 && st.d[j - 1] > 80 && st.d[j] <= 80) { leads.push(j - p.i); break; } } });
+    const lead = leads.length ? (leads.reduce((s, x) => s + x, 0) / leads.length).toFixed(1) + ' bars' : 'n/a';
+    const names = kept.map((p) => p.name).join(', ') || 'none this market';
+    $('r10').innerHTML = `reversal patterns found <b>${pats.length}</b> · kept by the filter <b>${kept.length}</b> (${names}) · next 5 bars agreed: all <b>${agree(pats)}</b>, kept <b>${agree(kept)}</b> · kept pattern came before %D's own signal by <b>${lead}</b> on average<span class="full">simulated prices with persistent trend stretches and no crowd psychology: reversals often agree less than half the time here; this shows the mechanics, not evidence</span>`;
+  });
+  $('chk10').addEventListener('change', d10);
+
+  // ---------- section 10: trade lab (rules beyond the book) ----------
+  // stop beyond the pattern's own extreme, entry next open, target R x risk, time exit; gaps fill at the open
+  function runTrade(D, e, dir, entry, stop, risk, R, maxBars, costPct) {
+    const tgt = entry + dir * R * risk; const last = Math.min(D.c.length - 1, e + maxBars - 1);
+    let exit = null, how = 'time', j;
+    for (j = e; j <= last; j++) {
+      if (j > e) {
+        if ((D.o[j] - stop) * dir <= 0) { exit = D.o[j]; how = 'stop (gapped through)'; break; }
+        if ((D.o[j] - tgt) * dir >= 0) { exit = D.o[j]; how = 'target (gapped through)'; break; }
+      }
+      const adv = dir > 0 ? D.l[j] : D.h[j], fav = dir > 0 ? D.h[j] : D.l[j];
+      if ((adv - stop) * dir <= 0) { exit = stop; how = 'stop'; break; }
+      if ((fav - tgt) * dir >= 0) { exit = tgt; how = 'target'; break; }
+    }
+    if (exit == null) { j = last; exit = D.c[last]; }
+    const r = dir * (exit - entry) / risk - (costPct / 100) * entry / risk;
+    return { e, x: j, dir, entry, stop, tgt, exit, how, r, risk };
+  }
+  function patTrade(D, p, R, maxBars, costPct) {
+    const e = p.i + 1; if (e >= D.c.length) return null;
+    const entry = D.o[e]; let stop = p.dir > 0 ? Infinity : -Infinity;
+    for (let j = p.i - p.len + 1; j <= p.i; j++) stop = p.dir > 0 ? Math.min(stop, D.l[j]) : Math.max(stop, D.h[j]);
+    const risk = (entry - stop) * p.dir; if (!(risk > 0.003 * entry)) return null; // opened beyond the stop, or stop under 0.3% away: no trade
+    const t = runTrade(D, e, p.dir, entry, stop, risk, R, maxBars, costPct); t.p = p; return t;
+  }
+  const t10opts = () => ({ R: +$('sel10r').value, mb: val('m10'), cost: val('k10') / 100 });
+  const kept10 = (p, st) => (p.dir > 0 ? st.d[p.i] < 20 : st.d[p.i] > 80);
+  let t10idx = 0;
+  const d10t = reg(() => {
+    const D = getOH(); const ma = sma(D.c, 10); const st = stoch(D, 14, 3); const filt = $('chk10').checked; const O = t10opts();
+    const sl = $('s10s'); sl.max = O.mb; if (val('s10s') > O.mb) sl.value = O.mb; $('s10so').textContent = sl.value;
+    const pats = findPatterns(D, ma).filter((p) => st.d[p.i] != null && (!filt || kept10(p, st)));
+    const trades = pats.map((p) => patTrade(D, p, O.R, O.mb, O.cost)).filter((t) => t);
+    if (!trades.length) { candlePlot('c10t', D, { x0: Math.max(0, D.c.length - 60), legend: [['no tradeable pattern in this market: roll a new one or untick the filter', 'muted']] }); $('r10t').innerHTML = 'no trades in this market with these settings'; return; }
+    t10idx = ((t10idx % trades.length) + trades.length) % trades.length;
+    const t = trades[t10idx]; const p = t.p; const step = val('s10s');
+    const shownLast = Math.min(D.c.length - 1, t.e + step); const done = shownLast >= t.x;
+    const x0 = Math.max(0, p.i - 30), x1 = Math.min(D.c.length - 1, t.e + O.mb + 2);
+    let lo = Math.min(t.stop, t.tgt), hi = Math.max(t.stop, t.tgt);
+    for (let i = x0; i <= x1; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    const pad = (hi - lo) * 0.06; const mask = (a) => a.map((v, i) => (i > shownLast ? NaN : v));
+    const V = { o: mask(D.o), h: mask(D.h), l: mask(D.l), c: mask(D.c), n: D.c.length };
+    const marks = [{ i: p.i, dir: p.dir, col: p.dir > 0 ? 'buy' : 'sell' }];
+    const res = candlePlot('c10t', V, { x0, x1, ymin: lo - pad, ymax: hi + pad, marks, lines: [{ d: mask(ma), col: 'c1', w: 1.2, alpha: 0.6, label: '10-bar SMA' }], sub: { lines: [{ d: mask(st.d), col: 'c2', w: 1.5, label: '%D' }], ymin: 0, ymax: 100, hl: [80, 20], label: '%D' }, legend: [['entry', 'ink'], ['stop', 'sell'], ['target', 'buy']] });
+    const cv = $('c10t');
+    if (res && cv) {
+      const g = cv.getContext('2d'); const xa = res.X(t.e) - res.slot / 2, xb = res.X(done ? t.x : shownLast) + res.slot / 2;
+      g.font = '11px ' + css('mono');
+      [[t.entry, 'ink', 'entry ' + fmt(t.entry)], [t.stop, 'sell', 'stop ' + fmt(t.stop)], [t.tgt, 'buy', 'target ' + fmt(t.tgt)]].forEach(([v, col, lab]) => {
+        g.strokeStyle = colorOf(col); g.lineWidth = 1.4; g.setLineDash(col === 'ink' ? [] : [5, 3]); g.beginPath(); g.moveTo(xa, res.Y(v)); g.lineTo(xb, res.Y(v)); g.stroke(); g.setLineDash([]);
+        g.fillStyle = colorOf(col); g.fillText(lab, Math.max(4, xa - 4 - g.measureText(lab).width), res.Y(v) + 4);
+      });
+      if (done) { g.fillStyle = colorOf(t.r > 0 ? 'buy' : 'sell'); g.beginPath(); g.arc(res.X(t.x), res.Y(t.exit), 4, 0, Math.PI * 2); g.fill(); }
+    }
+    const side = p.dir > 0 ? 'long (bullish pattern)' : 'short (bearish pattern)';
+    let state;
+    if (done) state = `exited on bar +${t.x - t.e} by <b>${t.how}</b> at ${fmt(t.exit)} → <b class="${t.r > 0 ? 'good' : 'bad'}">${t.r >= 0 ? '+' : ''}${t.r.toFixed(2)}R</b> after costs`;
+    else { const now = D.c[shownLast]; const open = p.dir * (now - t.entry) / t.risk; state = `bar +${step}: still open, close ${fmt(now)} = <b>${open >= 0 ? '+' : ''}${open.toFixed(2)}R</b> so far (step on to see the exit)`; }
+    $('r10t').innerHTML = `trade <b>${t10idx + 1}</b> of ${trades.length} · <b>${p.name}</b> at %D ${st.d[p.i].toFixed(1)} → ${side} · entry next open <b>${fmt(t.entry)}</b> · stop <b>${fmt(t.stop)}</b> (pattern ${p.dir > 0 ? 'low' : 'high'}) · risk <b>${fmt(t.risk)}</b> = ${(t.risk / t.entry * 100).toFixed(1)}% of price · target <b>${fmt(t.tgt)}</b><span class="full">${state} · simulated prices, not a real trade</span>`;
+  });
+  $('t10p').addEventListener('click', () => { t10idx--; $('s10s').value = 0; d10t(); });
+  $('t10n').addEventListener('click', () => { t10idx++; $('s10s').value = 0; d10t(); });
+  $('b10s').addEventListener('click', () => { $('s10s').value = Math.min(val('m10'), val('s10s') + 1); d10t(); });
+  $('b10r').addEventListener('click', () => { $('s10s').value = 0; d10t(); });
+  bindRange('s10s', d10t);
+  $('chk10').addEventListener('change', () => { t10idx = 0; d10t(); });
+
+  // pooled over many simulated markets; markets + patterns cached per page seed, trades recomputed per setting
+  const K10 = 150; let P10 = null, p10Seed = null;
+  function pooledMarkets() {
+    if (p10Seed === seed && P10) return P10;
+    P10 = [];
+    for (let k = 0; k < K10; k++) {
+      const D = genOHLC([
+        { n: 45, drift: -0.004, vol: 0.012 }, { n: 40, drift: 0, vol: 0.012, revert: 0.08 },
+        { n: 45, drift: 0.0045, vol: 0.012 }, { n: 30, drift: -0.0035, vol: 0.013 }
+      ], seed * 7919 + k * 104729 + 17);
+      const ma = sma(D.c, 10), st = stoch(D, 14, 3);
+      P10.push({ D, st, sd: seed * 7919 + k * 104729 + 17, pats: findPatterns(D, ma).filter((p) => st.d[p.i] != null) });
+    }
+    p10Seed = seed; return P10;
+  }
+  function summ(rs) {
+    if (!rs.length) return { n: 0 };
+    const s = rs.slice().sort((a, b) => a - b); const mean = rs.reduce((a, b) => a + b, 0) / rs.length;
+    return { n: rs.length, win: rs.filter((r) => r > 0).length / rs.length, mean, med: s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2, tot: mean * rs.length };
+  }
+  const d10p = reg(() => {
+    const O = t10opts(); const MK = pooledMarkets();
+    const all = [], kept = [], rnd = []; let fBeat = 0, fBoth = 0, pinned = 0, keptLoss = 0; const leads = []; let noSig = 0;
+    MK.forEach((m) => {
+      const D = m.D, st = m.st, r = rng(m.sd ^ 0x5bd1e995); const ma = [], ka = [];
+      m.pats.forEach((p) => {
+        const t = patTrade(D, p, O.R, O.mb, O.cost); if (!t) return;
+        all.push(t.r); ma.push(t.r);
+        // random control: same direction and same stop distance (as % of price), random entry bar
+        const e = 20 + Math.floor(r() * (D.c.length - 22)); const en = D.o[e]; const rk = t.risk / t.entry * en;
+        rnd.push(runTrade(D, e, p.dir, en, en - p.dir * rk, rk, O.R, O.mb, O.cost).r);
+        if (kept10(p, st)) {
+          kept.push(t.r); ka.push(t.r);
+          if (t.r < 0) { keptLoss++; let pin = true; for (let j = p.i + 1; j <= p.i + 5; j++) { const v = st.d[j]; if (v == null || (p.dir > 0 ? v >= 20 : v <= 80)) { pin = false; break; } } if (pin) pinned++; }
+          let found = false;
+          for (let j = p.i + 1; j < Math.min(D.c.length, p.i + 31); j++) { const a = st.d[j - 1], b = st.d[j]; if (a == null || b == null) continue; if ((p.dir > 0 && a < 20 && b >= 20) || (p.dir < 0 && a > 80 && b <= 80)) { leads.push(j - p.i); found = true; break; } }
+          if (!found) noSig++;
+        }
+      });
+      if (ka.length && ma.length) { fBoth++; if (ka.reduce((a, b) => a + b, 0) / ka.length > ma.reduce((a, b) => a + b, 0) / ma.length) fBeat++; }
+    });
+    const row = (name, s) => s.n ? `<tr><td>${name}</td><td class="num">${s.n}</td><td class="num">${(s.win * 100).toFixed(0)}%</td><td class="num">${s.mean >= 0 ? '+' : ''}${s.mean.toFixed(3)}R</td><td class="num">${s.med >= 0 ? '+' : ''}${s.med.toFixed(2)}R</td><td class="num">${s.tot >= 0 ? '+' : ''}${s.tot.toFixed(1)}R</td></tr>` : `<tr><td>${name}</td><td class="num">0</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+    $('r10p').innerHTML = `<table><tr><th>entries</th><th>trades</th><th>winners</th><th>mean per trade</th><th>median</th><th>total</th></tr>${row('all reversal patterns', summ(all))}${row('filtered (%D beyond 20/80)', summ(kept))}${row('random entries (control)', summ(rnd))}</table>`;
+    const noEdge = 1 / (1 + O.R);
+    const lead = leads.length ? (leads.reduce((a, b) => a + b, 0) / leads.length).toFixed(1) : 'n/a';
+    $('r10q').innerHTML = `win rate with no edge at ${O.R}R ≈ <b>${(noEdge * 100).toFixed(0)}%</b> · filtered beat unfiltered (mean R) in <b>${fBeat}</b> of ${fBoth} markets that had both · kept losers with %D still pinned for 5 bars <b>${pinned}</b> of ${keptLoss} · kept pattern came before %D's own signal by <b>${lead}</b> bars on average (${leads.length} signals; ${noSig} with no %D signal within 30 bars)<span class="full">${K10} simulated markets with no built-in candle psychology: this shows the method and what "no edge" looks like, not evidence about real markets</span>`;
+  });
+  $('sel10r').addEventListener('change', () => { d10t(); d10p(); });
+  bindRange('m10', () => { d10t(); d10p(); });
+  bindRange('k10', () => { d10t(); d10p(); });
+
+  // ---------- section 12: pattern library ----------
+  // [name, sign(+1/-1/0 as drawn), candles, group, prior trend, OHLC list, page, definition, inText]
+  const BR = 'bullish reversal', SR = 'bearish reversal', BC = 'bullish continuation', SC = 'bearish continuation';
+  const LIB = [
+    ['Long White Body', '+', 1, BR, 'down', [[40, 82, 37, 80]], 'p354 list only · long day Fig 12.3 p345', 'One long white candle: a big up move from open to close.', true],
+    ['Hammer', '+', 1, BR, 'down', [[48, 48.5, 22, 44]], 'p355', 'After a fall: small body at the top of the range, lower shadow at least twice the body, little or no upper shadow. Colour unimportant.', false],
+    ['Inverted Hammer', '+', 1, BR, 'down', [[70, 71, 49, 50], [44, 62, 39.5, 40]], 'p355', 'After a fall: a small body near the bottom of the range with a long upper shadow, often gapping down from a long black day; needs confirmation next day.', false],
+    ['Belt Hold', '+', 1, BR, 'down', [[30, 53, 30, 50]], 'p355', 'After a fall: a white candle that opens at its low (no lower shadow) and rallies all day.', false],
+    ['Engulfing Pattern', '+', 2, BR, 'down', [[52, 54, 44, 46], [42, 58, 41, 56]], 'p355', 'After a fall: a small black body followed by a white body that completely covers it.', false],
+    ['Harami', '+', 2, BR, 'down', [[70, 72, 40, 42], [50, 58, 48, 56]], 'p355', 'After a fall: a long black body followed by a small white body inside it ("harami" = pregnant).', false],
+    ['Harami Cross', '+', 2, BR, 'down', [[70, 72, 40, 42], [55, 60, 50, 55]], 'p356', 'A harami whose second day is a doji: a long black day, then a doji inside its body.', false],
+    ['Piercing Line', '+', 2, BR, 'down', [[70, 72, 46, 48], [42, 64, 41, 62]], 'p356 · Fig 12.7 p348', 'Long black day; next day opens at a new low and closes above the midpoint of the black body (section 06).', true],
+    ['Doji Star', '+', 2, BR, 'down', [[70, 72, 46, 48], [42, 45, 38, 42]], 'p356', 'After a fall: a long black day, then a doji that gaps below its body.', false],
+    ['Meeting Lines', '+', 2, BR, 'down', [[70, 72, 48, 50], [30, 52, 28, 50]], 'p356', 'Long black day; next day opens far lower but rallies to close at the same close as the black day.', false],
+    ['Three White Soldiers', '+', 3, BR, 'down', [[40, 52, 38, 50], [46, 62, 44, 60], [56, 72, 54, 70]], 'p357', 'Three long white days, each opening inside the previous body and closing at a new high.', false],
+    ['Morning Star', '+', 3, BR, 'down', [[72, 74, 50, 52], [44, 48, 42, 46], [50, 68, 49, 66]], 'p357 · Fig 12.9 p348', 'Long black day, a small-bodied star gapping below it, then a white day closing well into the black body (section 07).', true],
+    ['Morning Doji Star', '+', 3, BR, 'down', [[72, 74, 50, 52], [45, 48, 42, 45], [50, 68, 49, 66]], 'p357', 'A Morning Star whose middle star is a doji.', false],
+    ['Abandoned Baby', '+', 3, BR, 'down', [[72, 74, 50, 52], [44, 47, 41, 44], [50, 66, 49, 64]], 'p357', 'A doji star whose shadows gap away from both neighbours: left alone below a black day and a white day.', false],
+    ['Tri-Star', '+', 3, BR, 'down', [[50, 54, 46, 50], [44, 48, 40, 44], [50, 54, 46, 50]], 'p357', 'Three doji in a row, the middle one gapping below the other two.', false],
+    ['Breakaway', '+', 5, BR, 'down', [[80, 82, 64, 66], [60, 62, 55, 56], [57, 59, 52, 53], [54, 56, 49, 50], [51, 64, 50, 63]], 'p360', 'Long black day, a gap down, three more small days drifting lower, then a long white day that closes inside the gap.', false],
+    ['Three Inside Up', '+', 3, BR, 'down', [[70, 72, 48, 50], [54, 60, 53, 59], [58, 76, 57, 74]], 'p360', 'A bullish harami confirmed by a third white day closing above the first day\'s open.', false],
+    ['Three Outside Up', '+', 3, BR, 'down', [[56, 58, 48, 50], [46, 64, 45, 62], [61, 72, 60, 70]], 'p360', 'A bullish engulfing confirmed by a third day closing higher.', false],
+    ['Kicking', '+', 2, BR, 'none', [[60, 60, 40, 40], [66, 86, 66, 86]], 'p360', 'A black marubozu (no shadows) followed by a white marubozu that gaps above it. Drawn without a prior trend.', false],
+    ['Unique Three Rivers Bottom', '+', 3, BR, 'down', [[74, 76, 50, 52], [56, 57, 30, 50], [44, 48, 42, 46]], 'p361 (drawn "Unique Three River", no sign)', 'Long black day; a smaller black day that makes a new low with a long lower shadow; then a small white body below it.', false],
+    ['Three Stars in the South', '+', 3, BR, 'down', [[78, 79, 40, 50], [58, 60, 44, 50], [52, 52, 48, 48]], 'p361', 'Three shrinking black days with higher lows; the last is a small black body with no shadows. Selling is drying up.', false],
+    ['Concealing Swallow', '+', 4, BR, 'down', [[80, 80, 62, 62], [64, 64, 46, 46], [42, 52, 38, 38], [56, 56, 32, 32]], 'p361 (drawn "Concealing Baby Swallow")', 'Two black marubozu; a third black day gaps down but trades up into the prior body; a fourth black day engulfs it, shadow included.', false],
+    ['Stick Sandwich', '+', 3, BR, 'down', [[64, 66, 46, 48], [52, 62, 51, 60], [66, 68, 47, 48]], 'p361', 'Black day, white day trading above it, then a black day closing at the same close as the first: a support level.', false],
+    ['Homing Pigeon', '+', 2, BR, 'down', [[70, 72, 44, 46], [60, 62, 52, 54]], 'p362', 'Like a harami but both days black: a small black body inside a long black body.', false],
+    ['Ladder Bottom', '+', 5, BR, 'down', [[80, 81, 66, 67], [70, 71, 56, 57], [60, 61, 46, 47], [50, 58, 40, 42], [52, 66, 51, 64]], 'p362', 'Three falling black days, a fourth black day with an upper shadow, then a white day gapping above the fourth day\'s open.', false],
+    ['Matching Low', '+', 2, BR, 'down', [[70, 72, 48, 50], [60, 62, 49.5, 50]], 'p361', 'Two black days with the same close: the low held twice.', false],
+    ['Long Black Body', '−', 1, SR, 'up', [[80, 83, 38, 40]], 'p354 list only · long day Fig 12.3 p345', 'One long black candle: a big down move from open to close.', true],
+    ['Hanging Man', '−', 1, SR, 'up', [[78, 78.5, 52, 74]], 'p355', 'The hammer shape after a rise: small body at the top, long lower shadow. A warning.', false],
+    ['Shooting Star', '−', 1, SR, 'up', [[50, 72, 48, 70], [79, 97, 74.5, 75]], 'p355', 'After a rise: a small body gapping up, with a long upper shadow; prices were pushed up and rejected.', false],
+    ['Belt Hold', '−', 1, SR, 'up', [[80, 80, 57, 60]], 'p355', 'After a rise: a black candle that opens at its high (no upper shadow) and falls all day.', false],
+    ['Engulfing Pattern', '−', 2, SR, 'up', [[48, 56, 46, 54], [58, 60, 42, 44]], 'p355', 'After a rise: a small white body followed by a black body that completely covers it.', false],
+    ['Harami', '−', 2, SR, 'up', [[40, 72, 38, 70], [62, 64, 52, 54]], 'p356', 'After a rise: a long white body followed by a small black body inside it.', false],
+    ['Harami Cross', '−', 2, SR, 'up', [[40, 72, 38, 70], [56, 61, 51, 56]], 'p356', 'A long white day, then a doji inside its body.', false],
+    ['Dark Cloud Cover', '−', 2, SR, 'up', [[40, 64, 38, 62], [68, 70, 46, 48]], 'p356 · Fig 12.6 p347', 'Long white day; next day opens above its high and closes below the midpoint of the white body (section 06).', true],
+    ['Doji Star', '−', 2, SR, 'up', [[40, 64, 38, 62], [68, 72, 65, 68]], 'p356', 'After a rise: a long white day, then a doji that gaps above its body.', false],
+    ['Meeting Lines', '−', 2, SR, 'up', [[40, 62, 38, 60], [80, 82, 58, 60]], 'p356', 'Long white day; next day opens far higher but falls to close at the same close.', false],
+    ['Three Black Crows', '−', 3, SR, 'up', [[70, 72, 48, 50], [54, 56, 38, 40], [44, 46, 28, 30]], 'p357', 'Three long black days, each opening inside the previous body and closing at a new low.', false],
+    ['Evening Star', '−', 3, SR, 'up', [[40, 62, 38, 60], [68, 70, 65, 66], [62, 63, 44, 46]], 'p357 · Fig 12.8 p348', 'Long white day, a small star gapping above it, then a black day gapping down and closing below the white day\'s midpoint (section 07).', true],
+    ['Evening Doji Star', '−', 3, SR, 'up', [[40, 62, 38, 60], [67, 70, 64, 67], [62, 63, 44, 46]], 'p357', 'An Evening Star whose star is a doji.', false],
+    ['Abandoned Baby', '−', 3, SR, 'up', [[40, 62, 38, 60], [68, 71, 65, 68], [62, 63, 46, 48]], 'p357', 'A doji star whose shadows gap away from a white day before it and a black day after it.', false],
+    ['Tri-Star', '−', 3, SR, 'up', [[50, 54, 46, 50], [56, 60, 52, 56], [50, 54, 46, 50]], 'p360', 'Three doji, the middle one gapping above the other two.', false],
+    ['Breakaway', '−', 5, SR, 'up', [[20, 36, 18, 34], [40, 45, 39, 44], [46, 48, 42, 43], [44, 50, 43, 49], [49, 50, 36, 37]], 'p360', 'Long white day, a gap up, three small days drifting higher, then a long black day closing inside the gap.', false],
+    ['Three Inside Down', '−', 3, SR, 'up', [[40, 62, 38, 60], [56, 57, 50, 51], [52, 53, 34, 36]], 'p360', 'A bearish harami confirmed by a third black day closing below the first day\'s open.', false],
+    ['Three Outside Down', '−', 3, SR, 'up', [[50, 58, 48, 56], [60, 62, 42, 44], [45, 46, 34, 36]], 'p360 (drawn with no sign)', 'A bearish engulfing confirmed by a third day closing lower.', false],
+    ['Kicking', '−', 2, SR, 'none', [[60, 80, 60, 80], [54, 54, 34, 34]], 'p360', 'A white marubozu followed by a black marubozu that gaps below it. Drawn without a prior trend.', false],
+    ['Latter Top', '−', 5, SR, 'up', [[20, 34, 19, 33], [30, 44, 29, 43], [40, 54, 39, 53], [50, 58, 42, 56], [48, 49, 32, 34]], 'p362 (drawn "Ladder Top")', 'Mirror of Ladder Bottom: three rising white days, a fourth white day with a lower shadow, then a black day gapping below the fourth day\'s open.', false],
+    ['Matching High', '−', 2, SR, 'up', [[40, 72, 36, 70], [56, 72, 50, 70]], 'p361', 'Two white days closing at the same level: the high held twice.', false],
+    ['Upside Gap Two Crows', '−', 3, SR, 'up', [[40, 62, 38, 60], [68, 70, 64, 66], [70, 72, 62, 64]], 'p361', 'Long white day; a small black day gapping up; a second black day opening above it and engulfing it, still above the white close.', false],
+    ['Identical Three Crows', '−', 3, SR, 'up', [[70, 72, 52, 54], [54, 55, 38, 40], [40, 41, 24, 26]], 'p361', 'Three Black Crows where each day opens exactly at the previous close.', false],
+    ['Deliberation', '−', 3, SR, 'up', [[30, 46, 29, 45], [44, 62, 43, 60], [63, 67, 62, 65]], 'p361', 'Two long white days, then a small white day (spinning top) at the top: the advance is hesitating.', false],
+    ['Advance Block', '−', 3, SR, 'up', [[30, 52, 29, 50], [48, 62, 47, 58], [57, 68, 56, 60]], 'p362', 'Three white days with shrinking bodies and growing upper shadows: buying is weakening.', false],
+    ['Two Crows', '−', 3, SR, 'up', [[40, 62, 38, 60], [68, 70, 64, 66], [67, 68, 50, 52]], 'p362', 'Long white day; a black day gapping up; a second black day opening inside it and closing inside the white body.', false],
+    ['Separating Lines', '+', 2, BC, 'up', [[60, 62, 46, 48], [60, 78, 59, 76]], 'p362', 'In an uptrend: a black day, then a white day opening at the same open and rising away.', false],
+    ['Rising Three Methods', '+', 5, BC, 'up', [[40, 62, 38, 60], [58, 59, 52, 53], [50, 56, 49, 55], [54, 55, 46, 47], [48, 72, 47, 70]], 'p362 (4 candles drawn) · Fig 12.10 p350', 'Long white day, small rest days inside its body (at least two black), then a long white day closing at a new high (section 08).', true],
+    ['Upside Tasuki Gap', '+', 3, BC, 'up', [[30, 52, 29, 50], [56, 72, 55, 70], [64, 65, 52, 53]], 'p363', 'Two white days with a gap between them; a black day opens in the second body and closes inside the gap without filling it.', false],
+    ['Side by Side White Lines', '+', 3, BC, 'up', [[30, 52, 29, 50], [58, 68, 57, 66], [58, 67, 57, 65]], 'p363', 'A white day gapping up, followed by a second white day of similar size with the same open.', false],
+    ['Three Line Strike', '+', 4, BC, 'up', [[30, 42, 29, 40], [38, 50, 37, 48], [46, 58, 45, 56], [58, 59, 26, 28]], 'p363', 'Three rising white days, then one long black day that opens higher and wipes them out; listed as bullish continuation.', false],
+    ['Upside Gap Three Methods', '+', 3, BC, 'up', [[30, 46, 29, 44], [50, 66, 49, 64], [62, 63, 38, 40]], 'p363', 'Two white days with a gap up; a black day opens in the second body and closes in the first, filling the gap.', false],
+    ['On Neck Line', '+', 2, BC, 'up', [[30, 52, 29, 50], [56, 57, 52, 52]], 'p363', 'The bullish mirror of On Neck has no standard definition; the book\'s drawing shows a small black day gapping above a long white day, closing about at its high.', false],
+    ['In Neck Line', '+', 2, BC, 'up', [[30, 52, 29, 50], [55, 57, 53, 53]], 'p364', 'The bullish mirror of In Neck has no standard definition; the book\'s drawing shows a small black day gapping above a long white day, much like its On Neck Line +.', false],
+    ['Separating Lines', '−', 2, SC, 'down', [[40, 54, 38, 52], [40, 42, 22, 24]], 'p362', 'In a downtrend: a white day, then a black day opening at the same open and falling away.', false],
+    ['Falling Three Methods', '−', 5, SC, 'down', [[60, 62, 38, 40], [42, 48, 41, 47], [50, 51, 44, 45], [46, 54, 45, 53], [52, 53, 28, 30]], 'p362 · Fig 12.11 p350', 'Mirror of Rising Three Methods: long black day, small rest days inside its body, then a long black day closing at a new low.', true],
+    ['Downside Tasuki Gap', '−', 3, SC, 'down', [[70, 72, 48, 50], [44, 45, 28, 30], [36, 47, 35, 46]], 'p363', 'Two black days with a gap between them; a white day opens in the second body and closes inside the gap without filling it.', false],
+    ['Side by Side White Lines', '−', 3, SC, 'down', [[70, 72, 48, 50], [30, 40, 29, 38], [30, 39, 29, 37]], 'p363', 'After a black day, two similar white days gapping below it with the same open.', false],
+    ['Three Line Strike', '−', 4, SC, 'down', [[70, 71, 58, 60], [62, 63, 50, 52], [54, 55, 42, 44], [42, 74, 41, 72]], 'p363', 'Three falling black days, then one long white day that opens lower and wipes them out; listed as bearish continuation.', false],
+    ['Downside Gap Three Methods', '−', 3, SC, 'down', [[70, 72, 54, 56], [50, 51, 34, 36], [38, 62, 37, 60]], 'p363 (drawn "+")', 'Two black days with a gap down; a white day opens in the second body and closes in the first, filling the gap.', false],
+    ['On Neck Line', '−', 2, SC, 'down', [[70, 72, 48, 50], [44, 48, 42, 48]], 'p364', 'Long black day; a white day opens below its low and closes right at that low.', false],
+    ['In Neck Line', '−', 2, SC, 'down', [[70, 72, 48, 50], [44, 51.5, 43, 51]], 'p364', 'Long black day; a white day opens lower and closes just inside the black body.', false]
+  ];
+  function patSVG(p) {
+    const C = p[5], lead = leadTicks(C, p[4]);
+    let lo = Infinity, hi = -Infinity; C.forEach((q) => { lo = Math.min(lo, q[2]); hi = Math.max(hi, q[1]); }); lead.forEach((t) => { lo = Math.min(lo, t.bot); hi = Math.max(hi, t.top); });
+    const W = 150, H = 100, pd = 8; const slots = C.length + lead.length + 1; const sw = (W - 2 * pd) / slots;
+    const Y = (v) => (pd + (hi - v) / (hi - lo) * (H - 2 * pd)).toFixed(1);
+    let s = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+    lead.forEach((t, k) => { const x = (pd + (k + 0.5) * sw).toFixed(1); s += `<line x1="${x}" x2="${x}" y1="${Y(t.top)}" y2="${Y(t.bot)}" stroke="var(--muted)" stroke-width="1.5"/>`; });
+    C.forEach((q, k) => {
+      const x = pd + (lead.length + 1 + k) * sw; const bw = Math.min(16, sw * 0.6); const up = q[3] >= q[0]; const [fill, stroke] = cssCols(up);
+      const yt = +Y(Math.max(q[0], q[3])), yb = +Y(Math.min(q[0], q[3]));
+      s += `<line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${Y(q[1])}" y2="${Y(q[2])}" stroke="${stroke}" stroke-width="1.3"/>`;
+      if (yb - yt < 1.2) s += `<line x1="${(x - bw / 2).toFixed(1)}" x2="${(x + bw / 2).toFixed(1)}" y1="${yt}" y2="${yt}" stroke="${stroke}" stroke-width="1.6"/>`;
+      else s += `<rect x="${(x - bw / 2).toFixed(1)}" y="${yt}" width="${bw.toFixed(1)}" height="${(yb - yt).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>`;
+    });
+    return s + '</svg>';
+  }
+  let gfilter = 'all', gsel = 7;
+  function renderGallery() {
+    const el = $('gal12'); if (!el) return;
+    el.innerHTML = LIB.map((p, k) => {
+      const show = gfilter === 'all' || p[3] === gfilter;
+      return `<button type="button" class="pcard${k === gsel ? ' sel' : ''}" data-k="${k}"${show ? '' : ' hidden'} aria-label="${p[0]} ${p[1]}">${patSVG(p)}<span class="pname">${p[0]} ${p[1]}</span><span class="pmeta">(${p[2]}) · ${p[4] === 'none' ? 'no trend' : p[4] + 'trend'}${p[8] ? ' · in text' : ''}</span></button>`;
+    }).join('');
+  }
+  const d12 = reg(() => {
+    renderGallery();
+    const p = LIB[gsel]; const ex = Math.max(0, p[5].length - p[2]); const lab = (k) => (k < ex ? 'day before' : 'day ' + (k - ex + 1));
+    patPlot('c12v', p[5], { trend: p[4], labels: p[5].map((q, k) => lab(k)) });
+    const rows = p[5].map((q, k) => `${lab(k)}: O ${q[0]} H ${q[1]} L ${q[2]} C ${q[3]}`).join(' · ');
+    $('r12').innerHTML = `<b>${p[0]} ${p[1]}</b> · ${p[3]} · ${p[2]} candle${p[2] > 1 ? 's' : ''} · book drawing pdf ${p[6]}<span class="full">${p[8] ? 'Explained in this chapter: ' : 'Standard definition (not in Murphy\'s text): '}${p[7]}</span><span class="full">constructed prices → ${rows}</span>`;
+  });
+  $('gal12').addEventListener('click', (e) => {
+    const t = e && e.target; const card = t && t.closest ? t.closest('[data-k]') : null;
+    if (!card || !card.dataset || card.dataset.k == null) return;
+    gsel = +card.dataset.k; d12(); const v = $('c12v'); if (v && v.scrollIntoView) v.scrollIntoView({ block: 'nearest' });
+  });
+  const gbtn = { g12all: 'all', g12br: BR, g12sr: SR, g12bc: BC, g12sc: SC };
+  Object.keys(gbtn).forEach((id) => $(id).addEventListener('click', () => {
+    gfilter = gbtn[id]; Object.keys(gbtn).forEach((j) => $(j).classList.toggle('on', j === id));
+    const firstK = LIB.findIndex((p) => gfilter === 'all' || p[3] === gfilter); if (gfilter !== 'all' && LIB[gsel][3] !== gfilter) gsel = firstK;
+    d12();
+  }));
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

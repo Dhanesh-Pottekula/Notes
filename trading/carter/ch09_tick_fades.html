@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.9 Tick Fades</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* page additions (ch09) */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 68ch; }
+.verdict { font-family: var(--mono); font-size: 13px; border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; background: var(--paper); display: grid; gap: 6px; }
+.verdict ul.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.verdict .good { color: var(--buy); } .verdict .bad { color: var(--sell); }
+.readout { line-height: 1.5; }
+code { font-family: var(--mono); font-size: .88em; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch08_pivot_points.html">← Ch.8 Pivot Points</a><a href="ch10_reverting_back_to_the_mean.html">Ch.10 Reverting Back to the Mean →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John F. Carter · Mastering the Trade, 3rd ed. · Chapter 9 · pdf p214–232</div>
+  <h1>Tick fades, and when to <em>go with</em> the ticks</h1>
+  <p class="lede">The NYSE $TICK counts, minute by minute, how many stocks last traded up versus down. When it pushes past +1,000 or −1,000, the crowd is buying or selling in a panic. Carter's default play is to take the other side for a small, fixed bracket, with a 35-minute timer. The second half of the chapter covers the days when that is exactly wrong, and how to read the $TICK's trend instead. This page walks the chapter in the book's order: the alert, the seven rules, all ten worked days (28 trades), why it works, how to tell a probe from real selling, the 2010 flash crash, and the 8/21 EMA read.</p>
+  <p class="lede">Every chart uses simulated prices and simulated $TICK readings. Figures 9.1–9.15 are blank in this PDF copy, so each chart is rebuilt from the text. Where a chart replays one of Carter's trades, the entry, stop, target and exit levels are his; the minute-by-minute path between them is simulated, and times marked ≈ are my placement where the book gives none.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b> · re-rolls the simulated paths, never the book's levels</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>One instrument, two opposite ways to use it. In quiet, two-way markets an extreme $TICK reading marks a climax, so you fade it. When big institutions ("the elephants") are moving, extreme readings come one after another, and you trade in their direction instead.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Premise</span><span class="node">Markets mostly back and fill</span><span class="arr">→</span><span class="node">Flat is right ~60% of the day</span><span class="arr">→</span><span class="node key">Wait for an alert, don't stare</span></div>
+    <div class="row"><span class="tag">Signal</span><span class="node key">$TICK ≥ +1,000 → short · ≤ −1,000 → buy</span><span class="arr">→</span><span class="node">The chasers are the last buyers / sellers</span></div>
+    <div class="row"><span class="tag">Rules</span><span class="node">10:00–3:30 ET only</span><span class="node">ES · YM (SPY, DIA, …)</span><span class="node key">YM 30/20 · ES 3/2 · 35-min timer</span><span class="node">2 hard stops → done</span><span class="node">&gt;85% above zero by noon → stop fading</span></div>
+    <div class="row"><span class="tag">Evidence</span><span class="node">5 YM days · 5 ES days · 28 trades</span><span class="arr">→</span><span class="node">many timer exits, 1 hard stop</span></div>
+    <div class="row"><span class="tag">Switch</span><span class="node">Post-2008: big trend days</span><span class="arr">→</span><span class="node key">Probe (bounces) vs real selling (hangs at −1,000, rejects 0.00)</span></div>
+    <div class="row"><span class="tag">Go with</span><span class="node">Short rallies to 0.00, cover at −1,000</span><span class="node">Flash crash: −1,500 → −1,875, EMA trendline break</span><span class="node key">8/21 EMA of $TICK above/below zero sets the side</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>The number-one action alert</a>
+    <a href="#s2"><span>02</span>The seven rules for sell fades</a>
+    <a href="#s3"><span>03</span>Worked days: mini-sized Dow</a>
+    <a href="#s4"><span>04</span>Worked days: E-mini S&amp;P</a>
+    <a href="#s5"><span>05</span>Summing up the tick fades</a>
+    <a href="#s6"><span>06</span>When fading won't work</a>
+    <a href="#s7"><span>07</span>Going with the ticks</a>
+    <a href="#s8"><span>08</span>The flash crash, May 6, 2010</a>
+    <a href="#s9"><span>09</span>The 8/21 EMA on the $TICK</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · WHAT IS THE NUMBER ONE ACTION ALERT AVAILABLE TO TRADERS TODAY?</div><h2>Sit on your hands, then fade the panic</h2></div><span class="chip">pdf p214–215</span></div>
+  <p>Stock markets spend most of their time <b>backing and filling</b>: drifting up to resistance, drifting back to support, not doing much. For most of that time a trader has nothing to do but wait, and many fail at exactly that. They believe a trader should always be in a trade. Carter calls this one of the biggest misconceptions in trading. There are always three positions: <b>long, short or flat</b>, and for day trading, flat is the best choice about <b>60 percent</b> of the time. A cat doesn't chase the first bird it sees; it crouches and waits, sometimes for hours. When something real happens, like a buy or sell program hitting the market, the alert trader gets a good scalp. Actively trading really means actively waiting. <b>Overtrading is the number one reason most day traders fail.</b></p>
+  <p>The easiest way to wait well is to watch, or rather <b>listen</b> for, the $TICK. Readings above <b>+1,000</b> or below <b>−1,000</b> mean extreme buying or selling, and by then most of the bullets have been fired. Amateurs get caught up in the excitement, fear missing a big move, and jump in just as it is running out; they become the bag holders shaken out on the reversal. Carter waits for the extreme reading and <b>fades</b> it with a <b>market order</b>:</p>
+  <ul class="plain">
+    <li>+1,000 and he is flat → he <b>shorts</b> at current levels.</li>
+    <li>+1,000 and he is already long from another signal → he starts <b>exiting the long and opening a short</b>.</li>
+    <li>−1,000 → the mirror image: he <b>buys</b>.</li>
+  </ul>
+  <p>He has <b>audio alerts</b> set at those levels, so he doesn't have to stare at charts and can be down the hall. The setup isn't his invention: he was shown several versions by other traders, and people who have traded for decades tie part of their trading to the $TICK. The chapter covers the fades first, then (new material) when and how to <b>"go with"</b> an extreme reading, for example waiting after a +1,000 reading for a pullback to the <b>0.00 line</b> to buy. He uses "$TICK", "tick" and "ticks" interchangeably; they all mean the same indicator.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch09_stadium_wave_peak.svg" alt="A packed cricket stadium crowd is mid-wave with two-thirds of fans standing at once, and the first fans are already starting to sit down." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A stadium crowd doing a wave. When two-thirds of the stadium is standing at the same moment, the wave is at its peak: everyone who was going to stand up already has. The next thing that happens is people sitting down. A +1,000 $TICK is that moment, counted across the stock exchange.</p></div>
+  <div class="fig">
+    <h3>Beyond the book: how a $TICK reading is built</h3>
+    <canvas id="c1" class="short" aria-label="Simulated $TICK for one session built from many stocks"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls">
+      <label for="n1">Issues counted <input id="n1" type="range" min="500" max="4000" step="100" value="3000"><output id="n1o">3000</output></label>
+      <label for="k1">How much stocks move together <input id="k1" type="range" min="0" max="0.5" step="0.01" value="0.15"><output id="k1o">0.15</output></label>
+      <label for="b1">Program size <input id="b1" type="range" min="0" max="5" step="0.1" value="3"><output id="b1o">3</output></label>
+    </div>
+    <div class="readout" id="r1"></div>
+    <p>Model (mine, not the book's): each minute every stock's last trade is an uptick with probability Φ(k·f), where f is a shared market "mood" and k is how strongly stocks follow it. The program slider adds a burst of index buying around 12:50. Set "move together" to 0 and the $TICK barely leaves ±200 however many stocks you count.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Carter defines the $TICK in Chapter 5 (pdf p117): the number of NYSE stocks whose last price change was up, minus the number whose last change was down. If stocks moved independently, the count would hover near zero, because ups and downs cancel (with 3,000 coin flips the spread is only about ±55). Readings near ±1,000 need a large share of the whole exchange to move the same way in the same minute: with 3,000 issues, +1,000 means about 67% upticking. The things that do that are index programs and basket orders, which buy or sell hundreds of stocks at once, plus a crowd piling in after them. That's why an extreme reading is a footprint of size and urgency, and why it tends to be short-lived: a program finishes, and the latecomers who chased it have nobody left to sell to.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_tools_that_predict_the_next_move.html">Ch.5</a> (pdf p116–118): the $TICK as the "DJ" of the market, the rule that readings between −400 and +400 are noise, paying attention beyond ±600, and a spike versus conviction (spike, ease back, then a new extreme).</li>
+    <li><a href="ch07_the_opening_gap.html">Ch.7</a>: the "99% setup" (buy every −1,000 $TICK with a 1-point target and 100-point stop) that shows why the payoff matters more than the win rate. This chapter's bracket is the sane version of that idea.</li>
+    <li>Your <code>order_flow.md</code> §8: the <b>tick rule</b> (price up versus the previous trade = buy). The $TICK is that rule applied to every NYSE stock at once and summed.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · WHAT ARE THE TRADING RULES FOR SELL FADES (BUYS ARE REVERSED)?</div><h2>The seven rules, written for a short</h2></div><span class="chip">pdf p215–216</span></div>
+  <p>Carter studied three setups from other traders and adapted them into this "extreme emotion" play. The rules are written for sells; for buys, flip every sign.</p>
+  <ol class="plain">
+    <li><b>Time window: 10:00 a.m. to 3:30 p.m. eastern only.</b> The first and last half-hour have a lot of sporadic action; let the market settle first.</li>
+    <li><b>Markets:</b> he plays it in the <b>E-mini S&amp;P (ES)</b> and the <b>mini-sized Dow (YM)</b>. It also works in SPY, DIA, the E-mini Russell, the E-mini Nasdaq, and stocks that mirror the indexes. Option traders can use SPY options; choose slightly in-the-money ones, ideally with a <b>delta of at least 0.70</b>.</li>
+    <li><b>Entry: when the ticks reach +1,000, short at the market.</b> Audio alerts at +1,000 and −1,000 mean no staring. If the ticks get to +988 and fall back, there is no trade: the alert never sounds. That keeps the setup exact and free of interpretation.</li>
+    <li><b>YM: 30-point stop, 20-point target, and a 35-minute time limit.</b> If neither is hit in 35 minutes, exit at the market. He uses a beeping timer because most traders lose all sense of time once they're in a trade.</li>
+    <li><b>ES: 3-point stop, 2-point target, same 35-minute limit.</b></li>
+    <li><b>Two hard stops in a row and he is done with tick fades for the day.</b> Only the physical stop counts, not the time stop. Those are the days he switches to "go with" (section 7).</li>
+    <li><b>The power-day filter.</b> If by <b>12:00 noon eastern</b> the ticks have spent <b>more than 85 percent</b> of their time above zero, he passes on all further fades that day: it shows funds accumulating stock. These power days are rare, about <b>once every four to six weeks</b>, and come with many readings above +1,000, typically <b>+1,200 to +1,400</b>. Also: if it's past 10:00 and the ticks have been one-sided all day (say, all positive), he waits until they spend some time below zero before the first fade. On such days, go with the ticks.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><p>A smoke alarm, a kitchen timer and a two-strikes rule. The alarm (the audio alert) tells you when to act; the timer tells you when to give up waiting; two strikes tell you the kitchen is actually on fire today and you should stop treating smoke as a false alarm.</p></div>
+  <div class="fig">
+    <h3>Try the rules: would Carter take this signal?</h3>
+    <div class="controls">
+      <label for="sel2">Market <select id="sel2"><option value="ES">ES</option><option value="YM">YM</option></select></label>
+      <label for="t2">Time (ET) <input id="t2" type="range" min="570" max="960" step="5" value="660"><output id="t2o">11:00</output></label>
+      <label for="v2">$TICK reading <input id="v2" type="range" min="-1500" max="1500" step="1" value="1012"><output id="v2o">1012</output></label>
+    </div>
+    <div class="controls">
+      <label for="st2">Hard stops today <input id="st2" type="range" min="0" max="3" step="1" value="0"><output id="st2o">0</output></label>
+      <label for="f2">% of time above zero (by noon) <input id="f2" type="range" min="0" max="100" step="1" value="55"><output id="f2o">55</output></label>
+      <label for="chk2"><input id="chk2" type="checkbox" checked> ticks have been below zero today</label>
+    </div>
+    <div class="verdict" id="r2"></div>
+  </div>
+  <div class="map">
+  <svg viewBox="0 0 760 210" width="100%" role="img" aria-label="Short bracket for YM and ES: stop above, target below, 35-minute timer">
+    <text x="20" y="20" style="font-weight:600">YM short (mini-sized Dow)</text>
+    <rect x="20" y="34" width="330" height="54" fill="var(--sell)" opacity="0.12"/><line x1="20" y1="34" x2="350" y2="34" stroke="var(--sell)" stroke-dasharray="5 3"/><text x="26" y="50">stop +30 pts</text>
+    <line x1="20" y1="88" x2="350" y2="88" stroke="var(--c2)" stroke-width="2"/><text x="26" y="104">entry (market order at the alert)</text>
+    <rect x="20" y="88" width="330" height="36" fill="var(--buy)" opacity="0.12"/><line x1="20" y1="124" x2="350" y2="124" stroke="var(--buy)" stroke-dasharray="5 3"/><text x="26" y="140">target −20 pts</text>
+    <line x1="350" y1="28" x2="350" y2="150" stroke="var(--c1)" stroke-dasharray="3 3"/><text x="230" y="168" style="fill:var(--c1)">35 min → out at market</text>
+    <text x="410" y="20" style="font-weight:600">ES short (E-mini S&amp;P)</text>
+    <rect x="410" y="34" width="330" height="54" fill="var(--sell)" opacity="0.12"/><line x1="410" y1="34" x2="740" y2="34" stroke="var(--sell)" stroke-dasharray="5 3"/><text x="416" y="50">stop +3 pts</text>
+    <line x1="410" y1="88" x2="740" y2="88" stroke="var(--c2)" stroke-width="2"/><text x="416" y="104">entry</text>
+    <rect x="410" y="88" width="330" height="36" fill="var(--buy)" opacity="0.12"/><line x1="410" y1="124" x2="740" y2="124" stroke="var(--buy)" stroke-dasharray="5 3"/><text x="416" y="140">target −2 pts</text>
+    <line x1="740" y1="28" x2="740" y2="150" stroke="var(--c1)" stroke-dasharray="3 3"/><text x="620" y="168" style="fill:var(--c1)">35 min → out at market</text>
+    <text x="20" y="198" style="fill:var(--muted)">Same shape in both: risk 1.5 units to make 1. YM points are worth $5, ES points $50 (contract sizes are beyond the book).</text>
+  </svg>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every rule removes a decision you'd otherwise make while emotional. The exact threshold removes "is +988 close enough?". The bracket removes "should I hold a bit longer?". The timer removes the slow drift where a losing idea sits in your account all afternoon. The two-stops rule and the 85% filter are <b>regime detectors</b>: a fade only works when buying and selling take turns. If the ticks have been above zero for 85% of the morning, or you've been run over twice, someone big is buying all day and the "climax" isn't one.</p></div>
+  <div class="box behind"><b>Worked example: the bracket in money (beyond the book)</b>
+    <p>Contract values: YM moves $5 per point, ES $50 per point. So both brackets risk <b>$150</b> to make <b>$100</b> per contract (YM 30 × $5, 20 × $5; ES 3 × $50, 2 × $50). If every trade ended at the stop or the target, you'd need a win rate above <b>150 ÷ (150 + 100) = 60%</b> to profit before costs. The timer changes this: many trades end in between, with small wins or losses (sections 3–4 show that 11 of Carter's 28 example trades did). On ES, one tick is 0.25 point ($12.50), so even one tick of slippage plus commission each way takes a real slice of a $100 target.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><b>Beyond the book, for India:</b> 10:00–3:30 p.m. eastern is <b>7:30 p.m.–1:00 a.m. IST</b> while the US is on daylight time, and <b>8:30 p.m.–2:00 a.m. IST</b> in the US winter. NSE doesn't publish a $TICK-style uptick/downtick count that I know of; the closest you could do is build one yourself from live quotes of index constituents with the tick rule.</li>
+    <li>Your <code>backtest_results_summary.md</code>: on Nifty futures, an intraday momentum edge was "tiny … eaten by ~₹480 charges + slippage per ₹10L trade". A 2-point ES target is the same kind of thin edge; know your costs per trade before copying a small fixed target.</li>
+    <li><a href="ch08_pivot_points.html">Ch.8</a> ends with the same philosophy: set the parameters, then let them "babysit" the position.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · WHAT ARE SPECIFIC EXAMPLES OF TICK FADE SETUPS? (MINI-SIZED DOW)</div><h2>Five days of fading on the YM</h2></div><span class="chip">pdf p216–220 · Figs 9.1–9.5</span></div>
+  <p>All five examples use the September 2004 YM contract. Every trade uses the YM rules: 30-point stop, 20-point target, 35-minute timer. What each day teaches:</p>
+  <ul class="plain">
+    <li><b>Sep 1, 2004 (Fig 9.1):</b> four trades: a +10 timer exit, then three targets of +20 (including a <b>buy</b> at −1,000 after a hard sell-off). A fifth reading at 3:50 p.m. is skipped: no new fades after 3:30.</li>
+    <li><b>Sep 10 (Fig 9.2):</b> the rough day. Three timer exits (−5, +10, +9) and one full 30-point hard stop as the ticks kept pushing higher. One alert caught him on the phone; he ran over, entered, set the bracket and timer, and went back to the call. He doesn't try to finesse timer exits: he just gets out.</li>
+    <li><b>Sep 9 (Fig 9.3):</b> the first alert comes around noon. A +11 timer exit, then three targets of +20. Carter jokes that this beats working for a living.</li>
+    <li><b>Sep 8 (Fig 9.4):</b> a target in 10 minutes, a timer exit for +2 in chop, a target a few hours later, and a pass after 3:30 even though it would have made +20, because last-half-hour tick plays are less reliable.</li>
+    <li><b>Jul 26 (Fig 9.5):</b> a weak start but no extreme reading until just after 11:00, which is a −1,000: buy, +20. Quiet until near 3:00, a +1,000: short, +20. Another extreme after 3:30 is ignored.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A fisherman with lines out and an alarm on each rod. Most of the day he reads. When a bell rings he reels in, rebaits, sets the timer and goes back to his book. He doesn't stand on the dock staring at the water.</p></div>
+  <div class="fig">
+    <div class="controls">
+      <label for="sel3">Day <select id="sel3"><option value="ym1">Sep 1, 2004 (Fig 9.1)</option><option value="ym2">Sep 10, 2004 (Fig 9.2)</option><option value="ym3">Sep 9, 2004 (Fig 9.3)</option><option value="ym4">Sep 8, 2004 (Fig 9.4)</option><option value="ym5">Jul 26, 2004 (Fig 9.5)</option></select></label>
+      <button id="prev3" type="button">◀ Back</button><button id="next3" type="button">Next step ▶</button><button id="all3" type="button">Whole day</button>
+    </div>
+    <canvas id="c3" class="tall" aria-label="Replay of one of Carter's mini-sized Dow tick-fade days"></canvas>
+    <div class="legend" id="c3L"></div>
+    <div class="readout" id="r3"></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Time</th><th>Side</th><th>Entry</th><th>Stop</th><th>Target</th><th>Exit</th><th>Why</th><th>Pts</th></tr></thead><tbody id="tb3"></tbody></table></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Look at <b>how</b> the trades end, not just whether they win. On Sep 10 the market was grinding higher all day: each +1,000 reading was not a climax but part of a steady advance, so the fades went nowhere (timer exits) and the last one was stopped out. That is exactly the pattern rules 6 and 7 try to catch. On Sep 1 and Sep 9 the readings were genuine bursts that faded, so the targets came quickly (8 to 25 minutes).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><b>Two printing errors in the book</b>, which the table corrects: on Sep 9 (step 4 in the book's list, trade #2 in the table) the exit is printed as 10,386 (a 20-point target from a 10,306 short is 10,286), and on Sep 8 (step 6, trade #3 in the table) it is printed as 10,226 (from 10,346 it is 10,326). The point totals in the book are right; only the prices are misprinted.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">03 (cont.) · SPECIFIC EXAMPLES (E-MINI S&amp;P)</div><h2>Five days on the ES, and the whole sample</h2></div><span class="chip">pdf p220–225 · Figs 9.6–9.10</span></div>
+  <p>The ES examples use the 3-point stop, 2-point target and 35-minute timer.</p>
+  <ul class="plain">
+    <li><b>Sep 7, 2004 (Fig 9.6):</b> an early +1,000 near 9:50 a.m. is passed (before 10:00; he finds tick trades in the first 30 minutes unreliable, even though this one would have worked). Then five shorts: 1119.75 → timer at 1121.25 (−1.50); 1122.00 → timer at 1121.50; 1123.50 → timer at 1123.50 (scratch); 1124.75 → target 1122.75 (+2); and into the last hour 1119.75 → target 1117.75 (+2). Carter's asides (an arowana fish leaping from its tank, a turkey sandwich) make one point: the timer, not his attention, ends the trade.</li>
+    <li><b>Sep 3 (Fig 9.7):</b> the ticks come close to +1,000 and −1,000 but never reach them. No trade until the final hour: short 1117.25, target 1115.25 about 30 minutes later. His lesson: without a specific setup, a day like this turns into overtrading out of boredom. Is the goal not to be bored, or to make money?</li>
+    <li><b>Aug 26 (Fig 9.8):</b> an early high of <b>+978</b> and another near-miss: no trade: close doesn't count. Then a real +1,000: short 1106.75, target 1104.75 about 30 minutes later.</li>
+    <li><b>May 24 (Fig 9.9):</b> gap higher, an early +1,000 before 10:00 is ignored like an unknown caller on the phone. Near 10:30 another one: short 1098.50, target 1096.50 in about 20 minutes. Later, short 1096.50, target in about 25 minutes (+2). Then short 1096.00, timer exit at 1095.50 (+0.50). A last extreme after 3:30 is ignored.</li>
+    <li><b>Jun 7 (Fig 9.10):</b> a gap up with the ticks above zero almost all day. Around 11:00 he takes one short (1134.25, timer exit 1133.00, +1.25): it's before the noon check, and the ticks had dipped just below zero, so the one-sided rule passes, though he calls the conditions less than ideal. After noon the ticks have been above zero more than 85% of the time, so he ignores the +1,000 readings a little after 1:00 and near 3:30. Only steady fund buying keeps the ticks above zero all day; know what these days look like so you can avoid fading them.</li>
+  </ul>
+  <div class="fig">
+    <div class="controls">
+      <label for="sel4">Day <select id="sel4"><option value="es1">Sep 7, 2004 (Fig 9.6)</option><option value="es2">Sep 3, 2004 (Fig 9.7)</option><option value="es3">Aug 26, 2004 (Fig 9.8)</option><option value="es4">May 24, 2004 (Fig 9.9)</option><option value="es5">Jun 7, 2004 (Fig 9.10)</option></select></label>
+      <button id="prev4" type="button">◀ Back</button><button id="next4" type="button">Next step ▶</button><button id="all4" type="button">Whole day</button>
+    </div>
+    <canvas id="c4" class="tall" aria-label="Replay of one of Carter's E-mini S&amp;P tick-fade days"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="readout" id="r4"></div>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Time</th><th>Side</th><th>Entry</th><th>Stop</th><th>Target</th><th>Exit</th><th>Why</th><th>Pts</th></tr></thead><tbody id="tb4"></tbody></table></div>
+  </div>
+  <h3>Worked example: all 28 example trades, added up</h3>
+  <div class="tablewrap"><table><thead><tr><th>Market</th><th>Trades</th><th>Target / timer / stop</th><th>Won / lost / flat</th><th>Pts from timer exits</th><th>Total pts</th><th>Per trade</th><th>$ per contract</th></tr></thead><tbody id="tbS"></tbody></table></div>
+  <p>Points are computed from the book's fill prices. Dollar values use $5 per YM point and $50 per ES point (beyond the book), before commissions and slippage.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>Three things stand out. First, the <b>timer does a lot of the work</b>: 11 of 28 trades end on it, mostly with small results, so the real risk per trade is often far below the full stop. Second, only <b>one</b> hard stop in 28 trades. Third, these are days Carter chose to show; they are illustrations of how the rules behave, not a complete trading record, so they can't tell you the setup's real win rate (my observation, not a claim in the book). A fair test needs every signal over months, including the bad weeks.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><b>A sign slip in the book</b>: Sep 7 step 5 (trade #2 in the table) is labelled "−0.50 point", but a short filled at 1122.00 and covered at 1121.50 makes +0.50. The table uses the fills, so the ES total here is 12.75 points; with the book's label it would be 11.75.</li>
+    <li><a href="ch07_the_opening_gap.html">Ch.7</a> made the same argument about judging a setup by batches (25, 100 trades) rather than single days.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">04 · SUMMING UP THE TICK FADES</div><h2>Why it works: the market preys on the fear of missing out</h2></div><span class="chip">pdf p225–226</span></div>
+  <p>Markets are naturally set up to prey on human nature. When traders see a market running away without them, their instinct is to jump on board. That feeling of "missing the move" causes more trading errors than almost anything else: amateurs enter out of fear of missing profits, not because a setup they mapped out has appeared. The $TICK measures that panic buying and selling accurately, and extreme readings are the chance to step in on the other side of the amateurs.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch09_queue_because_of_queue.svg" alt="A long queue snakes outside a sweet shop because people joined a queue, while inside the shopkeeper is down to the last few boxes." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A queue that forms outside a shop because people saw a queue. The last people to join are the ones who arrive when the line is longest, which is exactly when the shop is about to run out. The $TICK tells you how long the line is.</p></div>
+  <div class="fig">
+    <h3>Beyond the book: the seven rules, tested on simulated days</h3>
+    <canvas id="c5" class="short" aria-label="Cumulative points of the fade rules over many simulated days"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls">
+      <label for="nd5">Days <input id="nd5" type="range" min="50" max="600" step="50" value="250"><output id="nd5o">250</output></label>
+      <label for="tr5">Trend days % <input id="tr5" type="range" min="0" max="100" step="5" value="10"><output id="tr5o">10</output></label>
+      <label for="cs5">Cost per trade (pts) <input id="cs5" type="range" min="0" max="0.75" step="0.25" value="0.25"><output id="cs5o">0.25</output></label>
+    </div>
+    <div class="controls">
+      <label for="chk5d"><input id="chk5d" type="checkbox" checked> 10:00–3:30 only</label>
+      <label for="chk5a"><input id="chk5a" type="checkbox" checked> 2 hard stops → done</label>
+      <label for="chk5b"><input id="chk5b" type="checkbox" checked> 85%-by-noon filter</label>
+      <label for="chk5c"><input id="chk5c" type="checkbox" checked> one-sided → wait</label>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Days</th><th>Trades</th><th>Win %</th><th>Target / timer / stop / other</th><th>Avg pts</th><th>Total pts</th><th>$ (×50)</th></tr></thead><tbody id="tb5"></tbody></table></div>
+    <div class="controls"><label for="ex5">Show one example <select id="ex5"><option value="quiet">quiet day</option><option value="trend">trend day</option></select></label></div>
+    <canvas id="c5b" aria-label="One simulated day with the fade trades marked"></canvas>
+    <div class="legend" id="c5bL"></div>
+    <div class="readout" id="r5b"></div>
+    <p><b>Read this honestly.</b> The simulated market is built so that program bursts push price temporarily and then fade on quiet days, while trend days have one-sided flow that keeps going. So the fade "works" on quiet days because I assumed it would. What the simulation does show is mechanics: how the bracket, the timer and the filters shape the results, and how much damage trend days do when the filters are switched off (untick them and set trend days to 40%). It is not evidence that the setup works in a real market. For scale: Carter says power days come about once every four to six weeks (roughly 4–5% of sessions); the post-2008 trend days of section 6 make one-sided days more common than that.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A fade earns money only from the part of a move that is <b>temporary</b>: price pushed by urgent orders that have now finished. If the move is a permanent repricing (news, or funds accumulating all day), there is nothing to revert to, and a fixed bracket loses. That's why every filter in section 2 is really a test of "is this flow temporary?". On the simulated trend days, the filters don't make the fades profitable; they make you take far fewer of them.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>backtest_results_summary.md</code>: "VWAP pullback / VWAP reversion lost in every version" on NSE intraday data. Intraday mean reversion without a regime filter is a hard trade, which is the problem the rest of this chapter addresses.</li>
+    <li><a href="ch02_psychology_101.html">Ch.2</a> on the psychology that makes traders chase.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">05 · HOW DO YOU KNOW WHEN FADING TICKS WON'T WORK?</div><h2>Quiet markets fade; trending markets don't</h2></div><span class="chip">pdf p226</span></div>
+  <p>The first edition covered only the fade. During most of 2004 and 2005, when it was written, stock indexes were extremely quiet and the big momentum moves were in currencies. That is one benefit of trading setups rather than markets: Carter says he doesn't trade markets, he trades setups and patterns, and doesn't care whether they appear in stocks, oil or gold.</p>
+  <p>Since the 2008 financial crisis, big moves in both directions have become normal in stocks, and the ticks matter in those markets too. The bottom line: <b>if the market is crashing today, don't buy a −1,000 reading.</b> Instead, use <b>modest</b> tick strength (not extreme strength) as the chance to go short. Which leaves two questions: how do you know whether to fade or go with the move, and how do you play it if you go with it?</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch09_beach_backwash_vs_river.svg" alt="On a beach every wave runs up the sand and back down, while in a river the rushing water never comes back past a waiting person." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Waves at a beach versus a river. At the beach every wave that runs up the sand runs back down, so betting on the backwash is safe. In a river, the water that rushes past you doesn't come back. The same splash means opposite things depending on which one you're standing in.</p></div>
+  <div class="fig">
+    <h3>Beyond the book: same model, both strategies, three kinds of day</h3>
+    <canvas id="c6" class="short" aria-label="Average points per day for fade and go-with strategies on quiet, up-trend and down-trend simulated days"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls">
+      <label for="nd6">Days per type <input id="nd6" type="range" min="40" max="300" step="20" value="120"><output id="nd6o">120</output></label>
+      <label for="sp6">Go-with price stop (ES pts) <input id="sp6" type="range" min="4" max="6" step="0.5" value="5"><output id="sp6o">5</output></label>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>Day type</th><th>Fade: trades · win % · avg pts</th><th>Go with: trades · win % · avg pts</th></tr></thead><tbody id="tb6"></tbody></table></div>
+    <p>Bars show average ES points per simulated day, after 0.25 point cost per trade. The go-with rule is my reading of sections 7–9 (details in the code comment): 8- and 21-EMA of the $TICK both on one side of zero plus a recent ±1,000 reading set the side; enter when the $TICK returns to 0.00; stop on $TICK beyond ±600 for over a minute or the price stop; cover at the next ±1,000. Again: the model decides which regime rewards which style, so this shows the logic, not proof.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Fade and go-with are mirror images: one bets that extreme flow reverts, the other that it continues. Neither is right in general. Each one's profit is the other one's loss, regime by regime, which is why the real skill the chapter teaches is <b>classifying the day</b> (sections 7–9), not the entry.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch10_reverting_back_to_the_mean.html">Ch.10 Reverting Back to the Mean</a> is the next "fade" idea; <a href="ch11_the_squeeze.html">Ch.11 The Squeeze</a> is the next "go with" idea.</li>
+    <li>Your <code>backtest_results_summary.md</code>: the 200-day market filter was "the one consistent winner". The same lesson at a different time scale: a regime filter often adds more than a better entry.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">06 · HOW DO WE TRADE "GOING WITH" THE TICKS INSTEAD OF FADING THEM?</div><h2>Follow the elephants: probe or real selling?</h2></div><span class="chip">pdf p226–228 · Fig 9.11</span></div>
+  <p>This ties in with the chapter on internals (<a href="ch05_tools_that_predict_the_next_move.html">Ch.5</a>). The first half-hour is usually very telling about what kind of day it will be (Carter makes the point with a joke about reading his wife's mood first thing in the morning). The ticks show <b>where the elephants are and where they are heading</b>. On a 2010 World Cup trip he stayed at Richard Branson's Ulusaba game reserve in Kruger National Park, where the elephants were the easiest of the "Big 5" to find: tracks, knocked-over trees, huge piles of dung. Big coordinated institutional buying and selling can't hide either; the $TICK marks their trail. His advice: be the jaguar quietly following the elephant.</p>
+  <p><b>Fig 9.11, SPY and $TICK, Friday September 30, 2011:</b></p>
+  <ul class="plain">
+    <li>The market gaps down about <b>15 ES points</b> (150 Dow points, <b>$1.50</b> on SPY). The first few hours are choppy while traders digest it.</li>
+    <li><b>11:20 a.m.</b> · the first extreme reading of the day, +1,000. The first extreme reading is a good one to fade: it's the first probe, and probes usually fail. The market chops for about 20 minutes, then sells off.</li>
+    <li>About an hour later · the first extreme reading to the downside. The market is down more than 15 points but still choppy, with no trend. Buying looks scary, but it's the first real downside probe of the cash session (the rest of the selling was overnight). Worth a shot, and the market rallies. Fading the first extreme reading is working.</li>
+    <li><b>Point 3</b> · the market makes new lows on the day: that's trend, not chop. Now the ticks can't push much above <b>+200</b> and are rejected when they try. They spend most of the time below zero and keep probing −1,000 and beyond.</li>
+  </ul>
+  <p>The key distinction: if the market tests −1,000 and <b>bounces back</b>, that's a <b>probe</b>. If it tests −1,000 and <b>keeps hanging around</b> there, even testing lower, real selling is coming in. The final confirmation is that every move back toward the 0.00 line is quickly rejected: the elephants are selling hard.</p>
+  <p><b>The play.</b> The book says there are two strategies for this situation. The first: any move up to the <b>0.00 line is a shorting opportunity</b>. The stop is the $TICK staying <b>above +600 for more than a minute</b>, or <b>4 to 6 ES points</b>, whichever comes first. The target is another move to <b>−1,000</b>. In ferocious selling it's fine to cover there and reload at the next retracement to 0.00. (The second strategy is never spelled out separately in this section; covering at −1,000 and reloading may be what is meant.)</p>
+  <div class="box picture"><b>Picture it</b><p>Knocking on a door. A probe is one knock and you walk away. Real selling is someone leaning on the door and staying there; every time it opens a crack toward 0.00, it gets shoved shut again.</p></div>
+  <div class="fig">
+    <div class="controls">
+      <button id="prev7" type="button">◀ Back</button><button id="next7" type="button">Next step ▶</button><button id="all7" type="button">Whole day</button>
+      <label for="sp7">Price stop (ES pts) <input id="sp7" type="range" min="4" max="6" step="0.5" value="5"><output id="sp7o">5</output></label>
+    </div>
+    <canvas id="c7" class="tall" aria-label="Recreated September 30, 2011: fade the first probes, then go with the selling"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="readout" id="r7"></div>
+    <p>Simulated SPY-like path shaped to follow the book's description of Fig 9.11 (gap size, times and the +200 cap are from the text; everything else is invented). A 4–6 ES-point stop is $0.40–0.60 on SPY, using the book's own ratio of 15 ES points = $1.50 SPY. Because the path is drawn to match the story, the go-with result on it is an illustration, not a test.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A probe is one urgent participant: once their order is done, nobody follows, and price snaps back. Persistent selling is a large holder working a big order over hours. They sell into every bounce, which is exactly why the $TICK can't climb past +200: each rally meets fresh supply. Shorting at 0.00 means you sell where they sell, and covering at −1,000 means you take profit when the urgent wave peaks, the same "climax" logic as the fade, used in the trend's direction.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_tools_that_predict_the_next_move.html">Ch.5</a> (pdf p117–118): the same "spike versus conviction" idea, and his exit rule when long: −1,000, bounce to −500, then a new low means get out even if the stop wasn't hit.</li>
+    <li>Your <code>order_flow.md</code>: a big player working an order shows up as one-sided aggressor flow, the same thing the $TICK sees across the whole exchange.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">06 (cont.) · AN EXTREME EXAMPLE: THE FLASH CRASH</div><h2>May 6, 2010: when the $TICK sits at −1,500</h2></div><span class="chip">pdf p228–230 · Figs 9.12–9.13</span></div>
+  <p>Looking at an extreme case helps you handle normal ones. Fig 9.12 is a <b>one-minute $TICK chart with an eight-period EMA</b> from the day of the "flash crash". The EMA shows the "trend of the $TICK". Carter repeats that moving averages lag and are useless for spotting an immediate change, but they are good at confirming that a trend <b>has</b> changed. Many traders blow up their accounts trying to prove they're right; a moving average is a road sign telling you to change tactics. Still shorting after the averages have crossed and turned up? "Good luck with that."</p>
+  <ul class="plain">
+    <li><b>Point 1</b> · the first extreme reading, −1,000. Normal.</li>
+    <li><b>Point 2</b> · consistently extreme readings begin: the first hint of a "go with" day, though nothing says what is coming.</li>
+    <li><b>Point 3</b> · the first <b>−1,500</b> of the day. Unusual; extreme downside pressure. From here, every $TICK rally is a chance to get short.</li>
+    <li><b>Point 4</b> · a few hours of chop. Rallies to 0.00 can be shorted and covered when the $TICK heads to −1,000.</li>
+    <li><b>Point 5</b> · consistent readings at −1,500: rare, and a sign this might be a crash day. <b>Crashes only happen with consistent readings in the −1,200 to −1,500 range</b>; if the $TICK stays there, the selling eventually cracks the market.</li>
+    <li><b>Point 6</b> · <b>−1,875</b>, with repeated tests of −1,700 to −1,800. Steady selling for about 15 minutes takes the Dow down just over 300 points. Then it falls another <b>600 points in five minutes</b>, and recovers it in the next five.</li>
+    <li><b>Point 7</b> · the downward trendline of the eight-period EMA breaks: a "mentality shift" in the herd. Time to stop shorting and focus on long setups, even though every ounce of rational thought fights it.</li>
+  </ul>
+  <p>Could anyone tell a flash crash was coming? No. Were there signs of intense selling and no reason to be long? Yes. Was there a way to see the selling end? Yes, point 7. It doesn't catch the exact bottom; it tells you the herd has turned. <b>Fig 9.13</b> zooms in: the −1,500 and −1,800 readings are very hard for a market to shake off and signal more selling to come. Shortly after, the EMA turns up and a small bounce follows, but the real change in trend comes only when the trendline breaks.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch09_fever_thermometer_readings.svg" alt="A mother checks a child&#x27;s fever hour after hour, writing the high readings on a chart, and waits for a clear downturn before relaxing." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A thermometer during a fever. One reading of 39° is a spike. Readings of 40° hour after hour mean something serious is going on, even if you can't say what. And you don't declare the fever over on the first slightly lower reading; you wait until the trend of the readings has clearly turned.</p></div>
+  <div class="fig">
+    <div class="controls">
+      <button id="prev8" type="button">◀ Back</button><button id="next8" type="button">Next step ▶</button><button id="all8" type="button">Whole day</button>
+      <button id="z8" type="button">Zoom 2:00–3:15 (Fig 9.13)</button>
+      <label for="n8">EMA length <input id="n8" type="range" min="3" max="30" step="1" value="8"><output id="n8o">8</output></label>
+    </div>
+    <canvas id="c8" class="tall" aria-label="Recreated flash-crash day: $TICK with its EMA and trendline"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="readout" id="r8"></div>
+    <p>Simulated path shaped to the book's seven points; times of points 1–7 are my placement. Change the EMA length to see the trade-off the book describes: a short EMA turns up on the first bounce (more false alarms), a long one confirms the turn later.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A sustained −1,500 means roughly three-quarters of the exchange is trading down minute after minute. Buyers who would normally step in get overwhelmed, liquidity thins, and when the remaining bids are pulled the price can gap through levels in seconds. The EMA is a smoother of that breadth: when it stops making lower highs and breaks its own trendline, the selling has, at least for now, stopped dominating.</p></div>
+  <div class="box behind"><b>Beyond the book: what happened that day</b><p>The joint SEC–CFTC staff report on the events of May 6, 2010 (published September 30, 2010) traced the trigger to a large automated sell program in E-mini S&amp;P futures that ran into a market already short of liquidity; high-frequency traders and other intermediaries then traded the contracts back and forth and withdrew, and the selling spilled into stocks and ETFs. Carter's $TICK readings are the stock-side footprint of that cascade.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Murphy's chapter on moving averages (<a href="../murphy/ch09_moving_averages.html">Murphy Ch.9</a>): lag versus confirmation, the same trade-off on a price chart.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">06 (cont.) · THE 8- AND 21-PERIOD EMA ON THE $TICK</div><h2>Which side to trade: the $TICK's own trend</h2></div><span class="chip">pdf p230–232 · Figs 9.14–9.15</span></div>
+  <p><b>Fig 9.14, Monday October 3, 2011:</b> choppy strength early, then a roll-over into steady selling. Carter puts an <b>8-period EMA (thick)</b> and a <b>21-period EMA (thin)</b> on the one-minute $TICK. He watches the raw $TICK more, but the averages show the "trend of the $TICK", which drives price all day:</p>
+  <ul class="plain">
+    <li>Averages <b>above zero</b> → focus on longs. <b>Below zero</b> → focus on shorts.</li>
+    <li>Below zero, the 8 crossing <b>under</b> the 21 means massive selling pressure. The 8 crossing <b>over</b> the 21 while still below zero means a <b>pause</b> in the selling. The reverse holds above zero.</li>
+  </ul>
+  <p><b>Fig 9.15</b> shows the rest of the day (the vertical line at point 1 is where Fig 9.14 ends). At <b>point 2</b> the $TICK and SPY rally and are rejected, forming an intraday swing high that must break for a real short-covering rally into the close. At <b>point 3</b> the $TICK goes positive and the market rallies hard, and is rejected again. At <b>point 4</b>, a time of day when a reversal is most likely, the $TICK goes above zero and SPY rallies hard, and is rejected once more; then the market plummets into the close. What they share: the $TICK went positive and a rally looked promising, but <b>the 8 and 21 EMAs could not both cross above zero</b>. As long as they stay below, the pressure is down.</p>
+  <p><b>Closing advice:</b> in quiet markets, fading $TICK moves (and the odd stray high reading) is a solid way to make a living. When the elephants are moving, follow the herd. Carter can't imagine day trading stocks or indexes without the $TICK, says he has logged over 20,000 hours watching it, and that the best way to learn it is to start using it; he points to simplertrading.com/ticks for updated live examples.</p>
+  <div class="box picture"><b>Picture it</b><p>A tide gauge versus individual waves. Single waves (the raw $TICK) splash above the line now and then. The tide (the two averages) tells you whether the water is actually rising. A wave that crosses the line while the tide is still going out is just a wave.</p></div>
+  <div class="fig">
+    <div class="controls">
+      <button id="prev9" type="button">◀ Back</button><button id="next9" type="button">Next step ▶</button><button id="all9" type="button">Whole day</button>
+      <label for="fa9">Fast EMA <input id="fa9" type="range" min="3" max="15" step="1" value="8"><output id="fa9o">8</output></label>
+      <label for="sl9">Slow EMA <input id="sl9" type="range" min="10" max="40" step="1" value="21"><output id="sl9o">21</output></label>
+    </div>
+    <canvas id="c9" class="tall" aria-label="Recreated October 3, 2011: $TICK with 8- and 21-period EMAs and shaded regimes"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="readout" id="r9"></div>
+    <p>Simulated path shaped to the book's description; the time of each rally is my placement. Shading: green while both EMAs are above zero, red while both are below. Dots mark 8/21 crosses: red/green when the cross agrees with the side of zero (pressure), plum when it signals a pause.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The raw $TICK answers "what is the crowd doing this minute?". An 8-period EMA answers "this last stretch?", and a 21-period one "this last half-hour or so?". A short rally can lift the fast average above zero, but lifting the slow one needs buying that lasts. So "both above zero" is a cheap test of whether a rally has real participation behind it or is just shorts covering.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch12_catching_the_wave.html">Ch.12 Catching the Wave</a> uses moving averages to stay with a trend on price; here the same idea runs on breadth.</li>
+    <li>Your MACD tests in <code>backtest_results_summary.md</code> ("not worth trading anywhere") are a warning: EMA crosses alone are weak signals. Carter uses these as a <b>side filter</b> (long-only vs short-only focus), not as entries.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. What does a $TICK of +1,000 measure, and why does Carter fade it rather than join it?</summary><p>About 1,000 more NYSE stocks last ticked up than down: extreme, urgent buying. By then most of the buying has already been done, and the late chasers become the bag holders on the reversal (sections 1 and 5).</p></details>
+  <details><summary>2. The ticks hit +988 at 11:15 a.m. and fall back. Trade?</summary><p>No. The audio alert is set at +1,000, and the rule is exact on purpose so it isn't open to interpretation (rule 3; the Aug 26 example with +978).</p></details>
+  <details><summary>3. Write down both brackets and the time limit.</summary><p>YM: 30-point stop, 20-point target. ES: 3-point stop, 2-point target. Both: exit at the market after 35 minutes if neither is hit (rules 4–5).</p></details>
+  <details><summary>4. You were stopped on one fade and exited another on the timer for −1.5. Are you done for the day?</summary><p>No. Only physical hard stops count toward the two-stops rule, and they have to be two in a row. A time-stop exit doesn't count (rule 6).</p></details>
+  <details><summary>5. At noon the ticks have been above zero 88% of the session. At 1:05 p.m. they hit +1,100. What do you do, and what kind of day is it?</summary><p>Pass. More than 85% above zero by noon means a power day with funds accumulating stock; no more fades. These come roughly every four to six weeks with many readings of +1,200 to +1,400. On such days go with the ticks (rule 7, Jun 7 example).</p></details>
+  <details><summary>6. It's 10:20, every reading today has been positive, and the ticks hit +1,000. Trade?</summary><p>Not yet: when the ticks have been all one-sided past 10:00, wait until they spend some time below zero before the first fade (rule 7). On Jun 7 the 11:00 short was allowed because the ticks had dipped just below zero.</p></details>
+  <details><summary>7. Why skip readings before 10:00 and after 3:30 even when they would have worked (Sep 7, Sep 8)?</summary><p>The first and last half-hours have sporadic action; Carter found tick trades then erratic and less reliable. A rule that is followed every time beats picking off the occasional winner it excludes.</p></details>
+  <details><summary>8. Both brackets risk 1.5 to make 1. What win rate breaks even if every trade hits a level, and why is the real picture different?</summary><p>60% (1.5 ÷ 2.5). But the 35-minute timer ends many trades in between (11 of the 28 examples) with small results, so the average loss is smaller than the full stop. Costs push the needed rate the other way (section 2 worked example, beyond the book).</p></details>
+  <details><summary>9. How do you tell a probe from real selling on the $TICK?</summary><p>A probe tests −1,000 and bounces back. Real selling tests −1,000 and keeps hanging around there or lower, and every move back toward 0.00 is quickly rejected (Sep 30, 2011).</p></details>
+  <details><summary>10. Spell out the go-with short: entry, stop and target.</summary><p>Entry: a $TICK move up to the 0.00 line. Stop: the $TICK stays above +600 for more than a minute, or 4–6 ES points, whichever comes first. Target: the next move to −1,000; then reload at the next retracement to 0.00 (section 7).</p></details>
+  <details><summary>11. On the flash-crash day, what readings marked a possible crash day, and what said the selling was over?</summary><p>Consistent −1,200 to −1,500 readings (point 5), then −1,875 with repeated −1,700 to −1,800 tests (point 6). The end of the selling showed up when the eight-period EMA of the $TICK broke its downward trendline (point 7). It doesn't mark the bottom tick; it marks the herd turning.</p></details>
+  <details><summary>12. On Oct 3, 2011, the $TICK went positive three times in the afternoon. Why weren't these buy signals?</summary><p>The 8- and 21-period EMAs never both crossed above zero, so the trend of the $TICK stayed down; each rally was rejected and the market fell into the close.</p></details>
+  <details><summary>13. Below zero, the 8-EMA crosses above the 21-EMA. What does it mean?</summary><p>A pause in the selling pressure, not a reversal. The 8 crossing below the 21 while below zero means massive selling (section 9).</p></details>
+  <details><summary>14. Senior question: why can't Carter's 28 example trades tell you the setup's real win rate, and what would you need?</summary><p>They're days he picked to illustrate the rules, so they are not every signal over a period. You'd need all signals over months or years, logged with the rules applied mechanically (including the passed signals and the days with two stops), with real fills and costs, and ideally split by regime.</p></details>
+</section>
+
+<footer>Built from John F. Carter, <i>Mastering the Trade</i>, 3rd ed., Chapter 9 "Tick Fades: Are They Really the Best Way to Take Money Away from Newbies?" (printed pp. 214–232, PDF pages 214–232), explained in my own words. Figures 9.1–9.15 are blank in this PDF copy; every chart is rebuilt from the text with simulated prices and simulated $TICK readings, not real market data. Trade levels in the replays are the book's (two misprinted exit prices and one sign corrected, as noted). Contract values, IST times, the flash-crash report and all simulations are additions beyond the book. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  let M;
+  function buildData() {
+    M = genMarket([
+      { n: 70, drift: 0.0042, vol: 0.010, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.0046, vol: 0.011, kind: 'trend' }
+    ], seed);
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ---------- intraday model (1-minute bars, 9:30-16:00 eastern = 390 minutes) ----------
+  const NM = 390;
+  const at = (h, m) => h * 60 + m - 570;               // minute index for a clock time
+  const hhmm = (i) => { const m = 570 + Math.round(i); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fmtS = (v, d) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(d == null ? 2 : d);
+
+  // One simulated session. B = regime bias of the order flow: 0 = quiet two-way day, +/-0.45 = one-sided (trend) day.
+  // tick  = 900 x (slow flow + bias + program burst) + noise           (a breadth count, so it is capped near +/-2,200)
+  // price = permanent part (moves with the bias and slow flow) + transient part (pushed by bursts, decays 7%/min)
+  // The fade only has an edge because the burst impact is assumed to be transient. That is a model assumption, not a market fact.
+  function simDay(seed, B, o) {
+    o = o || {};
+    const r = rng(seed); const P = [], H = [], L = [], T = [];
+    let pr = 0, F = o.start || 1100, Tr = 0, bl = 0, bn = 0, bs = 0, bi = 0, last = F;
+    const q = o.q || 0.03, sig = o.sig || 0.22, kF = o.kF || 0.09, kP = o.kP == null ? 0.03 : o.kP, kT = o.kT == null ? 0.5 : o.kT, rho = o.rho || 0.93;
+    for (let i = 0; i < NM; i++) {
+      pr = 0.98 * pr + 0.07 * gauss(r);
+      if (bl <= 0 && r() < q) { bn = 3 + Math.floor(r() * 5); bl = bn; bs = (B !== 0 && r() < 0.75) ? Math.sign(B) : (r() < 0.5 ? 1 : -1); bi = 0.75 + 0.6 * r(); }
+      const burst = bl > 0 ? bs * bi * (bn - bl + 1) / bn : 0; if (bl > 0) bl--;   // a program ramps up to its climax, then stops
+      const t = clamp(Math.round(900 * (pr + B + burst) + 150 * gauss(r)), -2200, 2200);
+      F += kF * B + kP * pr + sig * gauss(r);
+      Tr = rho * Tr + kT * burst;
+      const p = F + Tr; const w = sig * 0.6 * Math.abs(gauss(r));
+      H.push(Math.max(p, last) + w); L.push(Math.min(p, last) - w); P.push(p); T.push(t); last = p;
+    }
+    return { P, H, L, T, B };
+  }
+
+  // Carter's fade rules on one simulated ES day. cfg: stop, tgt (points), timer (min), win, two, f85, one, cost
+  function runFade(d, cfg) {
+    const { P, H, L, T } = d; const tr = []; let pos = 0, e = 0, ei = 0, stops = 0;
+    let sawNeg = T[0] < 0, sawPos = T[0] > 0; let noShort = false, noLong = false; let above = 0;
+    const close = (i, px, why) => { const pts = pos * (px - e) - (cfg.cost || 0); tr.push({ dir: pos, ei, xi: i, e, x: px, pts, why }); if (why === 'stop') stops++; pos = 0; };
+    for (let i = 1; i < NM; i++) {
+      if (i <= at(12, 0)) { if (T[i - 1] > 0) above++; if (i === at(12, 0) && cfg.f85) { const f = above / at(12, 0); if (f > 0.85) noShort = true; if (f < 0.15) noLong = true; } }
+      if (pos !== 0) {
+        const st = e + pos * -cfg.stop, tg = e + pos * cfg.tgt;
+        const hitS = pos < 0 ? H[i] >= st : L[i] <= st; const hitT = pos < 0 ? L[i] <= tg : H[i] >= tg;
+        if (hitS) close(i, st, 'stop'); else if (hitT) close(i, tg, 'target'); else if (i - ei >= cfg.timer) close(i, P[i], 'timer');
+      }
+      const up = T[i] >= 1000 && T[i - 1] < 1000, dn = T[i] <= -1000 && T[i - 1] > -1000;
+      const inWin = !cfg.win || (i >= at(10, 0) && i <= at(15, 30));
+      const okStops = !cfg.two || stops < 2;
+      if ((up || dn) && inWin && okStops) {
+        const want = up ? -1 : 1;
+        const blocked = (want < 0 && (noShort || (cfg.one && !sawNeg))) || (want > 0 && (noLong || (cfg.one && !sawPos)));
+        if (!blocked && pos !== want) { if (pos !== 0) close(i, P[i], 'flip'); pos = want; e = P[i]; ei = i; }
+      }
+      if (T[i] < 0) sawNeg = true; if (T[i] > 0) sawPos = true;
+    }
+    if (pos !== 0) close(NM - 1, P[NM - 1], 'bell');
+    return tr;
+  }
+
+  // "Go with" rule, written by me from the chapter's description (the operational details are my assumptions):
+  // short mode = 8- and 21-EMA of $TICK both below zero and a reading <= -1,000 in the last 60 minutes (long mode mirrored).
+  // entry: $TICK climbs back to the 0.00 line; stop: $TICK above +600 for more than one minute, or price stop of stopPts;
+  // target: the next -1,000 reading. Entries 10:00-15:30 (my assumption), out at the bell.
+  function runWith(d, cfg) {
+    const { P, H, L, T } = d; const e8 = ema(T, 8), e21 = ema(T, 21); const tr = []; let pos = 0, e = 0, ei = 0; let lastLo = -999, lastHi = -999;
+    const close = (i, px, why) => { tr.push({ dir: pos, ei, xi: i, e, x: px, pts: pos * (px - e) - (cfg.cost || 0), why }); pos = 0; };
+    for (let i = 1; i < NM; i++) {
+      if (T[i] <= -1000) lastLo = i; if (T[i] >= 1000) lastHi = i;
+      if (pos !== 0) {
+        const st = e - pos * cfg.stop;
+        if (pos < 0 ? H[i] >= st : L[i] <= st) close(i, st, 'stop');
+        else if (pos < 0 ? (T[i] > 600 && T[i - 1] > 600) : (T[i] < -600 && T[i - 1] < -600)) close(i, P[i], 'tick stop');
+        else if (pos < 0 ? T[i] <= -1000 : T[i] >= 1000) close(i, P[i], 'target');
+      }
+      if (pos === 0 && i >= at(10, 0) && i <= at(15, 30) && e8[i] != null && e21[i] != null) {
+        const shortMode = e8[i] < 0 && e21[i] < 0 && i - lastLo <= 60, longMode = e8[i] > 0 && e21[i] > 0 && i - lastHi <= 60;
+        if (shortMode && T[i - 1] < 0 && T[i] >= 0) { pos = -1; e = P[i]; ei = i; }
+        else if (longMode && T[i - 1] > 0 && T[i] <= 0) { pos = 1; e = P[i]; ei = i; }
+      }
+    }
+    if (pos !== 0) close(NM - 1, P[NM - 1], 'bell');
+    return tr;
+  }
+
+  function pool(trs) {
+    const n = trs.length; const tot = trs.reduce((s, t) => s + t.pts, 0); const w = trs.filter((t) => t.pts > 0).length;
+    const by = {}; trs.forEach((t) => { by[t.why] = (by[t.why] || 0) + 1; });
+    return { n, tot, avg: n ? tot / n : 0, win: n ? w / n : 0, by };
+  }
+
+  // ---------- two-panel intraday chart: price on top, $TICK below ----------
+  // sp: {x0,x1, P, pLines:[{d,col,w,dash}], hl:[{y,a,b,col,dash,label}], marks:[{i,v,kind,col}], T, tLines:[{d,col,w}],
+  //      tMarks:[{i,v,col}], levels:[], shade:[{a,b,col,alpha}], vlines:[{i,label,col,row}], reveal, pLabel, tmin, tmax, legend:[[t,c]]}
+  function duo(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : NM - 1; const rev = sp.reveal != null ? sp.reveal : x1;
+    const padL = 6, padR = 54, padT = 8, padB = 20, gap = 16; const avail = H - padT - padB - gap;
+    const mainH = Math.round(avail * (sp.split || 0.56)), subH = avail - mainH, subTop = padT + mainH + gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    const font = '11px ' + css('mono'); g.font = font;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = x0; i <= x1; i++) { const v = sp.P[i]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+    (sp.hl || []).forEach((h) => { if (!h.noScale && (h.a == null || (h.b >= x0 && h.a <= x1))) { lo = Math.min(lo, h.y); hi = Math.max(hi, h.y); } });
+    const pd = (hi - lo) * 0.08 || 1; lo -= pd; hi += pd;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    let tlo = sp.tmin != null ? sp.tmin : -1500, thi = sp.tmax != null ? sp.tmax : 1500;
+    for (let i = x0; i <= x1; i++) { const v = sp.T[i]; if (v != null) { tlo = Math.min(tlo, v * 1.05); thi = Math.max(thi, v * 1.05); } }
+    const Yt = (v) => subTop + (thi - v) / (thi - tlo) * subH;
+    (sp.shade || []).forEach((s) => { const a = Math.max(s.a, x0), b = Math.min(s.b, x1); if (b < a) return; g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(a), padT, Math.max(1, X(b) - X(a)), H - padT - padB); });
+    g.lineWidth = 1;
+    niceTicks(lo, hi, mainH > 130 ? 4 : 3).forEach((t) => { const y = Y(t); if (y < padT || y > padT + mainH) return; g.strokeStyle = colorOf('rule', 0.8); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(t), W - padR + 4, y + 4); });
+    // time axis
+    g.fillStyle = colorOf('muted');
+    for (let m = 600; m <= 960; m += 60) { const i = m - 570; if (i < x0 || i > x1) continue; const x = X(i); g.strokeStyle = colorOf('rule', 0.5); g.beginPath(); g.moveTo(x, padT); g.lineTo(x, H - padB); g.stroke(); const lab = hhmm(i); g.fillText(lab, Math.min(W - padR - 30, Math.max(padL, x - 14)), H - 5); }
+    if (x1 - x0 < 120) for (let i = Math.ceil(x0 / 15) * 15; i <= x1; i += 15) { if ((i + 570) % 60 === 0) continue; g.fillText(hhmm(i), Math.min(W - padR - 30, Math.max(padL, X(i) - 14)), H - 5); }
+    (sp.hl || []).forEach((h) => {
+      const a = h.a == null ? x0 : Math.max(x0, h.a), b = h.b == null ? x1 : Math.min(x1, h.b); if (b < a) return;
+      g.strokeStyle = colorOf(h.col || 'muted'); g.lineWidth = h.w || 1.3; g.setLineDash(h.dash || []); g.beginPath(); g.moveTo(X(a), Y(h.y)); g.lineTo(X(b), Y(h.y)); g.stroke(); g.setLineDash([]);
+      if (h.label) { g.fillStyle = colorOf(h.col || 'muted'); const tw = g.measureText(h.label).width; let tx = X(b) + 3; if (tx + tw > W - padR) tx = X(a) - tw - 3; if (tx < padL) tx = X(a) + 2; g.fillText(h.label, tx, Y(h.y) + (h.below ? 12 : -3)); }
+    });
+    const cut = (d, from, to) => d.map((v, i) => (i >= from && i <= to ? v : null));
+    strokeSeries(g, sp.P, X, Y, x0, x1, colorOf('price', 0.16), 1.2);
+    strokeSeries(g, cut(sp.P, 0, rev), X, Y, x0, x1, colorOf('price'), 1.4);
+    (sp.pLines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.4, l.dash));
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.i > rev) return; const x = X(m.i), y = Y(m.v), s = 5;
+      if (m.kind === 'buy') { g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 3); g.lineTo(x - s, y + 3 + s * 1.6); g.lineTo(x + s, y + 3 + s * 1.6); g.closePath(); g.fill(); }
+      else if (m.kind === 'sell') { g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 3); g.lineTo(x - s, y - 3 - s * 1.6); g.lineTo(x + s, y - 3 - s * 1.6); g.closePath(); g.fill(); }
+      else { g.strokeStyle = colorOf(m.col || 'c1'); g.fillStyle = colorOf('plate'); g.lineWidth = 1.6; g.beginPath(); g.arc(x, y, 3.5, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    });
+    g.fillStyle = colorOf('muted'); g.fillText(sp.pLabel || 'price (simulated)', padL + 4, padT + 11);
+    // $TICK panel
+    g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, subTop - gap / 2); g.lineTo(W - padR, subTop - gap / 2); g.stroke();
+    const lv = sp.levels || [1000, -1000];
+    [0].concat(lv).forEach((v) => { if (v < tlo || v > thi) return; const y = Yt(v); g.strokeStyle = colorOf(v === 0 ? 'muted' : (v > 0 ? 'sell' : 'buy'), v === 0 ? 0.7 : 0.75); g.setLineDash(v === 0 ? [] : [4, 3]); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.setLineDash([]); g.fillStyle = colorOf('muted'); g.fillText((v > 0 ? '+' : '') + v, W - padR + 4, y + 4); });
+    const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.8);
+    for (let i = x0; i <= x1; i++) { const v = sp.T[i]; if (v == null) continue; g.fillStyle = colorOf(v >= 0 ? 'buy' : 'sell', i <= rev ? 0.7 : 0.1); const y0 = Yt(0), yv = Yt(v); g.fillRect(X(i) - bw / 2, Math.min(y0, yv), bw, Math.max(1, Math.abs(yv - y0))); }
+    (sp.tLines || []).forEach((l) => strokeSeries(g, cut(l.d, 0, rev), X, Yt, x0, x1, colorOf(l.col), l.w || 1.6, l.dash));
+    (sp.tMarks || []).forEach((m) => { if (m.i < x0 || m.i > x1 || m.i > rev) return; g.strokeStyle = colorOf(m.col || 'c1'); g.fillStyle = colorOf('plate'); g.lineWidth = 1.6; g.beginPath(); g.arc(X(m.i), Yt(m.v), m.r || 3.5, 0, Math.PI * 2); g.fill(); g.stroke(); });
+    if (sp.tline) { const t = sp.tline; g.strokeStyle = colorOf(t.col || 'c3'); g.lineWidth = 1.5; g.setLineDash([6, 4]); g.beginPath(); const a = Math.max(x0, t.i0), b = Math.min(x1, t.iEnd); g.moveTo(X(a), Yt(t.y0 + t.sl * (a - t.i0))); g.lineTo(X(b), Yt(t.y0 + t.sl * (b - t.i0))); g.stroke(); g.setLineDash([]); }
+    g.fillStyle = colorOf('muted'); g.fillText(sp.tLabel || '$TICK (simulated)', padL + 4, subTop + 11);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; const x = X(v.i); g.strokeStyle = colorOf(v.col || 'c1', 0.9); g.setLineDash([3, 3]); g.lineWidth = 1.1; g.beginPath(); g.moveTo(x, padT); g.lineTo(x, H - padB); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'c1'); const tw = g.measureText(v.label).width; let tx = x + 3; if (tx + tw > W - padR) tx = x - tw - 3; g.fillText(v.label, tx, padT + 22 + (v.row || 0) * 13); } });
+    const L = $(id + 'L'); if (L && sp.legend) L.innerHTML = sp.legend.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+  }
+
+  function stepper(prefix, count, draw) {
+    const st = { k: 0 };
+    const go = (d) => { st.k = clamp(st.k + d, 0, count() - 1); draw(st.k); };
+    $('prev' + prefix).addEventListener('click', () => go(-1));
+    $('next' + prefix).addEventListener('click', () => go(1));
+    if ($('all' + prefix)) $('all' + prefix).addEventListener('click', () => { st.k = count() - 1; draw(st.k); });
+    return st;
+  }
+  function brownBridge(r, anchors, sig) {
+    const P = new Array(NM).fill(null);
+    for (let k = 0; k < anchors.length - 1; k++) {
+      const [t0, p0] = anchors[k], [t1, p1] = anchors[k + 1]; const n = t1 - t0; if (n <= 0) continue;
+      const w = [0]; for (let j = 1; j <= n; j++) w.push(w[j - 1] + sig * gauss(r));
+      for (let j = 0; j <= n; j++) P[t0 + j] = p0 + (p1 - p0) * j / n + (w[j] - w[n] * j / n);
+    }
+    return P;
+  }
+  // smooth AR noise for $TICK
+  function arNoise(r, n, phi, s) { const o = []; let x = 0; for (let i = 0; i < n; i++) { x = phi * x + s * gauss(r); o.push(x); } return o; }
+  function spike(T, t, v) { const sh = [[-3, 0.45], [-2, 0.62], [-1, 0.84], [0, 1], [1, 0.78], [2, 0.5], [3, 0.3]]; sh.forEach(([d, f]) => { const i = t + d; if (i < 0 || i >= T.length) return; const val = Math.round(v * f); T[i] = v > 0 ? Math.max(T[i], val) : Math.min(T[i], val); }); T[t] = v; }
+
+  // ---------- section 1: building a $TICK from many stocks ----------
+  function normCdf(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)); const d = 0.3989423 * Math.exp(-x * x / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
+  const d1 = reg(() => {
+    const N = val('n1'), k = val('k1'), b = val('b1'); const r = rng(seed * 13 + 1);
+    const T = [], f = arNoise(r, NM, 0.9, 0.42);
+    for (let i = 0; i < NM; i++) {
+      let x = f[i]; const dt = i - 200; if (dt >= -6 && dt <= 4) x += b * (1 - Math.abs(dt) / 7);   // a program near 12:50
+      const p = normCdf(k * x); const mean = N * (2 * p - 1); const sd = 2 * Math.sqrt(N * p * (1 - p));
+      T.push(Math.round(mean + sd * gauss(r)));
+    }
+    const ext = T.filter((v) => Math.abs(v) >= 1000).length; const mx = Math.max(...T), mn = Math.min(...T);
+    plot('c1', { n: NM, lines: [{ d: T, col: 'c2', w: 1.3, label: '$TICK = upticking − downticking issues (simulated)' }, { d: T.map(() => 1000), col: 'sell', w: 1, dash: [4, 3], label: '±1,000' }, { d: T.map(() => -1000), col: 'buy', w: 1, dash: [4, 3] }], zero: true, ymin: Math.min(-1600, mn), ymax: Math.max(1600, mx), vlines: [{ i: 200, col: 'c1', label: 'program at ' + hhmm(200) }] });
+    const need = (N + 1000) / (2 * N) * 100;
+    $('r1').innerHTML = `to read +1,000 with ${N.toLocaleString()} issues, <b>${need.toFixed(1)}%</b> of them must have last ticked up (vs 50% on a calm minute) · minutes at or beyond ±1,000: <b>${ext}</b> of 390 · day's high <b>${mx > 0 ? '+' : ''}${mx}</b> · low <b>${mn}</b>`;
+  });
+  ['n1', 'k1', 'b1'].forEach((id) => bindRange(id, d1));
+
+  // ---------- section 2: the rules as a checklist ----------
+  const d2 = reg(() => {
+    const mkt = $('sel2').value, tm = val('t2'), v = val('v2'), st = val('st2'), f = val('f2'), neg = $('chk2').checked;
+    const clock = Math.floor(tm / 60) + ':' + String(tm % 60).padStart(2, '0');
+    $('t2o').textContent = clock;
+    const side = v >= 1000 ? 'short' : v <= -1000 ? 'buy' : null; const lines = [];
+    const ok = (good, txt) => { lines.push(`<li class="${good ? 'good' : 'bad'}">${good ? '✓' : '✗'} ${txt}</li>`); return good; };
+    let pass = true;
+    pass = ok(side != null, side ? `Alert fired: reading ${v > 0 ? '+' : ''}${v} is at or beyond ±1,000` : `Reading ${v > 0 ? '+' : ''}${v} never reached ±1,000, so the audio alert stays silent (rule 3: +988 is not a trade)`) && pass;
+    pass = ok(tm >= 600 && tm <= 930, tm < 600 ? `${clock} is before 10:00 a.m. eastern (rule 1)` : tm > 930 ? `${clock} is after 3:30 p.m. eastern (rule 1)` : `${clock} is inside 10:00–3:30 eastern`) && pass;
+    pass = ok(st < 2, st >= 2 ? `Two hard stops already today: done with fades, switch to "go with" (rule 6)` : `${st} hard stop${st === 1 ? '' : 's'} so far today (time-stop exits don't count)`) && pass;
+    if (side === 'short' || side == null) {
+      if (tm >= 720) pass = ok(f <= 85, f > 85 ? `By noon the ticks were above zero ${f}% of the time (> 85%): a power day, no more short fades (rule 7)` : `Noon check: above zero ${f}% of the time (≤ 85%)`) && pass;
+      else lines.push(`<li>· Noon check not due yet (it applies from 12:00).</li>`);
+      if (tm >= 600) pass = ok(neg, neg ? 'The ticks have spent some time below zero today' : 'Ticks all positive so far today: wait for some time below zero first (rule 7)') && pass;
+    } else {
+      if (tm >= 720) pass = ok(f >= 15, f < 15 ? `Mirror of rule 7: ticks below zero ${100 - f}% of the time by noon, no more buy fades` : `Noon check (mirrored): below zero ${100 - f}% of the time`) && pass;
+      lines.push('<li>· The one-sided rule mirrors for buys: if the ticks had been all negative, wait for time above zero.</li>');
+    }
+    const S = mkt === 'YM' ? { stop: 30, tgt: 20, pv: 5, name: 'mini-sized Dow (YM)' } : { stop: 3, tgt: 2, pv: 50, name: 'E-mini S&P (ES)' };
+    const plan = pass && side ? `<b class="good">TAKE IT:</b> ${side} the ${S.name} at the market · stop ${S.stop} pts ($${S.stop * S.pv}) · target ${S.tgt} pts ($${S.tgt * S.pv}) · start the 35-minute timer` : '<b class="bad">NO TRADE</b>';
+    $('r2').innerHTML = `<ul class="checks">${lines.join('')}</ul><p>${plan}</p>`;
+  });
+  ['t2', 'v2', 'st2', 'f2'].forEach((id) => { const el = $(id); el.addEventListener('input', () => { if ($(id + 'o') && id !== 't2') $(id + 'o').textContent = el.value; d2(); }); if ($(id + 'o') && id !== 't2') $(id + 'o').textContent = el.value; });
+  $('sel2').addEventListener('change', d2); $('chk2').addEventListener('change', d2);
+
+  // ---------- sections 3-4: Carter's worked days (levels from the book, paths simulated) ----------
+  const tr = (dir, h, m, e, xh, xm, x, why, note) => ({ dir, t: at(h, m), e, xt: at(xh, xm), x, why, note });
+  const DAYS = {
+    ym1: { mkt: 'YM', title: 'Mini-sized Dow · Sep 1, 2004 · Fig 9.1', pdf: 'pdf p216', open: 10180, close: 10150, trades: [
+      tr(-1, 10, 5, 10192, 10, 40, 10182, 'timer'), tr(-1, 11, 30, 10194, 11, 50, 10174, 'target', 'the book calls this "point 3"'), tr(1, 13, 10, 10118, 13, 18, 10138, 'target', 'a −1,000 reading after a hard sell-off'), tr(-1, 14, 0, 10168, 14, 10, 10148, 'target')],
+      skips: [{ t: at(15, 50), v: 1080, why: 'it is 3:50 p.m., past the 3:30 cut-off' }], intro: 'A clean fade day: drift, roll-over, sell-off, reversal.' },
+    ym2: { mkt: 'YM', title: 'Mini-sized Dow · Sep 10, 2004 · Fig 9.2', pdf: 'pdf p217', open: 10245, close: 10292, trades: [
+      tr(-1, 10, 5, 10252, 10, 40, 10257, 'timer'), tr(-1, 11, 0, 10262, 11, 35, 10252, 'timer'), tr(-1, 12, 30, 10264, 13, 5, 10255, 'timer', 'Carter was on the phone; the audio alert called him over'), tr(-1, 14, 0, 10257, 14, 25, 10287, 'stop', 'the ticks kept pushing higher')],
+      skips: [], intro: 'A grinding up day: three timer exits and one full hard stop.' },
+    ym3: { mkt: 'YM', title: 'Mini-sized Dow · Sep 9, 2004 · Fig 9.3', pdf: 'pdf p218', open: 10270, close: 10292, trades: [
+      tr(-1, 12, 0, 10283, 12, 35, 10272, 'timer'), tr(-1, 13, 0, 10306, 13, 25, 10286, 'target', 'the book prints the exit as 10,386; +20 from 10,306 is 10,286'), tr(-1, 13, 45, 10297, 14, 0, 10277, 'target'), tr(-1, 14, 40, 10308, 15, 0, 10288, 'target')],
+      skips: [], intro: 'First alert around noon, then three straight targets.' },
+    ym4: { mkt: 'YM', title: 'Mini-sized Dow · Sep 8, 2004 · Fig 9.4', pdf: 'pdf p218–219', open: 10345, close: 10330, trades: [
+      tr(-1, 10, 5, 10355, 10, 15, 10335, 'target'), tr(-1, 10, 55, 10337, 11, 30, 10335, 'timer', 'chop: the timer ends it for +2'), tr(-1, 14, 0, 10346, 14, 15, 10326, 'target', 'the book prints the exit as 10,226; +20 from 10,346 is 10,326')],
+      skips: [{ t: at(15, 40), v: 1060, why: 'past 3:30 p.m.; it would have made +20, but last-half-hour plays are less reliable' }], intro: 'Quick target, a chop scratch, a late target, and a pass.' },
+    ym5: { mkt: 'YM', title: 'Mini-sized Dow · Jul 26, 2004 · Fig 9.5', pdf: 'pdf p219–220', open: 9945, close: 9920, trades: [
+      tr(1, 11, 5, 9912, 11, 35, 9932, 'target', 'a −1,000 reading: buy'), tr(-1, 15, 0, 9932, 15, 20, 9912, 'target')],
+      skips: [{ t: at(15, 45), v: 1050, why: 'past 3:30 p.m.: sit on your hands' }], intro: 'A weak start but no extreme reading until after 11:00.' },
+    es1: { mkt: 'ES', title: 'E-mini S&P · Sep 7, 2004 · Fig 9.6', pdf: 'pdf p220–222', open: 1118, close: 1118.5, trades: [
+      tr(-1, 11, 30, 1119.75, 12, 5, 1121.25, 'timer', 'the arowana jumped; the timer still rang'), tr(-1, 12, 15, 1122.00, 12, 50, 1121.50, 'timer', 'the book labels this −0.50, but a short from 1122.00 covered at 1121.50 is +0.50'), tr(-1, 13, 0, 1123.50, 13, 35, 1123.50, 'timer', 'a scratch'), tr(-1, 13, 50, 1124.75, 14, 15, 1122.75, 'target'), tr(-1, 15, 5, 1119.75, 15, 25, 1117.75, 'target', 'the last hour')],
+      skips: [{ t: at(9, 50), v: 1040, why: 'about 9:50 a.m., before 10:00: first-30-minute tick trades are haphazard' }], intro: 'Five fades: three timer exits, two targets.' },
+    es2: { mkt: 'ES', title: 'E-mini S&P · Sep 3, 2004 · Fig 9.7', pdf: 'pdf p222', open: 1118, close: 1115.5, trades: [
+      tr(-1, 15, 2, 1117.25, 15, 32, 1115.25, 'target')],
+      skips: [], near: [{ t: at(10, 35), v: 955 }, { t: at(11, 50), v: -950 }, { t: at(13, 25), v: 965 }], intro: 'Slim pickings: near-misses all day, one real signal in the final hour.' },
+    es3: { mkt: 'ES', title: 'E-mini S&P · Aug 26, 2004 · Fig 9.8', pdf: 'pdf p222–223', open: 1105, close: 1104.5, trades: [
+      tr(-1, 13, 40, 1106.75, 14, 10, 1104.75, 'target')],
+      skips: [], near: [{ t: at(10, 20), v: 978 }, { t: at(12, 10), v: 962 }], intro: 'A +978 high early, another near-miss, then one clean signal.' },
+    es4: { mkt: 'ES', title: 'E-mini S&P · May 24, 2004 · Fig 9.9', pdf: 'pdf p223–224', open: 1099.5, close: 1095, trades: [
+      tr(-1, 10, 28, 1098.50, 10, 48, 1096.50, 'target'), tr(-1, 13, 30, 1096.50, 13, 55, 1094.50, 'target', 'exit level not printed; implied by +2.00'), tr(-1, 14, 20, 1096.00, 14, 55, 1095.50, 'timer')],
+      skips: [{ t: at(9, 45), v: 1060, why: 'before 10:00 (a gap-up open): ignore it like an "out of area" call' }, { t: at(15, 40), v: 1050, why: 'past 3:30 p.m.' }], intro: 'Gap up, an early signal ignored, then two targets and a timer exit.' },
+    es5: { mkt: 'ES', title: 'E-mini S&P · Jun 7, 2004 · Fig 9.10', pdf: 'pdf p224–225', open: 1130, close: 1138, bias: 430, power: true, trades: [
+      tr(-1, 11, 0, 1134.25, 11, 35, 1133.00, 'timer', 'allowed: before noon, and the ticks had dipped just below zero')],
+      skips: [{ t: at(13, 5), v: 1100, why: 'more than 85% of the time above zero by noon: fund buying, no more fades' }, { t: at(15, 28), v: 1120, why: 'same reason: a power day' }], intro: 'A power day: gap up, ticks above zero almost all day.' }
+  };
+  function buildDay(key) {
+    const D = DAYS[key]; const r = rng(seed * 97 + key.charCodeAt(0) * 7 + key.charCodeAt(2)); const ym = D.mkt === 'YM';
+    const sig = ym ? 2.2 : 0.22, sd = ym ? 30 : 3, tg = ym ? 20 : 2;
+    const an = [[0, D.open]]; D.trades.forEach((t) => { an.push([t.t, t.e]); an.push([t.xt, t.x]); }); an.push([NM - 1, D.close]);
+    const P = brownBridge(r, an, sig);
+    D.trades.forEach((t) => {   // keep the path inside the bracket while the trade is open
+      const stop = t.e - t.dir * sd, tgt = t.e + t.dir * tg; const lo = Math.min(stop, tgt), hi = Math.max(stop, tgt); const m = (hi - lo) * 0.05;
+      for (let i = t.t + 1; i < t.xt; i++) P[i] = clamp(P[i], lo + m, hi - m);
+    });
+    const base = arNoise(r, NM, 0.9, 85); const T = base.map((x, i) => clamp(Math.round(x * 1.15 + (D.bias || 0)), -900, 900));
+    if (D.power) { for (let i = 0; i < 30; i++) T[i] = Math.max(T[i], 60 + Math.round(40 * r())); T[at(10, 20)] = -120; T[at(10, 21)] = -60; T[at(10, 42)] = -90; }
+    D.trades.forEach((t) => spike(T, t.t, t.dir < 0 ? 1030 + Math.round(170 * r()) : -1030 - Math.round(170 * r())));
+    D.skips.forEach((s) => spike(T, s.t, s.v));
+    (D.near || []).forEach((s) => spike(T, s.t, s.v));
+    // events for the step-through
+    const ev = [{ t: -1, txt: D.intro }];
+    D.trades.forEach((t, k) => {
+      const sideW = t.dir < 0 ? 'short' : 'buy'; const stop = t.e - t.dir * sd, tgt = t.e + t.dir * tg;
+      ev.push({ t: t.t, k, txt: `${hhmm(t.t)} · $TICK ${t.dir < 0 ? '+' : '−'}1,000 alert → ${sideW} at the market, filled ${t.e.toLocaleString()}. Stop ${stop.toLocaleString()} · target ${tgt.toLocaleString()} · 35-min timer on.` });
+      const pts = t.dir * (t.x - t.e); const how = t.why === 'timer' ? 'Timer rang with neither level hit: out at the market' : t.why === 'stop' ? 'Hard stop hit' : 'Target hit';
+      ev.push({ t: t.xt, k, txt: `${hhmm(t.xt)} · ${how} at ${t.x.toLocaleString()} → <b class="${pts > 0 ? 'good' : pts < 0 ? 'bad' : ''}">${fmtS(pts, ym ? 0 : 2)} pts</b>${t.note ? ' · ' + t.note : ''}.` });
+    });
+    D.skips.forEach((s) => ev.push({ t: s.t, txt: `${hhmm(s.t)} · $TICK ${s.v > 0 ? '+' : ''}${s.v.toLocaleString()} → <b>pass</b>: ${s.why}.` }));
+    (D.near || []).forEach((s) => ev.push({ t: s.t, txt: `${hhmm(s.t)} · $TICK peaks at ${s.v > 0 ? '+' : ''}${s.v} → no alert, no trade. Either it hits 1,000 or it doesn't.` }));
+    if (D.power) { let a = 0; for (let i = 0; i < at(12, 0); i++) if (T[i] > 0) a++; ev.push({ t: at(12, 0), txt: `12:00 noon check · ticks above zero <b>${(a / at(12, 0) * 100).toFixed(0)}%</b> of the session so far (simulated path) → more than 85%: no more fades today.` }); }
+    ev.sort((a, b) => a.t - b.t);
+    return { D, P, T, ev, sd, tg, ym };
+  }
+  function drawDay(cid, rid, tid, B, k) {
+    const { D, P, T, ev, sd, tg, ym } = B; const e = ev[k]; const rev = e.t < 0 ? at(10, 0) : e.t;
+    const hl = [], marks = [];
+    D.trades.forEach((t) => {
+      if (t.t > rev) return; const end = Math.min(t.xt, rev);
+      hl.push({ y: t.e, a: t.t, b: end, col: 'c2', w: 1.2 }); hl.push({ y: t.e - t.dir * sd, a: t.t, b: end, col: 'sell', dash: [4, 3] }); hl.push({ y: t.e + t.dir * tg, a: t.t, b: end, col: 'buy', dash: [4, 3] });
+      marks.push({ i: t.t, v: t.e, kind: t.dir < 0 ? 'sell' : 'buy' }); if (t.xt <= rev) marks.push({ i: t.xt, v: t.x, col: 'c1' });
+    });
+    const tMarks = D.skips.map((s) => ({ i: s.t, v: s.v, col: 'muted', r: 4 })).concat((D.near || []).map((s) => ({ i: s.t, v: s.v, col: 'c3', r: 4 })));
+    duo(cid, { P, T, hl, marks, tMarks, reveal: rev, shade: [{ a: 0, b: at(10, 0), col: 'muted', alpha: 0.1 }, { a: at(15, 30), b: NM - 1, col: 'muted', alpha: 0.1 }], pLabel: (ym ? 'YM' : 'ES') + ' price · levels from the book, path simulated', legend: [['entry', 'c2'], ['stop', 'sell'], ['target', 'buy'], ['exit', 'c1'], ['passed signal', 'muted'], ['near-miss (no alert)', 'c3'], ['grey = outside 10:00–3:30', 'rule']] });
+    $(rid).innerHTML = `<b>${D.title}</b> · ${D.pdf} · step ${k + 1}/${ev.length}<br>${e.txt}`;
+    let tot = 0; const rows = D.trades.map((t, n) => { const pts = t.dir * (t.x - t.e); tot += pts; return `<tr><td class="num">${n + 1}</td><td class="num">≈${hhmm(t.t)}</td><td>${t.dir < 0 ? 'short' : 'long'}</td><td class="num">${t.e.toLocaleString()}</td><td class="num">${(t.e - t.dir * sd).toLocaleString()}</td><td class="num">${(t.e + t.dir * tg).toLocaleString()}</td><td class="num">${t.x.toLocaleString()}</td><td>${t.why}</td><td class="num">${fmtS(pts, ym ? 0 : 2)}</td></tr>`; });
+    $(tid).innerHTML = rows.join('') + `<tr><td colspan="8"><b>Day total</b> (${D.skips.length} signal${D.skips.length === 1 ? '' : 's'} passed)</td><td class="num"><b>${fmtS(tot, ym ? 0 : 2)}</b></td></tr>`;
+  }
+  function dayWidget(n, first) {
+    let B = null; const sel = $('sel' + n);
+    const st = stepper(n, () => (B ? B.ev.length : 1), (k) => drawDay('c' + n, 'r' + n, 'tb' + n, B, k));
+    const rebuild = () => { B = buildDay(sel.value); st.k = clamp(st.k, 0, B.ev.length - 1); drawDay('c' + n, 'r' + n, 'tb' + n, B, st.k); };
+    sel.addEventListener('change', () => { st.k = 0; rebuild(); });
+    reg(rebuild);
+  }
+  dayWidget(3); dayWidget(4);
+  // summary of all 28 trades
+  (function () {
+    const out = { YM: { n: 0, pts: 0, w: 0, l: 0, s: 0, by: {}, tp: 0 }, ES: { n: 0, pts: 0, w: 0, l: 0, s: 0, by: {}, tp: 0 } };
+    Object.values(DAYS).forEach((D) => D.trades.forEach((t) => { const o = out[D.mkt]; const p = t.dir * (t.x - t.e); o.n++; o.pts += p; if (p > 0) o.w++; else if (p < 0) o.l++; else o.s++; o.by[t.why] = (o.by[t.why] || 0) + 1; if (t.why === 'timer') o.tp += p; }));
+    const row = (k, pv, d) => { const o = out[k]; return `<tr><td>${k}</td><td class="num">${o.n}</td><td class="num">${o.by.target || 0} / ${o.by.timer || 0} / ${o.by.stop || 0}</td><td class="num">${o.w} / ${o.l} / ${o.s}</td><td class="num">${fmtS(o.tp, d)}</td><td class="num">${fmtS(o.pts, d)}</td><td class="num">${fmtS(o.pts / o.n, d)}</td><td class="num">$${Math.round(o.pts * pv).toLocaleString()}</td></tr>`; };
+    $('tbS').innerHTML = row('YM', 5, 0) + row('ES', 50, 2);
+  })();
+
+  // ---------- section 5: pooled simulation of the fade rules ----------
+  let pool5 = null;
+  const d5 = reg(() => {
+    const nd = val('nd5'), share = val('tr5') / 100, cost = val('cs5');
+    const cfg = { stop: 3, tgt: 2, timer: 35, win: $('chk5d').checked, two: $('chk5a').checked, f85: $('chk5b').checked, one: $('chk5c').checked, cost };
+    const r = rng(seed * 31 + 5); const eq = [0]; const all = { quiet: [], trend: [] }; let ex = null;
+    for (let k = 0; k < nd; k++) {
+      const trend = r() < share; const B = trend ? (r() < 0.5 ? 0.45 : -0.45) : 0; const d = simDay(seed * 1000 + k * 17 + 3, B); const t = runFade(d, cfg);
+      all[trend ? 'trend' : 'quiet'].push(...t); eq.push(eq[eq.length - 1] + t.reduce((s, x) => s + x.pts, 0)); if (!ex && trend === ($('ex5').value === 'trend')) ex = { d, t, B };
+    }
+    pool5 = ex;
+    plot('c5', { n: eq.length, lines: [{ d: eq, col: 'c1', w: 2, label: 'cumulative ES points, 1 contract (simulated days)' }], zero: true });
+    const q = pool(all.quiet), t = pool(all.trend), a = pool(all.quiet.concat(all.trend));
+    const line = (nm, p) => `<tr><td>${nm}</td><td class="num">${p.n}</td><td class="num">${(p.win * 100).toFixed(0)}%</td><td class="num">${p.by.target || 0} / ${p.by.timer || 0} / ${p.by.stop || 0} / ${(p.by.flip || 0) + (p.by.bell || 0)}</td><td class="num">${fmtS(p.avg, 2)}</td><td class="num">${fmtS(p.tot, 1)}</td><td class="num">${p.tot < 0 ? '−' : ''}$${Math.abs(Math.round(p.tot * 50)).toLocaleString()}</td></tr>`;
+    $('tb5').innerHTML = line('quiet days', q) + line('trend days', t) + line('all', a);
+    if (ex) {
+      const marks = []; ex.t.forEach((x) => { marks.push({ i: x.ei, v: x.e, kind: x.dir < 0 ? 'sell' : 'buy' }); marks.push({ i: x.xi, v: x.x, col: x.pts > 0 ? 'buy' : 'sell' }); });
+      duo('c5b', { P: ex.d.P, T: ex.d.T, marks, shade: [{ a: 0, b: at(10, 0), col: 'muted', alpha: 0.1 }, { a: at(15, 30), b: NM - 1, col: 'muted', alpha: 0.1 }], pLabel: `one ${ex.B === 0 ? 'quiet' : 'trend'} day from this run (simulated ES)`, legend: [['short / buy entry', 'sell'], ['exit (green = win, red = loss)', 'c1']] });
+      $('r5b').innerHTML = `this day: <b>${ex.t.length}</b> fade trades · net <b class="${ex.t.reduce((s, x) => s + x.pts, 0) >= 0 ? 'good' : 'bad'}">${fmtS(ex.t.reduce((s, x) => s + x.pts, 0), 2)} pts</b>`;
+    } else $('r5b').textContent = 'no day of that type in this run; raise the number of days or change the mix';
+  });
+  ['nd5', 'tr5', 'cs5'].forEach((id) => bindRange(id, d5));
+  ['chk5a', 'chk5b', 'chk5c', 'chk5d'].forEach((id) => $(id).addEventListener('change', d5));
+  $('ex5').addEventListener('change', d5);
+
+  // ---------- section 6: fade vs go-with across regimes ----------
+  const d6 = reg(() => {
+    const nd = val('nd6'), stop = val('sp6');
+    const cfgF = { stop: 3, tgt: 2, timer: 35, win: true, two: true, f85: true, one: true, cost: 0.25 }, cfgW = { stop, cost: 0.25 };
+    const res = {}; const regs = [['quiet', 0], ['trend up', 0.45], ['trend down', -0.45]];
+    regs.forEach(([nm, B], j) => { const f = [], w = []; for (let k = 0; k < nd; k++) { const d = simDay(seed * 2000 + j * 7919 + k * 13, B); f.push(...runFade(d, cfgF)); w.push(...runWith(d, cfgW)); } res[nm] = { f: pool(f), w: pool(w) }; });
+    const bars = regs.map(([nm]) => [res[nm].f.tot / nd, res[nm].w.tot / nd]);
+    // grouped bar chart via canvas
+    const cv = $('c6'); if (cv) { const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (W && H) {
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); g.font = '11px ' + css('mono');
+      const vals = bars.flat(); const m = Math.max(1, ...vals.map(Math.abs)) * 1.15; const top = 14, bot = H - 30; const Y = (v) => top + (m - v) / (2 * m) * (bot - top);
+      g.strokeStyle = colorOf('muted'); g.beginPath(); g.moveTo(10, Y(0)); g.lineTo(W - 10, Y(0)); g.stroke();
+      const gw = (W - 20) / 3; bars.forEach((b, j) => { [['c1', b[0], 'fade'], ['c2', b[1], 'go with']].forEach(([c, v, nm], q) => { const x = 10 + j * gw + gw * 0.18 + q * gw * 0.34; g.fillStyle = colorOf(c, 0.85); g.fillRect(x, Math.min(Y(0), Y(v)), gw * 0.3, Math.abs(Y(v) - Y(0))); g.fillStyle = colorOf('ink'); g.fillText(fmtS(v, 2), x, v >= 0 ? Y(v) - 4 : Y(v) + 12); }); g.fillStyle = colorOf('muted'); g.fillText(regs[j][0], 10 + j * gw + gw * 0.3, H - 10); });
+    } }
+    $('c6L').innerHTML = `<span style="--sw:${colorOf('c1')}">fade (Carter's rules, ES 3/2, 35 min)</span><span style="--sw:${colorOf('c2')}">go with (short the 0.00 line, cover at −1,000; mirrored for longs)</span>`;
+    const row = (nm) => { const R = res[nm]; return `<tr><td>${nm}</td><td class="num">${R.f.n} · ${(R.f.win * 100).toFixed(0)}% · ${fmtS(R.f.avg, 2)}</td><td class="num">${R.w.n} · ${(R.w.win * 100).toFixed(0)}% · ${fmtS(R.w.avg, 2)}</td></tr>`; };
+    $('tb6').innerHTML = regs.map(([nm]) => row(nm)).join('');
+  });
+  ['nd6', 'sp6'].forEach((id) => bindRange(id, d6));
+
+  // ---------- section 7: Sep 30, 2011 (go-with day), recreated ----------
+  function buildSep30() {
+    const r = rng(seed * 59 + 30); const x = arNoise(r, NM, 0.88, 85); const T = []; const P0 = brownBridge(r, [[0, 114.5], [30, 114.3], [60, 114.72], [90, 114.38], [110, 114.95], [130, 114.82], [160, 114.0], [175, 113.86], [210, 114.52], [236, 113.95], [240, 113.8]], 0.03);
+    for (let i = 0; i < NM; i++) {
+      if (i < 240) T.push(clamp(Math.round(x[i] * 1.5), -880, 880));
+      else { let v = -380 + x[i] * 1.6; const ph = (i - 240) % 26; if (ph >= 6 && ph <= 10) v = -1000 - 260 * Math.sin((ph - 6) / 4 * Math.PI) - 60 * r(); if (ph >= 17 && ph <= 21) v = -40 + 200 * Math.sin((ph - 17) / 4 * Math.PI) + 30 * r(); T.push(Math.round(Math.min(v, 195))); }
+    }
+    spike(T, 110, 1060); spike(T, at(12, 25), -1060);
+    const P = P0.slice(0, 241); for (let i = 241; i < NM; i++) P.push(P[i - 1] + 0.05 * (T[i] + 250) / 1000 + 0.012 * gauss(r));
+    let p3 = 240; let lo = Infinity; for (let i = 0; i < NM; i++) { if (i > 200 && P[i] < lo) { p3 = i; break; } lo = Math.min(lo, P[i]); }
+    return { P, T, p3 };
+  }
+  let S7 = null;
+  function goWith7(stopEs) {
+    const { P, T, p3 } = S7; const trs = []; let pos = 0, e = 0, ei = 0;
+    for (let i = p3 + 1; i < NM; i++) {
+      if (pos) { if (P[i] >= e + stopEs / 10) { trs.push({ ei, xi: i, e, x: e + stopEs / 10, why: 'price stop' }); pos = 0; } else if (T[i] > 600 && T[i - 1] > 600) { trs.push({ ei, xi: i, e, x: P[i], why: '$TICK > +600 for over a minute' }); pos = 0; } else if (T[i] <= -1000) { trs.push({ ei, xi: i, e, x: P[i], why: 'next −1,000 reading' }); pos = 0; } }
+      if (!pos && i <= at(15, 30) && T[i - 1] < 0 && T[i] >= 0) { pos = -1; e = P[i]; ei = i; }
+    }
+    if (pos) trs.push({ ei, xi: NM - 1, e, x: P[NM - 1], why: 'the bell' });
+    return trs;
+  }
+  const EV7 = [
+    { t: 100, txt: 'Gap down of about $1.50 on SPY (≈15 ES points, ≈150 Dow points). The first hours are choppy while traders digest it. No extreme readings yet.' },
+    { t: 110, txt: '11:20 · first extreme reading of the day: +1,000. The first probe usually fails, so this is a good one to fade (short).' },
+    { t: 162, txt: 'About 20 minutes of chop, then the market sells off: the fade works.' },
+    { t: at(12, 25), txt: '≈12:25 · about an hour later, the first −1,000 reading. Scary to buy a market down 15 points, but it is the first real downside probe of the cash session (most of the selling happened overnight). Fade it: buy.' },
+    { t: 215, txt: 'The market rallies after the −1,000 reading: fading the first extreme reading in each direction has worked.' },
+    { t: -2, txt: 'Point 3 · new lows on the day. That is not chop any more; that is trend.' },
+    { t: 330, txt: 'After point 3 the ticks cannot get much above +200 and keep testing −1,000 and lower. Testing −1,000 and bouncing is a probe; hanging around −1,000 and rejecting every move to 0.00 means the elephants are selling hard.' },
+    { t: NM - 1, txt: 'The go-with play: short each climb back to the 0.00 line, cover at the next −1,000 reading, reload at the next move to 0.00. Stop: $TICK above +600 for more than a minute, or the price stop (slider), whichever comes first.' }
+  ];
+  const st7 = stepper('7', () => EV7.length, (k) => draw7(k));
+  function draw7(k) {
+    if (!S7) return; const e = EV7[k]; const rev = e.t === -2 ? S7.p3 : e.t; const stopEs = val('sp7'); const trs = goWith7(stopEs);
+    const marks = [{ i: 110, v: S7.P[110], kind: 'sell' }, { i: at(12, 25), v: S7.P[at(12, 25)], kind: 'buy' }]; let tot = 0, n = 0;
+    if (k === EV7.length - 1) trs.forEach((t) => { marks.push({ i: t.ei, v: t.e, kind: 'sell' }); marks.push({ i: t.xi, v: t.x, col: t.e - t.x > 0 ? 'buy' : 'sell' }); tot += t.e - t.x; n++; });
+    duo('c7', { P: S7.P, T: S7.T, reveal: rev, marks, levels: [1000, 600, 200, -1000], hl: [{ y: 116.0, col: 'muted', dash: [2, 3], label: 'prior close', noScale: false }], vlines: [{ i: 110, label: '1', col: 'c1' }, { i: at(12, 25), label: '2', col: 'c1' }, { i: S7.p3, label: '3', col: 'c3' }].filter((v) => v.i <= rev), pLabel: 'SPY-like price (simulated)', legend: [['fade / go-with short', 'sell'], ['fade buy', 'buy'], ['+200 cap, +600 stop level', 'muted']] });
+    $('r7').innerHTML = `step ${k + 1}/${EV7.length} · ${e.t === -2 ? hhmm(S7.p3) + ' · ' : ''}${e.txt}` + (k === EV7.length - 1 ? `<br>go-with shorts on this simulated path: <b>${n}</b> · net <b class="${tot >= 0 ? 'good' : 'bad'}">${fmtS(tot, 2)} SPY</b> (≈ ${fmtS(tot * 10, 1)} ES points) · exits: ${trs.map((t) => t.why).filter((v, i, a) => a.indexOf(v) === i).join(', ') || 'none'}` : '');
+  }
+  reg(() => { S7 = buildSep30(); draw7(st7.k); });
+  bindRange('sp7', () => draw7(st7.k));
+
+  // ---------- section 8: May 6, 2010 flash crash, recreated ----------
+  let S8 = null;
+  function buildCrash() {
+    const r = rng(seed * 71 + 8); const x = arNoise(r, NM, 0.85, 90); const T = [];
+    for (let i = 0; i < NM; i++) {
+      let v;
+      if (i < 35) v = x[i] * 1.6;
+      else if (i < 150) v = -260 + x[i] * 1.7 + (i >= 90 && i % 12 < 3 ? -820 - 200 * r() : 0);
+      else if (i < 272) { v = -320 + x[i] * 1.5; const ph = (i - 150) % 30; if (ph >= 22 && ph <= 27) v = -40 + 120 * Math.sin((ph - 22) / 5 * Math.PI); if (ph >= 6 && ph <= 8) v = -1000 - 150 * r(); }
+      else if (i < 304) v = -900 + x[i] * 1.2 + (i % 6 < 3 ? -620 - 120 * r() : 0);
+      else if (i < 318) v = -1450 + x[i] * 1.4 - (i % 4 === 1 ? 300 : 0);
+      else if (i < 324) v = -1200 + (i - 318) * 260 + x[i];
+      else v = 280 + x[i] * 1.8 + (i % 15 < 3 ? 450 : 0);
+      T.push(Math.round(clamp(v, -1880, 1300)));
+    }
+    spike(T, 35, -1040); spike(T, 140, -1520); T[305] = -1875; T[309] = Math.min(T[309], -1760); T[313] = Math.min(T[313], -1720);
+    const P = brownBridge(r, [[0, 10868], [35, 10835], [90, 10795], [140, 10745], [225, 10770], [272, 10715], [298, 10650], [313, 10565], [318, 9965], [323, 10560], [NM - 1, 10520]], 3.2);
+    return { P, T };
+  }
+  const EV8 = [
+    { t: 35, p: 1, txt: 'Point 1 · the first extreme reading of the day, −1,000. A normal reading.' },
+    { t: 110, p: 2, txt: 'Point 2 · extreme readings start coming consistently: the first heads-up that this could be a "go with" day. Nothing yet says what is coming.' },
+    { t: 140, p: 3, txt: 'Point 3 · the first −1,500 of the day. Unusual: extreme downside pressure. From here every rally in the $TICK is a chance to get short.' },
+    { t: 252, p: 4, txt: 'Point 4 · hours of chop. Rallies to the 0.00 line can be shorted and covered when the $TICK heads back to −1,000.' },
+    { t: 290, p: 5, txt: 'Point 5 · consistent −1,500 readings: rare, and a warning this may be a crash day. Carter: crashes only happen with consistent readings of −1,200 to −1,500.' },
+    { t: 313, p: 6, txt: 'Point 6 · −1,875, with repeated tests of −1,700 to −1,800. Steady selling for about 15 minutes takes the Dow down just over 300 points.' },
+    { t: 318, p: 0, txt: 'Then all hell breaks loose: the Dow drops about 600 more points in five minutes.' },
+    { t: -7, p: 7, txt: 'Over the next five minutes the Dow wins the 600 points back. Point 7 · the 8-period EMA of the $TICK breaks its downward trendline: a "mentality shift" in the herd. Not the bottom tick, but the sign to stop shorting and look for longs.' }
+  ];
+  function ema8line(T, n) {
+    // trendline over the EMA's lower highs: from the last chop high, the steepest line that stays above the EMA down to the low
+    const E = ema(T, n); let i0 = 250; for (let i = 250; i <= 275; i++) if (E[i] != null && E[i] > E[i0]) i0 = i;
+    let bot = 316; for (let i = 316; i <= 330; i++) if (E[i] < E[bot]) bot = i;
+    let i1 = i0 + 10, best = -Infinity; for (let j = i0 + 10; j <= bot - 10; j++) { const s = (E[j] - E[i0]) / (j - i0); if (s > best) { best = s; i1 = j; } }
+    const sl = best; let br = null;
+    for (let i = bot + 1; i < NM; i++) if (E[i] > E[i0] + sl * (i - i0)) { br = i; break; }
+    return { E, tl: { i0, i1, y0: E[i0], sl, iEnd: br != null ? Math.min(NM - 1, br + 25) : NM - 1 }, br };
+  }
+  const st8 = stepper('8', () => EV8.length, (k) => draw8(k));
+  let zoom8 = false;
+  function draw8(k) {
+    if (!S8) return; const n = val('n8'); const { E, tl, br } = ema8line(S8.T, n); const e = EV8[k]; const rev = e.t === -7 ? Math.max(br != null ? br : NM - 1, at(14, 55)) : e.t;
+    const pts = EV8.filter((q) => q.p && (q.t === -7 ? (br != null && br <= rev) : q.t <= rev)).map((q) => ({ i: q.t === -7 ? br : q.t, label: String(q.p), col: q.p === 7 ? 'buy' : 'c1' }));
+    duo('c8', { P: S8.P, T: S8.T, reveal: rev, x0: zoom8 ? at(14, 0) : 0, x1: zoom8 ? at(15, 15) : NM - 1, tLines: [{ d: E, col: 'c1', w: 2 }], tline: k >= 5 ? Object.assign({}, tl, { iEnd: Math.min(tl.iEnd, rev) }) : null, levels: [1000, -1000, -1500], vlines: pts, tmin: -1950, pLabel: 'Dow-like index (simulated)', legend: [[n + '-period EMA of $TICK', 'c1'], ['trendline on the EMA', 'c3']] });
+    $('r8').innerHTML = `step ${k + 1}/${EV8.length} · ${e.txt}` + (k === EV8.length - 1 ? `<br>with a <b>${n}</b>-period EMA the trendline breaks at <b>${br != null ? hhmm(br) : 'never'}</b> on this path; the $TICK itself turned up at about ${hhmm(318)}. Try other lengths and watch the break time move.` : '');
+  }
+  reg(() => { S8 = buildCrash(); draw8(st8.k); });
+  bindRange('n8', () => draw8(st8.k));
+  $('z8').addEventListener('click', () => { zoom8 = !zoom8; $('z8').classList.toggle('on', zoom8); $('z8').textContent = zoom8 ? 'Show whole day (Fig 9.12)' : 'Zoom 2:00–3:15 (Fig 9.13)'; draw8(st8.k); });
+
+  // ---------- section 9: Oct 3, 2011, 8/21 EMA on the $TICK ----------
+  let S9 = null;
+  function buildOct3() {
+    const r = rng(seed * 83 + 9); const x = arNoise(r, NM, 0.85, 80); const T = []; const rallies = [[at(13, 40), 7, 260], [at(14, 25), 7, 270], [at(15, 2), 7, 260]];
+    for (let i = 0; i < NM; i++) {
+      let v;
+      if (i < 90) v = 200 + x[i] * 2 + (i % 23 < 2 ? 500 : 0);
+      else if (i < 150) v = 200 - (i - 90) * 10 + x[i] * 1.5;
+      else if (i < 345) v = -430 + x[i] * 1.3 + (i % 19 < 2 ? -650 : 0);
+      else v = -520 + x[i] * 1.4 + (i % 9 < 2 ? -600 : 0);
+      rallies.forEach(([a, len, h]) => { if (i >= a && i < a + len) v = h + x[i] * 0.6; });
+      T.push(Math.round(clamp(v, -1500, 1300)));
+    }
+    const P = [112.6]; for (let i = 1; i < NM; i++) P.push(P[i - 1] + 0.03 * (T[i] + 150) / 1000 + 0.02 * gauss(r));
+    return { P, T, rallies };
+  }
+  const EV9 = [
+    { t: 90, txt: 'Choppy strength early: the ticks are mostly above zero and so are both EMAs, so the focus is on longs.' },
+    { t: at(12, 30), txt: 'Point 1 (end of Fig 9.14) · the session has rolled over into steady selling. Both EMAs sit below zero, so the focus is on shorts. 8 crossing under 21 below zero = heavy selling; 8 crossing over 21 below zero = a pause.' },
+    { t: -1, r: 0, txt: 'Point 2 · the $TICK and SPY rally, then get rejected: an intraday swing high that must break for a real short-covering rally.' },
+    { t: -1, r: 1, txt: 'Point 3 · the $TICK goes positive and the market rallies hard, and is rejected again.' },
+    { t: -1, r: 2, txt: 'Point 4 · a time of day when a reversal is most likely: the $TICK goes above zero, SPY rallies hard, and is rejected once more. This time the market plummets into the close.' },
+    { t: NM - 1, txt: 'What the rallies share: the $TICK went positive, but the 8 and the 21 EMA never both got above zero. While they stay below, the pressure is down.' }
+  ];
+  const st9 = stepper('9', () => EV9.length, (k) => draw9(k));
+  function draw9(k) {
+    if (!S9) return; const nf = val('fa9'), ns = val('sl9'); const F = ema(S9.T, nf), Sl = ema(S9.T, ns); const e = EV9[k];
+    const rev = e.t === -1 ? S9.rallies[e.r][0] + S9.rallies[e.r][1] + 12 : e.t;
+    const shade = []; let cur = null, a = 0;
+    for (let i = 0; i < NM; i++) { const s = F[i] == null || Sl[i] == null ? null : (F[i] > 0 && Sl[i] > 0 ? 'buy' : F[i] < 0 && Sl[i] < 0 ? 'sell' : null); if (s !== cur) { if (cur) shade.push({ a, b: i - 1, col: cur, alpha: 0.08 }); cur = s; a = i; } }
+    if (cur) shade.push({ a, b: NM - 1, col: cur, alpha: 0.08 });
+    const tMarks = []; for (let i = 1; i < NM; i++) { if (F[i - 1] == null || Sl[i - 1] == null) continue; const below = F[i] < 0 && Sl[i] < 0, above = F[i] > 0 && Sl[i] > 0; const xu = F[i - 1] <= Sl[i - 1] && F[i] > Sl[i], xd = F[i - 1] >= Sl[i - 1] && F[i] < Sl[i]; if ((below || above) && (xu || xd)) tMarks.push({ i, v: F[i], col: (below && xd) || (above && xu) ? (below ? 'sell' : 'buy') : 'c3', r: 3 }); }
+    const vl = [{ i: at(12, 30), label: '1', col: 'muted' }].concat(S9.rallies.map((q, j) => ({ i: q[0] + 3, label: String(j + 2), col: 'c1' }))).filter((v) => v.i <= rev);
+    duo('c9', { P: S9.P, T: S9.T, reveal: rev, shade, tLines: [{ d: F, col: 'c1', w: 2.4 }, { d: Sl, col: 'c2', w: 1.2 }], tMarks, vlines: vl, pLabel: 'SPY-like price (simulated)', legend: [[nf + '-EMA of $TICK (thick)', 'c1'], [ns + '-EMA (thin)', 'c2'], ['both EMAs > 0: long focus', 'buy'], ['both < 0: short focus', 'sell'], ['cross that signals a pause', 'c3']] });
+    const both = S9.rallies.map((q) => { for (let i = q[0]; i < q[0] + q[1] + 10; i++) if (F[i] > 0 && Sl[i] > 0) return true; return false; });
+    $('r9').innerHTML = `step ${k + 1}/${EV9.length} · ${e.txt}<br>on this simulated path, did both EMAs get above zero during rallies 2 / 3 / 4? <b>${both.map((b) => (b ? 'yes' : 'no')).join(' / ')}</b>`;
+  }
+  reg(() => { S9 = buildOct3(); draw9(st9.k); });
+  bindRange('fa9', () => draw9(st9.k)); bindRange('sl9', () => draw9(st9.k));
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

@@ -1,0 +1,1649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.11 Tools for Quantitative Analysis of Market Data</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* ---- chapter 11 additions ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+q { font-style: italic; }
+.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.warn { border-left: 3px solid var(--sell); padding-left: 10px; }
+.two > .box { align-content: start; }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: 100%; min-width: 0; }
+.controls input[type=number], .controls input[type=text] { font-family: var(--mono); font-size: 13px; padding: 3px 5px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; max-width: 100%; }
+.controls input[type=number] { width: 8ch; }
+.controls input[type=text] { width: 22ch; }
+td.good { color: var(--buy); font-weight: 600; } td.bad { color: var(--sell); font-weight: 600; }
+.svgwrap { overflow-x: auto; }
+.svgwrap svg { display: block; width: 100%; height: auto; min-width: 320px; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch10_academic_theories_of_market_behavior.html">← Ch.10 · Academic theories</a><a href="ch12_test_universe_and_methodology.html">Ch.12 · Test universe &amp; methodology →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Adam Grimes · The Art and Science of Trading: Course Workbook (2017) · Chapter 11 · pdf p412–454</div>
+  <h1>Tools for measuring markets, and the <em>traps</em> inside them</h1>
+  <p class="lede">This chapter is Grimes' statistics toolkit for traders. First, put every price move on a common scale (returns, ATR, historical volatility, his standard-deviation spike). Then describe a pile of returns (distributions, mean and median, standard deviation and IQR). Then reason from a sample to the unseen population, and see why fat tails break that reasoning. Then three working tools: bin analysis with significance testing, linear regression, and Monte Carlo simulation. It ends with seven common ways analysts fool themselves. Every chart here runs on <b>simulated</b> data that you can re-roll. The simulations show the <i>method</i>; they are not evidence about real markets. The book's real-market numbers are quoted as the book's.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll new simulated data</button><span class="readout">data set #<b id="seedOut">1</b></span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>The chapter climbs a ladder. Each rung needs the one below it: you can't compare moves until they're standardized, you can't test an idea until you can summarize groups of numbers, and you can't trust any test until you know how it can mislead you.</p>
+  <div class="svgwrap">
+  <svg viewBox="0 0 820 300" role="img" aria-label="Concept map: standardize, describe, infer, test, beware">
+    <defs><marker id="mapArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--c1)"/></marker></defs>
+    <g style="font-size:12px">
+      <rect x="10" y="20" width="150" height="120" rx="6" style="fill:var(--tint);stroke:var(--c1)"/>
+      <text x="22" y="42" style="font-weight:600">1 · STANDARDIZE</text>
+      <text x="22" y="64">% and log returns</text><text x="22" y="82">volatility: ATR</text><text x="22" y="100">historical vol</text><text x="22" y="118">σ-spike (his tool)</text>
+      <rect x="175" y="20" width="150" height="120" rx="6" style="fill:var(--tint2);stroke:var(--c2)"/>
+      <text x="187" y="42" style="font-weight:600">2 · DESCRIBE</text>
+      <text x="187" y="64">histograms, tails</text><text x="187" y="82">normal curve (and</text><text x="187" y="100">why markets aren't)</text><text x="187" y="118">mean/median, SD/IQR</text>
+      <rect x="340" y="20" width="150" height="120" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/>
+      <text x="352" y="42" style="font-weight:600">3 · INFER</text>
+      <text x="352" y="64">sample → population</text><text x="352" y="82">running mean settles</text><text x="352" y="100">...unless Cauchy:</text><text x="352" y="118">no mean at all</text>
+      <rect x="505" y="20" width="150" height="120" rx="6" style="fill:var(--paper);stroke:var(--c1)"/>
+      <text x="517" y="42" style="font-weight:600">4 · TEST</text>
+      <text x="517" y="64">bin analysis</text><text x="517" y="82">+ significance (p)</text><text x="517" y="100">linear regression</text><text x="517" y="118">Monte Carlo</text>
+      <rect x="670" y="20" width="140" height="120" rx="6" style="fill:var(--paper);stroke:var(--sell)"/>
+      <text x="682" y="42" style="font-weight:600">5 · BEWARE</text>
+      <text x="682" y="64">tool limits</text><text x="682" y="82">real sample size</text><text x="682" y="100">variability, causation</text><text x="682" y="118">cuts, overlays, tiny n</text>
+      <line x1="160" y1="80" x2="173" y2="80" style="stroke:var(--c1);stroke-width:2" marker-end="url(#mapArr)"/>
+      <line x1="325" y1="80" x2="338" y2="80" style="stroke:var(--c1);stroke-width:2" marker-end="url(#mapArr)"/>
+      <line x1="490" y1="80" x2="503" y2="80" style="stroke:var(--c1);stroke-width:2" marker-end="url(#mapArr)"/>
+      <line x1="655" y1="80" x2="668" y2="80" style="stroke:var(--c1);stroke-width:2" marker-end="url(#mapArr)"/>
+      <path d="M740,140 C740,230 420,250 85,170" style="fill:none;stroke:var(--muted);stroke-dasharray:5 4" marker-end="url(#mapArr)"/>
+      <text x="250" y="262" style="fill:var(--muted)">the warnings send you back: think first, define the question, then measure</text>
+      <text x="250" y="284" style="fill:var(--muted)">goal of all of it: separate a real edge from random noise (Ch.12 onward applies it)</text>
+    </g>
+  </svg>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Why quantify at all</a>
+    <a href="#s2"><span>02</span>Market math · the need to standardize</a>
+    <a href="#s3"><span>03</span>Standardizing for volatility</a>
+    <a href="#s4"><span>04</span>Average True Range</a>
+    <a href="#s5"><span>05</span>Historical volatility</a>
+    <a href="#s6"><span>06</span>Standard deviation spike tool</a>
+    <a href="#s7"><span>07</span>Probability distributions</a>
+    <a href="#s8"><span>08</span>The normal distribution</a>
+    <a href="#s9"><span>09</span>Central tendency (the mummy)</a>
+    <a href="#s10"><span>10</span>Dispersion: SD vs IQR</a>
+    <a href="#s11"><span>11</span>Inferential statistics: apples</a>
+    <a href="#s12"><span>12</span>Cauchy: when there is no mean</a>
+    <a href="#s13"><span>13</span>Three statistical tools</a>
+    <a href="#s14"><span>14</span>Statistical bin analysis</a>
+    <a href="#s15"><span>15</span>Significance testing</a>
+    <a href="#s16"><span>16</span>Linear regression</a>
+    <a href="#s17"><span>17</span>Linear equations and error</a>
+    <a href="#s18"><span>18</span>Regression: ABX vs gold</a>
+    <a href="#s19"><span>19</span>Monte Carlo simulation</a>
+    <a href="#s20"><span>20</span>A warning against sloppy statistics</a>
+    <a href="#s21"><span>21</span>Limitations of the tools</a>
+    <a href="#s22"><span>22</span>Actual sample size</a>
+    <a href="#s23"><span>23</span>Accounting for variability</a>
+    <a href="#s24"><span>24</span>Correlation is not causation</a>
+    <a href="#s25"><span>25</span>Too many cuts through the data</a>
+    <a href="#s26"><span>26</span>Multiple markets on one chart</a>
+    <a href="#s27"><span>27</span>Percentages for small samples</a>
+    <a href="#s28"><span>28</span>Summary</a>
+    <a href="#quiz"><span>?</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- ============ 01 ============ -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER 11 OPENING</div><h2>How do markets really move?</h2></div><span class="chip">pdf p412–413</span></div>
+  <p>The chapter opens with an epigraph from Plato: take counting, measuring and weighing out of any craft and very little of the craft is left. Then a story. Years earlier Grimes was struggling to adapt to a new market and a new timeframe. A friend, Doug, a former floor trader at the Chicago Board of Trade (CBOT), told him the way he was trading didn't fit how markets move. Grimes asked the obvious follow-up: then how <i>do</i> they move? Doug thought about it and admitted he didn't know, only that it wasn't like that. Grimes kept coming back to that question for the next decade; it shaped his whole approach.</p>
+  <p>Many old-school traders distrust quantitative work and feel that numbers can't replace hard-won intuition. Grimes grants there is some truth in that, but a main theme of the book is the reverse: a rigorous statistical framework can <b>grow</b> real intuition. Quantitative tools let you see relationships you would otherwise miss. The warning comes with it: in the wrong hands these tools can do more harm than good. They can give misleading answers and can even create relationships where none exist. He promises to point out pitfalls as he goes, and asks you not to accept anything at face value.</p>
+  <div class="box picture"><b>Picture it</b><p>A doctor with years of bedside experience and a blood test. Experience tells her where to look; the blood test tells her whether what she "sees" is really there. Neither replaces the other. Grimes wants the trader's eye trained by measurement, not replaced by it.</p></div>
+  <div class="svgwrap">
+  <svg viewBox="0 0 760 150" role="img" aria-label="Loop: question, measure, test, intuition">
+    <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--c2)"/></marker></defs>
+    <g style="font-size:12px">
+      <rect x="10" y="45" width="160" height="56" rx="6" style="fill:var(--tint);stroke:var(--c1)"/><text x="22" y="69">a question about</text><text x="22" y="87">how price moves</text>
+      <rect x="205" y="45" width="160" height="56" rx="6" style="fill:var(--tint2);stroke:var(--c2)"/><text x="217" y="69">measure it</text><text x="217" y="87">(standardized data)</text>
+      <rect x="400" y="45" width="160" height="56" rx="6" style="fill:var(--tint2);stroke:var(--c2)"/><text x="412" y="69">test it, and ask</text><text x="412" y="87">"could this be luck?"</text>
+      <rect x="595" y="45" width="155" height="56" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/><text x="607" y="69">intuition that</text><text x="607" y="87">matches reality</text>
+      <line x1="170" y1="73" x2="203" y2="73" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a1)"/>
+      <line x1="365" y1="73" x2="398" y2="73" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a1)"/>
+      <line x1="560" y1="73" x2="593" y2="73" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a1)"/>
+      <path d="M672,101 C672,140 90,140 90,103" style="fill:none;stroke:var(--muted);stroke-dasharray:4 4" marker-end="url(#a1)"/>
+      <text x="300" y="138" style="fill:var(--muted)">better questions next time</text>
+      <text x="10" y="25" style="fill:var(--sell)">pitfall at every arrow: a tool can invent a pattern that isn't there</text>
+    </g>
+  </svg>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Markets give you one noisy outcome at a time. Your memory keeps the vivid ones and drops the dull ones, so "intuition" built only from experience is a biased sample. Counting removes that bias: every case gets the same vote. That is all quantitative analysis really is at its core, and it is why the chapter keeps returning to the same question: is this difference bigger than what randomness alone would produce?</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch10_academic_theories_of_market_behavior.html">Ch.10</a> ended by saying markets are nearly efficient and mostly random, so the trader's first job is to find the rare non-random moments. This chapter supplies the tools to find them; <a href="ch12_test_universe_and_methodology.html">Ch.12</a> starts applying them.</li>
+    <li>Your own process in <code>Notes/trading/backtest_results_summary.md</code> already follows this loop: an idea, a test on NSE data with real FYERS costs, then a check on data the rules weren't tuned on.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 02 ============ -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SOME MARKET MATH · THE NEED TO STANDARDIZE</div><h2>Turn prices into returns before comparing anything</h2></div><span class="chip">pdf p413–414</span></div>
+  <p><b>Some market math.</b> Grimes admits a math chapter is hard to get excited about, but these are the tools of the trade: competing needs a deep sense of probabilities and market structure. Some traders build that sense through the school of hard knocks; quantifying the probabilities is a much more direct route. He deliberately skips the encyclopedic approach (his example: reading one paragraph on harmonic averages that you'll never see again) because a technique applied wrongly misleads. Instead he goes fairly deep on a few simple tools, and points to the bibliography for more. Even readers who know this material may see it in a new light.</p>
+  <p><b>The need to standardize.</b> Pop quiz: which price change is bigger, 675 or 0.01603? It's a trick question: the only honest reply is to ask what "bigger" means. Assets trade at prices from fractions of a penny to millions of dollars, so raw changes can't be compared. The first fix is percentages. In research the first step is usually to turn prices into a <b>return series</b>:</p>
+  <div class="formula">percent return = price_today / price_yesterday − 1
+log return     = ln(price_today / price_yesterday)      ← academics' choice; = continuously compounded return</div>
+  <p>Grimes treats the two as roughly interchangeable because the returns he studies are small, and for small moves they're almost equal: a 1% simple return is a 0.995% log return. They drift apart as moves get bigger. Academics like log returns because they are easier to work with mathematically; Grimes uses simple percentages in the book for clarity. One more property: <b>percentages don't add</b>. Lose $10 then gain $10 and you're flat; lose 10% then gain 10% and you're still down. <b>Log returns do add</b>, which is one reason researchers prefer them.</p>
+  <div class="box beyond"><b>Beyond the book: a misprint to watch for</b><p>The book says a 10% simple return equals a 40.5% continuously compounded return. That number is wrong. ln(1.10) = 0.0953, so a 10% simple return is a <b>9.53%</b> log return (and a 10% log return is a 10.52% simple return). The book's main point still holds: the gap grows with the size of the move. Check it in the calculator below.</p></div>
+  <div class="fig">
+    <canvas id="c2" class="short" aria-label="Log return versus simple return: close for small moves, apart for big ones"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="n2a">yesterday <input id="n2a" type="number" value="100" min="0.0001" step="any"></label>
+      <label for="n2b">today <input id="n2b" type="number" value="110" min="0.0001" step="any"></label>
+      <label for="sel2">two-day path <select id="sel2"><option value="a">−10% then +10%</option><option value="b">+10% then −10%</option><option value="c">−50% then +50%</option><option value="d">−50% then +100%</option></select></label>
+    </div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two people each say "I moved 675". One walked 675 metres; the other drove 675 km. You can't compare until you know the starting point. Percentages divide by the starting point. Log returns are like measuring on a ruler where every doubling is the same length, which is why their pieces add up end to end.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>A simple return multiplies: (1 − 0.10) × (1 + 0.10) = 0.99, a 1% loss, because the +10% is taken on a smaller base. Logs turn multiplication into addition: ln(0.9) + ln(1.1) = −0.105 + 0.095 = −0.010, and e<sup>−0.010</sup> − 1 = −1%. So summing log returns over a period gives the period's log return exactly; summing simple returns doesn't. For daily moves of ±1–2% the difference is tiny, which is why Grimes can use simple percentages.</p></div>
+  <div class="box behind"><b>Worked example (my numbers)</b><p>Nifty moves 675 points from 25,000: 675/25,000 = <b>2.7%</b>. A currency moves 0.01603 from 1.1000: 0.01603/1.1 = <b>1.46%</b>. Now they're comparable: the index moved more, in percentage terms. Whether either move was <i>large</i> is the next section's question.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>Notes/trading/trading_equations.md</code> §2 (Sharpe) and §11 (annualised volatility) both start from a return series like this one.</li>
+    <li>Section 05 (historical volatility) uses <b>log</b> returns in its formula; the rest of the chapter uses simple percentages.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 03 ============ -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · STANDARDIZING FOR VOLATILITY</div><h2>1.5% can be huge or nothing</h2></div><span class="chip">pdf p414–415</span></div>
+  <p>Percentages fix price level but not personality: some assets simply move more than others. Grimes' example is two currency rates, one that moves 0.5% on an average day and one that moves 2.0%. Both move 1.5% today. For the first that's a very big day, <b>three times</b> its average. For the second it's a small day, a bit under average. The simple way to measure this is <b>average percentage return</b>, but you must average the <b>absolute values</b> of the returns, or the ups and downs cancel out. He notes this isn't a common volatility measure because better tools exist; it's here because it shows the basic idea behind them.</p>
+  <div class="fig">
+    <canvas id="c3" aria-label="Daily absolute moves of a calm and a wild asset with today's move marked"></canvas>
+    <div class="legend" id="c3L"></div>
+    <div class="controls">
+      <label for="n3a">calm asset avg move % <input id="n3a" type="range" min="0.2" max="3" step="0.1" value="0.5"><output id="n3ao">0.5</output></label>
+      <label for="n3b">wild asset avg move % <input id="n3b" type="range" min="0.2" max="3" step="0.1" value="2"><output id="n3bo">2</output></label>
+      <label for="n3c">today's move % <input id="n3c" type="range" min="0.1" max="5" step="0.1" value="1.5"><output id="n3co">1.5</output></label>
+    </div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A 1.5-metre wave. At a calm lake it makes the news. At a surf beach nobody looks up. To know if a move is "big", divide it by what's normal for that place.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The simulated returns above are drawn around zero. Their plain average is close to zero for both assets, so it says nothing about how much they move. The average of absolute values (the bar heights) is the typical size of a day's move. Divide today's move by it and you get a unit-free number: "how many normal days was today?" Every later tool in this chapter (ATR%, historical volatility, the σ-spike) is a better way to compute that denominator.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The next three sections replace "average absolute return" with ATR, historical volatility and the σ-spike.</li></ul></div>
+</section>
+
+<!-- ============ 04 ============ -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · AVERAGE TRUE RANGE</div><h2>Range, true range, ATR, and ATR%</h2></div><span class="chip">pdf p415</span></div>
+  <p>The most common volatility gauge among traders is the average range, or the <b>Average True Range (ATR)</b>, of a bar or candle.</p>
+  <ul class="plain">
+    <li><b>Range</b> = high − low of the bar: all the prices the session covered.</li>
+    <li><b>True range</b> = the range, plus any gap from the previous close. If the previous close sits inside today's bar, true range equals range. If the previous close is above today's high or below today's low, the gap is added.</li>
+    <li>Why add the gap: it shows as empty space on a chart, but someone holding through it was exposed to that change. The market really did move through those prices.</li>
+    <li>Average either one to get <b>average range</b> or <b>ATR</b>. The length is partly a personal choice that depends on the goal; for most uses Grimes finds <b>20 to 90</b> bars most useful.</li>
+  </ul>
+  <p>To standardize, express a day's change as a fraction of ATR. A stock that changes 1.0% on a day when its ATR is 2.0% made a <b>0.5 ATR%</b> move. You could average the absolute values of these to get an average ATR% measure. But Grimes flags a logical problem: you'd be comparing a <b>close-to-close</b> change with a yardstick built mostly from the <b>high and low</b>. In a sense that is apples to oranges.</p>
+  <div class="fig">
+    <canvas id="c4" class="tall" aria-label="Simulated candles with the selected bar's range, true range and previous close"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <button id="b4p" type="button">◀ bar</button><button id="b4n" type="button">bar ▶</button>
+      <label for="n4">ATR length <input id="n4" type="range" min="5" max="90" step="1" value="20"><output id="n4o">20</output></label>
+    </div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch11_lift_true_range.svg" alt="An elevator closes at floor 3 overnight and opens at floor 7 the next morning, then travels only to floor 9, while a passenger who stayed inside rode the whole way." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A lift that skipped floors 4 to 6 overnight: it closed at floor 3 and opened at floor 7. Today it only travelled 7 to 9. Its <i>range</i> is two floors, but a passenger who stayed on overnight rode six. True range counts the ride, not just today's part of it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>True range = max(high, previous close) − min(low, previous close). That single line covers all three cases (no gap, gap up, gap down). In the chart, the shaded column is the selected bar, the dashed line is the previous close, and the readout shows when the gap added to the range. The ATR line averages the last N true ranges with a simple average (Grimes doesn't specify the averaging; Wilder's original ATR uses a smoothed average).</p></div>
+  <div class="box behind"><b>Worked example (my numbers)</b><p>Previous close ₹100. Today: high ₹106, low ₹103, close ₹104. Range = 106 − 103 = ₹3. The previous close is below the low, so true range = 106 − 100 = <b>₹6</b>. If the 20-day ATR is 2.0% of price and today closed +4%, that's a <b>2.0 ATR%</b> move, but remember Grimes' caveat: that is a close-to-close change measured with a range-based ruler.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>Notes/trading/trading_equations.md</code> §10 defines TR the same way and uses a Wilder-smoothed ATR (14) for stops; the backtest summary found fixed 1% risk with ATR stops "as good as or better than volatility targeting".</li>
+    <li>Your weekly-pullback strategy in <code>backtest_results_summary.md</code> uses a 2.5 ATR stop, an ATR length shorter than the 20–90 Grimes suggests for standardizing moves; for stops the purpose is different.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 05 ============ -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · HISTORICAL VOLATILITY</div><h2>Historical volatility: an annualized one-SD move</h2></div><span class="chip">pdf p416</span></div>
+  <p><b>Historical volatility</b> (Hvol; also called statistical or realized volatility) is a good alternative for most assets, with the bonus that options traders use it too. For daily data:</p>
+  <div class="formula">Hvol = StandardDeviation[ ln(p_t / p_t−1) ] × annualization factor
+annualization factor = √(periods per year):  daily √252 · weekly √52 · monthly √12</div>
+  <p>Here p is price, t is this period, t − 1 the previous one, and the standard deviation is taken over a chosen window. A 20-period standard deviation gives a 20-bar Hvol. The annualization factor is the square root of the number of measured periods in a year; there are 252 trading days in a year, so daily data uses √252. Conceptually, Hvol is an annualized one-standard-deviation move at the current volatility. At 25% Hvol you could expect prices within ±25% of today's price one year from now <b>if</b> returns followed a zero-mean normal distribution, and Grimes immediately adds that they don't.</p>
+  <div class="fig">
+    <canvas id="c5" class="tall" aria-label="Simulated price with rolling historical volatility below"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls">
+      <label for="n5">window (bars) <input id="n5" type="range" min="5" max="90" step="1" value="20"><output id="n5o">20</output></label>
+      <label for="sel5">bar size <select id="sel5"><option value="1">daily (√252)</option><option value="5">weekly (√52)</option><option value="21">monthly (√12)</option></select></label>
+    </div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Your daily commute varies by about 4 minutes. Over a year of commutes the <i>total</i> doesn't vary by 4 × 252 minutes, because good and bad days partly cancel. Random wobbles grow with the square root of the number of steps. That is why the annualizing multiplier is √252 ≈ 15.9, not 252.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>If daily returns are independent with standard deviation σ, the variance of a sum of 252 of them is 252σ², so the yearly standard deviation is σ√252. The simulated market above switches between calm and stormy regimes; watch the Hvol line react. A short window reacts fast but jumps around; a long one is smooth but late. Switch to weekly or monthly bars: the same simulated prices give a similar annual number, because the factor changes to √52 or √12 (it isn't identical, because the sample is smaller and the regimes shift).</p></div>
+  <div class="box behind"><b>Worked example</b><p>Daily SD of log returns = 1.575%. Hvol = 1.575% × √252 = 1.575 × 15.87 ≈ <b>25%</b>. On a ₹1,000 stock that is a one-SD band of roughly ₹750–₹1,250 a year out under the normal assumption Grimes warns against (beyond the book: a typical single day is 1,000 × 1.575% ≈ ₹16).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>Notes/trading/trading_equations.md</code> §11 has the same square-root-of-time rule (σ<sub>annual</sub> = σ<sub>daily</sub>√252), and §14 the expected move from implied volatility.</li>
+    <li>Next section: Grimes notes implied volatility tends to track 20-day Hvol, which is why his spike tool uses a 20-day window.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 06 ============ -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · STANDARD DEVIATION SPIKE TOOL</div><h2>The σ-spike: today's move in units of recent volatility</h2></div><span class="chip">pdf p416–417</span></div>
+  <p>The standardized measure Grimes uses most in his daily work: each day's return expressed in standard deviations of the past 20 days' returns. He calls it a <b>standard deviation spike</b> and uses it on charts and in quantitative screens. The book announces four steps but prints only three:</p>
+  <ol class="plain"><li>Calculate returns for the price series.</li><li>Calculate the 20-day standard deviation of the returns.</li><li>Spike = today's return ÷ yesterday's <i>BaseVariation</i>.</li></ol>
+  <p>Read it this way (my interpretation, since "BaseVariation" isn't defined on the page): BaseVariation is the 20-day standard deviation from step 2, <b>as of yesterday</b>, so today's move is not part of the ruler it is measured with.</p>
+  <ul class="plain">
+    <li>It has "standard deviation" in its name, but because it compares today to a very small window, very large readings are common. Your statistics-class intuitions about standard deviations don't apply; that isn't the tool's purpose.</li>
+    <li>Even large, stable stocks show a few <b>five or six SD</b> moves a year on this measure, which would be essentially impossible if these were true standard deviations.</li>
+    <li>Its value: price changes become comparable across assets. Grimes uses it mainly to <b>quantify surprise</b>. Anything above about <b>2.5 or 3.0</b> stands out visually on a chart as a large move.</li>
+    <li>After years of trying other volatility-adjusted measures, this is the one he settled on.</li>
+    <li>Implied volatility usually tracks 20-day historical volatility fairly well, so a move that surprises this indicator usually surprises the options market too, unless implied volatility was ramped up before an expected event. Options traders may find it useful.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c6" class="tall" aria-label="Simulated price with sigma-spike bars below and large spikes marked"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="controls">
+      <label for="sel6">simulated returns <select id="sel6"><option value="g">fat tails + volatility clusters</option><option value="n">normal, constant volatility</option></select></label>
+      <label for="n6">flag spikes ≥ <input id="n6" type="range" min="1.5" max="5" step="0.5" value="3"><output id="n6o">3</output></label>
+    </div>
+    <div class="readout" id="r6"></div>
+    <div class="readout" id="r6b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A smoke alarm that calibrates itself to the last 20 days of your kitchen. After a quiet month even toast sets it off. After a month of stir-fries it takes a real fire. It measures surprise relative to recent habit, not danger in absolute terms.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two things make big spikes common. First, only 20 observations estimate the denominator, so it is often too small by luck; even perfectly normal data then produce more 3+ readings than the textbook 0.27% (the pooled table shows this). Second, real returns have fat tails and volatility that comes in clusters: a quiet stretch shrinks the ruler, then a shock arrives. The "fat tails + clusters" model (a GARCH-style process with Student-t shocks, my choice of model) produces 3+ readings about six times a year and 5+ readings about once a year in the pooled count, far above the textbook rates and in the spirit of the few 5–6 SD days a year Grimes reports for real stocks. Those pooled counts are from simulation, not from his data.</p></div>
+  <div class="box behind"><b>Worked example (my numbers)</b><p>The last 20 daily returns of a stock have SD 1.2% (as of yesterday's close). Today it falls 4.2%. Spike = −4.2 / 1.2 = <b>−3.5</b>: a surprise move by Grimes' 2.5–3.0 yardstick. The same −4.2% on a stock whose 20-day SD is 3.5% is a −1.2 spike: an ordinary day.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.16 of the workbook (pdf p553) counts days with absolute spikes above 5, 4, 3, 2 and 1 SD; Ch.4 (pdf p169) treats repeated large upward spikes as evidence against a bearish higher-timeframe bias.</li>
+    <li>Section 08: the reason 5σ days aren't "impossible" is that returns are not normal.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 07 ============ -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SOME USEFUL STATISTICAL MEASURES · PROBABILITY DISTRIBUTIONS</div><h2>Histograms: see the whole pile, especially the tails</h2></div><span class="chip">pdf p417–418 · Fig 11.1</span></div>
+  <p>Markets speak the language of probability. We live through single outcomes, but they only mean something across large samples. Statistics gives tools to summarize data and expose hidden relationships.</p>
+  <p>Any information can be turned into numbers; the hard part is presenting it. There's always a trade-off: a summary loses detail that may matter, but lets you grasp the whole set. Grimes' image: the ages of everyone in a large city, printed out and loaded on a tractor-trailer. All you could say is that it's a lot of numbers. Descriptive statistics strips the set down to its important elements.</p>
+  <p>The <b>histogram</b> is one very useful tool: sort the raw data into evenly spaced categories (<b>bins</b>) and count each. More bins give finer resolution; how many to use depends on what you want to show. Figure 11.1 compares daily % changes of LULU (a volatile momentum stock) with SPY (the S&amp;P 500) from June 1, 2009 to December 31, 2010. Traders care most about the <b>tails</b>, the edges of the distribution, because that's where both exceptional opportunity and risk live. LULU's histogram is much wider, with many more large up and down days than SPY: a much crazier stock to trade.</p>
+  <div class="fig">
+    <canvas id="c7" aria-label="Histograms of simulated daily returns for a calm index and a volatile stock"></canvas>
+    <div class="legend" id="c7L"></div>
+    <div class="controls"><label for="n7">bins <input id="n7" type="range" min="8" max="80" step="1" value="40"><output id="n7o">40</output></label></div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Sorting coins into jars by size. You can no longer say which coin came first, but one look at the jars tells you what's common and what's rare. Too few jars hide the shape; too many and each jar holds one coin.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The two simulated series (about 400 trading days, the length of Grimes' window) share the same x-axis on purpose. The volatile one has a larger spread and fat tails: its outer bins are populated, the index's are empty. Counting days beyond ±5% (readout) is a crude but honest tail measure. Change the bins: the shape stays, the noise in each bar changes.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 08 asks whether these shapes are "normal"; section 10 measures their spread with SD and IQR.</li></ul></div>
+</section>
+
+<!-- ============ 08 ============ -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · THE NORMAL DISTRIBUTION</div><h2>The bell curve: useful, tempting, and wrong for markets</h2></div><span class="chip">pdf p419–420 · Fig 11.2</span></div>
+  <p>The normal distribution (bell curve) is widely used for three reasons:</p>
+  <ol class="plain">
+    <li>It really does describe an astonishing range of natural phenomena, from physics and astronomy to sociology: heights, water-current speeds, neighbourhood incomes.</li>
+    <li>It is very easy to use in simulations and models. That's double-edged: it is so easy that people use it where it doesn't fit.</li>
+    <li>The <b>central limit theorem</b>: means of random samples from a population with <i>any</i> distribution tend toward normal, provided the population has a finite mean and variance. Most of inferential statistics rests on this. (Grimes points to Snedecor and Cochran, <i>Statistical Methods</i>, 1989, for more.)</li>
+  </ol>
+  <p>Figure 11.2 shows three normal curves, all with mean zero and different standard deviations (0.5, 1 and 2). The standard deviation just describes spread; in the LULU/SPY example, LULU had the bigger SD, so its histogram spread further along the x-axis. Two last points. Don't read too much into the shape: many other distributions look like a bell, so a bell shape doesn't mean normal. And most important: <b>normal distributions describe financial data exceptionally poorly</b>. Assume normality in trading and you will badly underestimate risk. Over the past two decades that assumption contributed to several financial crises, when models and risk frameworks built on it failed.</p>
+  <div class="fig">
+    <canvas id="c8" aria-label="Three normal curves with SD 0.5, 1 and 2 plus an optional fat-tailed curve"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls">
+      <label for="chk8"><input id="chk8" type="checkbox" checked> overlay a fat-tailed curve (Student-t, 3 df, scaled to SD 1)</label>
+      <label for="n8">tail beyond ± <input id="n8" type="range" min="2" max="6" step="0.5" value="4"><output id="n8o">4</output> SD</label>
+    </div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="fig">
+    <canvas id="c8b" class="short" aria-label="Central limit theorem: means of samples from a skewed distribution"></canvas>
+    <div class="legend" id="c8bL"></div>
+    <div class="controls"><label for="n8b">sample size per mean <input id="n8b" type="range" min="1" max="60" step="1" value="1"><output id="n8bo">1</output></label></div>
+    <div class="readout" id="r8b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two curves can look alike in the middle and differ wildly at the edges. It's the edges that wreck accounts. A fat-tailed curve is a bell with a few hidden trapdoors far out on the sides.</p></div>
+  <div class="box behind"><b>What's happening behind it (beyond the book: the numbers)</b><p>With the overlay on, both curves have SD 1, yet beyond ±4 SD the normal puts about 0.006% of days (one day in roughly 60 years of 252 days) while the Student-t with 3 degrees of freedom puts about 0.6%, roughly 1.5 days a year. That factor of about 100 is the "dramatic underestimate" Grimes means. The second chart demonstrates the CLT he quotes: means of samples from a very skewed distribution (exponential, my choice) look more and more like a bell as the sample grows. Section 12 shows the CLT failing when the variance isn't finite.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 06: 5–6σ spikes a year are only "impossible" under this curve.</li><li>Section 19: Monte Carlo lets you simulate from fat-tailed distributions instead of assuming a bell.</li></ul></div>
+</section>
+
+<!-- ============ 09 ============ -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · MEASURES OF CENTRAL TENDENCY</div><h2>Mean vs median, and the 3,000-year-old mummy</h2></div><span class="chip">pdf p420–422</span></div>
+  <p>A graph gives ideas; it isn't analysis. A few calculations summarize a data set. <b>Central tendency</b> describes where the data clusters; the three curves in Fig 11.2 share it, which is why they're centred on the same point. The <b>mean</b> is the sum divided by the count. People call it "the average", but that's imprecise because there are several kinds of average.</p>
+  <p>Five people aged 18, 22, 25, 33 and 38: mean <b>27.2</b>. It describes them well: about as many people on either side, nobody is exactly 27.2, but it's a good guess for anyone's age. The <b>median</b> is the middle value after sorting; with an even count it's the mean of the two middle values (matters mostly in small sets). Here the median is <b>25</b>, also a reasonable guess.</p>
+  <p>Why two measures? They treat <b>outliers</b> (extreme values in the tails) differently. Bring a 3,000-year-old mummy into the room (absurd examples help build intuition). The mean jumps to <b>522.7</b>; the median, now between 25 and 33, only rises four years to <b>29</b>. The mean now describes nobody. The median is a better guess, but it's completely blind to the mummy: the jump in the mean is what tells you a huge value arrived. Make the mummy 3,000,000 years old: the median stays 29, the mean becomes a little over 500,000, a number meaningless for the five people and a vast understatement for the (extraterrestrial?) mummy. Market data often contain a handful of extreme events, so Grimes looks at both mean and median throughout the book.</p>
+  <div class="fig">
+    <canvas id="c9" class="short" aria-label="Ages on a log axis with mean and median markers"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls">
+      <label for="t9">ages <input id="t9" type="text" value="18, 22, 25, 33, 38"></label>
+      <label for="sel9">add <select id="sel9"><option value="0">nobody</option><option value="3000">the 3,000-year-old mummy</option><option value="3000000">the 3,000,000-year-old mummy</option></select></label>
+    </div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Bill Gates walks into a café. The mean wealth of the customers is now a billion dollars; the median customer is still a student with a coffee. The mean tells you somebody unusual arrived. The median tells you what a typical customer looks like.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The mean uses every value's size, so one huge value moves it by (huge value − old mean)/n. The median uses only order: adding one value shifts it by at most half a position, whatever that value's size. That's why the axis here is logarithmic: on a normal axis the five people would sit in one pixel.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Trade results are mummy-prone: one huge winner can make a system's mean return look great while its median trade loses. Look at both, as Grimes does in his studies from Ch.12 on.</li></ul></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · MEASURES OF DISPERSION</div><h2>Standard deviation vs interquartile range</h2></div><span class="chip">pdf p422–423 · Table 11.1</span></div>
+  <p><b>Dispersion</b> is how far the data spread from the centre. <b>Standard deviation</b>: find the mean, square each point's distance from it, and average the squares to get the <b>variance</b> (not useful for most market work because its units are price squared); the square root of the variance is the SD. Without squaring, positive and negative distances would cancel. Squaring makes them all positive and also <b>greatly magnifies outliers</b>, which may or may not be what you want. And since SD is built on the mean, if the mean isn't meaningful (or is undefined) the SD isn't either.</p>
+  <p>Market and trading data often have large outliers, so another measure helps: the <b>interquartile range (IQR)</b>. Rank the data and find the 25th and 75th percentiles (first and third quartiles); their difference is the range holding the middle half of the values, so it's also called the "middle 50". SD is extremely sensitive to outliers; the IQR is almost blind to them. Used together they reveal more about complex distributions from trading problems.</p>
+  <p>Table 11.1 summarizes the three age examples (no mummy / 3,000 / 3,000,000). Means: 27.2, 522.7, 500,022.7. Medians: 25.0, 29.0, 29.0. Standard deviations: 7.3, 1,107.9, 1,118,023.9. IQRs: 3.0, 6.3, 6.3. Mean and SD react violently to the outlier; median and IQR barely move.</p>
+  <div class="fig">
+    <canvas id="c10" aria-label="Mean, median, SD and IQR as the mummy's age grows (log scale)"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="controls"><label for="n10">mummy's age (log slider) <input id="n10" type="range" min="1.6" max="6.5" step="any" value="3.4771"><output id="n10o">3000</output></label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="box beyond"><b>Beyond the book: checking Table 11.1</b><p>The book's SDs match the <b>population</b> formula (divide by N, not N − 1): 7.30, 1,107.9 and 1,118,023.9 reproduce exactly. The sample formula would give 8.17, 1,213.7 and 1,224,733.8. The book's IQRs (3.0 and 6.3) don't match any standard quartile method I tried: the usual linear-interpolation quartiles give 22 and 33 for the five ages (IQR <b>11</b>), and 22.75 and 36.75 with the mummy (IQR <b>14</b>). The lesson survives either way: the IQR hardly reacts to the mummy while the SD explodes. The calculator uses linear interpolation.</p></div>
+  <div class="box picture"><b>Picture it</b><p>SD is a smoke detector that screams at one burnt match. IQR is a thermostat in the middle of the room that doesn't notice the match at all. Each misses something the other catches.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The mummy's squared distance from the mean dwarfs everyone else's, so the SD is essentially (mummy's distance)/√N: it grows in lock-step with the mummy (look at the parallel lines on the log chart). The quartiles depend only on which values sit at the 25% and 75% positions; adding one value at the far end just slides those positions a little.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 12: for Cauchy data the SD is useless (infinite variance) while the median and quartiles still work.</li><li>Section 15: significance tests compare a difference with the SD, so an outlier-inflated SD can hide a real effect.</li></ul></div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · INFERENTIAL STATISTICS</div><h2>From a sample to the population: the apple orchard</h2></div><span class="chip">pdf p423–427 · Figs 11.3–11.5</span></div>
+  <p><b>Inferential statistics</b> draws conclusions about a <b>population</b> (every member of a set) from a <b>sample</b>, or, for markets, about data produced by some random process. Example: the average weight of all apples in an orchard. You could weigh every apple, but usually you can't or won't, so you pick a sample and make educated guesses. It isn't simple: if the orchard has several varieties with different-sized apples, where and how you pick matters. How many apples do you need? What does the population's distribution look like? What's its average? How sure can you be?</p>
+  <p>Grimes' set-up: average apple 4.5 ounces, normal distribution, SD 3 ounces (facts you wouldn't know in reality, or you wouldn't measure). Pick two apples and average them, then a third, and so on, recording the running average. His random draws were unlucky: the first apple weighed only 1.07 oz. (The "apples" are really numbers from a random generator, so some are negative, which real apples can't be; that was needed for the Cauchy part later.)</p>
+  <ul class="plain">
+    <li><b>20 apples</b> (Fig 11.3): the running mean seems to trend upward instead of settling, an effect of the unlucky first apple.</li>
+    <li><b>100 apples</b> (Fig 11.4): the line starts settling; you might guess closer to 4 than 4.5 because some small apples skewed the sample. The sample isn't yet big enough to guarantee convergence.</li>
+    <li><b>2,500 apples</b> (Fig 11.5, y-axis cut to values near 4.5): the running mean hugs 4.5 very closely.</li>
+  </ul>
+  <p>With markets the hard question comes first: <b>what is the population and what is the sample?</b> With a long history (the Dow Jones Industrial Average from 1896; some commodities with patchy prices back to the 1400s) it's tempting to call the full history the population. Grimes thinks that's a mistake. The population is better thought of as <b>all possible returns</b> for that market: everything that has happened, will happen, and could happen. All market history, including all future history, is only a sample of it. The question for traders and risk managers is what that unobservable population looks like.</p>
+  <div class="fig">
+    <canvas id="c11" aria-label="Running mean of simulated apple weights converging toward 4.5"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls">
+      <label for="sel11">apples picked <select id="sel11"><option value="20">20</option><option value="100" selected>100</option><option value="2500">2,500</option></select></label>
+      <label for="chk11"><input id="chk11" type="checkbox" checked> first apple = 1.07 oz (like the book)</label>
+      <button id="b11" type="button">pick a new sample</button>
+    </div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch11_tasting_soup_sample.svg" alt="A cook tastes one spoonful from the top of an unstirred pot of soup, while another stirs and tastes several spoonfuls." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Tasting soup. One spoonful from the top might be all broth; stir and take ten spoonfuls and you know the soup. The orchard with several varieties is a soup you didn't stir. Markets are a soup that is still being cooked while you taste it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The running mean's typical error shrinks like σ/√n: with σ = 3, about 0.67 oz after 20 apples, 0.30 after 100, 0.06 after 2,500 (readout shows yours). A bad first apple pulls the early average down by (4.5 − 1.07)/n, which fades as n grows, so the line looks like it's "trending up" when it's really recovering. Re-pick a few times: sometimes 100 apples land close to 4.5, sometimes not. That spread <i>is</i> the uncertainty.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Your backtests are samples of "all possible NSE paths". The summary in <code>backtest_results_summary.md</code> judges rules on later data than they were chosen on for exactly this reason: one stretch of history is not the population.</li></ul></div>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · INFERENTIAL STATISTICS (CONT.) · CAUCHY DISTRIBUTIONS</div><h2>When more data makes the average worse</h2></div><span class="chip">pdf p427–429 · Figs 11.6–11.8</span></div>
+  <p>The real world isn't always polite enough to be normal. Some families of distributions have no mean at all. Think back to the mummy: now imagine many ages that could be arbitrarily huge or tiny. The mean would keep lurching with each extreme value and be useless.</p>
+  <p>The <b>Cauchy</b> family has such extreme outliers that its mean is <b>undefined</b> and its variance infinite. If price changes really come from a population like this, then in the words of a risk-manager colleague of Grimes, <q>we're all screwed in the long run.</q> If the apples were Cauchy:</p>
+  <ul class="plain">
+    <li><b>100 draws</b> (Fig 11.6): the running mean lurches; a reasonable guess might be around 2.0.</li>
+    <li><b>10,000 draws</b> (Fig 11.7): worse, not better. Bigger samples catch more giant tail events, and the average never settles; another outlier can always arrive. (Remember: there is no mean to find.)</li>
+    <li>The <b>median</b> is defined for Cauchy distributions. In Grimes' example it was 4.5, and the running median (Fig 11.8) settles nicely. This is why he looks at both means and medians in market data.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c12" aria-label="Running mean and running median of Cauchy random numbers"></canvas>
+    <div class="legend" id="c12L"></div>
+    <div class="controls">
+      <label for="sel12">draws <select id="sel12"><option value="100">100</option><option value="10000" selected>10,000</option></select></label>
+      <label for="chk12"><input id="chk12" type="checkbox" checked> show running median</label>
+      <button id="b12" type="button">draw a new sample</button>
+    </div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Averaging lottery outcomes where, very rarely, a ticket wins an amount bigger than every prize so far combined. However long you play, the next jackpot can drag the average anywhere. The middle ticket, though, is always "lost a little".</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The simulation draws Cauchy numbers centred on 4.5 as 4.5 + s·tan(π(u − ½)), with scale s = 3 (my choice; the book doesn't give one). For a Cauchy distribution the mean of n draws has the <i>same</i> Cauchy distribution as a single draw: averaging buys nothing, so the CLT's "finite variance" condition from section 08 fails. The median uses order, not size, so it converges at the usual √n rate. Each re-draw gives a different-looking mean path; that's the point, not a bug. (Beyond the book: strictly the Cauchy variance is undefined rather than infinite, but it's the same practical message.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Real returns aren't Cauchy (they do have a variance), but their tails are fat enough that sample means of trade results converge slowly. Report medians next to means.</li></ul></div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · THREE STATISTICAL TOOLS</div><h2>Simple tools beat clever ones</h2></div><span class="chip">pdf p429</span></div>
+  <p>After the abstract part, good news: some of the best market tools are the simplest. Complex techniques tempt you, but it's easy to get lost in their details and lose sight of what matters, and they bring their own complications. <b>Data mining</b> is Grimes' example: it is perfectly capable of finding patterns in random data that don't exist. Nearly all your market analysis can probably be done with basic arithmetic plus central tendency and dispersion. Three simple tools belong in every trader's kit:</p>
+  <div class="svgwrap">
+  <svg viewBox="0 0 760 170" role="img" aria-label="The three tools">
+    <g style="font-size:12px">
+      <rect x="10" y="10" width="235" height="150" rx="6" style="fill:var(--tint);stroke:var(--c1)"/>
+      <text x="22" y="34" style="font-weight:600">BIN ANALYSIS</text><text x="22" y="56">split data: signal vs control</text><text x="22" y="74">compare means, medians, % up</text><text x="22" y="92">+ significance test</text><text x="22" y="122" style="fill:var(--muted)">simplest, most useful</text><text x="22" y="140" style="fill:var(--muted)">→ section 14–15</text>
+      <rect x="262" y="10" width="235" height="150" rx="6" style="fill:var(--tint2);stroke:var(--c2)"/>
+      <text x="274" y="34" style="font-weight:600">LINEAR REGRESSION</text><text x="274" y="56">best-fit line through a scatter</text><text x="274" y="74">slope, p-value, R²</text><text x="274" y="92">how two markets move together</text><text x="274" y="122" style="fill:var(--muted)">relationship, not cause</text><text x="274" y="140" style="fill:var(--muted)">→ section 16–18</text>
+      <rect x="514" y="10" width="236" height="150" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/>
+      <text x="526" y="34" style="font-weight:600">MONTE CARLO</text><text x="526" y="56">simulate many random runs</text><text x="526" y="74">of a rule set, then count</text><text x="526" y="92">for path-dependent problems</text><text x="526" y="122" style="fill:var(--muted)">advanced; use when needed</text><text x="526" y="140" style="fill:var(--muted)">→ section 19</text>
+    </g>
+  </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A carpenter's tape measure, spirit level and square do most of the job. The laser scanner is great until it confidently measures a reflection.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The more knobs a method has, the more ways it can bend to fit noise. A comparison of two group averages has almost no knobs, so it can't flatter you much; a data-mining search over thousands of patterns has nearly unlimited knobs and will always find something. Section 25 shows that effect directly.</p></div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · STATISTICAL BIN ANALYSIS</div><h2>Signal group vs control group: the day-of-week test</h2></div><span class="chip">pdf p430–432 · Tables 11.2, 11.3</span></div>
+  <p>By far the simplest and most useful of the three tools. Define a condition clearly; split the data into days that have it (the <b>signal group</b>) and days that don't (the <b>control group</b>); compute simple statistics for each and compare. The simplest test: does the signal group have a higher mean and median return? Other attributes can be compared too.</p>
+  <p>Example: some traders believe certain weekdays are reliably stronger or weaker. Grimes splits the 2010 returns of the Dow Jones Industrial Average by weekday and reports the share of days closing up and the mean return. <b>2010:</b> all days 56.75% up, mean +0.04%. Monday 59.57% up, +0.22%; Wednesday 61.54%, +0.18%; Tuesday 53.85%, −0.05%; Thursday 54.90%, 0.00%; Friday 54.00%, −0.14%. Each weekday only means something compared with the all-days baseline. If you sampled random days from that year, about 56.75% would close up and the mean would be near zero; an unlucky small sample could differ, but large or many samples would very probably converge on those numbers. Monday and Wednesday beat the baseline on both measures; Friday looks prone to sell-offs.</p>
+  <p>So: buy Friday, sell Monday, buy Tuesday's close, sell Wednesday's? No. The math describes only the data examined, here one year. Before acting, check whether the effect is <b>stable over time</b> and think about whether there's a <b>reason</b> it should persist. <b>2009</b> (Table 11.3): all days 53.97% up, +0.07%. Monday 56.25%, +0.02%; Tuesday 48.08%, −0.03%; Wednesday 53.85%, +0.16%; Thursday 58.82%, +0.19%; Friday 53.06%, 0.00%. Monday still closes up more often but now has a <i>below</i>-average mean. Wednesday's mean is still over twice the average, but it closes down <i>more</i> often than the average day. Friday, the "soft" day of 2010, is exactly average. You could go further with more measures and formal tests, but often just splitting the data and comparing summary statistics answers the question, or flags an idea worth deeper work.</p>
+  <div class="fig">
+    <canvas id="c14" aria-label="Mean return by weekday in two simulated years of pure noise"></canvas>
+    <div class="legend" id="c14L"></div>
+    <div class="controls"><button id="b14" type="button">simulate two new years</button></div>
+    <div class="readout" id="r14"></div>
+    <div class="readout" id="r14b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Testing a new fertilizer: treat half the plants (signal), leave half alone (control), compare. Bin analysis is that, with days instead of plants. If you only had one season and five small plots, a plot could look great by luck; you'd want a second season before buying a truckload.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The simulation has <b>no</b> weekday effect at all: every day is drawn from the same distribution (mean +0.04%, SD 1.1%, about the size of the Dow's daily moves in those years; my assumption). Yet each simulated year shows "strong" and "weak" days, and they reshuffle the next year, much like 2010 versus 2009. With about 50 Mondays a year and a 1.1% SD, a weekday mean wobbles by roughly 1.1/√50 ≈ 0.16% by chance alone, about the size of the effects in the tables. The pooled readout counts this over 2,000 simulated pairs of years.</p></div>
+  <div class="box behind"><b>Worked example: "X out of Y" behind the percentages (my inference)</b><p>The percentages imply the counts: 59.57% of Mondays = 28 of 47; 61.54% of Wednesdays = 32 of 52; all days 56.75% = 143 of 252. So Monday's "edge" over the baseline is about 1.3 extra up-days in a year. Section 27 explains why counts are often more honest than percentages.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 15 formalizes "is this bigger than chance?". Section 25 shows what happens if you keep adding conditions to the signal group.</li>
+    <li>Your momentum test in <code>backtest_results_summary.md</code> used the same signal-vs-control logic: it beat an equal-weight hold of the same stocks and all 20 random portfolios.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · SIGNIFICANCE TESTING</div><h2>Could this difference be luck? The null hypothesis and p-values</h2></div><span class="chip">pdf p432–435</span></div>
+  <p>Significance testing is complex and even divides statisticians, but the core idea is simple: random variation must be considered when judging any result, because interesting results sometimes appear by chance. Grimes' image: big bags of numbers you can only sample one at a time. Did two samples come from the same bag? One full of 2s, 3s and 4s versus one with numbers from 20 to 40: clearly different bags. But a sample averaging 3 versus one with a few extra 4s averaging 3.2? Maybe you just pulled extra 4s from the same bag. A key factor is <b>sample size</b>: the bigger the samples, the more confident you can be that small differences are real.</p>
+  <ul class="plain">
+    <li><b>Null hypothesis</b>: start by assuming the two groups are the same (came from one population). Then look for evidence against it. Most tests weigh central tendency, dispersion and sample sizes; the burden of proof lies on the data that contradict the assumption.</li>
+    <li>If you can't find enough evidence, the null is accepted, but they might still differ and your test just failed to show it. So the honest wording is that the data did not give enough evidence to contradict the null hypothesis, <b>never</b> that you have proven the groups are the same. Subtle, but extremely important.</li>
+    <li><b>p-value</b>: the probability of a result at least as extreme as the one observed, <i>if the null hypothesis were true</i>. A very low p (say under 0.1%) means such a result would be unlikely if the samples were from one population, so you reject the null. A p of 50% is no evidence against it.</li>
+    <li>The researcher picks the cut-off; 5% and 1% are common, but only by convention. Both high and low thresholds have trade-offs, so choose with the data and design in mind.</li>
+    <li>Other hypotheses can be tested, e.g. whether a group's mean is above zero. Mean 2% with SD 0.5% is 4 SDs above zero, very likely significant; mean 2% with SD 5% is well within one SD of zero.</li>
+    <li>Back to Mondays 2010: +0.22% vs +0.04% for all days looks big, but the SD of all daily returns is over 1%, so the outperformance is less than one-fifth of an SD: well within the noise, not significant.</li>
+    <li>Significance testing is no substitute for common sense and misleads if the experiment is badly designed. The t-test is common, but market data usually violate its assumptions of normality and independence; non-parametric alternatives may be more reliable.</li>
+    <li><b>Statistical vs economic significance</b>: an edge can pass tests yet be too small to capture. Monday's 0.18% outperformance is $0.18 on a $100 stock. Whether that's exploitable depends on your execution and costs.</li>
+  </ul>
+  <div class="fig">
+    <canvas id="c15" aria-label="Distribution of differences between two samples drawn from the same bag, with the observed difference marked"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls">
+      <label for="n15a">observed difference % <input id="n15a" type="number" value="0.18" step="0.01"></label>
+      <label for="n15b">SD of returns % <input id="n15b" type="number" value="1.0" min="0.01" step="0.1"></label>
+      <label for="n15c">n in signal group <input id="n15c" type="number" value="47" min="2" step="1"></label>
+      <label for="n15d">round-trip cost % <input id="n15d" type="number" value="0.10" min="0" step="0.01"></label>
+    </div>
+    <div class="controls"><button id="b15a" type="button">Mondays 2010</button><button id="b15b" type="button">2% mean, SD 0.5%</button><button id="b15c" type="button">2% mean, SD 5%</button></div>
+    <div class="readout" id="r15"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A courtroom. The defendant (your edge) is presumed not to exist. The data must prove it beyond reasonable doubt. "Not guilty" doesn't mean innocent; it means the evidence wasn't enough. The p-value is how often an innocent world would produce evidence this damning by coincidence.</p></div>
+  <div class="box behind"><b>What's happening behind it (beyond the book: the arithmetic)</b><p>The chart draws 4,000 pairs of samples from the <i>same</i> bag (normal, your SD) and plots the difference in their means: the spread is what luck alone produces. The share of luck-differences at least as large as yours is the simulated p. The readout also gives the formula version: standard error = SD/√n, z = difference/SE, two-sided p from the normal curve. For Mondays (0.18%, SD about 1%, 47 Mondays): SE ≈ 0.146%, z ≈ 1.2, p ≈ 0.22. Grimes' shortcut, difference/SD = 0.18 (under one-fifth of an SD), ignores n; dividing by SE instead adds the sample size he says matters. Both say: not significant. The 2% / 0.5% and 2% / 5% presets reproduce his one-sample example with n = 1 (pure SD units).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Economic significance is your break-even rule in <code>backtest_results_summary.md</code>: p* = (L + c)/(W + L), and "every losing run had a win rate below its p*". The NSE futures momentum result there ("tiny real edge, eaten by ~₹480 charges + slippage") is a statistically real but economically empty edge.</li>
+    <li>Section 23 repeats the variability lesson; section 22 explains why "n" is often smaller than it looks.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 16 ============ -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · LINEAR REGRESSION</div><h2>Magnitude, direction and strength of a relationship</h2></div><span class="chip">pdf p435</span></div>
+  <p>Linear regression helps measure the <b>magnitude, direction and strength</b> of relationships between markets. Grimes stresses this isn't a statistics textbook. Every mathematical tool has limits, pitfalls and blind spots, and most assume things about their inputs. Violate the assumptions and you may get misleading or false results; sometimes, though, an assumption can be broken with little effect. If you'll do analytical work for your own trading, learn the finer points; he recommends Miles and Shevlin (2000) as an introduction that is both accessible and thorough, which he calls a rare combination.</p>
+  <div class="svgwrap">
+  <svg viewBox="0 0 760 120" role="img" aria-label="What a regression reports">
+    <g style="font-size:12px">
+      <rect x="10" y="10" width="235" height="100" rx="6" style="fill:var(--tint);stroke:var(--c1)"/><text x="22" y="34" style="font-weight:600">DIRECTION + MAGNITUDE</text><text x="22" y="58">slope m: up (+) or down (−),</text><text x="22" y="76">and how much y moves per</text><text x="22" y="94">1 unit of x</text>
+      <rect x="262" y="10" width="235" height="100" rx="6" style="fill:var(--tint2);stroke:var(--c2)"/><text x="274" y="34" style="font-weight:600">IS IT REAL?</text><text x="274" y="58">p-value of the slope: chance</text><text x="274" y="76">of a slope this steep if the</text><text x="274" y="94">true line were flat</text>
+      <rect x="514" y="10" width="236" height="100" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/><text x="526" y="34" style="font-weight:600">STRENGTH</text><text x="526" y="58">R²: share of y's variation</text><text x="526" y="76">the line explains (0 to 1);</text><text x="526" y="94">markets: often below 0.20</text>
+    </g>
+  </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A see-saw with springs. The slope is how far your side moves when the other side moves; the p-value is whether there's a see-saw at all or just two people bouncing randomly; R² is how stiff the springs are, how much of your motion comes from the other side rather than your own bouncing.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Sections 17–18 build regression from y = mx + b; section 21 lists the assumptions that break it.</li><li><code>Notes/trading/trading_equations.md</code> §5 (CAPM beta) is this same regression with the stock on y and the market on x.</li></ul></div>
+</section>
+
+<!-- ============ 17 ============ -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · LINEAR EQUATIONS AND ERROR FACTORS</div><h2>y = mx + b, then add noise</h2></div><span class="chip">pdf p436–438 · Figs 11.9, 11.10</span></div>
+  <p>The straight line: <b>y = mx + b</b>. y (vertical axis) is a function of x (horizontal). <b>m</b> is the slope: bigger m, steeper line; m = 0 gives a flat line (every x times 0 is 0); negative m slopes down. <b>b</b> shifts the whole line up or down: it's where the line crosses the y-axis, at x = 0. Grimes sets b = 0 and ignores it; Fig 11.9 shows lines with m = 2, 1 and −0.1. The one intuition to lock in: higher m is steeper; positive slopes up, negative slopes down.</p>
+  <p>Real relationships don't fall on perfect lines: noise and measurement error blur them, sometimes completely. So add one term:</p>
+  <div class="formula">y = mx + b + ε
+ε ~ i.i.d. N(0, σ)      ← each ε drawn independently from a normal curve, mean 0, SD σ</div>
+  <p>Epsilon (ε) is the usual symbol for error in time series. Each point gets its own random ε, so the points jitter above and below the true line; σ sets how far (bigger σ, more spread; Fig 11.2 is the reminder). Every time you draw it, it's different. That one term turns a deterministic equation into a <b>random (stochastic) process</b>, a big leap because you're now dealing with uncertainty. Fig 11.10: same slope m = 1, error SD 0.5 (points hug the line) vs 4.0 (points scatter widely). More variability hides the same underlying line, which is common in market data.</p>
+  <div class="fig">
+    <canvas id="c17" class="tall" aria-label="Points generated from y = mx + epsilon around the true line"></canvas>
+    <div class="legend" id="c17L"></div>
+    <div class="controls">
+      <label for="n17a">slope m <input id="n17a" type="range" min="-2" max="2" step="0.1" value="1"><output id="n17ao">1</output></label>
+      <label for="n17b">error SD σ <input id="n17b" type="range" min="0" max="6" step="0.5" value="4"><output id="n17bo">4</output></label>
+      <label for="chk17"><input id="chk17" type="checkbox"> show Fig 11.9's lines (m = 2, 1, −0.1)</label>
+      <button id="b17" type="button">new ε draws</button>
+    </div>
+    <div class="readout" id="r17"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A straight road seen through a rainy windscreen. The road (the line) hasn't changed; the rain (σ) decides whether you can see it. Turn σ to 0.5 and you see the road; turn it to 4 and you're guessing.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The solid dots are the line plus fresh normal noise at each x. The dashed line is the least-squares line fitted <i>back</i> from those dots (next section). With σ small the fit lands on the true slope; with σ large it can be noticeably off on any single draw. Press "new ε draws" a few times at σ = 4 and watch the fitted slope wander. That wander is why regression output needs a p-value.</p></div>
+</section>
+
+<!-- ============ 18 ============ -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · REGRESSION</div><h2>Does gold drive a gold miner? Slope, p-value, R²</h2></div><span class="chip">pdf p438–443 · Tables 11.4, 11.5 · Figs 11.11, 11.12</span></div>
+  <p>The question: Barrick Gold (NYSE: ABX) explores for, mines and sells gold. Does the gold price influence the stock, and by how much? And what about the U.S. Dollar Index and the stock market (S&amp;P 500 as proxy)? Grimes takes weekly prices from January 2, 2009 to December 31, 2010 and turns each into a return series.</p>
+  <p><b>Start with summary statistics</b> (Table 11.4, 104 weekly returns each). ABX: mean 0.4%, SD 5.8%, worst week −20.0%, best +16.0%. S&amp;P 500: 0.3%, 3.0%, −7.3%, +10.2%. Gold: 0.4%, 2.3%, −5.4%, +6.2%. USD: 0.0%, 1.3%, −4.2%, +3.1%. ABX, the S&amp;P and gold have nearly the same mean, but ABX is far more volatile (it once lost 20% in a week). A series whose SD is this large relative to its mean is very noisy, and that noise can limit any analysis.</p>
+  <p><b>Then look at scatterplots</b> (Fig 11.11, a matrix of every pair). Which ones hide a straight line? Gold/ABX looks like a very clean line; ABX/S&amp;P hints at an upward slope; the USD boxes suggest slight downward slopes; S&amp;P/gold is a shapeless cloud. So expect the strongest links to be ABX–gold and ABX–S&amp;P, and check ABX–USD too.</p>
+  <p><b>How regression works</b>: draw a line through the cloud, measure each point's vertical distance to it (the ε's of the last section, run in reverse), square them (same logic as the SD), and add them up. Try another line, repeat; keep the line with the smallest sum of squared errors: the <b>least-squares</b> fit (Fig 11.12, ABX on y vs gold on x). Grimes notes the trial-and-error picture isn't literally how it's done: this type of regression has a closed-form solution. Nobody does it by hand; a computer does in a fraction of a second what could take weeks by hand.</p>
+  <p><b>Read three numbers.</b> (1) The <b>slope</b> m: direction and strength of the influence; positive means the dependent variable (y) rises as the independent variable (x) rises. (2) Its <b>p-value</b>: approach every analysis expecting <i>no</i> relationship, which would be a flat line; the p-value says how likely a slope this steep would be if there were truly no relationship. (3) <b>R²</b>: how much of the variation in y the x explains, i.e. how well the line fits. In finance R² well below 0.20 is common, and even a small R² can reveal something important. A simple regression assumes x is the only influence on y besides noise, which is unrealistic; markets respond to countless factors, some unknowable. R² says how much you've explained.</p>
+  <p><b>Results</b> (Table 11.5). Gold: slope 1.79, R² 0.53. S&amp;P 500: slope 0.75, R² 0.15. USD: slope −1.53, R² 0.11. All three p-values print as 0.00: they aren't truly zero, just very small and truncated, so all three slopes are statistically significant. The intuition was right. Gold explains 53% of ABX's weekly variation, exceptionally high for so simple a financial model, and the positive slope means higher gold goes with a higher ABX. The S&amp;P link is positive but much weaker (lower R² and slope). The dollar is weaker still, and its slope is negative: a higher dollar index goes with lower ABX.</p>
+  <p>Last caution: regression shows how data series move <b>together</b>, when and how much. It can't explain or quantify a <b>cause</b>, if there is one; that's a much harder question. But if you can run a regression, you never have to take anyone's word about market relationships: you can ask the data yourself.</p>
+  <div class="fig">
+    <canvas id="c18" class="tall" aria-label="Simulated miner vs gold weekly returns with least-squares line and a candidate line with residuals"></canvas>
+    <div class="legend" id="c18L"></div>
+    <div class="controls">
+      <label for="n18a">true slope <input id="n18a" type="range" min="-2" max="3" step="0.1" value="1.8"><output id="n18ao">1.8</output></label>
+      <label for="n18b">stock-specific noise SD % <input id="n18b" type="range" min="0.5" max="10" step="0.5" value="4"><output id="n18bo">4</output></label>
+      <label for="n18c">tilt a candidate line <input id="n18c" type="range" min="-1.5" max="1.5" step="0.1" value="0.6"><output id="n18co">0.6</output></label>
+      <label for="chk18"><input id="chk18" type="checkbox"> add one −20% week</label>
+      <button id="b18" type="button">new 104 weeks</button>
+    </div>
+    <div class="readout" id="r18"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Threading a stiff wire through a swarm of beads so the total squared "pull" of all the beads on the wire is as small as possible. Tilt the wire away from the best spot (the slider) and the pull, the sum of squared residual sticks, always goes up.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The closed form: slope = cov(x, y)/var(x), intercept = mean(y) − slope·mean(x). R² equals the squared correlation for a one-variable regression, and slope = correlation × SD(y)/SD(x). The p-value here uses t = slope/SE(slope) with a normal approximation (fine for n = 104; labelled approximate). Simulated "gold" weeks have SD 2.3% like Grimes' gold; "miner" = slope × gold + stock-specific noise. With the defaults (slope 1.8, noise 4%) R² lands near Grimes' 0.53. Tick the −20% week and watch one point move the slope and R²: section 21's warning.</p></div>
+  <div class="box behind"><b>Worked example: the book's two tables agree (beyond the book)</b><p>slope = √R² × SD(ABX)/SD(x). Gold: √0.53 × 5.8/2.3 = 0.728 × 2.52 ≈ <b>1.84</b> (book: 1.79). S&amp;P: √0.15 × 5.8/3.0 ≈ <b>0.75</b> (book: 0.75). USD: −√0.11 × 5.8/1.3 ≈ <b>−1.48</b> (book: −1.53). The small gaps come from rounding in the printed SDs and R²s. So a 1% weekly gold move went with roughly a 1.8% ABX move.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><code>Notes/trading/trading_equations.md</code> §5 (CAPM beta/alpha): beta is the slope of exactly this regression against the index.</li><li>Section 24: a strong R² still isn't causation; section 26: the right way to compare markets is this, not an overlay chart.</li></ul></div>
+</section>
+
+<!-- ============ 19 ============ -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · MONTE CARLO SIMULATION</div><h2>Can a trailing stop beat a random walk? Simulate it</h2></div><span class="chip">pdf p443–445</span></div>
+  <p>Many finance problems are surprisingly complex: many scenarios, choices at many steps, tens of thousands of branches, small early decisions with outsized later effects, and a market that is extremely random. Deterministic equations can't capture every possibility. With today's computing power the simplest answer is often to build a simulation that captures the important factors, run it, and see what happens.</p>
+  <p><b>Monte Carlo</b> simulation, named by Los Alamos physicists in the 1940s after the casino, follows a basic pattern:</p>
+  <ol class="plain"><li>Define the choices or inputs that create decision branches in the model.</li><li>Define a probability distribution for each branch.</li><li>Run many trials with different random numbers for the inputs.</li><li>Collect and analyze the results.</li></ol>
+  <p>Example: the trader on a random-walk binomial tree. Each node is a coin flip, ±1 (formally i.i.d. on {−1, +1}). Simplest case: loss at −1, profit at +1, one step. Run hundreds of thousands of one-step trials and the P&amp;Ls sum to very nearly zero: the simulation reproduces what probability says should happen.</p>
+  <p>Stop-loss rules on the tree quickly become intractable by hand (too many branches), but Monte Carlo handles any rule set. Maybe skip the profit target and trail a stop under the best P&amp;L, leaving unlimited upside for a lucky run; random data has more runs than people expect, so one good run might pay for many small, controlled losses. Or maybe wider stops help you avoid getting hit by noise (Grimes points out that the tree is random, so it is all noise). These ideas sometimes make sense in real markets, but nothing helps in a random walk. His rule set:</p>
+  <ul class="plain">
+    <li>Binomial tree, fixed step ±1, probability 0.5 at each node.</li>
+    <li>Initial stop at −25.</li>
+    <li>The stop trails under the high-water mark of the P&amp;L and only ever moves up. The book gives the trail as 50 points, but its own example (first step +1 moves the stop to −24) is a 25-point trail.</li>
+    <li>100,000 runs, recording each run's high, low and ending P&amp;L.</li>
+  </ul>
+  <p><b>Result</b>: average P&amp;L <b>0.02</b>. An edge? Careful: an average of exactly zero would itself be unlikely; you must consider the variation. The SD of ending P&amp;Ls was <b>15.2</b>. As a rough rule of thumb you'd start to suspect significance at a mean two or more SDs from zero; 0.02 against 15.2 is deep in the noise. No evidence that the trailing stop creates an edge. Monte Carlo is a good alternative to deterministic methods when a problem has many moving parts or is very path-dependent: an advanced tool, worth understanding in every market and timeframe.</p>
+  <div class="fig">
+    <canvas id="c19" aria-label="Histogram of ending P&amp;L across simulated runs"></canvas>
+    <div class="legend" id="c19L"></div>
+    <canvas id="c19b" class="short" aria-label="A few simulated paths with their trailing stops"></canvas>
+    <div class="legend" id="c19bL"></div>
+    <div class="controls">
+      <label for="n19a">initial stop <input id="n19a" type="range" min="5" max="50" step="5" value="25"><output id="n19ao">25</output></label>
+      <label for="n19b">trail distance <input id="n19b" type="range" min="5" max="50" step="5" value="25"><output id="n19bo">25</output></label>
+      <label for="n19c">max steps per run <input id="n19c" type="range" min="50" max="1000" step="50" value="250"><output id="n19co">250</output></label>
+      <label for="sel19">runs <select id="sel19"><option value="10000">10,000</option><option value="50000">50,000</option><option value="100000">100,000</option></select></label>
+      <button id="b19" type="button">run trailing-stop simulation</button>
+      <button id="b19b" type="button">run the one-step ±1 tree</button>
+    </div>
+    <div class="readout" id="r19"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Testing a roulette "system" by playing it a hundred thousand times on a simulator before risking a rupee. If the average result is a hair from zero and the swings are huge, the system is a ritual, not an edge.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each run walks ±1 until the P&amp;L touches the stop (stop = max(initial stop, high-water mark − trail)) or the step limit ends the run. The book doesn't say how long a run lasts, so the limit is your choice. With 250 steps the SD comes out close to his 15.2, but that is a guess at his set-up, not a reproduction of it; the mean hugs zero whatever you pick. Why: a fair coin is a martingale, so no rule for <i>when</i> to stop can change the expected P&amp;L. The trailing stop only reshapes the distribution: many small losses near the stop, a long right tail of lucky runs. The readout reports mean, SD, the standard error of the mean (SD/√runs) and mean ÷ SE; that last number is the honest test, since with 100,000 runs the SE is about 0.05.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The book says the binomial-tree trader appeared "in earlier chapters" (the order of the original 2012 book); in this workbook the binomial tree is worked through later, in Ch.15 (pdf p538–541).</li>
+    <li>Your backtests compared strategies with 20 random-entry or random-portfolio runs (<code>backtest_results_summary.md</code>): a small Monte Carlo control group.</li>
+  </ul></div>
+</section>
+
+<!-- ============ 20 ============ -->
+<section class="plate" id="s20">
+  <div class="plate-head"><div><div class="secno">20 · A WARNING AGAINST SLOPPY STATISTICS</div><h2>Think first, and know your tools</h2></div><span class="chip">pdf p445–446</span></div>
+  <p>Applying quantitative tools to market data is not simple; some mistakes are obvious and some aren't. Grimes' first point is so simple it's often skipped: <b>think carefully before doing anything</b>. Define the problem and make the questions precise. Many errors come from launching into number-crunching without thinking the process through, and having more advanced tools can make you <i>more</i> prone to this. Second: <b>understand the tools you use</b>. Statistics software offers a smorgasbord of techniques; trying six you don't understand is asking for trouble. The seven mistakes that follow are common in market analysis: guard against them in your own work and look for them in others'.</p>
+  <div class="flow" role="list" aria-label="Order of work">
+    <div class="row"><span class="tag">first</span><span class="node key">think: what might be happening, and why?</span><span class="arr">→</span><span class="node key">one precise question</span><span class="arr">→</span><span class="node">a tool you understand</span><span class="arr">→</span><span class="node">test</span></div>
+    <div class="row"><span class="tag">not</span><span class="node">load data</span><span class="arr">→</span><span class="node">try every technique</span><span class="arr">→</span><span class="node">keep what looks good</span><span class="arr">→</span><span class="node" style="border-color:var(--sell)">story invented afterwards</span></div>
+    <div class="row"><span class="tag">pitfalls</span><span class="node">21 tool limits</span><span class="node">22 real sample size</span><span class="node">23 variability</span><span class="node">24 causation</span><span class="node">25 too many cuts</span><span class="node">26 overlays</span><span class="node">27 tiny-n %</span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A well-equipped kitchen doesn't make a cook. Someone who throws every spice in because the rack is full makes worse food than someone with salt, pepper and a plan.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>The book lists the pitfalls under seven headings (sections 21–27 here); the first two points of this section are the general rule behind all of them.</li></ul></div>
+</section>
+
+<!-- ============ 21 ============ -->
+<section class="plate" id="s21">
+  <div class="plate-head"><div><div class="secno">21 · NOT CONSIDERING LIMITATIONS OF THE TOOLS</div><h2>Every tool has assumptions; markets break them</h2></div><span class="chip">pdf p446–447</span></div>
+  <p>No tool is perfect. Most do their job well most of the time but give biased or misleading results in special situations, and since market data are full of extreme values and randomness, those situations aren't rare. If you use these tools, learn everything you can about them.</p>
+  <p>Most tools assume things about the input. <b>Linear regression</b> assumes a real relationship exists, that it's a straight line, and that the errors are i.i.d. N(0, σ). The relationship might be better described by a curve, or a single outlier might swing the slope. Then results are biased at best and seriously misleading at worst.</p>
+  <p>Any result truly applies only to the <b>sample examined</b>. A pattern in 50 stocks over five years may or may not hold in other stocks or other years. Many technical analysts assume the same patterns work in every asset class (equities, futures, forex, fixed income); maybe, maybe not. So instead of claiming an experiment proves something, say that in the sample you examined you found evidence of it. The wording shapes your thinking.</p>
+  <p>Some trading questions are <b>epistemological</b>: what do we really know, how do we know it, how do we learn? Traders hunting the next big win usually ignore these. Grimes asks you to think about them and about the limits of market knowledge: we never know as much as we think, we're never as good as we think, and the market will remind us when we forget. Approach the work with humility; much more remains undiscovered than we know.</p>
+  <div class="fig">
+    <canvas id="c21" aria-label="A straight-line fit applied to data that break regression's assumptions"></canvas>
+    <div class="legend" id="c21L"></div>
+    <div class="controls"><label for="sel21">data <select id="sel21"><option value="ok">assumptions hold</option><option value="curve">relationship is a curve</option><option value="outlier">one extreme outlier</option><option value="none">no relationship + one outlier</option></select></label><button id="b21" type="button">new data</button></div>
+    <div class="readout" id="r21"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch11_bathroom_scale_car.svg" alt="A bathroom scale shows a confident number under a small car, though it is far beyond what the scale can measure." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A bathroom scale is accurate for people. Weigh a car on it and it still shows a number, confidently. The tool doesn't know it's out of its depth; you have to.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Least squares always returns a line and an R², whatever you feed it. With a U-shaped relationship it reports a near-flat slope and a low R² although y depends strongly on x. With pure noise plus one far-out point it can report a steep, "significant" slope that comes entirely from that one point, because squaring gives the far point a huge say. Plot the data and the residuals before trusting the numbers.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Your 15-min ORB result in <code>backtest_results_summary.md</code> is the "sample examined" lesson in action: profitable on Nifty 50, then all 43 settings lost on Nifty 200 stocks.</li></ul></div>
+</section>
+
+<!-- ============ 22 ============ -->
+<section class="plate" id="s22">
+  <div class="plate-head"><div><div class="secno">22 · NOT CONSIDERING ACTUAL SAMPLE SIZE</div><h2>Correlated events shrink your real sample</h2></div><span class="chip">pdf p447–448</span></div>
+  <p>Most statistical tools give better answers with bigger samples. Very specific conditions may leave only one or two qualifying events. (That's the problem with studies comparing the current market to particular past years: sample size = 1.) And many markets are tightly <b>correlated</b>: if stocks are up, most stocks are up that day; if the dollar is strong, most major currencies against it are weak. Most tools assume independent events. If you study opening gaps and 60% of your stocks gapped down on the same day, how independent are those events? Not independent. Across hundreds of stocks, expect many events to be highly correlated, so the real sample may be <b>hundreds of times smaller</b> than it looks.</p>
+  <div class="fig">
+    <canvas id="c22" aria-label="Distribution of the share of 200 simulated stocks that fell on each day"></canvas>
+    <div class="legend" id="c22L"></div>
+    <div class="controls"><label for="n22">stock-to-stock correlation <input id="n22" type="range" min="0" max="0.9" step="0.05" value="0.35"><output id="n22o">0.35</output></label></div>
+    <div class="readout" id="r22"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Polling 200 people about the weather, all standing in the same street. You have 200 answers but really one observation: it's raining there. Correlated stocks on one day are 200 people on one street.</p></div>
+  <div class="box behind"><b>What's happening behind it (beyond the book: the formula)</b><p>Each simulated stock's daily return = √ρ × (market factor) + √(1 − ρ) × (own noise), so any two stocks have correlation ρ. With ρ = 0, the share of stocks falling on a day stays near 50% (±3.5%); "60% fell together" almost never happens. With ρ around 0.3–0.4 it's routine. A standard rule of thumb for N equally correlated events: effective sample size ≈ N / (1 + (N − 1)ρ). For 200 stocks with ρ = 0.35 that's about 2.8 independent observations per day, not 200, roughly 70 times smaller: Grimes' "hundreds of times smaller" for bigger universes and stronger correlation.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Your Nifty 200 intraday tests count trades across many stocks on the same days; the 5-min ORB lead (~170 trades in 3.5 months, <code>backtest_results_summary.md</code>) has fewer independent observations than the trade count suggests.</li></ul></div>
+</section>
+
+<!-- ============ 23 ============ -->
+<section class="plate" id="s23">
+  <div class="plate-head"><div><div class="secno">23 · NOT ACCOUNTING FOR VARIABILITY</div><h2>A difference means nothing without its spread</h2></div><span class="chip">pdf p448</span></div>
+  <p>Worth repeating: noticing that two things differ is never enough; notice how much each varies. A 2% difference between two means might be significant if each has an SD of half a percent, and is probably meaningless if each has an SD of 5%. If two sets differ but both have a large random component, the difference may well be chance. Always consider variability, perhaps formally through a significance test.</p>
+  <div class="fig">
+    <canvas id="c23" class="short" aria-label="Two distributions 2 percent apart with adjustable spread"></canvas>
+    <div class="legend" id="c23L"></div>
+    <div class="controls"><label for="n23">SD of each group % <input id="n23" type="range" min="0.25" max="6" step="0.25" value="0.5"><output id="n23o">0.5</output></label></div>
+    <div class="readout" id="r23"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two archers whose average arrow is 2 cm apart. If both group their arrows within a few millimetres, they're aiming at different points. If their arrows land all over the target, a 2 cm gap in averages tells you nothing.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The gap in SD units (2/SD) is what matters: 4 SDs at SD 0.5%, 0.4 SD at SD 5%. The readout also shows how much the two curves overlap (beyond the book): at SD 0.5% they barely touch; at 5% they're almost the same curve.</p></div>
+</section>
+
+<!-- ============ 24 ============ -->
+<section class="plate" id="s24">
+  <div class="plate-head"><div><div class="secno">24 · ASSUMING THAT CORRELATION EQUALS CAUSATION</div><h2>Storks don't bring babies</h2></div><span class="chip">pdf p448–449</span></div>
+  <p>The classic statistics story: in a Dutch town, early statisticians found a strong correlation between storks nesting on roofs and newborn babies in those houses. The birds didn't cause the babies. The missing link was <b>heat</b>: homes with newborns were much more likely to keep fires burning in the hearth, and the storks were drawn to the warmth in the bitter winter cold. Flimsy logic like this creeps into market thinking. Data analysis doesn't replace common sense and deep thought. Two things moving together may have a real link, or not; the link may be complex and two-way, or an unseen <b>third variable</b> may drive both. In markets relationships are complex, causation usually runs both ways, and unaccounted-for third variables are the norm, not the exception. Think hard about possible links, and take no analysis at face value.</p>
+  <div class="svgwrap">
+  <svg viewBox="0 0 760 170" role="img" aria-label="Newborn leads to fire leads to warmth leads to storks; storks and babies only correlated">
+    <defs><marker id="a24" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--c2)"/></marker></defs>
+    <g style="font-size:12px">
+      <rect x="10" y="20" width="150" height="46" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/><text x="22" y="48">newborn in house</text>
+      <rect x="215" y="20" width="160" height="46" rx="6" style="fill:var(--tint);stroke:var(--c1)"/><text x="227" y="40">fire kept burning</text><text x="227" y="58">(hidden variable)</text>
+      <rect x="430" y="20" width="140" height="46" rx="6" style="fill:var(--tint);stroke:var(--c1)"/><text x="442" y="48">warm roof</text>
+      <rect x="620" y="20" width="130" height="46" rx="6" style="fill:var(--tint3);stroke:var(--c3)"/><text x="632" y="48">storks nest</text>
+      <line x1="160" y1="43" x2="213" y2="43" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a24)"/>
+      <line x1="375" y1="43" x2="428" y2="43" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a24)"/>
+      <line x1="570" y1="43" x2="618" y2="43" style="stroke:var(--c2);stroke-width:2" marker-end="url(#a24)"/>
+      <path d="M85,66 C85,140 685,140 685,68" style="fill:none;stroke:var(--sell);stroke-dasharray:6 4"/>
+      <text x="250" y="130" style="fill:var(--sell)">what the statisticians saw: storks ↔ babies (correlation only)</text>
+      <text x="250" y="158" style="fill:var(--muted)">bitter winter cold makes the warmth matter to the storks</text>
+    </g>
+  </svg>
+  </div>
+  <div class="fig">
+    <canvas id="c24" aria-label="Two series driven by a hidden factor: raw and controlled correlation"></canvas>
+    <div class="legend" id="c24L"></div>
+    <div class="controls"><label for="n24">strength of hidden driver <input id="n24" type="range" min="0" max="3" step="0.1" value="1.5"><output id="n24o">1.5</output></label><label for="chk24"><input id="chk24" type="checkbox"> remove the hidden driver's effect</label></div>
+    <div class="readout" id="r24"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch11_icecream_drownings_summer.svg" alt="A hot summer sun drives both an ice-cream cart&#x27;s queue and crowds at a swimming lake, linking the two only through the heat." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>Ice-cream sales and drownings rise together. Ice cream doesn't drown anyone; summer drives both. In markets "summer" is usually the overall market, rates, or the dollar.</p></div>
+  <div class="box behind"><b>What's happening behind it (beyond the book: a simulation)</b><p>Two series X and Y never touch each other; both are built as (hidden driver × strength) + their own noise. Raise the driver's strength and their correlation climbs toward 1. Tick "remove": each is regressed on the driver and only the leftovers are compared, and the correlation collapses to about zero. That's what "controlling for a third variable" means, and it only works if you know the variable exists.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 18: ABX's R² of 0.53 with gold is a relationship, not proof that gold "causes" ABX (though here the business link is obvious).</li><li>Your pairs-trading test lost even before costs (<code>backtest_results_summary.md</code>): co-movement alone wasn't a tradable link.</li></ul></div>
+</section>
+
+<!-- ============ 25 ============ -->
+<section class="plate" id="s25">
+  <div class="plate-head"><div><div class="secno">25 · TOO MANY CUTS THROUGH THE SAME DATA</div><h2>Every extra condition flatters the past</h2></div><span class="chip">pdf p449–450</span></div>
+  <p>System developers know <b>over-optimization</b>: test a buy/sell idea, it doesn't make money, so try other values until some set looks good. Try enough combinations and something will work, and it's useless going forward because it's only chance. Discretionary traders and analysts fall into the same trap more subtly: the more times you evaluate the same data with more qualifying conditions, the more the result is shaped by this hidden optimization.</p>
+  <p>Grimes' example: what happens after the market closes down four days in a row? You get an answer. Then: does it matter which side of the 50-day moving average it's on? Then the 100- and 200-day too. Then: is the fourth day in the second half of the week? Each cut removes observations, shrinks the sample and keeps the cases that best fit your theory. Start with <b>4,000</b> events, narrow to <b>2,500</b>, then <b>800</b>, end with <b>200</b> that seem to support the point. With the best intentions, you've fitted the question to the data, and the answer is much weaker than it looks.</p>
+  <p><b>Defences.</b> Start with careful thought about what might be happening and what effects to expect. Don't test a thousand patterns and then test the promising ones further; that's the worst statistical practice. Start with an idea, think it through, design a question and a test, then test. One or two qualifying conditions are reasonable; stop there. And hold data back for <b>out-of-sample testing</b>: with five years, analyze four and keep one completely pristine. Don't touch it, look at it, or consider it; for practical purposes it doesn't exist. When you're comfortable with your results, run the same analysis on it once. Similar results suggest a robust idea; different results mean either the effect wasn't stable over time (so it wouldn't have been profitable) or you over-optimized. Either way it's cheaper to learn that out-of-sample than in the market. The out-of-sample set is good for <b>one shot</b>: once touched, it becomes part of the test set. Be very confident before you use it.</p>
+  <div class="fig">
+    <canvas id="c25" aria-label="In-sample average after each cut versus out-of-sample average on fresh data"></canvas>
+    <div class="legend" id="c25L"></div>
+    <div class="controls"><label for="n25">cuts <input id="n25" type="range" min="0" max="5" step="1" value="4"><output id="n25o">4</output></label><button id="b25" type="button">new random data</button></div>
+    <div class="readout" id="r25"></div>
+    <div class="readout" id="r25b"></div>
+  </div>
+  <div class="svgwrap">
+  <svg viewBox="0 0 760 90" role="img" aria-label="Four years analyzed, one year held out for one shot">
+    <g style="font-size:12px">
+      <rect x="10" y="20" width="140" height="40" rx="4" style="fill:var(--tint2);stroke:var(--c2)"/><text x="22" y="45">year 1 · analyze</text>
+      <rect x="155" y="20" width="140" height="40" rx="4" style="fill:var(--tint2);stroke:var(--c2)"/><text x="167" y="45">year 2 · analyze</text>
+      <rect x="300" y="20" width="140" height="40" rx="4" style="fill:var(--tint2);stroke:var(--c2)"/><text x="312" y="45">year 3 · analyze</text>
+      <rect x="445" y="20" width="140" height="40" rx="4" style="fill:var(--tint2);stroke:var(--c2)"/><text x="457" y="45">year 4 · analyze</text>
+      <rect x="590" y="20" width="160" height="40" rx="4" style="fill:var(--paper);stroke:var(--sell);stroke-dasharray:5 3"/><text x="602" y="45">year 5 · locked</text>
+      <text x="590" y="80" style="fill:var(--sell)">open once, at the very end</text>
+    </g>
+  </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Drawing the target after shooting the arrow. Each "qualifying condition" is a redraw of the target around wherever the arrows happened to land. The locked year is a target painted before you shoot.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The simulation makes 4,000 random "events" whose next-day returns have <b>no edge</b> (mean 0, SD 2%), each tagged with six yes/no attributes that are also pure noise (like "above the 50-day MA"). At each cut the analyst keeps whichever attribute/side has the best average so far, the honest-looking "does it matter if…?" step. The in-sample average climbs and the sample shrinks, as in Grimes' 4,000 → 200. Then the same filter is applied once to 4,000 fresh events: the edge vanishes. The pooled line averages 300 independent runs so you aren't fooled by one lucky seed.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><code>backtest_results_summary.md</code>: "parameters chosen on earlier data and judged on later data"; the weekly pullback had all 8 settings profitable out-of-sample, while the Currency Pros 15-min lead had only 2 of 7 settings positive in both halves, the pattern this section warns about.</li></ul></div>
+</section>
+
+<!-- ============ 26 ============ -->
+<section class="plate" id="s26">
+  <div class="plate-head"><div><div class="secno">26 · MULTIPLE MARKETS ON ONE CHART</div><h2>Overlay charts lie about correlation</h2></div><span class="chip">pdf p450–453 · Figs 11.13, 11.14</span></div>
+  <p>Many traders overlay two markets (a stock and an index, rates and commodities, anything) and look for turning points in one that confirm or explain the other. Media, blogs and even professional research do it to give a theory a quantitative look. It nearly always looks convincing and is usually <b>worthless</b>. Any two markets on one chart will have two or three turning points, and you can almost always find a case where one seems to lead. The excuse that it is only to get a rough idea is sloppy thinking: what if it's the wrong idea? Better tools exist.</p>
+  <p>Fig 11.13 overlays Harley-Davidson (NYSE: HOG) on the Financial Sector index (NYSE: XLF): they track nearly perfectly, with small deviations that quickly correct and tops and bottoms at the same time. Fig 11.14 overlays Bank of America (BAC) on XLF over the same period: the lines drift apart visibly. A casual reader would bet HOG is more correlated with XLF. Wrong: the <b>BAC/XLF correlation is 0.88</b>, <b>HOG/XLF only 0.67</b>. There's a logical reason: BAC is a major component of XLF, so the two are linked mathematically. The visual impression is completely misleading here, and in many other cases.</p>
+  <div class="fig">
+    <canvas id="c26" aria-label="Simulated index overlaid with a stock, each scaled to fill the chart"></canvas>
+    <div class="legend" id="c26L"></div>
+    <div class="controls">
+      <label for="sel26">overlay <select id="sel26"><option value="b">stock B (different business)</option><option value="a">stock A (big index component)</option></select></label>
+      <label for="chk26"><input id="chk26" type="checkbox"> reveal daily-return correlations</label>
+      <button id="b26" type="button">new simulated period</button>
+    </div>
+    <div class="readout" id="r26"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two people walking a dog. One holds the leash tight but walks slowly downhill; the other has a slack leash but happens to walk the same route. From a distance the second looks more "connected" to the dog. The leash, not the route, is the correlation.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>An overlay compares <b>levels</b>, and each line is usually stretched to fill the chart (dual axes). Correlation that matters for trading is between <b>returns</b>, day by day. In the simulation stock A's daily moves are almost the index's (it's a big component, plus a little noise) but it carries its own steady downward drift, so its line peels away. Stock B has weaker daily co-movement but a similar drift, so its stretched line hugs the index. Flip the overlay, guess which is more correlated, then reveal. The pooled readout (300 periods) shows how often the eye picks the wrong one. All of this is my simulation, built to mirror Grimes' HOG/BAC point; it is not his data.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 18: regression and correlation of returns are the "far better techniques" Grimes means.</li></ul></div>
+</section>
+
+<!-- ============ 27 ============ -->
+<section class="plate" id="s27">
+  <div class="plate-head"><div><div class="secno">27 · PERCENTAGES FOR SMALL SAMPLE SIZES</div><h2>Under 20 cases, say "X out of Y"</h2></div><span class="chip">pdf p453–454</span></div>
+  <p>Be suspicious of percentages on tiny samples. With three cases, reporting that 67% of them were positive is silly, and the same applies to somewhat larger samples. There's no exact break point, but in general results from samples <b>smaller than 20</b> should be shown as <b>"X out of Y"</b>, not a percentage. Small samples are also best studied as <b>case studies</b>: with few results you can dig into each one, its context and other influences, and understand the story behind the data. Be careful with conclusions: they may have been very unusual situations that don't generalize. Be especially suspicious of small samples from someone else: maybe they didn't examine enough data, or it was a quick back-of-the-envelope study (possibly useful, but needing more work). Worst case, the small sample is the leftover of too many cuts through the data, keeping only the examples that fit.</p>
+  <div class="fig">
+    <canvas id="c27" class="short" aria-label="Binomial distribution of observed win percentages for a given true rate and sample size"></canvas>
+    <div class="legend" id="c27L"></div>
+    <div class="controls">
+      <label for="n27a">true win rate % <input id="n27a" type="range" min="10" max="90" step="5" value="50"><output id="n27ao">50</output></label>
+      <label for="n27b">sample size <input id="n27b" type="range" min="3" max="200" step="1" value="3"><output id="n27bo">3</output></label>
+    </div>
+    <div class="readout" id="r27"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A batter who's 2 for 3 in his first game isn't a .667 hitter. Everyone knows that in sport, then forgets it when a trading setup is 2 for 3.</p></div>
+  <div class="box behind"><b>What's happening behind it (beyond the book: binomial arithmetic)</b><p>The bars are the exact binomial probabilities of each observed win count. With a true 50% rate and 3 trades, you'd see 67% or more half the time (2 or 3 wins: 3/8 + 1/8). The middle-95% range of the observed percentage narrows only like 1/√n: roughly (normal approximation) ±57 points at n = 3, ±22 at n = 20, ±7 at n = 200. Below 20 the percentage's extra digits are pure decoration, hence "X out of Y".</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><code>backtest_results_summary.md</code> already reports settings in this form ("17 of 20 settings profitable", "2 of 7 settings positive in both halves").</li><li>Section 14's percentages hide counts like 28 of 47 Mondays.</li></ul></div>
+</section>
+
+<!-- ============ 28 ============ -->
+<section class="plate" id="s28">
+  <div class="plate-head"><div><div class="secno">28 · SUMMARY</div><h2>Without these tools, the trader is blind</h2></div><span class="chip">pdf p454</span></div>
+  <p>Quantitative analysis of market data is a rigorous discipline with one goal: to understand the market's movements better. Many traders think these tools are too abstract or complex for an individual. Grimes' answer: without them you're blind, and you can't separate a valid edge from random noise. The next chapter applies them to find verifiable edges.</p>
+  <div class="flow" role="list" aria-label="Chapter in one line">
+    <div class="row"><span class="node key">standardize</span><span class="arr">→</span><span class="node key">describe (mean + median, SD + IQR)</span><span class="arr">→</span><span class="node key">compare vs control</span><span class="arr">→</span><span class="node key">ask "could it be luck?"</span><span class="arr">→</span><span class="node key">check out-of-sample, once</span></div>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch12_test_universe_and_methodology.html">Ch.12 Test universe &amp; methodology</a>: Grimes uses exactly these tools to test Fibonacci retracements and moving averages as support/resistance, and finds no support for either.</li></ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. A stock fell 10% then rose 10%. Why is it still down, and which kind of return would have added to zero?</summary><p>Simple returns multiply: 0.9 × 1.1 = 0.99, a 1% loss, because the rise is on a smaller base. Log returns add: ln(0.9) + ln(1.1) ≈ −0.010, which correctly gives the −1% net. (Section 02.)</p></details>
+  <details><summary>2. Prev close 200, today high 199, low 195. Range and true range?</summary><p>Range = 4. The previous close is above today's high, so true range = 200 − 195 = 5: the overnight gap is included because a holder was exposed to it. (Section 04.)</p></details>
+  <details><summary>3. Why does Grimes call ATR% "apples to oranges"?</summary><p>It measures a close-to-close change with a yardstick built mainly from the high and low of the sessions. (Section 04.)</p></details>
+  <details><summary>4. A daily return SD of 2% is what annualized historical volatility, and what does that number mean?</summary><p>2% × √252 ≈ 31.7%. A one-SD annual move at current volatility; reading it as "±31.7% in a year" assumes normal, zero-mean returns, which Grimes says markets don't have. (Section 05.)</p></details>
+  <details><summary>5. Large stable stocks show several 5–6 "SD" spikes a year on Grimes' tool. Give two reasons that isn't a contradiction.</summary><p>The SD comes from only 20 days, so the ruler is noisy and often too short; and real returns have fat tails and volatility clusters, so a shock after a quiet stretch is many "SDs" of the quiet period. The tool is for comparing surprise across assets, not textbook probability. (Sections 06, 08.)</p></details>
+  <details><summary>6. You add one huge value to a data set. Which of mean, median, SD and IQR move a lot, and what is each one good for?</summary><p>Mean and SD jump (SD the most, because of squaring); median and IQR barely move. The mean/SD jump flags that an outlier arrived; median/IQR describe the typical case. Use both pairs. (Sections 09–10.)</p></details>
+  <details><summary>7. Why did 10,000 Cauchy draws give a worse estimate of the mean than 100?</summary><p>The Cauchy has no mean; bigger samples just catch bigger tail events, and the average of n Cauchy draws is as spread out as one draw. The median is defined and converges. (Section 12.)</p></details>
+  <details><summary>8. In Grimes' view, what is the "population" for a market's returns, and why does it matter?</summary><p>All possible returns: what happened, what will happen and what could happen. All history is only a sample, so even a century of data can miss what the tails hold. (Section 11.)</p></details>
+  <details><summary>9. Mondays 2010: +0.22% vs +0.04% for all days, SD over 1%, about 47 Mondays. Significant? Economically meaningful?</summary><p>Not significant: the 0.18% gap is under one-fifth of an SD (and about 1.2 standard errors). Even if it were real, 0.18% ($0.18 on $100) may not survive costs and execution. And 2009 didn't repeat the pattern. (Sections 14–15.)</p></details>
+  <details><summary>10. A p-value of 0.30. What can you say, and what must you not say?</summary><p>You found insufficient evidence to reject the null. You must not say you proved there is no difference. (Section 15.)</p></details>
+  <details><summary>11. ABX on gold: slope 1.79, R² 0.53, p ≈ 0. Interpret each, and name one thing the regression can't tell you.</summary><p>A 1% weekly gold move went with about 1.8% in ABX; gold explained 53% of ABX's weekly variation (very high for finance); the slope is very unlikely if there were no relationship. It can't establish cause. (Section 18.)</p></details>
+  <details><summary>12. A trailing-stop rule on a ±1 random walk returns +0.02 average over 100,000 runs with SD 15.2. Edge?</summary><p>No. The mean is a tiny fraction of an SD (and about 0.4 standard errors of the mean). On a fair random walk no exit rule can change expected P&amp;L; it only reshapes the distribution. (Section 19.)</p></details>
+  <details><summary>13. 200 stocks gap down on the same morning. How many independent observations is that?</summary><p>Far fewer than 200: correlated events share one cause (the market). With pairwise correlation ρ, effective N ≈ N/(1 + (N − 1)ρ), only a handful at typical ρ. (Section 22.)</p></details>
+  <details><summary>14. You narrowed 4,000 events to 200 with four "does it matter if…?" questions and the edge got stronger. What do you do?</summary><p>Suspect over-fitting: each cut kept the cases fitting your theory. Go back to one or two conditions you'd have predicted in advance, and test once on held-out data you've never looked at. (Section 25.)</p></details>
+  <details><summary>15. On an overlay chart HOG tracks XLF better than BAC does. Which has the higher correlation, and why might the chart mislead?</summary><p>BAC (0.88 vs 0.67); it's a big XLF component. Overlays compare stretched price levels; drift differences make a tightly correlated stock look disconnected. Measure correlation of returns instead. (Section 26.)</p></details>
+</section>
+
+<footer>Built from Adam Grimes, <i>The Art and Science of Trading: Course Workbook</i> (2017), Chapter 11 "Tools for Quantitative Analysis of Market Data" (PDF pages 412–454), summarised in my own words; the only direct quote is the risk manager's line Grimes reports. The book's real-market figures (LULU/SPY, DJIA weekdays 2009–2010, ABX regression, HOG/BAC/XLF correlations, the Monte Carlo result) are quoted as the book's. Every chart on this page uses simulated data generated in your browser; simulations illustrate methods and are not evidence about real markets. Items marked "beyond the book" are my additions, including corrections of apparent misprints (pdf p414, p416, p423, p445). Education, not investment advice.</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+
+  // =====================================================================
+  // ---------- chapter 11 helpers ----------
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f, show) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = show ? show(+el.value) : el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = show ? show(+el.value) : el.value; }
+  const val = (id) => +$(id).value;
+  const on = (id, ev, f) => $(id).addEventListener(ev, f);
+  const pct = (v, d = 2) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+
+  function cvs(id) {
+    const cv = $(id); if (!cv) return null;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.font = '11px ' + css('mono'); return { g, W, H };
+  }
+  function legend(id, items) { const L = $(id); if (L) L.innerHTML = items.map(([t, c, dash]) => `<span style="--sw:${colorOf(c)}${dash ? ';opacity:.8' : ''}">${t}</span>`).join(''); }
+  // xy frame with ticks; logx/logy use log10 space
+  function frame(C, xr, yr, o) {
+    o = o || {}; const { g, W, H } = C;
+    const padL = o.padL != null ? o.padL : 46, padR = o.padR != null ? o.padR : 12, padT = 10, padB = o.xlab ? 34 : 22;
+    const tx = (v) => (o.logx ? Math.log10(v) : v), ty = (v) => (o.logy ? Math.log10(v) : v);
+    const ax0 = tx(xr[0]), ax1 = tx(xr[1]), ay0 = ty(yr[0]), ay1 = ty(yr[1]);
+    const X = (v) => padL + (tx(v) - ax0) / (ax1 - ax0) * (W - padL - padR);
+    const Y = (v) => padT + (ay1 - ty(v)) / (ay1 - ay0) * (H - padT - padB);
+    g.lineWidth = 1; g.strokeStyle = colorOf('rule', 0.9); g.fillStyle = colorOf('muted');
+    const ticks = (a0, a1, log, n) => (log ? (() => { const out = []; for (let p = Math.ceil(a0); p <= Math.floor(a1); p++) out.push(Math.pow(10, p)); return out; })() : niceTicks(a0, a1, n));
+    const fx = o.fx || fmt, fy = o.fy || fmt;
+    ticks(ay0, ay1, o.logy, o.ny || 4).forEach((t) => { const y = Y(t); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); const s = fy(t); g.fillText(s, padL - 5 - g.measureText(s).width, y + 4); });
+    ticks(ax0, ax1, o.logx, o.nx || 6).forEach((t) => { const x = X(t); g.beginPath(); g.moveTo(x, padT); g.lineTo(x, H - padB); g.stroke(); const s = fx(t); g.fillText(s, x - g.measureText(s).width / 2, H - padB + 14); });
+    if (o.zeroY && yr[0] < 0 && yr[1] > 0) { g.strokeStyle = colorOf('muted', 0.8); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); }
+    if (o.zeroX && xr[0] < 0 && xr[1] > 0) { g.strokeStyle = colorOf('muted', 0.8); g.beginPath(); g.moveTo(X(0), padT); g.lineTo(X(0), H - padB); g.stroke(); }
+    if (o.xlab) { g.fillStyle = colorOf('muted'); g.fillText(o.xlab, padL, H - 4); }
+    if (o.ylab) { g.fillStyle = colorOf('muted'); g.fillText(o.ylab, padL + 4, padT + 12); }
+    return { X, Y, g, W, H, padL, padR, padT, padB };
+  }
+  function polyline(F, xs, ys, col, w, dash) { const { g, X, Y } = F; g.strokeStyle = colorOf(col); g.lineWidth = w || 1.6; g.setLineDash(dash || []); g.beginPath(); let pen = false; for (let i = 0; i < xs.length; i++) { const yv = ys[i]; if (yv == null || !isFinite(yv)) { pen = false; continue; } const x = X(xs[i]), y = Y(yv); if (!pen) { g.moveTo(x, y); pen = true; } else g.lineTo(x, y); } g.stroke(); g.setLineDash([]); }
+  function dot(F, x, y, col, r, hollow) { const { g, X, Y } = F; g.beginPath(); g.arc(X(x), Y(y), r || 2.5, 0, Math.PI * 2); if (hollow) { g.strokeStyle = colorOf(col); g.lineWidth = 1; g.stroke(); } else { g.fillStyle = colorOf(col); g.fill(); } }
+  function clipTo(F) { const { g, W, H, padL, padR, padT, padB } = F; g.save(); g.beginPath(); g.rect(padL, padT, W - padL - padR, H - padT - padB); g.clip(); }
+
+  // stats
+  const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+  const sdPop = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length); };
+  const sdSamp = (a) => { const m = mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / (a.length - 1)); };
+  function quant(a, p) { const s = [...a].sort((x, y) => x - y); const h = (s.length - 1) * p, lo = Math.floor(h); return s[lo] + (h - lo) * (s[Math.min(lo + 1, s.length - 1)] - s[lo]); }
+  const median = (a) => quant(a, 0.5);
+  function Phi(x) { const t = 1 / (1 + 0.2316419 * Math.abs(x)); const d = 0.3989423 * Math.exp(-x * x / 2); const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return x > 0 ? 1 - p : p; }
+  function upper(x) { if (x < 3) return 1 - Phi(x); const f = Math.exp(-x * x / 2) / Math.sqrt(2 * Math.PI) / x, x2 = x * x; return f * (1 - 1 / x2 + 3 / (x2 * x2) - 15 / (x2 * x2 * x2)); }
+  const npdf = (x, s) => Math.exp(-0.5 * (x / s) ** 2) / (s * Math.sqrt(2 * Math.PI));
+  function lgamma(z) { const c = [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]; if (z < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * z))) - lgamma(1 - z); z -= 1; let a = 0.99999999999980993; const t = z + 7.5; for (let i = 0; i < 8; i++) a += c[i] / (z + i + 1); return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(a); }
+  const tpdf = (x, v) => Math.exp(lgamma((v + 1) / 2) - lgamma(v / 2)) / Math.sqrt(v * Math.PI) * Math.pow(1 + x * x / v, -(v + 1) / 2);
+  function ols(x, y) {
+    const n = x.length, mx = mean(x), my = mean(y); let sxx = 0, sxy = 0, syy = 0;
+    for (let i = 0; i < n; i++) { sxx += (x[i] - mx) ** 2; sxy += (x[i] - mx) * (y[i] - my); syy += (y[i] - my) ** 2; }
+    const m = sxy / sxx, b = my - m * mx; let sse = 0; for (let i = 0; i < n; i++) sse += (y[i] - (m * x[i] + b)) ** 2;
+    const r2 = syy ? 1 - sse / syy : 0; const se = Math.sqrt(sse / (n - 2) / sxx); const t = m / se; const p = 2 * upper(Math.abs(t));
+    return { m, b, r2, se, t, p, sse, r: sxy / Math.sqrt(sxx * syy) };
+  }
+  const corr = (a, b) => ols(a, b).r;
+  function tdraw(r, df) { let c = 0; for (let k = 0; k < df; k++) { const z = gauss(r); c += z * z; } return gauss(r) / Math.sqrt(c / df) * Math.sqrt((df - 2) / df); }
+  const pfmt = (p) => (p < 0.0001 ? '&lt;0.0001' : p.toFixed(p < 0.01 ? 4 : 3));
+
+  let seed = 11;
+  const R = (k) => rng(seed * 7919 + k * 104729);
+
+  // ---------- s2 returns ----------
+  const d2 = reg(() => {
+    const a = +$('n2a').value, b = +$('n2b').value; const C = cvs('c2');
+    if (C) {
+      const F = frame(C, [-60, 150], [-100, 100], { xlab: 'simple return %', ylab: 'log return %', zeroY: true, zeroX: true });
+      const xs = [], ys = [], ids = []; for (let s = -60; s <= 150; s += 1) { xs.push(s); ys.push(Math.log(1 + s / 100) * 100); ids.push(s); }
+      polyline(F, xs, ids, 'muted', 1.2, [4, 4]); polyline(F, xs, ys, 'c1', 2.2);
+      if (a > 0 && b > 0) { const s = (b / a - 1) * 100; if (s >= -60 && s <= 150) dot(F, s, Math.log(b / a) * 100, 'c2', 5); }
+      legend('c2L', [['log return', 'c1'], ['if they were equal (y = x)', 'muted'], ['your move', 'c2']]);
+    }
+    const paths = { a: [-0.1, 0.1], b: [0.1, -0.1], c: [-0.5, 0.5], d: [-0.5, 1.0] }; const pth = paths[$('sel2').value];
+    const fin = pth.reduce((p, r) => p * (1 + r), 1) - 1; const sumS = pth.reduce((s, r) => s + r, 0); const sumL = pth.reduce((s, r) => s + Math.log(1 + r), 0);
+    let txt = '';
+    if (a > 0 && b > 0) { const s = (b / a - 1) * 100, l = Math.log(b / a) * 100; txt = `simple <b>${pct(s)}</b> · log <b>${pct(l)}</b> · gap <b>${(s - l).toFixed(3)}</b> points · `; } else txt = 'enter two positive prices · ';
+    txt += `path: sum of simple returns <b>${pct(sumS * 100, 1)}</b> vs actual <b class="${fin < 0 ? 'bad' : 'good'}">${pct(fin * 100, 1)}</b> · sum of log returns <b>${pct(sumL * 100, 2)}</b> → e^sum − 1 = <b>${pct((Math.exp(sumL) - 1) * 100, 1)}</b> (matches)`;
+    $('r2').innerHTML = txt;
+  });
+  on('n2a', 'input', d2); on('n2b', 'input', d2); on('sel2', 'change', d2);
+
+  // ---------- s3 standardizing ----------
+  const d3 = reg(() => {
+    const A = val('n3a'), B = val('n3b'), T = val('n3c'); const r = R(3); const k = Math.sqrt(Math.PI / 2);
+    const ra = [], rb = []; for (let i = 0; i < 60; i++) { ra.push(gauss(r) * A * k); rb.push(gauss(r) * B * k); }
+    const C = cvs('c3');
+    if (C) {
+      const { g, W, H } = C; const top = Math.max(...ra.map(Math.abs), ...rb.map(Math.abs), T) * 1.1; const padL = 40, padR = 10;
+      const rowH = (H - 40) / 2;
+      [[ra, A, 'c2', 'calm asset'], [rb, B, 'c1', 'wild asset']].forEach(([arr, avg, col, lab], row) => {
+        const y0 = 14 + row * (rowH + 14); const Y = (v) => y0 + rowH - v / top * rowH; const bw = (W - padL - padR) / 60;
+        g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, y0 + rowH); g.lineTo(W - padR, y0 + rowH); g.stroke();
+        arr.forEach((v, i) => { g.fillStyle = colorOf(col, 0.55); const y = Y(Math.abs(v)); g.fillRect(padL + i * bw + 1, y, bw - 2, y0 + rowH - y); });
+        g.strokeStyle = colorOf(col); g.lineWidth = 1.5; g.setLineDash([5, 3]); g.beginPath(); g.moveTo(padL, Y(mean(arr.map(Math.abs)))); g.lineTo(W - padR, Y(mean(arr.map(Math.abs)))); g.stroke(); g.setLineDash([]);
+        g.strokeStyle = colorOf('sell'); g.lineWidth = 2; g.beginPath(); g.moveTo(padL, Y(T)); g.lineTo(W - padR, Y(T)); g.stroke();
+        g.fillStyle = colorOf('muted'); g.fillText(lab + ' · |daily move| %', padL + 4, y0 + 10); g.fillText(top.toFixed(1), 4, y0 + 10); g.fillText('0', 4, y0 + rowH);
+      });
+      legend('c3L', [['calm |move| (simulated)', 'c2'], ['wild |move| (simulated)', 'c1'], ["today's move", 'sell'], ['dashed: average |move|', 'muted']]);
+    }
+    $('r3').innerHTML = `today = <b>${(T / A).toFixed(2)}×</b> the calm asset's average move · <b>${(T / B).toFixed(2)}×</b> the wild asset's · plain mean of the 60 simulated returns: calm <b>${pct(mean(ra))}</b>, wild <b>${pct(mean(rb))}</b> (≈0, useless) · mean of |returns|: <b>${mean(ra.map(Math.abs)).toFixed(2)}%</b>, <b>${mean(rb.map(Math.abs)).toFixed(2)}%</b>`;
+  });
+  bindRange('n3a', d3); bindRange('n3b', d3); bindRange('n3c', d3);
+
+  // ---------- s4 ATR ----------
+  let B4 = null, sel4 = 159;
+  function build4() {
+    const r = R(4); const o = [], h = [], l = [], c = []; let p = 100;
+    for (let i = 0; i < 160; i++) {
+      let gap = 0; const u = r(); if (u < 0.08) gap = 0.012 + 0.02 * r(); else if (u < 0.16) gap = -(0.012 + 0.02 * r());
+      if (i === 159) gap = 0.03; // make the last bar a clear gap-up for the default view
+      const op = i ? c[i - 1] * (1 + gap) : p; const cl = op * (1 + 0.012 * gauss(r));
+      const hi = Math.max(op, cl) * (1 + 0.006 * Math.abs(gauss(r))), lo = Math.min(op, cl) * (1 - 0.006 * Math.abs(gauss(r)));
+      o.push(op); h.push(hi); l.push(lo); c.push(cl);
+    }
+    B4 = { o, h, l, c };
+  }
+  function trArr(D) { return D.c.map((_, i) => (i ? Math.max(D.h[i], D.c[i - 1]) - Math.min(D.l[i], D.c[i - 1]) : D.h[i] - D.l[i])); }
+  const d4 = reg(() => {
+    if (!B4) build4(); const D = B4; const n = val('n4'); const tr = trArr(D); const atr = sma(tr, n);
+    const show0 = 100, N = 60; const C = cvs('c4');
+    if (C) {
+      const { g, W, H } = C; const padL = 6, padR = 52, topH = (H - 30) * 0.7, subT = topH + 26, subH = H - subT - 8;
+      let lo = Infinity, hi = -Infinity; for (let i = show0; i < show0 + N; i++) { lo = Math.min(lo, D.l[i], D.c[i - 1]); hi = Math.max(hi, D.h[i], D.c[i - 1]); }
+      const pd = (hi - lo) * 0.06; lo -= pd; hi += pd;
+      const X = (i) => padL + (i - show0 + 0.5) / N * (W - padL - padR); const Y = (v) => 8 + (hi - v) / (hi - lo) * topH;
+      g.strokeStyle = colorOf('rule'); g.fillStyle = colorOf('muted'); niceTicks(lo, hi, 4).forEach((t) => { g.beginPath(); g.moveTo(padL, Y(t)); g.lineTo(W - padR, Y(t)); g.stroke(); g.fillText(fmt(t), W - padR + 5, Y(t) + 4); });
+      const s = Math.min(Math.max(sel4, show0), show0 + N - 1);
+      g.fillStyle = colorOf('c1', 0.12); g.fillRect(X(s) - (W - padL - padR) / N / 2, 4, (W - padL - padR) / N, topH + 8);
+      const bw = Math.max(2, (W - padL - padR) / N * 0.6);
+      for (let i = show0; i < show0 + N; i++) {
+        const up = D.c[i] >= D.o[i]; const col = colorOf(up ? 'buy' : 'sell'); g.strokeStyle = col; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(X(i), Y(D.h[i])); g.lineTo(X(i), Y(D.l[i])); g.stroke();
+        const y1 = Y(Math.max(D.o[i], D.c[i])), y2 = Y(Math.min(D.o[i], D.c[i])); g.fillStyle = up ? colorOf('plate') : col; g.fillRect(X(i) - bw / 2, y1, bw, Math.max(1, y2 - y1)); g.strokeRect(X(i) - bw / 2, y1, bw, Math.max(1, y2 - y1));
+      }
+      const pc = D.c[s - 1]; g.strokeStyle = colorOf('c3'); g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(s - 1), Y(pc)); g.lineTo(X(s) + 14, Y(pc)); g.stroke(); g.setLineDash([]);
+      const tlo = Math.min(D.l[s], pc), thi = Math.max(D.h[s], pc); g.strokeStyle = colorOf('c2'); g.lineWidth = 3; g.beginPath(); g.moveTo(X(s) + 10, Y(thi)); g.lineTo(X(s) + 10, Y(tlo)); g.stroke();
+      g.strokeStyle = colorOf('c1'); g.beginPath(); g.moveTo(X(s) - 10, Y(D.h[s])); g.lineTo(X(s) - 10, Y(D.l[s])); g.stroke(); g.lineWidth = 1;
+      // ATR sub-panel
+      let alo = Infinity, ahi = -Infinity; for (let i = show0; i < show0 + N; i++) { if (atr[i] != null) { alo = Math.min(alo, atr[i], tr[i]); ahi = Math.max(ahi, atr[i], tr[i]); } }
+      const AY = (v) => subT + (ahi - v) / (ahi - alo || 1) * subH;
+      g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, subT - 8); g.lineTo(W - padR, subT - 8); g.stroke();
+      for (let i = show0; i < show0 + N; i++) { g.fillStyle = colorOf('c2', i === s ? 0.9 : 0.3); g.fillRect(X(i) - bw / 2, AY(tr[i]), bw, subT + subH - AY(tr[i])); }
+      g.strokeStyle = colorOf('c1'); g.lineWidth = 2; g.beginPath(); for (let i = show0; i < show0 + N; i++) { const y = AY(atr[i]); i === show0 ? g.moveTo(X(i), y) : g.lineTo(X(i), y); } g.stroke(); g.lineWidth = 1;
+      g.fillStyle = colorOf('muted'); g.fillText('true range bars · ATR line', padL + 4, subT + 4); g.fillText(fmt(ahi), W - padR + 5, subT + 4); g.fillText(fmt(alo), W - padR + 5, subT + subH);
+      legend('c4L', [['range (orange bar)', 'c1'], ['true range (teal bar)', 'c2'], ['previous close', 'c3'], [n + '-bar ATR', 'c1']]);
+      const rg = D.h[s] - D.l[s], t = tr[s], gapAdd = t - rg; const chg = (D.c[s] / pc - 1) * 100; const atrPct = atr[s] / pc * 100;
+      $('r4').innerHTML = `bar ${s - show0 + 1} of ${N} · prev close <b>${pc.toFixed(2)}</b> · high <b>${D.h[s].toFixed(2)}</b> low <b>${D.l[s].toFixed(2)}</b> · range <b>${rg.toFixed(2)}</b> · true range <b>${t.toFixed(2)}</b>${gapAdd > 1e-9 ? ` <span class="bad">(gap adds ${gapAdd.toFixed(2)})</span>` : ' (no gap: TR = range)'} · ${n}-bar ATR <b>${atr[s].toFixed(2)}</b> = <b>${atrPct.toFixed(2)}%</b> of price · close-to-close <b>${pct(chg)}</b> = <b>${(chg / atrPct).toFixed(2)}</b> ATR%`;
+    }
+  });
+  bindRange('n4', d4); on('b4p', 'click', () => { sel4 = Math.max(101, sel4 - 1); d4(); }); on('b4n', 'click', () => { sel4 = Math.min(159, sel4 + 1); d4(); });
+
+  // ---------- s5 historical volatility ----------
+  let M5 = null;
+  const d5 = reg(() => {
+    if (!M5) M5 = genMarket([{ n: 300, drift: 0.0004, vol: 0.009 }, { n: 200, drift: -0.001, vol: 0.022 }, { n: 360, drift: 0.0006, vol: 0.011 }, { n: 160, drift: -0.0005, vol: 0.026 }, { n: 240, drift: 0.0005, vol: 0.01 }], seed * 5 + 1);
+    const k = +$('sel5').value; const nWin = val('n5'); const ann = Math.sqrt(252 / k);
+    const c = M5.c.filter((_, i) => i % k === 0); const lr = c.map((v, i) => (i ? Math.log(v / c[i - 1]) : null));
+    const lr2 = lr.slice(1); const sd = rollStd(lr2, Math.min(nWin, lr2.length)); const hv = [null].concat(sd.map((v) => (v == null ? null : v * ann * 100)));
+    plot('c5', { n: c.length, lines: [{ d: c, col: 'price', w: 1.3, label: 'price (simulated, regimes switch)' }], sub: { lines: [{ d: hv, col: 'c1', w: 1.8, label: nWin + '-bar Hvol, annualized %' }], label: 'Hvol %' } });
+    const last = hv[hv.length - 1]; const pr = c[c.length - 1];
+    const lbl = { 1: '√252', 5: '√52', 21: '√12' }[k];
+    $('r5').innerHTML = (last == null ? `window longer than the ${c.length} bars available at this bar size` : `latest Hvol <b>${last.toFixed(1)}%</b> (SD of ${nWin} log returns × ${lbl}) · 1-SD band a year out ≈ <b>${(pr * (1 - last / 100)).toFixed(0)}–${(pr * (1 + last / 100)).toFixed(0)}</b> on price ${pr.toFixed(0)}, <i>if</i> returns were normal · one typical bar ≈ <b>${(last / ann).toFixed(2)}%</b>`) + ` · ${c.length} bars`;
+  });
+  bindRange('n5', d5); on('sel5', 'change', d5);
+
+  // ---------- s6 sigma spike ----------
+  function genRets(model, n, r) {
+    const out = []; if (model === 'n') { for (let i = 0; i < n; i++) out.push(0.012 * gauss(r)); return out; }
+    const a = 0.08, b = 0.9, lr = 0.012 * 0.012, w = lr * (1 - a - b); let v = lr, prev = 0;
+    for (let i = 0; i < n + 100; i++) { v = w + a * prev * prev + b * v; const e = Math.sqrt(v) * tdraw(r, 4); prev = e; if (i >= 100) out.push(e); }
+    return out;
+  }
+  function spikes(ret) { const sd = rollStd(ret, 20); return ret.map((x, i) => (i >= 20 && sd[i - 1] ? x / sd[i - 1] : null)); }
+  let P6 = null;
+  function pool6() {
+    const res = {}; ['g', 'n'].forEach((m) => { const r = rng(4242 + (m === 'g' ? 1 : 2)); let c25 = 0, c3 = 0, c5 = 0, days = 0; for (let y = 0; y < 300; y++) { const sp = spikes(genRets(m, 272, r)).slice(20); sp.forEach((s) => { const a = Math.abs(s); days++; if (a >= 2.5) c25++; if (a >= 3) c3++; if (a >= 5) c5++; }); } const f = 252 / days; res[m] = [c25 * f, c3 * f, c5 * f]; });
+    P6 = res;
+  }
+  const d6 = reg(() => {
+    const m = $('sel6').value; const thr = val('n6'); const r = R(6); const ret = genRets(m, 504, r);
+    const c = []; let p = 100; ret.forEach((x) => { p *= 1 + x; c.push(p); }); const sp = spikes(ret);
+    const marks = []; let cnt = 0; sp.forEach((s, i) => { if (s != null && Math.abs(s) >= thr) { cnt++; marks.push({ i, v: c[i], kind: s > 0 ? 'alertUp' : 'alertDown' }); } });
+    plot('c6', { n: c.length, lines: [{ d: c, col: 'price', w: 1.3, label: 'price (simulated, 2 years)' }], marks, sub: { bars: [{ d: sp, col: (i, v) => colorOf(Math.abs(v) >= thr ? (v > 0 ? 'buy' : 'sell') : 'muted', Math.abs(v) >= thr ? 0.9 : 0.35), label: 'σ-spike' }], zero: true, label: 'spike (σ of prior 20 days)' }, legend: [['spike ≥ threshold', 'buy']] });
+    let mx = 0; sp.forEach((s) => { if (s != null) mx = Math.max(mx, Math.abs(s)); });
+    $('r6').innerHTML = `this 2-year sample: <b>${cnt}</b> days with |spike| ≥ ${thr} (≈<b>${(cnt / 2).toFixed(1)}</b> a year) · largest |spike| <b>${mx.toFixed(1)}</b>`;
+    if (!P6) pool6(); const T = (k) => (2 * upper(k) * 252);
+    $('r6b').innerHTML = `pooled over 300 simulated years, days per year with |spike| ≥ 2.5 / ≥ 3 / ≥ 5 → fat tails + clusters: <b>${P6.g.map((v) => v.toFixed(1)).join(' / ')}</b> · normal, constant vol: <b>${P6.n.map((v) => v.toFixed(2)).join(' / ')}</b> · textbook normal with a known SD: <b>${T(2.5).toFixed(1)} / ${T(3).toFixed(2)} / ${T(5).toFixed(4)}</b>`;
+  });
+  on('sel6', 'change', d6); bindRange('n6', d6);
+
+  // ---------- s7 histograms ----------
+  const d7 = reg(() => {
+    const r = R(7); const idx = [], stk = []; for (let i = 0; i < 400; i++) { idx.push(0.011 * tdraw(r, 5) * 100); stk.push(0.034 * tdraw(r, 3) * 100); }
+    const bins = val('n7'); const lo = -20, hi = 20, w = (hi - lo) / bins;
+    const hist = (a) => { const hcount = new Array(bins).fill(0); a.forEach((v) => { const k = Math.floor((v - lo) / w); if (k >= 0 && k < bins) hcount[k]++; }); return hcount.map((x) => x / a.length); };
+    const hI = hist(idx), hS = hist(stk); const C = cvs('c7');
+    if (C) {
+      const top = Math.max(...hI, ...hS) * 1.08; const F = frame(C, [lo, hi], [0, top], { xlab: 'daily return %', ylab: 'fraction of days', fy: (v) => v.toFixed(2) });
+      [[hS, 'c1'], [hI, 'c2']].forEach(([hh, col]) => { hh.forEach((f, k) => { if (!f) return; const x0 = F.X(lo + k * w), x1 = F.X(lo + (k + 1) * w); F.g.fillStyle = colorOf(col, 0.45); F.g.fillRect(x0 + 0.5, F.Y(f), Math.max(1, x1 - x0 - 1), F.Y(0) - F.Y(f)); F.g.strokeStyle = colorOf(col); F.g.strokeRect(x0 + 0.5, F.Y(f), Math.max(1, x1 - x0 - 1), F.Y(0) - F.Y(f)); }); });
+      legend('c7L', [['volatile momentum stock (simulated)', 'c1'], ['broad index (simulated)', 'c2']]);
+    }
+    const out5 = (a) => a.filter((v) => Math.abs(v) > 5).length;
+    $('r7').innerHTML = `index: SD <b>${sdSamp(idx).toFixed(2)}%</b>, days beyond ±5%: <b>${out5(idx)}</b> of 400 · stock: SD <b>${sdSamp(stk).toFixed(2)}%</b>, days beyond ±5%: <b>${out5(stk)}</b> of 400 · bin width <b>${w.toFixed(2)}</b> points`;
+  });
+  bindRange('n7', d7);
+
+  // ---------- s8 normal ----------
+  const tTail = {}; function tailT3(k) { if (tTail[k] != null) return tTail[k]; const a = k * Math.sqrt(3); let s = 0; const h = 0.002; for (let x = a; x < a + 400; x += h) s += tpdf(x + h / 2, 3) * h; tTail[k] = 2 * s; return tTail[k]; }
+  const d8 = reg(() => {
+    const C = cvs('c8'); const fat = $('chk8').checked; const k = val('n8');
+    if (C) {
+      const F = frame(C, [-5, 5], [0, 0.85], { xlab: 'value (SD units of the middle curve)', fy: (v) => v.toFixed(1) });
+      const xs = []; for (let x = -5; x <= 5.0001; x += 0.02) xs.push(x);
+      [[0.5, 'c3'], [1, 'c2'], [2, 'c1']].forEach(([s, col]) => polyline(F, xs, xs.map((x) => npdf(x, s)), col, 2));
+      if (fat) polyline(F, xs, xs.map((x) => tpdf(x * Math.sqrt(3), 3) * Math.sqrt(3)), 'sell', 1.8, [5, 3]);
+      F.g.fillStyle = colorOf('sell', 0.12); F.g.fillRect(F.X(k), F.padT, F.X(5) - F.X(k), F.Y(0) - F.padT); F.g.fillRect(F.X(-5), F.padT, F.X(-k) - F.X(-5), F.Y(0) - F.padT);
+      legend('c8L', [['mean 0, SD 0.5', 'c3'], ['mean 0, SD 1', 'c2'], ['mean 0, SD 2', 'c1']].concat(fat ? [['fat-tailed, SD 1 (beyond the book)', 'sell']] : []));
+    }
+    const pn = 2 * upper(k), pt = tailT3(k);
+    const yrs = (p) => (p * 252 >= 1 ? `${(p * 252).toFixed(2)} days a year` : `once every ${(1 / (p * 252)).toFixed(p * 252 < 0.001 ? 0 : 1)} years`);
+    $('r8').innerHTML = `share of days beyond ±${k} SD (SD-1 curves) · normal: <b>${(pn * 100).toPrecision(2)}%</b> (${yrs(pn)}) · fat-tailed t(3): <b>${(pt * 100).toPrecision(2)}%</b> (${yrs(pt)}) · ratio <b>${(pt / pn).toPrecision(2)}×</b>`;
+  });
+  on('chk8', 'change', d8); bindRange('n8', d8);
+  const d8b = reg(() => {
+    const n = val('n8b'); const r = R(8); const means = []; for (let i = 0; i < 4000; i++) { let s = 0; for (let j = 0; j < n; j++) s += -Math.log(1 - r()); means.push(s / n); }
+    const C = cvs('c8b'); const bins = 60, lo = 0, hi = 4, w = (hi - lo) / bins; const h = new Array(bins).fill(0); means.forEach((v) => { const k = Math.floor((v - lo) / w); if (k >= 0 && k < bins) h[k]++; });
+    const dens = h.map((x) => x / means.length / w);
+    if (C) {
+      const xs = []; for (let x = 0; x <= 4; x += 0.02) xs.push(x); const nd = xs.map((x) => npdf(x - 1, 1 / Math.sqrt(n)));
+      const top = Math.max(...dens, Math.min(3.5, Math.max(...nd))) * 1.08; const F = frame(C, [0, 4], [0, top], { xlab: 'mean of n draws from a skewed (exponential) distribution, true mean 1', fy: (v) => v.toFixed(1) });
+      dens.forEach((d, k) => { if (!d) return; F.g.fillStyle = colorOf('c2', 0.5); const x0 = F.X(lo + k * w), x1 = F.X(lo + (k + 1) * w); F.g.fillRect(x0, F.Y(d), Math.max(1, x1 - x0 - 0.5), F.Y(0) - F.Y(d)); });
+      clipTo(F); polyline(F, xs, nd, 'c1', 2); F.g.restore();
+      legend('c8bL', [['4,000 simulated sample means', 'c2'], ['normal curve the CLT predicts', 'c1']]);
+    }
+    $('r8b').innerHTML = `n = <b>${n}</b>: ${n === 1 ? 'single draws, the raw skewed shape' : n < 10 ? 'already less skewed' : 'close to a bell'} · SD of the means <b>${sdSamp(means).toFixed(3)}</b> vs CLT's 1/√n = <b>${(1 / Math.sqrt(n)).toFixed(3)}</b>`;
+  });
+  bindRange('n8b', d8b);
+
+  // ---------- s9 mean vs median ----------
+  function ages9() { return ($('t9').value || '').split(/[,\s]+/).map(Number).filter((v) => isFinite(v) && v > 0); }
+  const d9 = reg(() => {
+    const base = ages9(); const mum = +$('sel9').value; const a = mum ? base.concat([mum]) : base.slice();
+    if (!a.length) { $('r9').innerHTML = 'enter some positive ages'; return; }
+    const m = mean(a), md = median(a); const C = cvs('c9');
+    if (C) {
+      const hi = Math.max(...a, m) * 2, lo = Math.max(1, Math.min(...a) / 2); const F = frame(C, [lo, hi], [0, 1], { logx: true, xlab: 'age (log scale)', fy: () => '', padL: 10 });
+      a.forEach((v, i) => dot(F, v, 0.35 + (i % 3) * 0.12, v === mum ? 'sell' : 'price', v === mum ? 6 : 4));
+      [[m, 'c1', 'mean ' + fmt(m)], [md, 'c2', 'median ' + fmt(md)]].forEach(([v, col, lab], j) => { F.g.strokeStyle = colorOf(col); F.g.lineWidth = 2; F.g.beginPath(); F.g.moveTo(F.X(v), F.padT); F.g.lineTo(F.X(v), F.Y(0)); F.g.stroke(); F.g.fillStyle = colorOf(col); const tw = F.g.measureText(lab).width; let tx = F.X(v) + 5; if (tx + tw > F.W - 10) tx = F.X(v) - tw - 5; F.g.fillText(lab, tx, F.padT + 12 + j * 14); });
+      legend('c9L', [['people', 'price'], ['mummy', 'sell'], ['mean', 'c1'], ['median', 'c2']]);
+    }
+    $('r9').innerHTML = `n = <b>${a.length}</b> · mean <b>${m.toLocaleString(undefined, { maximumFractionDigits: 1 })}</b> · median <b>${md.toLocaleString(undefined, { maximumFractionDigits: 1 })}</b> · values closer to the median than to the mean: <b>${a.filter((v) => Math.abs(v - md) < Math.abs(v - m)).length}</b> of ${a.length}`;
+  });
+  on('t9', 'input', d9); on('sel9', 'change', d9);
+
+  // ---------- s10 dispersion ----------
+  const ages10 = [18, 22, 25, 33, 38];
+  const stats10 = (a) => ({ mean: mean(a), med: median(a), sd: sdPop(a), iqr: quant(a, 0.75) - quant(a, 0.25) });
+  const d10 = reg(() => {
+    const v = val('n10'); const mum = Math.round(Math.pow(10, v)); const C = cvs('c10');
+    const xs = [], S = { mean: [], med: [], sd: [], iqr: [] }; for (let x = 1.6; x <= 6.5001; x += 0.05) { const st = stats10(ages10.concat([Math.pow(10, x)])); xs.push(Math.pow(10, x)); Object.keys(S).forEach((k) => S[k].push(st[k])); }
+    if (C) {
+      const F = frame(C, [40, 3.2e6], [1, 3e6], { logx: true, logy: true, xlab: "mummy's age (log)", ylab: 'statistic (log)', fx: (t) => (t >= 1e6 ? t / 1e6 + 'M' : t >= 1e3 ? t / 1e3 + 'k' : String(t)), fy: (t) => (t >= 1e6 ? t / 1e6 + 'M' : t >= 1e3 ? t / 1e3 + 'k' : String(t)) });
+      polyline(F, xs, S.mean, 'c1', 2); polyline(F, xs, S.sd, 'sell', 2, [6, 3]); polyline(F, xs, S.med, 'c2', 2); polyline(F, xs, S.iqr, 'c3', 2, [6, 3]);
+      F.g.strokeStyle = colorOf('muted'); F.g.setLineDash([3, 3]); F.g.beginPath(); F.g.moveTo(F.X(mum), F.padT); F.g.lineTo(F.X(mum), F.H - F.padB); F.g.stroke(); F.g.setLineDash([]);
+      legend('c10L', [['mean', 'c1'], ['standard deviation', 'sell'], ['median', 'c2'], ['IQR', 'c3']]);
+    }
+    const st0 = stats10(ages10), st = stats10(ages10.concat([mum])); const f = (x) => x.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    $('r10').innerHTML = `five people only: mean <b>${f(st0.mean)}</b>, median <b>${f(st0.med)}</b>, SD (÷N) <b>${f(st0.sd)}</b>, SD (÷N−1) <b>${f(sdSamp(ages10))}</b>, IQR <b>${f(st0.iqr)}</b> · with a ${f(mum)}-year mummy: mean <b>${f(st.mean)}</b>, median <b>${f(st.med)}</b>, SD (÷N) <b>${f(st.sd)}</b>, variance <b>${f(st.sd * st.sd)}</b> years², IQR <b>${f(st.iqr)}</b>`;
+  });
+  bindRange('n10', d10, (v) => Math.round(Math.pow(10, v)).toLocaleString());
+
+  // ---------- s11 apples ----------
+  let k11 = 0;
+  const d11 = reg(() => {
+    const N = +$('sel11').value; const r = rng(seed * 31 + 1100 + k11); const w = []; for (let i = 0; i < N; i++) w.push(4.5 + 3 * gauss(r)); if ($('chk11').checked) w[0] = 1.07;
+    const run = []; let s = 0; w.forEach((v, i) => { s += v; run.push(s / (i + 1)); });
+    plot('c11', { n: N, lines: [{ d: run, col: 'c1', w: 2, label: 'running mean (simulated apples)' }, { d: new Array(N).fill(4.5), col: 'muted', dash: [5, 4], w: 1.2, label: 'true mean 4.5 oz' }] });
+    const fin = run[N - 1];
+    $('r11').innerHTML = `after <b>${N.toLocaleString()}</b> apples: running mean <b>${fin.toFixed(2)}</b> oz · error <b>${(fin - 4.5 >= 0 ? '+' : '') + (fin - 4.5).toFixed(2)}</b> · typical error σ/√n = <b>${(3 / Math.sqrt(N)).toFixed(2)}</b> · negative "apples" in this sample: <b>${w.filter((v) => v < 0).length}</b>`;
+  });
+  on('sel11', 'change', d11); on('chk11', 'change', d11); on('b11', 'click', () => { k11++; d11(); });
+
+  // ---------- s12 Cauchy ----------
+  let k12 = 0;
+  const d12 = reg(() => {
+    const N = +$('sel12').value; const r = rng(seed * 37 + 1200 + k12); const x = []; for (let i = 0; i < N; i++) x.push(4.5 + 3 * Math.tan(Math.PI * (r() - 0.5)));
+    const rm = [], rmed = [], sorted = []; let s = 0;
+    x.forEach((v, i) => { s += v; rm.push(s / (i + 1)); let lo = 0, hi = sorted.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } sorted.splice(lo, 0, v); const n = sorted.length; rmed.push(n % 2 ? sorted[(n - 1) >> 1] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2); });
+    const lines = [{ d: rm, col: 'sell', w: 1.8, label: 'running mean (Cauchy, simulated)' }]; if ($('chk12').checked) lines.push({ d: rmed, col: 'c2', w: 2, label: 'running median' }); lines.push({ d: new Array(N).fill(4.5), col: 'muted', dash: [5, 4], w: 1.1, label: 'centre 4.5' });
+    plot('c12', { n: N, lines });
+    let big = 0; x.forEach((v) => { if (Math.abs(v) > Math.abs(big)) big = v; });
+    $('r12').innerHTML = `after <b>${N.toLocaleString()}</b> draws: running mean <b>${rm[N - 1].toFixed(2)}</b> · running median <b>${rmed[N - 1].toFixed(2)}</b> · most extreme single draw <b>${big.toFixed(0)}</b> · mean's range over the last half of the run: <b>${Math.min(...rm.slice(N >> 1)).toFixed(1)} to ${Math.max(...rm.slice(N >> 1)).toFixed(1)}</b>`;
+  });
+  on('sel12', 'change', d12); on('chk12', 'change', d12); on('b12', 'click', () => { k12++; d12(); });
+
+  // ---------- s14 bin analysis ----------
+  const days14 = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  function year14(r) { const ret = []; for (let i = 0; i < 252; i++) ret.push(0.04 + 1.1 * gauss(r)); const by = days14.map((_, d) => ret.filter((_, i) => i % 5 === d)); return { all: ret, by, mean: by.map(mean), up: by.map((a) => a.filter((v) => v > 0).length / a.length), allMean: mean(ret), allUp: ret.filter((v) => v > 0).length / ret.length }; }
+  let k14 = 0, P14 = null;
+  const d14 = reg(() => {
+    const r = rng(seed * 41 + 1400 + k14); const A = year14(r), B = year14(r); const C = cvs('c14');
+    if (C) {
+      const mx = Math.max(0.45, ...A.mean.map(Math.abs), ...B.mean.map(Math.abs)) * 1.1; const F = frame(C, [0, 5], [-mx, mx], { zeroY: true, ylab: 'mean daily return %', fx: () => '', fy: (v) => v.toFixed(2) });
+      const cw = (F.X(1) - F.X(0)); [[A, 'c2', -0.2], [B, 'c1', 0.02]].forEach(([Y, col, off]) => { Y.mean.forEach((m, d) => { const x = F.X(d + 0.5 + off * 1); F.g.fillStyle = colorOf(col, 0.7); F.g.fillRect(x, Math.min(F.Y(m), F.Y(0)), cw * 0.18, Math.abs(F.Y(m) - F.Y(0))); }); F.g.strokeStyle = colorOf(col); F.g.setLineDash([5, 3]); F.g.beginPath(); F.g.moveTo(F.padL, F.Y(Y.allMean)); F.g.lineTo(F.W - F.padR, F.Y(Y.allMean)); F.g.stroke(); F.g.setLineDash([]); });
+      F.g.fillStyle = colorOf('ink'); days14.forEach((d, i) => F.g.fillText(d, F.X(i + 0.5) - 10, F.H - F.padB + 14));
+      legend('c14L', [['year A by weekday', 'c2'], ['year B by weekday', 'c1'], ['dashed: all-days mean', 'muted']]);
+    }
+    const best = (Y) => Y.mean.indexOf(Math.max(...Y.mean)), worst = (Y) => Y.mean.indexOf(Math.min(...Y.mean));
+    const row = (Y, lab) => `${lab}: all days <b>${(Y.allUp * 100).toFixed(1)}%</b> up, ${pct(Y.allMean)} · ` + days14.map((d, i) => `${d} ${(Y.up[i] * 100).toFixed(0)}% / ${pct(Y.mean[i])}`).join(' · ') + ` · "strong" day <b>${days14[best(Y)]}</b>, "weak" day <b>${days14[worst(Y)]}</b>`;
+    $('r14').innerHTML = row(A, 'year A') + '<br>' + row(B, 'year B');
+    if (!P14) { const rp = rng(9090); let same = 0, big = 0; const T = 2000; for (let t = 0; t < T; t++) { const a = year14(rp), b = year14(rp); if (best(a) === best(b)) same++; if (a.mean.some((m) => Math.abs(m - a.allMean) >= 0.18)) big++; } P14 = [same / T, big / T]; }
+    $('r14b').innerHTML = `pooled over 2,000 simulated pairs of years with <b>no</b> weekday effect: the best weekday repeats next year <b>${(P14[0] * 100).toFixed(0)}%</b> of the time (pure chance is 20%) · at least one weekday's mean is ≥0.18 points from the all-days mean in <b>${(P14[1] * 100).toFixed(0)}%</b> of years`;
+  });
+  on('b14', 'click', () => { k14++; d14(); });
+
+  // ---------- s15 significance ----------
+  const d15 = reg(() => {
+    const d = +$('n15a').value, sd = Math.max(1e-6, +$('n15b').value), n = Math.max(1, Math.round(+$('n15c').value)), cost = Math.max(0, +$('n15d').value);
+    const se = sd / Math.sqrt(n), z = d / se, p = 2 * upper(Math.abs(z));
+    const r = R(15); const sims = []; for (let i = 0; i < 4000; i++) { let s = 0; for (let j = 0; j < Math.min(n, 400); j++) s += gauss(r); sims.push(s / Math.min(n, 400) * sd * Math.sqrt(Math.min(n, 400) / n)); }
+    const ps = sims.filter((v) => Math.abs(v) >= Math.abs(d)).length / sims.length;
+    const C = cvs('c15');
+    if (C) {
+      const span = Math.max(4 * se, Math.abs(d) * 1.2); const bins = 50, w = 2 * span / bins; const h = new Array(bins).fill(0); sims.forEach((v) => { const k = Math.floor((v + span) / w); if (k >= 0 && k < bins) h[k]++; });
+      const F = frame(C, [-span, span], [0, Math.max(...h) * 1.1], { xlab: 'difference produced by luck alone (same bag), %', fy: (v) => String(Math.round(v)), fx: (v) => v.toFixed(2) });
+      h.forEach((c, k) => { if (!c) return; const lo = -span + k * w; const tail = Math.abs(lo + w / 2) >= Math.abs(d); F.g.fillStyle = colorOf(tail ? 'sell' : 'c2', tail ? 0.7 : 0.45); const x0 = F.X(lo), x1 = F.X(lo + w); F.g.fillRect(x0, F.Y(c), Math.max(1, x1 - x0 - 0.5), F.Y(0) - F.Y(c)); });
+      F.g.strokeStyle = colorOf('c1'); F.g.lineWidth = 2.5; F.g.beginPath(); F.g.moveTo(F.X(d), F.padT); F.g.lineTo(F.X(d), F.Y(0)); F.g.stroke(); F.g.lineWidth = 1;
+      legend('c15L', [['4,000 luck-only differences', 'c2'], ['as or more extreme than yours', 'sell'], ['your observed difference', 'c1']]);
+    }
+    $('r15').innerHTML = `difference ÷ SD (Grimes' yardstick) <b>${(d / sd).toFixed(2)}</b> · standard error SD/√n <b>${se.toFixed(3)}%</b> · z <b>${z.toFixed(2)}</b> · p (formula, two-sided) <b>${pfmt(p)}</b> · p (simulated) <b>${pfmt(ps)}</b> · ${p < 0.05 ? '<span class="good">reject the null at 5%</span>' : '<span class="bad">not enough evidence against the null</span>'} · after a ${cost.toFixed(2)}% cost: <b class="${d - cost > 0 ? 'good' : 'bad'}">${pct(d - cost)}</b> per trade (₹${(d * 10).toFixed(2)} → ₹${((d - cost) * 10).toFixed(2)} on a ₹1,000 share)`;
+  });
+  ['n15a', 'n15b', 'n15c', 'n15d'].forEach((id) => on(id, 'input', d15));
+  const preset15 = (a, b, c) => () => { $('n15a').value = a; $('n15b').value = b; $('n15c').value = c; d15(); };
+  on('b15a', 'click', preset15(0.18, 1.0, 47)); on('b15b', 'click', preset15(2, 0.5, 1)); on('b15c', 'click', preset15(2, 5, 1));
+
+  // ---------- s17 y = mx + b + e ----------
+  let k17 = 0;
+  const d17 = reg(() => {
+    const m = val('n17a'), s = val('n17b'); const r = rng(seed * 43 + 1700 + k17); const xs = [], ys = []; for (let i = 0; i < 90; i++) { const x = -10 + 20 * (i + 0.5) / 90; xs.push(x); ys.push(m * x + s * gauss(r)); }
+    const fit = ols(xs, ys); const C = cvs('c17');
+    if (C) {
+      const F = frame(C, [-10, 10], [-22, 22], { zeroX: true, zeroY: true });
+      clipTo(F);
+      if ($('chk17').checked) [[2, 'c3'], [1, 'muted'], [-0.1, 'price']].forEach(([mm, col]) => polyline(F, [-10, 10], [-10 * mm, 10 * mm], col, 1.3, [2, 3]));
+      polyline(F, [-10, 10], [-10 * m, 10 * m], 'c2', 2.2); xs.forEach((x, i) => dot(F, x, ys[i], 'c1', 2.6)); polyline(F, [-10, 10], [fit.b - 10 * fit.m, fit.b + 10 * fit.m], 'sell', 1.6, [6, 4]);
+      F.g.restore();
+      legend('c17L', [['true line y = ' + m + 'x', 'c2'], ['points = line + ε (simulated)', 'c1'], ['least-squares fit', 'sell']].concat($('chk17').checked ? [['Fig 11.9 lines: m = 2, 1, −0.1', 'c3']] : []));
+    }
+    $('r17').innerHTML = `true slope <b>${m}</b> · fitted slope <b>${fit.m.toFixed(2)}</b> ± <b>${fit.se.toFixed(2)}</b> (1 SE) · fitted intercept <b>${fit.b.toFixed(2)}</b> (true 0) · R² <b>${fit.r2.toFixed(2)}</b>`;
+  });
+  bindRange('n17a', d17); bindRange('n17b', d17); on('chk17', 'change', d17); on('b17', 'click', () => { k17++; d17(); });
+
+  // ---------- s18 regression ----------
+  let k18 = 0;
+  const d18 = reg(() => {
+    const beta = val('n18a'), noise = val('n18b'), tilt = val('n18c'); const r = rng(seed * 47 + 1800 + k18);
+    const x = [], y = []; for (let i = 0; i < 104; i++) { const gx = 0.2 + 2.3 * gauss(r); x.push(gx); y.push(0.1 + beta * gx + noise * gauss(r)); }
+    if ($('chk18').checked) { x.push(2); y.push(-20); }
+    const fit = ols(x, y); const mx = mean(x), my = mean(y); const cm = fit.m + tilt, cb = my - cm * mx; let sseC = 0; x.forEach((v, i) => { sseC += (y[i] - (cm * v + cb)) ** 2; });
+    const C = cvs('c18');
+    if (C) {
+      const ylo = Math.min(-12, ...y) - 1, yhi = Math.max(12, ...y) + 1; const F = frame(C, [-8, 8], [ylo, yhi], { zeroX: true, zeroY: true, xlab: 'gold weekly return % (simulated)', ylab: 'miner weekly return %' });
+      clipTo(F);
+      x.forEach((v, i) => { const yc = cm * v + cb; F.g.strokeStyle = colorOf('c3', 0.45); F.g.beginPath(); F.g.moveTo(F.X(v), F.Y(y[i])); F.g.lineTo(F.X(v), F.Y(yc)); F.g.stroke(); });
+      x.forEach((v, i) => dot(F, v, y[i], 'price', 2.8, true));
+      polyline(F, [-8, 8], [cb - 8 * cm, cb + 8 * cm], 'c3', 1.6, [5, 4]); polyline(F, [-8, 8], [fit.b - 8 * fit.m, fit.b + 8 * fit.m], 'c1', 2.4);
+      F.g.restore();
+      legend('c18L', [['104 simulated weeks', 'price'], ['least-squares line', 'c1'], ['candidate line + its residuals', 'c3']]);
+    }
+    $('r18').innerHTML = `fitted slope <b>${fit.m.toFixed(2)}</b> (true ${beta}) · intercept <b>${fit.b.toFixed(2)}%</b> · R² <b>${fit.r2.toFixed(2)}</b> (correlation ${fit.r.toFixed(2)}) · t <b>${fit.t.toFixed(1)}</b> · p ≈ <b>${pfmt(fit.p)}</b> (normal approx.) · sum of squared errors: best <b>${fit.sse.toFixed(0)}</b>, candidate (slope ${cm.toFixed(2)}) <b>${sseC.toFixed(0)}</b> = <b>${(sseC / fit.sse).toFixed(2)}×</b>`;
+  });
+  bindRange('n18a', d18); bindRange('n18b', d18); bindRange('n18c', d18); on('chk18', 'change', d18); on('b18', 'click', () => { k18++; d18(); });
+
+  // ---------- s19 Monte Carlo ----------
+  let k19 = 0, mode19 = 'trail';
+  function runMC(runs, init, trail, maxSteps, r) {
+    const end = new Float64Array(runs); const paths = []; let stopped = 0;
+    for (let k = 0; k < runs; k++) {
+      let p = 0, hw = 0, stop = -init; const keep = k < 6; const P = keep ? [0] : null, S = keep ? [stop] : null; let t = 0;
+      for (; t < maxSteps; t++) { p += r() < 0.5 ? 1 : -1; if (p > hw) { hw = p; stop = Math.max(stop, hw - trail); } if (keep) { P.push(p); S.push(stop); } if (p <= stop) { stopped++; break; } }
+      end[k] = p; if (keep) paths.push({ P, S });
+    }
+    return { end, paths, stopped };
+  }
+  const d19 = reg(() => {
+    const runs = +$('sel19').value, init = val('n19a'), trail = val('n19b'), maxS = val('n19c'); const r = rng(seed * 53 + 1900 + k19);
+    let res; if (mode19 === 'one') { const end = new Float64Array(runs); for (let k = 0; k < runs; k++) end[k] = r() < 0.5 ? 1 : -1; res = { end, paths: [], stopped: runs }; } else res = runMC(runs, init, trail, maxS, r);
+    const e = Array.from(res.end); const m = mean(e), sd = sdPop(e), se = sd / Math.sqrt(e.length);
+    const C = cvs('c19');
+    if (C) {
+      const lo = Math.min(...e), hi = Math.max(...e); const bins = Math.min(80, Math.max(2, hi - lo + 1)); const w = (hi - lo + 1) / bins; const h = new Array(bins).fill(0); e.forEach((v) => { h[Math.min(bins - 1, Math.floor((v - lo) / w))]++; });
+      const F = frame(C, [lo - 0.5, hi + 0.5], [0, Math.max(...h) * 1.1], { xlab: 'ending P&L (points)', fy: (v) => String(Math.round(v)) });
+      h.forEach((c, k) => { if (!c) return; const x0 = F.X(lo - 0.5 + k * w), x1 = F.X(lo - 0.5 + (k + 1) * w); F.g.fillStyle = colorOf('c2', 0.6); F.g.fillRect(x0, F.Y(c), Math.max(1, x1 - x0 - 0.5), F.Y(0) - F.Y(c)); });
+      F.g.strokeStyle = colorOf('c1'); F.g.lineWidth = 2; F.g.beginPath(); F.g.moveTo(F.X(m), F.padT); F.g.lineTo(F.X(m), F.Y(0)); F.g.stroke(); F.g.lineWidth = 1;
+      legend('c19L', [[`${runs.toLocaleString()} simulated runs`, 'c2'], ['mean', 'c1']]);
+    }
+    const C2 = cvs('c19b');
+    if (C2) {
+      if (res.paths.length) {
+        let L = 0, lo = 0, hi = 0; res.paths.forEach((q) => { L = Math.max(L, q.P.length); q.P.concat(q.S).forEach((v) => { lo = Math.min(lo, v); hi = Math.max(hi, v); }); });
+        const F = frame(C2, [0, L], [lo - 2, hi + 2], { zeroY: true, xlab: 'step', fx: (v) => String(Math.round(v)) });
+        const cols = ['c1', 'c2', 'c3', 'buy', 'sell', 'price']; res.paths.forEach((q, j) => { const xs = q.P.map((_, i) => i); polyline(F, xs, q.P, cols[j], 1.4); polyline(F, xs, q.S, cols[j], 1, [3, 3]); });
+        legend('c19bL', [['six sample paths (solid) and their trailing stops (dashed)', 'muted']]);
+      } else { C2.g.fillStyle = colorOf('muted'); C2.g.fillText('one-step tree: each run is a single ±1 flip', 20, 30); legend('c19bL', []); }
+    }
+    const pos = e.filter((v) => v > 0).length / e.length;
+    $('r19').innerHTML = (mode19 === 'one' ? 'one-step ±1 tree · ' : `stop = max(−${init}, high-water mark − ${trail}) · up to ${maxS} steps · stopped out <b>${(res.stopped / runs * 100).toFixed(1)}%</b> · `) + `mean P&amp;L <b>${m >= 0 ? '+' : ''}${m.toFixed(3)}</b> · SD <b>${sd.toFixed(1)}</b> · sum <b>${e.reduce((s, v) => s + v, 0).toLocaleString()}</b> · SE of mean <b>${se.toFixed(3)}</b> · mean ÷ SE <b>${(m / se).toFixed(2)}</b> ${Math.abs(m / se) < 2 ? '(noise)' : '(look again: rare by chance, ~5% of runs)'} · winners <b>${(pos * 100).toFixed(1)}%</b> · best run <b>+${Math.max(...e)}</b> · median <b>${median(e).toFixed(0)}</b> · book's result: mean 0.02, SD 15.2`;
+  });
+  bindRange('n19a', () => {}); bindRange('n19b', () => {}); bindRange('n19c', () => {}); on('sel19', 'change', () => {});
+  on('b19', 'click', () => { mode19 = 'trail'; k19++; d19(); }); on('b19b', 'click', () => { mode19 = 'one'; k19++; d19(); });
+
+  // ---------- s21 limitations ----------
+  let k21 = 0;
+  const d21 = reg(() => {
+    const kind = $('sel21').value; const r = rng(seed * 59 + 2100 + k21); const x = [], y = [];
+    for (let i = 0; i < 60; i++) { const xv = -5 + 10 * r(); x.push(xv); let yv; if (kind === 'curve') yv = 0.6 * xv * xv - 5 + 1.2 * gauss(r); else if (kind === 'none' || kind === 'outlier') yv = (kind === 'outlier' ? 0.8 * xv : 0) + 1.5 * gauss(r); else yv = 0.8 * xv + 1.5 * gauss(r); y.push(yv); }
+    if (kind === 'outlier' || kind === 'none') { x.push(9); y.push(kind === 'none' ? 25 : -25); }
+    const fit = ols(x, y); const C = cvs('c21');
+    if (C) {
+      const F = frame(C, [-6, 10], [Math.min(-12, ...y) - 1, Math.max(12, ...y) + 1], { zeroX: true, zeroY: true });
+      clipTo(F); x.forEach((v, i) => dot(F, v, y[i], i === x.length - 1 && (kind === 'outlier' || kind === 'none') ? 'sell' : 'price', i === x.length - 1 && (kind === 'outlier' || kind === 'none') ? 5 : 2.8, true)); polyline(F, [-6, 10], [fit.b - 6 * fit.m, fit.b + 10 * fit.m], 'c1', 2.2); F.g.restore();
+      legend('c21L', [['simulated points', 'price'], ['least-squares line', 'c1']].concat(kind === 'outlier' || kind === 'none' ? [['the outlier', 'sell']] : []));
+    }
+    let extra = ''; if (kind === 'outlier' || kind === 'none') { const f2 = ols(x.slice(0, -1), y.slice(0, -1)); extra = ` · without the outlier: slope <b>${f2.m.toFixed(2)}</b>, p <b>${pfmt(f2.p)}</b>`; }
+    const note = { ok: 'line fits; residuals are random', curve: 'y depends strongly on x, but not in a straight line: slope and R² understate it', outlier: 'one point drags the slope away from the other 60', none: 'no relationship in 60 points, yet one point can manufacture a "significant" slope' }[kind];
+    $('r21').innerHTML = `slope <b>${fit.m.toFixed(2)}</b> · R² <b>${fit.r2.toFixed(2)}</b> · p ≈ <b>${pfmt(fit.p)}</b>${extra} · ${note}`;
+  });
+  on('sel21', 'change', d21); on('b21', 'click', () => { k21++; d21(); });
+
+  // ---------- s22 correlated sample ----------
+  const d22 = reg(() => {
+    const rho = val('n22'); const r = R(22); const N = 200, T = 250; const share = [];
+    for (let t = 0; t < T; t++) { const f = gauss(r); let dn = 0; for (let k = 0; k < N; k++) if (Math.sqrt(rho) * f + Math.sqrt(1 - rho) * gauss(r) < 0) dn++; share.push(dn / N * 100); }
+    const bins = 25, w = 4; const h = new Array(bins).fill(0); share.forEach((v) => { h[Math.min(bins - 1, Math.floor(v / w))]++; });
+    const C = cvs('c22');
+    if (C) {
+      const F = frame(C, [0, 100], [0, Math.max(...h) * 1.1], { xlab: '% of the 200 stocks that fell that day', fy: (v) => String(Math.round(v)) });
+      h.forEach((c, k) => { if (!c) return; const x0 = F.X(k * w), x1 = F.X((k + 1) * w); F.g.fillStyle = colorOf(k * w >= 60 ? 'sell' : 'c2', 0.6); F.g.fillRect(x0, F.Y(c), Math.max(1, x1 - x0 - 1), F.Y(0) - F.Y(c)); });
+      legend('c22L', [['days (simulated, 250)', 'c2'], ['days with ≥ 60% of stocks down', 'sell']]);
+    }
+    const n60 = share.filter((v) => v >= 60).length; const eff = N / (1 + (N - 1) * rho);
+    $('r22').innerHTML = `days with ≥60% of stocks down together: <b>${n60}</b> of 250 · effective independent observations per day ≈ N/(1+(N−1)ρ) = <b>${eff.toFixed(1)}</b> of 200 (≈<b>${(N / eff).toFixed(0)}×</b> smaller)`;
+  });
+  bindRange('n22', d22);
+
+  // ---------- s23 variability ----------
+  const d23 = reg(() => {
+    const s = val('n23'); const C = cvs('c23'); const lo = -3 * Math.max(s, 0.5) - 0.5, hi = 2 + 3 * Math.max(s, 0.5) + 0.5;
+    if (C) {
+      const xs = []; for (let x = lo; x <= hi; x += (hi - lo) / 300) xs.push(x); const a = xs.map((x) => npdf(x, s)), b = xs.map((x) => npdf(x - 2, s));
+      const F = frame(C, [lo, hi], [0, Math.max(...a) * 1.1], { xlab: 'return %', fy: () => '' , padL: 10});
+      F.g.fillStyle = colorOf('c3', 0.25); F.g.beginPath(); F.g.moveTo(F.X(xs[0]), F.Y(0)); xs.forEach((x, i) => F.g.lineTo(F.X(x), F.Y(Math.min(a[i], b[i])))); F.g.lineTo(F.X(xs[xs.length - 1]), F.Y(0)); F.g.closePath(); F.g.fill();
+      polyline(F, xs, a, 'c2', 2); polyline(F, xs, b, 'c1', 2);
+      legend('c23L', [['group 1, mean 0%', 'c2'], ['group 2, mean 2%', 'c1'], ['overlap', 'c3']]);
+    }
+    const ov = 2 * Phi(-1 / s);
+    $('r23').innerHTML = `gap = <b>${(2 / s).toFixed(1)}</b> SDs · the curves overlap <b>${(ov * 100).toFixed(0)}%</b> · ${2 / s >= 2 ? 'clearly different groups' : 2 / s >= 1 ? 'some separation; test it formally' : 'mostly the same: the 2% gap may be noise'}`;
+  });
+  bindRange('n23', d23);
+
+  // ---------- s24 hidden variable ----------
+  const d24 = reg(() => {
+    const k = val('n24'); const ctrl = $('chk24').checked; const r = R(24); const Z = [], X = [], Y = [];
+    for (let i = 0; i < 200; i++) { const z = gauss(r); Z.push(z); X.push(k * z + gauss(r)); Y.push(k * z + gauss(r)); }
+    let px = X, py = Y; if (ctrl) { const fx = ols(Z, X), fy = ols(Z, Y); px = X.map((v, i) => v - (fx.m * Z[i] + fx.b)); py = Y.map((v, i) => v - (fy.m * Z[i] + fy.b)); }
+    const rr = corr(px, py), raw = corr(X, Y); const C = cvs('c24');
+    if (C) { const lim = Math.max(4, ...px.map(Math.abs), ...py.map(Math.abs)) * 1.05; const F = frame(C, [-lim, lim], [-lim, lim], { zeroX: true, zeroY: true, xlab: ctrl ? 'storks (driver removed)' : 'storks (simulated)', ylab: ctrl ? 'babies (driver removed)' : 'babies (simulated)' }); px.forEach((v, i) => dot(F, v, py[i], ctrl ? 'c2' : 'c1', 2.6, true)); legend('c24L', [[ctrl ? 'leftovers after removing the hidden driver' : 'raw data', ctrl ? 'c2' : 'c1']]); }
+    $('r24').innerHTML = `raw correlation <b>${raw.toFixed(2)}</b>${ctrl ? ` · after removing the hidden driver <b>${rr.toFixed(2)}</b>` : ''} · neither series affects the other in this simulation`;
+  });
+  bindRange('n24', d24); on('chk24', 'change', d24);
+
+  // ---------- s25 too many cuts ----------
+  function events25(r, n) { const ret = new Float64Array(n), att = new Uint8Array(n); for (let i = 0; i < n; i++) { ret[i] = 2 * gauss(r); let b = 0; for (let a = 0; a < 6; a++) if (r() < 0.5) b |= 1 << a; att[i] = b; } return { ret, att }; }
+  function cut25(E, cuts) {
+    let idx = []; for (let i = 0; i < E.ret.length; i++) idx.push(i); const used = new Set(); const conds = []; const steps = [{ n: idx.length, m: idx.reduce((s, i) => s + E.ret[i], 0) / idx.length }];
+    for (let c = 0; c < cuts; c++) {
+      let best = null; for (let a = 0; a < 6; a++) { if (used.has(a)) continue; for (let v = 0; v < 2; v++) { let s = 0, n = 0; for (const i of idx) if (((E.att[i] >> a) & 1) === v) { s += E.ret[i]; n++; } if (n >= 30 && (!best || s / n > best.m)) best = { a, v, m: s / n, n }; } }
+      if (!best) break; used.add(best.a); conds.push(best); idx = idx.filter((i) => ((E.att[i] >> best.a) & 1) === best.v); steps.push({ n: idx.length, m: best.m });
+    }
+    return { steps, conds };
+  }
+  function apply25(E, conds) { let s = 0, n = 0; for (let i = 0; i < E.ret.length; i++) { if (conds.every((c) => ((E.att[i] >> c.a) & 1) === c.v)) { s += E.ret[i]; n++; } } return { m: n ? s / n : 0, n }; }
+  let k25 = 0, P25 = null;
+  const d25 = reg(() => {
+    const cuts = val('n25'); const r = rng(seed * 61 + 2500 + k25); const IS = events25(r, 4000), OOS = events25(r, 4000);
+    const res = cut25(IS, cuts); const oos = apply25(OOS, res.conds); const C = cvs('c25');
+    if (!P25) { const rp = rng(2525); const acc = Array.from({ length: 6 }, () => ({ is: 0, oos: 0, n: 0 })); const RUNS = 200; for (let t = 0; t < RUNS; t++) { const a = events25(rp, 4000), b = events25(rp, 4000); const rr = cut25(a, 5); rr.steps.forEach((s, k) => { acc[k].is += s.m; acc[k].n += s.n; acc[k].oos += apply25(b, rr.conds.slice(0, k)).m; }); } P25 = acc.map((x) => ({ is: x.is / RUNS, oos: x.oos / RUNS, n: x.n / RUNS })); }
+    if (C) {
+      const vals = res.steps.map((s) => s.m).concat([oos.m]); const top = Math.max(0.6, ...vals.map(Math.abs)) * 1.15;
+      const F = frame(C, [0, res.steps.length + 1], [-top, top], { zeroY: true, ylab: 'average next-day return %', fx: () => '', fy: (v) => v.toFixed(2) });
+      const cw = F.X(1) - F.X(0);
+      res.steps.forEach((s, k) => { const x = F.X(k + 0.5) - cw * 0.3; F.g.fillStyle = colorOf('c1', 0.7); F.g.fillRect(x, Math.min(F.Y(s.m), F.Y(0)), cw * 0.6, Math.abs(F.Y(s.m) - F.Y(0))); F.g.fillStyle = colorOf('ink'); const lab = 'n=' + s.n; F.g.fillText(lab, F.X(k + 0.5) - F.g.measureText(lab).width / 2, F.H - F.padB + 14); });
+      const xo = F.X(res.steps.length + 0.5) - cw * 0.3; F.g.fillStyle = colorOf('c2', 0.8); F.g.fillRect(xo, Math.min(F.Y(oos.m), F.Y(0)), cw * 0.6, Math.abs(F.Y(oos.m) - F.Y(0))); F.g.fillStyle = colorOf('ink'); const lo = 'fresh n=' + oos.n; F.g.fillText(lo, F.X(res.steps.length + 0.5) - F.g.measureText(lo).width / 2, F.H - F.padB + 14);
+      F.g.strokeStyle = colorOf('muted'); F.g.setLineDash([4, 3]); F.g.beginPath(); P25.slice(0, cuts + 1).forEach((p, k) => { const x = F.X(k + 0.5), y = F.Y(p.is); k ? F.g.lineTo(x, y) : F.g.moveTo(x, y); }); F.g.stroke(); F.g.setLineDash([]);
+      legend('c25L', [['in-sample average after each cut', 'c1'], ['same filter on fresh data', 'c2'], ['pooled in-sample average (200 runs)', 'muted']]);
+    }
+    $('r25').innerHTML = `this run: ${res.steps.map((s) => s.n.toLocaleString()).join(' → ')} events · in-sample average <b>${pct(res.steps[res.steps.length - 1].m, 3)}</b> · same filter on 4,000 fresh events (n=${oos.n}) <b>${pct(oos.m, 3)}</b> · the true edge is 0`;
+    const p = P25[cuts]; $('r25b').innerHTML = `pooled over 200 runs after ${cuts} cut${cuts === 1 ? '' : 's'}: average sample <b>${Math.round(p.n).toLocaleString()}</b> · in-sample <b>${pct(p.is, 3)}</b> · out-of-sample <b>${pct(p.oos, 3)}</b>`;
+  });
+  bindRange('n25', d25); on('b25', 'click', () => { k25++; d25(); });
+
+  // ---------- s26 overlay ----------
+  function sim26(r) { const T = 200; const idx = [], A = [], B = []; for (let t = 0; t < T; t++) { const f = 0.0003 + 0.012 * gauss(r); idx.push(f); A.push(f + 0.005 * gauss(r) - 0.002); B.push(0.8 * f + 0.010 * gauss(r) + 0.00006); } const lv = (a) => { let p = 100; return a.map((x) => (p *= 1 + x)); }; return { ri: idx, ra: A, rb: B, li: lv(idx), la: lv(A), lb: lv(B) }; }
+  const norm = (a) => { const lo = Math.min(...a), hi = Math.max(...a); return a.map((v) => (v - lo) / (hi - lo || 1)); };
+  const gap26 = (u, v) => { const a = norm(u), b = norm(v); return mean(a.map((x, i) => Math.abs(x - b[i]))); };
+  let k26 = 0, P26 = null;
+  const d26 = reg(() => {
+    const r = rng(seed * 67 + 2600 + k26); const S = sim26(r); const which = $('sel26').value; const st = which === 'a' ? S.la : S.lb;
+    const ni = norm(S.li), ns = norm(st); plot('c26', { n: ni.length, ymin: -0.05, ymax: 1.05, lines: [{ d: ni, col: 'muted', w: 2.2, label: 'index (scaled to fill chart)' }, { d: ns, col: 'c1', w: 1.6, label: (which === 'a' ? 'stock A' : 'stock B') + ' (scaled to fill chart)' }] });
+    const ca = corr(S.ri, S.ra), cb = corr(S.ri, S.rb);
+    if (!P26) { const rp = rng(2626); let fooled = 0; const T = 300; for (let t = 0; t < T; t++) { const s = sim26(rp); if (gap26(s.li, s.lb) < gap26(s.li, s.la) && corr(s.ri, s.ra) > corr(s.ri, s.rb)) fooled++; } P26 = fooled / T; }
+    $('r26').innerHTML = `visual gap between the scaled lines: stock A <b>${gap26(S.li, S.la).toFixed(2)}</b>, stock B <b>${gap26(S.li, S.lb).toFixed(2)}</b> (smaller = looks closer)` + ($('chk26').checked ? ` · daily-return correlation with the index: A <b>${ca.toFixed(2)}</b>, B <b>${cb.toFixed(2)}</b>` : ' · tick "reveal" to see the correlations') + ` · pooled over 300 periods: B looks closer while A is more correlated in <b>${(P26 * 100).toFixed(0)}%</b> of cases`;
+  });
+  on('sel26', 'change', d26); on('chk26', 'change', d26); on('b26', 'click', () => { k26++; d26(); });
+
+  // ---------- s27 small samples ----------
+  function binom(n, p) { const out = new Array(n + 1); let lc = 0; for (let k = 0; k <= n; k++) { if (k) lc += Math.log(n - k + 1) - Math.log(k); out[k] = Math.exp(lc + k * Math.log(p) + (n - k) * Math.log(1 - p)); } return out; }
+  const d27 = reg(() => {
+    const p = val('n27a') / 100, n = val('n27b'); const pm = binom(n, p); const C = cvs('c27');
+    if (C) {
+      const F = frame(C, [-2, 102], [0, Math.max(...pm) * 1.12], { xlab: 'observed win % in the sample', fy: (v) => (v * 100).toFixed(0) + '%' });
+      const bw = Math.max(1.5, Math.min(30, (F.X(100) - F.X(0)) / (n + 1) * 0.8));
+      pm.forEach((q, k) => { const x = F.X(k / n * 100); F.g.fillStyle = colorOf(k / n >= 0.665 ? 'c1' : 'c2', 0.7); F.g.fillRect(x - bw / 2, F.Y(q), bw, F.Y(0) - F.Y(q)); });
+      F.g.strokeStyle = colorOf('sell'); F.g.setLineDash([4, 3]); F.g.beginPath(); F.g.moveTo(F.X(p * 100), F.padT); F.g.lineTo(F.X(p * 100), F.Y(0)); F.g.stroke(); F.g.setLineDash([]);
+      legend('c27L', [['chance of each observed result', 'c2'], ['results ≥ 67%', 'c1'], ['true rate', 'sell']]);
+    }
+    let cum = 0, lo = null, hi = null; pm.forEach((q, k) => { cum += q; if (lo == null && cum >= 0.025) lo = k; if (hi == null && cum >= 0.975) hi = k; });
+    const ge67 = pm.reduce((s, q, k) => s + (k / n >= 0.665 ? q : 0), 0);
+    $('r27').innerHTML = `true rate ${(p * 100).toFixed(0)}%, ${n} trades → middle 95% of outcomes: <b>${lo} to ${hi} out of ${n}</b> (${(lo / n * 100).toFixed(0)}–${(hi / n * 100).toFixed(0)}%) · chance of seeing ≥ 67% wins: <b>${(ge67 * 100).toFixed(1)}%</b> · ${n < 20 ? 'under 20: report as "X out of ' + n + '"' : 'big enough that a % is reasonable'}`;
+  });
+  bindRange('n27a', d27); bindRange('n27b', d27);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; $('seedOut').textContent = seed; B4 = null; M5 = null; redrawAll(); });
+  $('seedOut').textContent = seed;
+  redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

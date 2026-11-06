@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.14 Scalper Alerts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* chapter 14 additions */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.fig .readout { display: block; line-height: 1.65; }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 4px; font-size: 16px; max-width: 70ch; }
+ol.steps li.now { background: var(--tint); border-radius: 3px; }
+input[type=number] { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; width: 7.5em; }
+code { font-family: var(--mono); font-size: .85em; }
+.win div.up { border-color: var(--buy); color: var(--buy); }
+.win div.dn { border-color: var(--sell); color: var(--sell); }
+.win div.eq { color: var(--muted); }
+.slip { border-left: 3px solid var(--sell); padding-left: 10px; font-size: 15px; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch13_staying_in_a_trade.html">← Ch.13 Staying in a Trade</a><a href="ch15_brick_plays.html">Ch.15 Brick Plays →</a></nav>
+
+<header class="hero">
+  <div class="kicker">John F. Carter · Mastering the Trade, 3rd ed. · Chapter 14 · pdf p300–319</div>
+  <h1>Scalper alerts: <em>three closes</em> and the trend has turned</h1>
+  <p class="lede">Carter's quickest reversal signal: when a market closes higher three bars in a row, the downswing is probably over, so buy; when it closes lower three bars in a row, sell. A painted bar and a sound alert do the counting for you. This page walks the whole chapter in the book's order: the idea and its filter, the charts he runs it on, why tick charts suit scalping, the five trading rules, all 18 worked trades (index futures, a stock, crude oil and ten forex trades), and how he combines it with pivots. Every chart uses simulated prices. Where a chart replays one of Carter's trades, the entry, exit and stop prices are his and the bars between them are simulated.</p>
+  <div class="topbar"><button id="reroll" type="button">Roll a new market</button><span class="readout">market #<b id="seedOut">1</b> · re-rolls simulated paths, never the book's prices</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>One idea, stated in a page, then tested on 18 charts. The order is: what the signal is, how it is filtered, where it is used, which chart type, the rules, the evidence, and how to use it with other setups.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Observation</span><span class="node">Most reversals come after 3 higher / 3 lower closes</span><span class="arr">→</span><span class="node key">closes count, highs and lows don't</span><span class="arr">→</span><span class="node">holds on every time frame</span></div>
+    <div class="row"><span class="tag">Tool</span><span class="node">Indicator paints the 1st bar of the 3</span><span class="arr">→</span><span class="node">audio alert</span><span class="arr">→</span><span class="node key">market order at the 3rd close</span></div>
+    <div class="row"><span class="tag">Filter</span><span class="node">3 lower closes inside a bull flag = shake-out</span><span class="arr">→</span><span class="node key">needs a close beyond the trigger bar → paints the swing low/high</span></div>
+    <div class="row"><span class="tag">Where</span><span class="node">233-tick ES · 144-tick &amp; 5-min YM (scalps)</span><span class="node">60-min &amp; daily (swings)</span><span class="node">index futures, major FX pairs, stocks, any market</span></div>
+    <div class="row"><span class="tag">Chart type</span><span class="node">Tick charts: one bar per N trades (Fibonacci N)</span><span class="arr">→</span><span class="node key">slow market = slow chart = fewer false signals</span><span class="arr">→</span><span class="node">more volume → bigger N</span></div>
+    <div class="row"><span class="tag">Rules</span><span class="node">24-hour chart</span><span class="node key">long at 3rd higher close · out (and reverse) at 3 lower closes</span><span class="node">intraday: no stop, out 4:10 pm ET</span><span class="node">daily: stop at the painted bar</span><span class="node">60-min+: hold overnight</span></div>
+    <div class="row"><span class="tag">Evidence</span><span class="node">ES ×4 · YM ×2 · KLAC · crude</span><span class="node">10 forex trades + pip / lot slang</span><span class="node">all hand-picked</span></div>
+    <div class="row"><span class="tag">Use</span><span class="node key">buy bottoms / short tops only after confirmation</span><span class="arr">→</span><span class="node">combine with pivots, price channels</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Three closes, one painted bar</a>
+    <a href="#s2"><span>02</span>The filter: flags and trigger bars</a>
+    <a href="#s3"><span>03</span>Time frames and markets</a>
+    <a href="#s4"><span>04</span>Why tick charts for scalping</a>
+    <a href="#s5"><span>05</span>The five trading rules</a>
+    <a href="#s6"><span>06</span>ES intraday: Oct 3, Oct 5, Sep 30</a>
+    <a href="#s7"><span>07</span>Daily swings: ES, YM, KLAC, crude</a>
+    <a href="#s8"><span>08</span>YM Oct 6: flipping long and short</a>
+    <a href="#s9"><span>09</span>Forex: EURUSD, GBPUSD, the slang</a>
+    <a href="#s10"><span>10</span>Forex: the other majors and crosses</a>
+    <a href="#s11"><span>11</span>All 18 trades on one card</a>
+    <a href="#s12"><span>12</span>Summing up: no more falling knives</a>
+    <a href="#s13"><span>13</span>Combining with pivots</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · HOW DO YOU IDENTIFY AND PROFIT FROM CHANGES IN TREND WITHOUT CATCHING A FALLING KNIFE OR STEPPING IN FRONT OF A FREIGHT TRAIN?</div><h2>Three closes in a row, and the first bar gets painted</h2></div><span class="chip">pdf p300–301</span></div>
+  <p>The chapter title asks whether this is the best tool for quickly confirming that a price trend has changed. Carter's answer starts with something he says he has seen over years of watching markets: <b>most reversals happen after three consecutive higher closes or three consecutive lower closes</b>, and this holds on <b>every time frame</b>.</p>
+  <ul class="plain">
+    <li>It is built on <b>closes only</b>. Three higher highs or three lower lows don't count; the high and low of a bar don't matter here. The close is where the bar settles, which is "where the rubber meets the road".</li>
+    <li>The hard way is to watch the chart and count consecutive closes yourself, especially intraday. He calls that a way to go bug-eyed and insane.</li>
+    <li>Instead he wrote a simple indicator that <b>paints the first bar of the sequence once the third bar has met the condition</b>. When he sees the painted bar he places a <b>market order</b> and he is in.</li>
+    <li>Better still, an <b>audio alert</b> sounds, so he can be down the hall (or on the phone with his wife, who doesn't share his sense of urgency) and come back to place the trade.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_tug_of_war_marker.svg" alt="A tug-of-war match at a school sports day, where a referee notes only where the rope&#x27;s marker ends each round, and it ends closer to one team three rounds in a row." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A tug-of-war rope with a marker on it. One tug toward the buyers means nothing: the rope wobbles all day. But if the marker ends each round closer to the buyers three rounds running, the buyers are now winning. Carter only looks at where the marker <i>ends</i> each round (the close), not how far it was yanked during the round (the high and low).</p></div>
+  <div class="fig">
+    <canvas id="sc1" class="tall" aria-label="Simulated bar chart with scalper alert signals; step through bar by bar"></canvas>
+    <div class="legend" id="sc1L"></div>
+    <div class="controls">
+      <label for="st1">Bar <input id="st1" type="range" min="4" max="89" value="89"><output id="st1o">89</output></label>
+      <label for="sel1">Count <select id="sel1"><option value="closes">closes (Carter's rule)</option><option value="highs">highs / lows (what he ignores)</option></select></label>
+      <button id="bk1" type="button">◀ bar</button><button id="fw1" type="button">bar ▶</button>
+    </div>
+    <div class="win" id="strip1" aria-label="Last six closes compared with the close before"></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>The indicator is a small state machine. Each bar it compares this close with the last close and keeps a streak count. When the up-streak reaches 3 and the last signal was not already a buy, it fires: it paints bar <code>i−2</code> (the first of the three) and you buy at the close of bar <code>i</code>. Then it waits only for the opposite event. More higher closes in the same direction are ignored, because a buy has already fired.</p>
+    <div class="formula">long  fires at bar i  if  c[i] &gt; c[i−1] &gt; c[i−2] &gt; c[i−3]  and last signal ≠ long
+short fires at bar i  if  c[i] &lt; c[i−1] &lt; c[i−2] &lt; c[i−3]  and last signal ≠ short
+painted bar = i − 2      entry = close of bar i (the 3rd bar)</div>
+    <p>Why closes? A high or low is one print at one moment; a close is the price everybody holding overnight (or to the end of the bar) agreed to carry. Switch the selector to highs/lows: that version fires on bars that merely poke out and then fall back, so it flips more often in choppy stretches.</p>
+    <p><b>Beyond the book:</b> on a pure coin-flip market a run of three same-direction closes starts on about 1 bar in 8, so the signal will fire often there too. The claim that "most reversals" follow such a run is Carter's observation, not something this page can check on real data; section 5 shows what the rule does on simulated markets with and without trends.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch13_staying_in_a_trade.html">Ch.13</a> ends with TTM trend bars as an exit tool: hold until two "selling bars" print. The scalper alert is the same kind of bar-counting, but it also gives entries.</li>
+    <li>"Catching a falling knife" (buying something only because it fell a lot) comes back in the chapter's summing-up, <a href="#s12">section 12</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">01 (cont.) · THE ONE KEY FILTER</div><h2>Don't get shaken out of a bull flag</h2></div><span class="chip">pdf p301</span></div>
+  <p>He added one filter. In a bull flag (a short, gentle pullback inside an uptrend) prices can make a few lower closes in a row while the uptrend is still intact, and the plain rule would throw him out. So:</p>
+  <ul class="plain">
+    <li>If there are three lower closes but that price action <b>does not go below the signal bar's low</b>, he ignores the signal.</li>
+    <li>For a long signal, the <b>trigger bar</b> is the first bar whose low is higher than the bar before it.</li>
+    <li>The next bar that <b>closes above the trigger bar's high</b> paints the bar before the trigger (the low bar). That painted bar is now the <b>swing low</b>.</li>
+    <li>Most of the time this all happens together with three higher closes. When it isn't that clean, the version above still applies, because it rests on the one confirmation he trusts: <b>price</b>.</li>
+  </ul>
+  <p class="slip">The book describes the filter in a few lines, without a formula, so the "price-confirmed" detector on this page is <b>my reading</b> of it: a short needs a close below the low of the latest lower-high bar, and a long needs a close above the high of the latest higher-low bar. Fig 14.8 (the only figure printed in this copy) agrees with it: the painted bars there sit at the swing highs and swing lows.</p>
+  <div class="box picture"><b>Picture it</b><p>Someone walking up a staircase with a heavy bag stops and shuffles back half a step three times. Three backward shuffles don't mean they've turned around. You only believe they're heading down when they step below the last step they stood on.</p></div>
+  <div class="fig">
+    <h3>A hand-built bull flag (illustration, not market data)</h3>
+    <canvas id="fl2" aria-label="A hand-built uptrend with a bull flag: compare the plain three-closes rule with the price-confirmed filter"></canvas>
+    <div class="legend" id="fl2L"></div>
+    <div class="controls"><label for="det2">Detector <select id="det2"><option value="closes">three closes (plain)</option><option value="confirm">price-confirmed filter</option><option value="highs">highs / lows</option></select></label></div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="fig">
+    <h3>Same two detectors on a simulated market</h3>
+    <canvas id="cm2" aria-label="Simulated market showing where the plain and filtered detectors agree and disagree"></canvas>
+    <div class="legend" id="cm2L"></div>
+    <div class="controls"><label for="det2b">Paint <select id="det2b"><option value="closes">three closes</option><option value="confirm">price-confirmed</option></select></label></div>
+    <div class="readout" id="r2b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>A bull flag drifts down in small steps that overlap the previous bar. Each close is lower, but not lower than the previous bar's low, so the price-confirmed rule never sees a "break". The plain rule only asks "lower than last close?", so it sells in the flag and then has to buy back higher when the trend resumes: one losing round trip.</p>
+    <p>The cost of the filter: it is <b>stricter about the size</b> of the turn but not slower in general. On simulated bars my reading of it actually fires more often than the plain rule (it doesn't need three bars, just one decisive close), so the two only partly coincide. Treat that as a sign that the book's wording leaves room for interpretation; test whichever version you code on your own data.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Swing highs and lows defined by "a bar with a lower high, then a close below its low" are close cousins of the HOLP/LOHP idea in <a href="ch17_holp_and_lohp.html">Ch.17</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">01 (cont.) · WHICH CHARTS HE RUNS IT ON</div><h2>Same signal, many time frames</h2></div><span class="chip">pdf p301–302</span></div>
+  <div class="tablewrap"><table>
+    <tr><th>Use</th><th>Market</th><th>Chart</th></tr>
+    <tr><td>Scalping (very fast signals)</td><td>E-mini S&amp;P (ES)</td><td class="num">233-tick</td></tr>
+    <tr><td>Scalping</td><td>mini-sized Dow (YM)</td><td class="num">144-tick</td></tr>
+    <tr><td>The one or two reversals a day</td><td>YM</td><td class="num">5-minute</td></tr>
+    <tr><td>Swing trades</td><td>any</td><td class="num">60-minute and daily</td></tr>
+  </table></div>
+  <p>He uses it mainly on <b>stock index futures</b> and the <b>major currency pairs</b>, also on individual stocks he follows, and says it works the same way in any market and any time frame because it uses nothing but price. Rule 1 (section 5) adds: the larger the time frame, the larger the parameters and the potential move.</p>
+  <div class="box picture"><b>Picture it</b><p>A coastline looks jagged from a plane and from a beach. The scalper alert reads the same pattern whether one bar is a few seconds or a whole day; only the size of the waves changes.</p></div>
+  <div class="fig">
+    <canvas id="tf3" aria-label="One simulated market sampled at four time frames with scalper signals"></canvas>
+    <div class="legend" id="tf3L"></div>
+    <div class="controls"><label for="k3">Bar = <select id="k3"><option value="1">1 base bar</option><option value="5" selected>5 base bars</option><option value="15">15 base bars</option><option value="60">60 base bars</option></select></label></div>
+    <div class="readout" id="r3"></div>
+    <div class="tablewrap" id="t3"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Combine k small bars into one bar and you get a slower chart of the same market. The rule doesn't change, so it fires roughly k times less often per unit of time, and each trade spans more ground. On a random walk the typical move grows with √k, not k, which is why the daily-chart trades in this chapter are worth tens of points and the tick-chart ones a few. The table pools 200 simulated markets (beyond the book).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>backtest_results_summary.md</code>: on NSE, the weekly-chart strategies held up and the intraday ones mostly lost to costs. Faster charts mean more trades, and each trade pays the same charges.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">02 · WHY ARE TICK CHARTS BEST FOR SCALPING?</div><h2>A bar per N trades, not per N minutes</h2></div><span class="chip">pdf p302</span></div>
+  <p>A tick chart (not the NYSE <code>$TICK</code> from his tick-fade setup) draws a new bar every N trades. For N he uses <b>Fibonacci numbers</b>: 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1,597, 2,584, 4,181 and so on. There is no point testing a 144-tick chart against a 143-tick chart.</p>
+  <ul class="plain">
+    <li>A <b>377-tick</b> chart forms a bar every 377 trades. In slow trading (overnight especially) it crawls; in fast trading it races. A <b>2-minute</b> chart has to print a bar every two minutes whatever the volume, which fires <b>false signals in low-volume conditions</b>. Tick charts adapt to the market, and he finds them especially useful for day trading.</li>
+    <li>Which N? No exact science; rule of thumb: <b>the higher the volume, the higher the tick count</b>. He uses <b>987-tick for the ES</b> and <b>144-tick for the YM</b>; the only difference is volume. A <b>377-tick</b> chart suits most commodities and high-volume stocks.</li>
+    <li>A 233-tick chart: a new bar after 233 trades, whatever the size of each trade.</li>
+    <li>Two reasons he likes them for scalping. (1) They are <b>faster</b> than time charts exactly when it matters, when trading speeds up; and when trading slows, the signals slow too, which keeps you out when nothing is going on. (2) Pit traders have no idea of a two-minute or five-minute chart. They feel the <b>pace of trades</b>, and a breakout on a 2-minute chart means nothing to them.</li>
+    <li>He prefers 987-tick on the ES for intraday swings (holding half an hour or more) and 233-tick for faster scalps.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_time_meter_vs_distance_meter.svg" alt="Two taxis: one meter ticks up while stuck at a red light, the other only ticks when the taxi is actually covering distance on an open road." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A taxi meter. A time meter charges the same per minute whether you're stuck at a signal or flying down the highway. A distance meter charges only when something happens. A tick chart is the distance meter of trading: a bar only "ticks over" when enough business has been done.</p></div>
+  <div class="fig">
+    <h3>Simulated session, 04:00–12:00 ET: same trades, two chart types</h3>
+    <canvas id="tb4" class="short" aria-label="Time-based bars from simulated trades"></canvas>
+    <div class="legend" id="tb4L"></div>
+    <canvas id="kb4" class="short" aria-label="Tick-based bars from the same simulated trades"></canvas>
+    <div class="legend" id="kb4L"></div>
+    <canvas id="bc4" class="short" aria-label="Bars printed per 30 minutes for each chart type"></canvas>
+    <div class="legend" id="bc4L"></div>
+    <div class="controls">
+      <label for="N4">Tick chart <select id="N4"><option value="89">89-tick</option><option value="144">144-tick</option><option value="233" selected>233-tick</option><option value="377">377-tick</option><option value="610">610-tick</option><option value="987">987-tick</option></select></label>
+      <label for="T4">Time chart <select id="T4"><option value="1">1-minute</option><option value="2" selected>2-minute</option><option value="5">5-minute</option></select></label>
+      <label for="q4">Overnight trades / min <input id="q4" type="range" min="1" max="40" value="6"><output id="q4o">6</output></label>
+    </div>
+    <div class="readout" id="r4"></div>
+    <p>Model (not in the book): trades arrive at random at 6 a minute before 9:30 (slider), 130 a minute from 9:30 to 10:30 and 60 a minute after; each trade moves price one ES tick (0.25) up or down, or not at all. Dashed line = 9:30 open.</p>
+  </div>
+  <div class="fig">
+    <h3>Pick a tick size: bars per session</h3>
+    <div class="controls"><label for="tpd4">Trades in your session <input id="tpd4" type="number" min="100" step="100" value="40000"></label></div>
+    <div class="readout" id="fib4"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>Price only moves when people trade. A time bar mixes quiet minutes (a handful of trades, almost no movement) with busy minutes (hundreds of trades, big movement), so time-bar returns are a mix of tiny and huge moves: fat tails. A tick bar holds the same number of trades every time, so each bar carries a similar amount of "news". In the simulation the time bars' excess kurtosis is far above 0 (fat-tailed) while the tick bars' is near 0 (close to a normal curve).</p>
+    <p>For the scalper alert this matters in the quiet hours: a 2-minute chart keeps printing nearly flat bars, and three tiny higher closes are enough to fire. The tick chart prints only a few bars overnight, so it fires far less there.</p>
+    <p><b>Beyond the book:</b> the idea that markets run on a "trade clock" rather than a wall clock goes back to Peter Clark (1973, <i>Econometrica</i>, subordinated processes) and Ané &amp; Geman (2000, <i>Journal of Finance</i>, "Order Flow, Transaction Clock, and Normality of Asset Returns"); López de Prado's <i>Advances in Financial Machine Learning</i> (2018, ch. 2) builds tick, volume and dollar bars on it.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The NYSE <code>$TICK</code> (upticks minus downticks across NYSE stocks) is a different thing; it drives the setup in <a href="ch09_tick_fades.html">Ch.9 Tick Fades</a>.</li>
+    <li><b>Beyond the book, India:</b> NSE trades 9:15–15:30 IST with no overnight session, so the "slow overnight" problem shows up instead around lunch. Check whether your charting platform offers tick-count bars before planning around them.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">03 · WHAT ARE THE TRADING RULES FOR BUYS (SELLS ARE REVERSED)?</div><h2>The five rules, as a system you can test</h2></div><span class="chip">pdf p302–303</span></div>
+  <ol class="plain">
+    <li>On intraday charts use a <b>24-hour chart</b>, so overnight trading is part of the count. It works on all time frames: bigger time frame, bigger parameters and bigger potential move. On <b>daily charts</b> he uses <b>regular session hours</b>.</li>
+    <li>After <b>three consecutive higher closes</b>, go long at the market at the <b>close of the third bar</b>.</li>
+    <li>The trade is valid until <b>three consecutive lower closes</b>; then exit. If the market is still open on an intraday trade, exit the long and <b>go short at the same time</b>. <b>No stop loss on intraday charts</b>: the reversal signal is the exit, win or lose. On <b>daily charts</b>, the stop goes at the <b>low of the bar that started the signal</b> (the first of the three).</li>
+    <li>On an intraday trade (a <b>15-minute chart or smaller</b>) with no exit signal by the close, exit at the market at <b>4:10 p.m. eastern</b>.</li>
+    <li>On <b>60-minute or longer</b> charts, hold overnight and exit at the next signal: maybe the next day on a 60-minute chart, maybe a month later on a daily chart.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><p>A thermostat with a dead band. It doesn't switch the heater on at the first cold minute; it waits until the room has cooled three readings in a row, then switches, and stays switched until three warm readings in a row. You are always either heating or cooling: an "always in the market" switch.</p></div>
+  <div class="fig">
+    <canvas id="sy5" class="tall" aria-label="The five rules run on a simulated market, trades drawn"></canvas>
+    <div class="legend" id="sy5L"></div>
+    <div class="controls">
+      <label for="tf5">Rules for <select id="tf5"><option value="intra">≤15-min chart: no stop, flat at session end</option><option value="swing">60-min: no stop, hold overnight</option><option value="daily">daily: stop at the painted bar</option></select></label>
+      <label for="reg5">Market <select id="reg5"><option value="trend">trending stretches</option><option value="random">random walk</option><option value="chop">range-bound</option></select></label>
+      <label for="det5">Detector <select id="det5"><option value="closes">three closes</option><option value="confirm">price-confirmed</option></select></label>
+      <label for="cost5">Costs per round trip, % <input id="cost5" type="range" min="0" max="0.3" step="0.01" value="0.05"><output id="cost5o">0.05</output></label>
+    </div>
+    <div class="readout" id="r5"></div>
+    <div class="tablewrap" id="t5"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>The rules make a <b>stop-and-reverse</b> trend follower: it is always long or short (apart from the 4:10 flat and the daily stop). It gives up the first part of every move (it needs three bars to notice) and the last part (it needs three bars against it to leave). So it only earns when moves run well past three bars. The pooled table shows that on simulated data: clearly positive where the market has trending stretches, about zero minus costs on a random walk, and steadily negative in a range, where each turn comes just after it has entered.</p>
+    <p>The "no stop" rule intraday means risk is limited only by how far price can run before three closes go against you. The worst adverse move (MAE) column shows how deep simulated trades went against the entry before the exit. <b>Simulated results are not evidence</b> that the setup works on real markets; they show how the rules behave.</p>
+    <p><b>Beyond the book:</b> 4:10 p.m. eastern is 1:40 a.m. IST while the US is on daylight time and 2:40 a.m. IST in the US winter.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>backtest_results_summary.md</code>: "intraday momentum on Nifty futures: tiny real edge, eaten by ~₹480 charges + slippage". An always-in reversal system trades a lot, so costs decide it. Push the cost slider and watch the expectancy.</li>
+    <li><code>breakeven_move_fyers.md</code>: an intraday NSE trade in a ₹4,000 stock needs about a 0.08–0.15% move just to cover charges and slippage. That is roughly the cost range on the slider.</li>
+    <li>Carter prefers a squeeze (<a href="ch11_the_squeeze.html">Ch.11</a>) for entries and bar-based tools (<a href="ch13_staying_in_a_trade.html">Ch.13</a>) for exits; this setup does both jobs with one rule.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">04 · SPECIFIC EXAMPLES · E-MINI S&amp;P (1–3)</div><h2>Three ES trades: 233-tick, 15-minute, 60-minute</h2></div><span class="chip">pdf p303–305 · Fig 14.1–14.3</span></div>
+  <p>Pick a trade. The chart replays it: the book's entry, exit and stop prices, with simulated bars between them that obey the same rule (no reversal signal appears until the one he took). The painted bars are where the signal fired.</p>
+  <div class="fig">
+    <canvas id="rp6" class="tall" aria-label="Replay of one of Carter's ES trades with simulated bars"></canvas>
+    <div class="legend" id="rp6L"></div>
+    <div class="controls">
+      <label for="ex6">Trade <select id="ex6"><option value="es1003">Oct 3, 2004 · 233-tick (Fig 14.1)</option><option value="es1005">Oct 5, 2004 · 15-min (Fig 14.2)</option><option value="es0930">Sep 30, 2004 · 60-min (Fig 14.3)</option></select></label>
+      <label for="st6">Bars shown <input id="st6" type="range" min="1" max="60" value="60"><output id="st6o">60</output></label>
+    </div>
+    <div class="readout" id="r6"></div>
+    <ol class="steps" id="li6"></ol>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Oct 5 is a relay with a referee's whistle: short leg, long leg, then the 4:10 whistle ends the race for Carter, while the 24-hour trader keeps running into the dark and finishes 2.75 points better. Carter says the extra run isn't worth an evening of slow, irritating after-hours trading.</p></div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <ul>
+      <li><b>Oct 3 (233-tick):</b> the TradeStation "paint" is a thick black mark over the first bar of three higher closes; his point 1 sits a little to the right of it. He's long at 1133.25 at the third close and out at 1138.50 (the book says "lower lows" here; the rule is lower closes). +5.25 points = $262.50 at $50 a point, which he rounds to $262. Oscillators read overbought near 1135.00, which would have shaken some traders out or tempted them short. Here only price counts.</li>
+      <li><b>Oct 5 (15-minute):</b> short 1137.00 (~1 pm) → long 1134.00 (~3 pm), +3.00 on the short ($150 a contract, my arithmetic) → 4:10 exit at 1133.75, −0.25. After 4 p.m. he would rather trade forex, the cash market especially, where liquidity is better in that window. His line: when markets are active and liquid, trade them; when they're quiet, leave them alone.</li>
+      <li><b>Sep 30 (60-minute):</b> the timing lesson. The 10:30 bar is painted, but you can only know that at 12:30, when the third bar closes. That is the cost of using closes. +21.75 points = $1,087.50. Two-to-five-day swings, good for people with jobs, and it stops losing day traders from <b>overtrading</b>, which he calls by far the number one reason traders fail.</li>
+    </ul>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The 4:10 exit is rule 4 in <a href="#s5">section 5</a>; the "paint appears two bars late" point is the same lag every close-based signal has (moving-average crossovers in Murphy's <a href="../murphy/ch09_moving_averages.html">Ch.9</a>).</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">04 (cont.) · DAILY SWINGS: ES JUN 28 · YM AUG 10 · KLAC · CRUDE OIL</div><h2>Daily charts: one signal, a month in the trade</h2></div><span class="chip">pdf p306–309 · Fig 14.4–14.7</span></div>
+  <div class="fig">
+    <canvas id="rp7" class="tall" aria-label="Replay of one of Carter's daily-chart trades with its stop"></canvas>
+    <div class="legend" id="rp7L"></div>
+    <div class="controls">
+      <label for="ex7">Trade <select id="ex7"><option value="es0628">ES · Jun 28, 2004 (Fig 14.4)</option><option value="ym0810">YM · Aug 10, 2004 (Fig 14.5)</option><option value="klac">KLAC · Apr 5, 2004 (Fig 14.6)</option><option value="crude">Crude · Sep 9, 2004 (Fig 14.7)</option></select></label>
+      <label for="st7">Bars shown <input id="st7" type="range" min="1" max="60" value="60"><output id="st7o">60</output></label>
+    </div>
+    <div class="readout" id="r7"></div>
+    <ol class="steps" id="li7"></ol>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>He compares these swing trades to owning a rental flat and handing upkeep to a management company: you set it up, then it mostly looks after itself. Intraday trading is running the building yourself.</p></div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <ul>
+      <li>On daily charts the stop is the far end of the painted bar: <b>ES</b> short 1132.50 with stop 1153.50 (21 points of risk, $1,050 a contract) made 36.50 ($1,825); <b>YM</b> long 9916 with stop 9809 (107 points, $535) made 362 ($1,810); <b>KLAC</b> short 52.51 with stop 53.97 (1.46 a share) made 9.55. Measured in risk units that is roughly 1.7R, 3.4R and 6.5R (my arithmetic).</li>
+      <li>He says the stop is rarely hit because a reversal signal usually arrives first: the exit signal is the real exit, the stop is insurance.</li>
+      <li><b>Two accounts:</b> full-time traders should keep one for day trading and one for swing trading, so a bad patch intraday can be offset by a swing like these. And a person's trading style reflects their personality: a natural swing trader will struggle at day trading.</li>
+      <li><b>Crude:</b> a $1 move is $1,000 on the big contract (CL) and $500 on the mini (QM). The exit bar also started a new long (three higher closes right away). The book labels it the "September 2004 contract" on September 9; normally the September crude contract has expired by then, so the label may be a slip. Live crude prices need the NYMEX feed.</li>
+    </ul>
+    <p class="slip">Date check: the ES trade's exit "paints the July 24 bar", but July 24, 2004 was a Saturday. On a daily chart, three bars closing on Wednesday July 28 start on Monday July 26. The prices are unaffected.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>backtest_results_summary.md</code>: your weekly pullback test used a 2.5-ATR stop and a 2R target and was the best-behaved swing system. Carter's daily version has no target at all: the next opposite signal is the exit.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">04 (cont.) · MINI-SIZED DOW, DECEMBER 2004 CONTRACT, OCTOBER 6, 2004</div><h2>Flowing in and out: long, short, long, short</h2></div><span class="chip">pdf p309–310 · Fig 14.8</span></div>
+  <p>This example shows how he flips between long and short within a day. It works best on lower time frames such as a 5-minute or a 233-tick chart. Fig 14.8 (5-minute YM, CBOT) is the one chart printed in this copy: four painted bars, numbered 1, 3, 5 and 7, sit at the swing high, swing low, swing high and swing low, and the even numbers mark the fills.</p>
+  <div class="fig">
+    <canvas id="rp8" class="tall" aria-label="Replay of the YM October 6 flips with simulated 5-minute bars"></canvas>
+    <div class="legend" id="rp8L"></div>
+    <div class="controls"><label for="st8">Bars shown <input id="st8" type="range" min="1" max="60" value="60"><output id="st8o">60</output></label></div>
+    <div class="readout" id="r8"></div>
+    <ol class="steps" id="li8"></ol>
+  </div>
+  <div class="fig">
+    <h3>The "double the order" trick</h3>
+    <div class="controls"><label for="n8">Contracts you trade <input id="n8" type="range" min="1" max="20" value="10"><output id="n8o">10</output></label></div>
+    <div class="readout" id="r8b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_swing_door_stop_and_reverse.svg" alt="A waiter pushes a restaurant swing door in one smooth double-strength shove from fully open one way to fully open the other." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A swing door. You don't stop it in the middle and then push it the other way; one shove of double strength takes it from fully open one way to fully open the other.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>To exit and reverse in one go, send one order for <b>twice</b> your size: long 10, sell 20, and you are short 10. It saves a second order and a second chance of slippage between the two. The four legs: +7, +17, +13 points on the closed trades (+37 points, $185 a contract at $5 a point; my arithmetic), and the last long from 10,173 is open with the chart's last price at 10,183.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Rule 3 in <a href="#s5">section 5</a> (exit and reverse at the same time) is exactly this.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">04 (cont.) · FOREX MARKETS · EURUSD OCT 15, 2004 · GBPUSD MAY 9 &amp; AUG 2, 2005</div><h2>Forex: same signal, plus the dealers' slang</h2></div><span class="chip">pdf p310–313 · Fig 14.9–14.11</span></div>
+  <p>He moves to forex, starting with the pair most traders know, the euro against the US dollar.</p>
+  <div class="fig">
+    <canvas id="rp9" class="tall" aria-label="Replay of a forex trade with simulated bars"></canvas>
+    <div class="legend" id="rp9L"></div>
+    <div class="controls">
+      <label for="ex9">Trade <select id="ex9"><option value="eurusd">EURUSD · Oct 15, 2004 · daily (Fig 14.9)</option><option value="gbp0509">GBPUSD · May 9, 2005 · daily (Fig 14.10)</option><option value="gbp0802">GBPUSD · Aug 2, 2005 · 5-min (Fig 14.11)</option></select></label>
+      <label for="st9">Bars shown <input id="st9" type="range" min="1" max="80" value="80"><output id="st9o">80</output></label>
+    </div>
+    <div class="readout" id="r9"></div>
+    <ol class="steps" id="li9"></ol>
+  </div>
+  <div class="fig">
+    <h3>Forex size and slang</h3>
+    <div class="controls">
+      <label for="lots9">Lots <input id="lots9" type="range" min="1" max="100" value="35"><output id="lots9o">35</output></label>
+      <label for="pips9">Pips caught <input id="pips9" type="range" min="1" max="1200" value="998"><output id="pips9o">998</output></label>
+    </div>
+    <div class="readout" id="r9b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A pip is the smallest usual step on the price board: 0.0001 for most pairs. On a $100,000 lot each step moves your account by $10, so a 998-pip ride is 998 steps of $10.</p></div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <ul>
+      <li><b>Lot sizes:</b> one standard lot = $100,000 of currency; 10 lots = $1,000,000. All the lots in these examples are standard lots, not the $10,000 "mini".</li>
+      <li><b>Margin:</b> the book says each lot needed $1,000 in the account. That is 100:1 leverage, which is why he calls forex attractive: definite stops plus leverage to ride a trend until it turns.</li>
+      <li><b>Slang:</b> 10 lots is a "buck" (a dollar), so long 35 lots is "3½ bucks" when your broker reads it back. Catching 100 pips (one full cent) is "one large"; the EURUSD trade caught almost "10 large".</li>
+      <li><b>Interbank:</b> banks and big funds trade in the interbank market, where the smallest trade is $1,000,000, the same as 10 retail lots.</li>
+      <li>The EURUSD trade sat through a week-long pause and a late-December roll-over that made others take profits. With no sell signal there was nothing to do; you exit on the signal, not on how a pullback feels.</li>
+    </ul>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><b>Beyond the book:</b> leverage limits are much lower today in many places (for example, retail rules in the US and EU cap major-pair leverage far below 100:1), and Indian residents can trade only INR pairs and a few crosses on recognised exchanges (NSE/BSE currency derivatives), not spot EURUSD at an offshore broker.</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">04 (cont.) · FOREX · AUDUSD · USDCHF · USDJPY ×2 · USDCAD · EURJPY · EURGBP</div><h2>The other majors, two crosses, and what a pip is worth</h2></div><span class="chip">pdf p313–318 · Fig 14.12–14.18</span></div>
+  <div class="fig">
+    <canvas id="rp10" class="tall" aria-label="Replay of one forex trade with simulated bars"></canvas>
+    <div class="legend" id="rp10L"></div>
+    <div class="controls">
+      <label for="ex10">Trade <select id="ex10"><option value="aud">AUDUSD · Jul 31, 2005 · 60-min (Fig 14.12)</option><option value="chf">USDCHF · Jul 21, 2005 · 60-min (Fig 14.13)</option><option value="jpy0720">USDJPY · Jul 20, 2005 · 120-min (Fig 14.14)</option><option value="jpy0722">USDJPY · Jul 22, 2005 (Fig 14.15)</option><option value="cad">USDCAD · Jul 21, 2005 (Fig 14.16)</option><option value="eurjpy">EURJPY · Aug 2, 2005 · 15-min (Fig 14.17)</option><option value="eurgbp">EURGBP · Jul 19, 2005 · 240-min (Fig 14.18)</option></select></label>
+      <label for="st10">Bars shown <input id="st10" type="range" min="1" max="60" value="60"><output id="st10o">60</output></label>
+    </div>
+    <div class="readout" id="r10"></div>
+    <ol class="steps" id="li10"></ol>
+  </div>
+  <p>What he says about how the pairs move:</p>
+  <ul class="plain">
+    <li>A pair that <b>ends in USD</b> (EURUSD, GBPUSD, AUDUSD: the three USD-quoted pairs he trades most) is worth <b>$10 a pip</b> per standard lot and generally moves <b>opposite the US dollar index</b>. Dollar up, euro, pound and Aussie down.</li>
+    <li>The euro and the pound track the dollar most closely. The <b>Aussie</b> is also tied to commodity prices (Australia exports a lot of them), so at times it doesn't follow the dollar.</li>
+    <li>The <b>Swiss franc</b> ("Swissy") trades very closely with the dollar: if the dollar goes up, so does USDCHF. The <b>yen</b> also moves very closely with the dollar.</li>
+    <li>For pairs that don't end in USD the pip value changes with the exchange rate: about $7 for USDCHF, $8 for USDJPY, $6 for USDCAD, $8 for EURJPY and $18 for EURGBP at the time of these trades (his figures).</li>
+    <li>After USDCAD he has covered the <b>six majors</b> most traders watch; EURJPY and EURGBP are two favourite crosses. EURGBP is quiet, but when it moves it moves steadily and seems unstoppable: they nicknamed it <b>"the tank"</b>.</li>
+  </ul>
+  <div class="fig">
+    <h3>Beyond the book: pip value from the exchange rate</h3>
+    <div class="controls">
+      <label for="pair10">Pair <select id="pair10"><option value="USDCHF">USDCHF</option><option value="USDJPY">USDJPY</option><option value="USDCAD">USDCAD</option><option value="EURJPY">EURJPY</option><option value="EURGBP">EURGBP</option><option value="EURUSD">EURUSD</option></select></label>
+      <label for="rate10"><span id="rl10">Conversion rate</span> <input id="rate10" type="number" step="0.0001" value="1.2971"></label>
+    </div>
+    <div class="readout" id="r10b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A pip is a fixed step in the <i>second</i> currency of the pair. If that currency is the dollar, the step is always $10 a lot. If it is yen or Swiss francs, the step is fixed in yen or francs, and its dollar size floats with the exchange rate, like a price tag written in a foreign currency.</p></div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <div class="formula">pip value ($ per standard lot) = 100,000 × pip size  (in the quote currency)  → converted to $
+USDCHF:  100,000 × 0.0001 CHF ÷ USDCHF      = 10 ÷ 1.2971 ≈ $7.71
+USDJPY:  100,000 × 0.01 JPY  ÷ USDJPY       = 1,000 ÷ 110.40 ≈ $9.06
+USDCAD:  100,000 × 0.0001 CAD ÷ USDCAD      = 10 ÷ 1.2360 ≈ $8.09
+EURGBP:  100,000 × 0.0001 GBP × GBPUSD      = 10 × ~1.77 ≈ $17.7</div>
+    <p>The formula matches his ~$7 (CHF) and ~$18 (EURGBP). His ~$8 for the yen pairs and especially ~$6 for USDCAD are lower than the formula gives at those prices; the book's dollar totals use his own figures, so I show them as stated. Pip counts are unaffected.</p>
+    <p class="slip">Arithmetic check: the July 22 USDJPY trade is printed as +95 pips, but 112.10 − 111.12 = 0.98 = 98 pips, and the book's $784 equals 98 × $8. So "95" looks like a typo.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Pairs moving with or against the dollar index is the intermarket idea from <a href="ch01_what_really_causes_the_markets_to_move.html">Ch.1</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">04 (cont.) · ALL THE WORKED EXAMPLES</div><h2>All 18 trades on one card</h2></div><span class="chip">built from pdf p303–318</span></div>
+  <p>The book's numbers, with the money column re-computed (points × $ per point, or pips × his $ per pip). This table is my compilation; nothing here is new data.</p>
+  <div class="tablewrap"><table>
+    <tr><th>#</th><th>Market · chart</th><th>Side</th><th>Entry → exit</th><th>Gain</th><th>Book $ / contract or lot</th><th>Check</th></tr>
+    <tr><td>1</td><td>ES · 233-tick</td><td>long</td><td class="num">1133.25 → 1138.50</td><td class="num">+5.25 pt</td><td class="num">$262</td><td>5.25 × $50 = $262.50</td></tr>
+    <tr><td>2</td><td>ES · 15-min</td><td>short, then long</td><td class="num">1137.00 → 1134.00 → 1133.75</td><td class="num">+3.00, −0.25</td><td class="num">not given</td><td>$150, −$12.50</td></tr>
+    <tr><td>3</td><td>ES · 60-min</td><td>long</td><td class="num">1114.75 → 1136.50</td><td class="num">+21.75 pt</td><td class="num">$1,087.50</td><td>✓</td></tr>
+    <tr><td>4</td><td>ES · daily</td><td>short</td><td class="num">1132.50 → 1096.00</td><td class="num">+36.50 pt</td><td class="num">$1,825</td><td>✓ (stop 1153.50)</td></tr>
+    <tr><td>5</td><td>YM · daily</td><td>long</td><td class="num">9916 → 10,278</td><td class="num">+362 pt</td><td class="num">$1,810</td><td>✓ $5/pt (stop 9809)</td></tr>
+    <tr><td>6</td><td>KLAC · daily</td><td>short</td><td class="num">52.51 → 42.96</td><td class="num">+9.55</td><td class="num">per share</td><td>✓ (stop 53.97)</td></tr>
+    <tr><td>7</td><td>Crude · daily</td><td>long</td><td class="num">43.60 → 49.50</td><td class="num">+5.90</td><td class="num">$5,900 CL · $2,950 QM</td><td>✓</td></tr>
+    <tr><td>8</td><td>YM · 5-min</td><td>S, L, S, L</td><td class="num">10,176 → 10,169 → 10,186 → 10,173</td><td class="num">+7, +17, +13</td><td class="num">not given</td><td>+37 pt = $185</td></tr>
+    <tr><td>9</td><td>EURUSD · daily</td><td>long</td><td class="num">1.2469 → 1.3467</td><td class="num">+998 pips</td><td class="num">$9,980</td><td>✓</td></tr>
+    <tr><td>10</td><td>GBPUSD · daily</td><td>short</td><td class="num">1.8837 → 1.8148</td><td class="num">+689 pips</td><td class="num">$6,890</td><td>✓</td></tr>
+    <tr><td>11</td><td>GBPUSD · 5-min</td><td>long</td><td class="num">1.7696 → 1.7724</td><td class="num">+28 pips</td><td class="num">$280</td><td>✓</td></tr>
+    <tr><td>12</td><td>AUDUSD · 60-min</td><td>long</td><td class="num">0.7560 → 0.7604</td><td class="num">+44 pips</td><td class="num">$440</td><td>✓</td></tr>
+    <tr><td>13</td><td>USDCHF · 60-min</td><td>long</td><td class="num">1.2855 → 1.2971</td><td class="num">+116 pips</td><td class="num">$812</td><td>✓ at ~$7</td></tr>
+    <tr><td>14</td><td>USDJPY · 120-min</td><td>short</td><td class="num">112.85 → 110.40</td><td class="num">+245 pips</td><td class="num">$1,960</td><td>✓ at ~$8</td></tr>
+    <tr><td>15</td><td>USDJPY · ?</td><td>long</td><td class="num">111.12 → 112.10</td><td class="num">printed +95</td><td class="num">$784</td><td>is 98 pips; 98 × $8 = $784</td></tr>
+    <tr><td>16</td><td>USDCAD · ?</td><td>long</td><td class="num">1.2169 → 1.2360</td><td class="num">+191 pips</td><td class="num">$1,146</td><td>✓ at ~$6</td></tr>
+    <tr><td>17</td><td>EURJPY · 15-min</td><td>short</td><td class="num">136.66 → 136.18</td><td class="num">+48 pips</td><td class="num">$384</td><td>✓ at ~$8</td></tr>
+    <tr><td>18</td><td>EURGBP · 240-min</td><td>long</td><td class="num">0.6912 → 0.6970</td><td class="num">+58 pips</td><td class="num">$1,044</td><td>✓ at ~$18</td></tr>
+  </table></div>
+  <div class="fig">
+    <canvas id="lg11" class="short" aria-label="Each example's gain shown as a multiple of a typical bar, by time frame"></canvas>
+    <div class="legend" id="lg11L"></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A restaurant's photo menu. Every dish looks perfect because the photographer chose the best plate. These 18 charts show what a good scalper-alert trade looks like; they can't tell you how often you get one.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every one of the 18 examples makes money overall; the only losing leg in the whole chapter is the −0.25 on Oct 5, closed by the 4:10 rule. That is <b>selection</b>, not a win rate: the book shows no losing whipsaws, no count of signals and no costs. To know the edge you would run the rules over every signal on a fixed period, like the pooled simulation in <a href="#s5">section 5</a> but on real data, and compare against a random-entry baseline.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>backtest_results_summary.md</code> is that kind of test for your own ideas: in the MACD test, random buy weeks with the same sell rule did as well as the signal. A fair test of this setup would include the same random-entry check.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">05 · SUMMING UP THE SCALPER ALERTS</div><h2>Buy the bottom only after it turns</h2></div><span class="chip">pdf p318</span></div>
+  <p>Scalper alerts suit traders who like to <b>buy bottoms and short tops</b>. Shorting a market just because it is "too high", or buying because it is "too low", is foolish. Shorting that high-flyer or buying that total loser <b>after a reversal confirmation</b> from this signal is fine. The signal doesn't mean the exact high or low is in; it means power has <b>temporarily shifted</b>, which is enough reason to step in. The idea is the same on a 5-minute chart or a daily chart, and he likes it because it is pure price action: simple and effective.</p>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch14_falling_knife_handle.svg" alt="A cook lets a falling knife hit the kitchen floor and stop bouncing, then safely picks it up by the handle." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A falling knife is still moving; you catch it by the handle only after it has hit the floor and stopped. "It has fallen a lot" tells you nothing about where it lands. "It has bounced off the floor three times" does.</p></div>
+  <div class="fig">
+    <canvas id="kn12" aria-label="Simulated fall-then-recover market with a too-low entry and a confirmed entry"></canvas>
+    <div class="legend" id="kn12L"></div>
+    <div class="controls"><label for="x12">"Too low" = down <input id="x12" type="range" min="5" max="30" value="15"><output id="x12o">15</output>% from the top</label></div>
+    <div class="readout" id="r12"></div>
+    <div class="tablewrap" id="t12"></div>
+    <p>Beyond the book: 400 simulated paths that fall for 25–64 bars and then rise for 50. Entry A buys as soon as price is X% below the top; entry B waits for the first scalper long signal after that point. Every path here does turn, so this flatters both entries; a market that keeps falling would hurt A more and B less (B gets a sell signal and leaves).</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>"Too low" is a statement about the past (how far it fell). Three higher closes is a statement about the present (buyers are now winning each bar). In the simulation the "too low" buyer almost always enters before the bottom and sits through a further drop; the confirmed buyer usually enters after the bottom, with a much smaller drawdown, at the cost of missing the very low. That is the trade-off Carter describes: give up the exact low in exchange for evidence.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch17_holp_and_lohp.html">Ch.17 HOLP and LOHP</a> is another "catch the reversal without getting smashed" setup, and <a href="ch15_brick_plays.html">Ch.15 Brick Plays</a> looks for mid-day reversals.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">06 · INCREASE THE PROBABILITIES OF SUCCESS THROUGH MULTISETUP COMBINATIONS</div><h2>Scalper alerts at pivot levels</h2></div><span class="chip">pdf p318–319</span></div>
+  <ul class="plain">
+    <li>His setups are designed to work together. When scalping (less often as he gets older, he admits) he combines <b>pivots with scalper alerts</b> on a <b>233-tick ES</b> and a <b>144-tick YM</b> chart.</li>
+    <li>On days when he can't tell what the market will do, he waits for a <b>scalper confirmation against a pivot level</b>, which he rates a very high-probability trade.</li>
+    <li>Better still: he takes a pivot trade and shortly afterwards gets a scalper confirmation in the same direction. And he can use the <b>scalper sell signal to exit a long pivot trade</b>.</li>
+    <li>He points to his chapter on developing a business plan for more, but the idea is to find what fits you and your personality and mix and match. (I couldn't find a chapter with that title in this 3rd-edition copy; the business-plan idea comes up in earlier chapters.)</li>
+    <li>Other tools pair well with it, such as <b>price channels</b>, for pinpointing high-probability turns. He lists simplertrading.com/scalper for updates, free tools and more examples.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A pivot level is a doorway where traffic often turns around. A scalper alert is someone actually turning around. A U-turn <i>in</i> the doorway is more believable than a U-turn in the middle of the corridor.</p></div>
+  <div class="fig">
+    <canvas id="pv13" class="tall" aria-label="Simulated day of 5-minute bars with pivot levels and scalper signals near them"></canvas>
+    <div class="legend" id="pv13L"></div>
+    <div class="controls"><label for="tol13">"At a pivot" = within <input id="tol13" type="range" min="1" max="12" value="4"><output id="tol13o">4</output> ticks</label></div>
+    <div class="readout" id="r13"></div>
+    <div class="tablewrap" id="t13"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b>
+    <p>Pivots use the Ch.8 formula on the prior session: P = (H + L + C) ÷ 3, R1 = 2P − L, S1 = 2P − H, R2 = P + (H − L), S2 = P − (H − L), R3 = R1 + (H − L), S3 = S1 − (H − L). A signal counts as "against a pivot" here when its painted bar's extreme (the swing low for a buy, swing high for a sell) is within the chosen distance of a level.</p>
+    <p>On simulated random-walk days, signals at pivots do no better than other signals (see the pooled table): pivots only matter if real traders act on them, and a simulation has no traders. Carter's "very high probability" is his experience on real markets, so it is something to test on real intraday data, not something a simulation can show.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch08_pivot_points.html">Ch.8 Pivot Points</a> for the levels, midpoints, and weekly/monthly pivots.</li>
+    <li><b>Beyond the book:</b> a price channel is the highest high and lowest low of the last N bars (often called a Donchian channel); Carter doesn't define the one he means in this chapter.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Why does Carter count closes and not highs or lows?</summary><p>The close is where the bar settles, the price people actually carried; a high or low can be a brief poke that is immediately rejected. Three higher highs can happen inside a bar sequence that keeps closing weak. (Section 1.)</p></details>
+  <details><summary>2. On a 60-minute chart the 10:30 bar is painted. When can you actually trade, and at what price?</summary><p>At 12:30, the close of the third bar (10:30, 11:30, 12:30), at the market (1114.75 in the book). The paint marks the start of the pattern, but it is only known two bars later. (Section 6.)</p></details>
+  <details><summary>3. During a long, there are seven more higher closes in a row. What does the indicator do?</summary><p>Nothing. Signals alternate: after a buy, only a sell (three lower closes) can show. Same-direction streaks are ignored. (Sections 1, 6.)</p></details>
+  <details><summary>4. What problem does the filter solve, and how does it work for a long?</summary><p>Being shaken out of a bull flag by a few small lower closes. For a long, the trigger bar is the first bar with a higher low than the bar before; the signal comes when a later bar closes above the trigger's high, and it paints the low bar before the trigger, the swing low. Three lower closes that don't break the signal bar's low are ignored. (Section 2.)</p></details>
+  <details><summary>5. Give the two reasons he prefers tick charts for scalping.</summary><p>They speed up when trading speeds up and slow down (fewer false signals) when it is quiet; and floor traders react to the pace of trades, not to an arbitrary 2- or 5-minute clock. (Section 4.)</p></details>
+  <details><summary>6. Why does he use 987-tick for the ES but 144-tick for the YM?</summary><p>Volume only: the ES trades far more, and the rule of thumb is higher volume, higher tick count. (Section 4.)</p></details>
+  <details><summary>7. Where is the stop on an intraday trade, and on a daily trade?</summary><p>Intraday: no stop; the opposite signal is the exit, plus a forced exit at 4:10 p.m. eastern on charts of 15 minutes or less. Daily: at the low (for a long) of the first bar of the three, the painted bar. (Section 5.)</p></details>
+  <details><summary>8. You are long 6 contracts and a sell signal fires intraday. What single order puts you short 6?</summary><p>Sell 12 at the market: 6 close the long, 6 open the short. (Section 8.)</p></details>
+  <details><summary>9. A trader is long 35 lots of EURUSD and catches 100 pips. Say it the way the dealer would.</summary><p>"3½ bucks" (10 lots = a buck) and "one large" (100 pips = one large): $10 × 100 × 35 = $35,000. (Section 9.)</p></details>
+  <details><summary>10. Why is a pip on USDJPY not worth $10 per lot?</summary><p>The pip (0.01) is fixed in yen, the quote currency: 100,000 × 0.01 = ¥1,000, which is about $9 at 110. Only pairs that end in USD have a fixed $10 pip. (Section 10.)</p></details>
+  <details><summary>11. All 18 of the book's examples make money. What can you conclude about the setup's win rate?</summary><p>Nothing: the examples were chosen to illustrate it. A win rate needs every signal over a fixed period, with costs, compared against a random-entry baseline. (Section 11.)</p></details>
+  <details><summary>12. On what kind of market should an always-in, three-closes reversal system lose money, and why?</summary><p>A range-bound, mean-reverting one. It needs three bars to enter and three to leave, so in a range it buys after the rise and sells after the fall, near each turn. It earns only when moves run well beyond three bars. (Section 5.)</p></details>
+  <details><summary>13. How does Carter justify buying a market that has collapsed?</summary><p>Not because it is "too low", but after a reversal confirmation: a scalper buy signal means power has temporarily shifted, even if the exact low may not be in. (Section 12.)</p></details>
+  <details><summary>14. Name two ways he combines scalper alerts with pivots.</summary><p>Wait for a scalper confirmation against a pivot level; or take a pivot trade and look for a scalper confirmation in the same direction, and use a scalper sell signal to exit a long pivot trade. (Section 13.)</p></details>
+</section>
+
+<footer>Built from John F. Carter, <i>Mastering the Trade</i>, 3rd edition, Chapter 14, "Scalper Alerts: Is This the Best Tool for Quick Price Trend Change Confirmation?" (PDF pages 300–319; printed page numbers match the PDF indexes in this copy), summarised in my own words. In this PDF copy only Figure 14.8 is printed; Figures 14.1–14.7 and 14.9–14.18 are blank, so their trades are rebuilt from the numbers in the text. Every chart uses simulated prices; where a chart replays one of Carter's trades, only the entry, exit and stop levels come from the book. The "price-confirmed" detector is my reading of the book's filter. Anything marked "beyond the book" is my addition. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  let M;
+  function buildData() {
+    M = genMarket([
+      { n: 70, drift: 0.0042, vol: 0.010, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.0046, vol: 0.011, kind: 'trend' }
+    ], seed);
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // =====================================================================
+  // ---------- chapter 14 helpers ----------
+  // =====================================================================
+  const usd = (v, d) => { const a = Math.abs(v); const dd = d == null ? 0 : d; return (v < 0 ? '−$' : '$') + a.toLocaleString('en-US', { minimumFractionDigits: dd, maximumFractionDigits: dd }); };
+  const sgn = (v, d) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d == null ? 2 : d);
+  const pc = (x, d) => (x * 100).toFixed(d == null ? 1 : d) + '%';
+  const pcs = (x, d) => (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(d == null ? 2 : d) + '%';
+  function setR(id, v) { $(id).value = v; const o = $(id + 'o'); if (o) o.textContent = v; }
+  const onChange = (id, f) => $(id).addEventListener('change', f);
+
+  // OHLC bars from a close series (open = previous close); wick size = w (price units) or wp (fraction of price)
+  function barsFrom(c, r, w, wp) {
+    const D = { o: [], h: [], l: [], c: [], t: [] };
+    for (let i = 0; i < c.length; i++) {
+      const o = i ? c[i - 1] : c[0] + gauss(r) * (w || c[0] * wp) * 0.5;
+      const ww = w || c[i] * wp;
+      D.o.push(o); D.c.push(c[i]);
+      D.h.push(Math.max(o, c[i]) + Math.abs(gauss(r)) * ww); D.l.push(Math.min(o, c[i]) - Math.abs(gauss(r)) * ww);
+    }
+    return D;
+  }
+  function marketBars(segs, sd, start, wp) { const M = genMarket(segs, sd, start); return barsFrom(M.c, rng(sd * 31 + 7), 0, wp || 0.005); }
+  function regimeSegs(kind, sd, n) {
+    if (kind === 'random') return [{ n, drift: 0, vol: 0.01 }];
+    if (kind === 'chop') return [{ n, drift: 0, vol: 0.01, revert: 0.25 }];
+    const r = rng(sd * 13 + 5); const segs = []; let left = n;
+    while (left > 0) { const k = Math.min(left, 30 + Math.floor(r() * 50)); segs.push({ n: k, drift: (r() < 0.5 ? -1 : 1) * (0.0015 + r() * 0.002), vol: 0.01 }); left -= k; }
+    return segs;
+  }
+  function aggregate(D, k) {
+    const A = { o: [], h: [], l: [], c: [], t: [] };
+    for (let i = 0; i + k <= D.c.length; i += k) {
+      let h = -Infinity, l = Infinity; for (let j = i; j < i + k; j++) { h = Math.max(h, D.h[j]); l = Math.min(l, D.l[j]); }
+      A.o.push(D.o[i]); A.h.push(h); A.l.push(l); A.c.push(D.c[i + k - 1]);
+    }
+    return A;
+  }
+
+  // ---------- the scalper-alert detector ----------
+  // mode 'closes'  : three consecutive higher (lower) closes; paints the first bar of the three (the book's rule)
+  // mode 'confirm' : my reading of the book's filter: trigger = latest bar with a higher low than the bar before;
+  //                  signal when a later bar CLOSES above the trigger's high; paints the bar before the trigger (the swing low). Mirror for shorts.
+  // mode 'highs'   : three higher highs / three lower lows (what Carter says he does NOT use), for comparison
+  // Signals alternate: after a long, only a short can show, and vice versa.
+  function scalper(D, mode, start) {
+    const n = D.c.length, out = []; let last = start || 0, tU = -1, tD = -1;
+    for (let i = 1; i < n; i++) {
+      let f = 0, p = -1;
+      if (mode === 'confirm') {
+        if (last !== 1 && tU > 0 && D.c[i] > D.h[tU]) { f = 1; p = tU - 1; }
+        else if (last !== -1 && tD > 0 && D.c[i] < D.l[tD]) { f = -1; p = tD - 1; }
+      } else if (i >= 3) {
+        const A = mode === 'highs' ? D.h : D.c, B = mode === 'highs' ? D.l : D.c;
+        if (last !== 1 && A[i] > A[i - 1] && A[i - 1] > A[i - 2] && A[i - 2] > A[i - 3]) { f = 1; p = i - 2; }
+        else if (last !== -1 && B[i] < B[i - 1] && B[i - 1] < B[i - 2] && B[i - 2] < B[i - 3]) { f = -1; p = i - 2; }
+      }
+      if (f) { out.push({ i, dir: f, paint: p }); last = f; tU = -1; tD = -1; }
+      if (D.l[i] > D.l[i - 1]) tU = i;
+      if (D.h[i] < D.h[i - 1]) tD = i;
+    }
+    return out;
+  }
+
+  // ---------- always-in reversal system (the five rules) ----------
+  // opt: {sess: bars per session (0 = none; flat at the last bar of each session = the 4:10 pm rule), stop: bool (stop at the painted bar's low/high), cost: fraction per round turn}
+  function runSys(D, sigs, opt) {
+    const n = D.c.length, tr = []; let pos = 0, ent = 0, ei = 0, stp = null, mae = 0, pi = -1;
+    const S = new Map(sigs.map((s) => [s.i, s]));
+    const close = (i, px, why) => { tr.push({ a: ei, b: i, dir: pos, ent, ex: px, ret: pos * (px / ent - 1) - opt.cost, mae, why, stp, paint: pi }); pos = 0; };
+    for (let i = 0; i < n; i++) {
+      if (pos && stp != null && i > ei) {
+        if (pos > 0 && D.l[i] <= stp) close(i, Math.min(D.o[i], stp), 'stop');
+        else if (pos < 0 && D.h[i] >= stp) close(i, Math.max(D.o[i], stp), 'stop');
+      }
+      if (pos && i > ei) mae = Math.min(mae, pos > 0 ? D.l[i] / ent - 1 : 1 - D.h[i] / ent);
+      const endSess = opt.sess && (i % opt.sess === opt.sess - 1);
+      const s = S.get(i);
+      if (s) {
+        if (pos) close(i, D.c[i], 'signal');
+        if (!endSess) { pos = s.dir; ent = D.c[i]; ei = i; mae = 0; pi = s.paint; stp = opt.stop ? (s.dir > 0 ? D.l[s.paint] : D.h[s.paint]) : null; }
+      }
+      if (endSess && pos) close(i, D.c[i], 'time');
+    }
+    if (pos) close(n - 1, D.c[n - 1], 'open');
+    return tr;
+  }
+  function tstats(tr) {
+    const n = tr.length; const w = tr.filter((t) => t.ret > 0), l = tr.filter((t) => t.ret <= 0);
+    const sum = tr.reduce((a, t) => a + t.ret, 0);
+    return { n, win: n ? w.length / n : 0, aw: w.length ? w.reduce((a, t) => a + t.ret, 0) / w.length : 0, al: l.length ? l.reduce((a, t) => a + t.ret, 0) / l.length : 0, exp: n ? sum / n : 0, sum, mae: n ? Math.min(...tr.map((t) => t.mae)) : 0 };
+  }
+
+  // ---------- OHLC bar chart (the book's figures are bar charts with "painted" bars) ----------
+  // sp: {x0,x1,upto, paint:[i], paintCol, hl:[{v,col,label,dash,from,below,leg}], marks:[{i,v,kind:'buy'|'sell'|'x',txt}], vl:[{i,col,label,row}], seps:[i], shade:[{a,b,col,alpha}], dp, tEvery, legend}
+  function bplot(id, D, sp) {
+    const cv = $(id); if (!cv) return null;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = D.c.length; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const upto = sp.upto != null ? Math.min(sp.upto, x1) : x1;
+    const hasT = D.t && D.t.some((x) => x);
+    const padL = 6, padR = 58, padT = 12, padB = hasT ? 20 : 8; const mainH = H - padT - padB;
+    const slot = (W - padL - padR) / (x1 - x0 + 1); const X = (i) => padL + (i - x0 + 0.5) * slot;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = x0; i <= x1; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    (sp.hl || []).forEach((h) => { if (h.noScale) return; lo = Math.min(lo, h.v); hi = Math.max(hi, h.v); });
+    const pd = (hi - lo) * 0.1 || 1; lo -= pd; hi += pd;
+    const Y = (v) => padT + (hi - v) / (hi - lo) * mainH;
+    const font = '11px ' + css('mono'); g.font = font;
+    const dp = sp.dp != null ? sp.dp : (hi - lo < 0.2 ? 4 : hi - lo < 5 ? 2 : hi - lo < 60 ? 1 : 0);
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - slot / 2, padT, (s.b - s.a + 1) * slot, mainH); });
+    g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+    niceTicks(lo, hi, mainH > 200 ? 5 : 3).forEach((t) => { const y = Y(t); if (y < padT - 1 || y > padT + mainH + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(t.toFixed(dp), W - padR + 5, y + 4); });
+    (sp.seps || []).forEach((i) => { const x = X(i) - slot / 2; g.strokeStyle = colorOf('muted', 0.7); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + mainH); g.stroke(); g.setLineDash([]); });
+    if (hasT) { const every = sp.tEvery || Math.max(1, Math.round((x1 - x0) / 6)); g.fillStyle = colorOf('muted'); for (let i = x0; i <= x1; i++) { if ((i - x0) % every !== 0 || !D.t[i]) continue; g.fillText(D.t[i], Math.min(Math.max(padL, X(i) - 14), W - padR - 34), H - 5); } }
+    const paint = new Set(sp.paint || []);
+    const tw = Math.max(1.5, Math.min(7, slot * 0.28));
+    for (let i = x0; i <= upto; i++) {
+      const x = X(i); const pnt = paint.has(i);
+      g.strokeStyle = pnt ? colorOf(sp.paintCol || 'c1') : colorOf('price'); g.lineWidth = pnt ? Math.max(3, Math.min(8, slot * 0.55)) : Math.max(1, Math.min(2, slot * 0.18));
+      g.beginPath(); g.moveTo(x, Y(D.h[i])); g.lineTo(x, Y(D.l[i])); g.stroke();
+      g.lineWidth = Math.max(1, Math.min(2, slot * 0.18)); g.strokeStyle = colorOf('price');
+      g.beginPath(); g.moveTo(x - tw, Y(D.o[i])); g.lineTo(x, Y(D.o[i])); g.moveTo(x, Y(D.c[i])); g.lineTo(x + tw, Y(D.c[i])); g.stroke();
+    }
+    (sp.hl || []).forEach((h) => {
+      const y = Y(h.v); const xs = h.from != null ? X(Math.max(x0, h.from)) - slot / 2 : padL; const xe = h.to != null ? X(Math.min(x1, h.to)) + slot / 2 : W - padR;
+      g.strokeStyle = colorOf(h.col, 0.95); g.lineWidth = h.w || 1.3; g.setLineDash(h.dash || []); g.beginPath(); g.moveTo(xs, y); g.lineTo(xe, y); g.stroke(); g.setLineDash([]);
+      if (h.label) { g.font = font; g.fillStyle = colorOf(h.col); const twd = g.measureText(h.label).width; g.fillText(h.label, Math.max(xs + 2, Math.min(xe - twd - 4, W - padR - twd - 4)), y + (h.below ? 13 : -4)); }
+    });
+    (sp.vl || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; const x = X(v.i); g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const twd = g.measureText(v.label).width; let tx = x + 4; if (tx + twd > W - padR) tx = x - twd - 4; g.fillText(v.label, Math.max(padL, tx), padT + 10 + (v.row || 0) * 13); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i > upto || m.i < x0) return; const x = X(m.i); const s = 5;
+      g.font = font;
+      if (m.kind === 'buy') { const y = Y(D.l[m.i]) + 4; g.fillStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y); g.lineTo(x - s, y + s * 1.5); g.lineTo(x + s, y + s * 1.5); g.closePath(); g.fill(); if (m.txt) { const twd = g.measureText(m.txt).width; g.fillText(m.txt, Math.min(Math.max(padL, x - twd / 2), W - padR - twd), Math.min(y + s * 1.5 + 12, padT + mainH + 6)); } }
+      else if (m.kind === 'sell') { const y = Y(D.h[m.i]) - 4; g.fillStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y); g.lineTo(x - s, y - s * 1.5); g.lineTo(x + s, y - s * 1.5); g.closePath(); g.fill(); if (m.txt) { const twd = g.measureText(m.txt).width; g.fillText(m.txt, Math.min(Math.max(padL, x - twd / 2), W - padR - twd), Math.max(y - s * 1.5 - 5, padT + 9)); } }
+      else { const y = Y(m.v); g.strokeStyle = colorOf(m.col || 'c3'); g.lineWidth = 2; g.beginPath(); g.moveTo(x - 4, y - 4); g.lineTo(x + 4, y + 4); g.moveTo(x + 4, y - 4); g.lineTo(x - 4, y + 4); g.stroke(); if (m.txt) { g.fillStyle = colorOf(m.col || 'c3'); const twd = g.measureText(m.txt).width; g.fillText(m.txt, Math.min(x + 7, W - padR - twd - 2), y + 14); } }
+    });
+    const L = $(id + 'L');
+    if (L) { const items = []; if (paint.size) items.push(['painted bar', sp.paintCol || 'c1']); (sp.hl || []).forEach((h) => h.leg && items.push([h.leg, h.col])); (sp.legend || []).forEach((x) => items.push(x)); L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join(''); }
+    return { X, Y };
+  }
+
+  // ---------- path builder for the book's worked trades ----------
+  // m steps whose sum is `target`, never three steps in a row against direction d (counting runIn), last step with d.
+  function cSteps(m, d, target, sig, r, runIn) {
+    const s = []; let run = runIn || 0;
+    for (let j = 0; j < m; j++) {
+      let x = gauss(r) * sig + d * sig * 0.2;
+      if (Math.abs(x) < sig * 0.08) x = d * sig * 0.15;
+      if (d * x < 0 && run >= 2) x = -x;
+      if (j === m - 1 && d * x < 0) x = -x;
+      run = d * x < 0 ? run + 1 : 0; s.push(x);
+    }
+    if (d * target <= 0 && !s.some((x) => d * x < 0)) { for (let j = 1; j < m - 1; j++) if (d * s[j - 1] > 0) { s[j] = -s[j]; break; } }
+    let fav = 0, ctr = 0; s.forEach((x) => { if (d * x > 0) fav += x; else ctr += x; });
+    if (d * target > 0 || ctr === 0) { const f = (target - ctr) / fav; return s.map((x) => (d * x > 0 ? x * f : x)); }
+    const f = (target - fav) / ctr; return s.map((x) => (d * x < 0 ? x * f : x));
+  }
+  // ex: {fills:[p...], dirs:[d...], ends:['sig'|'time'|'open'], seg:[m...], sig, stop, lead, tail:'reentry'}
+  // returns bars + expected signal bars; retried until the strict detector reproduces exactly the book's signals.
+  function buildEx(ex, sd) {
+    let best = null;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const r = rng(sd * 7919 + attempt * 104729 + 17);
+      const F = ex.fills, d0 = ex.dirs[0], sig = ex.sig, c = [], expect = [];
+      const swing = ex.stop != null ? ex.stop + (F[0] - ex.stop) * 0.4 : F[0] - d0 * 3.4 * sig;
+      const L = ex.lead || 12; const start = swing + d0 * L * sig * 0.55;
+      let x = start; c.push(x); cSteps(L, -d0, swing - start, sig, r, 0).forEach((s) => { x += s; c.push(x); });
+      c[c.length - 1] = swing; x = swing;
+      const w3 = [0.7 + r(), 0.7 + r(), 0.7 + r()], tot = w3[0] + w3[1] + w3[2];
+      w3.forEach((w) => { x += (F[0] - swing) * w / tot; c.push(x); }); c[c.length - 1] = F[0]; x = F[0];
+      const fillBars = [c.length - 1]; expect.push(c.length - 1);
+      for (let k = 0; k < F.length - 1; k++) {
+        const d = ex.dirs[k], a = F[k], b = F[k + 1], m = ex.seg[k], type = ex.ends[k];
+        if (type === 'sig') {
+          const pull = Math.max(Math.abs(b - a) * 0.12, sig * 1.8);
+          const E = d > 0 ? Math.max(a, b) + pull : Math.min(a, b) - pull;
+          cSteps(m - 3, d, E - a, sig, r, 0).forEach((s) => { x += s; c.push(x); });
+          c[c.length - 1] = E; x = E;
+          const v = [0.7 + r(), 0.7 + r(), 0.7 + r()], t = v[0] + v[1] + v[2];
+          v.forEach((w) => { x += (b - E) * w / t; c.push(x); }); c[c.length - 1] = b; x = b; expect.push(c.length - 1);
+        } else {
+          cSteps(m, d, b - a, sig, r, 0).forEach((s) => { x += s; c.push(x); }); c[c.length - 1] = b; x = b;
+        }
+        fillBars.push(c.length - 1);
+      }
+      if (ex.tail === 'reentry') { for (let j = 0; j < 3; j++) { x += sig * (0.8 + r() * 0.6); c.push(x); } expect.push(c.length - 1); }
+      if (ex.after) { for (let j = 0; j < ex.after; j++) { x += gauss(r) * sig * 0.6; c.push(x); } }
+      const D = barsFrom(c, r, sig * 0.55);
+      const pEntry = fillBars[0] - 2;
+      if (ex.stop != null) {
+        if (d0 > 0) { D.l[pEntry] = ex.stop; for (let i = 0; i < c.length; i++) if (i !== pEntry && i <= fillBars[1]) D.l[i] = Math.max(D.l[i], ex.stop + sig * 0.25); }
+        else { D.h[pEntry] = ex.stop; for (let i = 0; i < c.length; i++) if (i !== pEntry && i <= fillBars[1]) D.h[i] = Math.min(D.h[i], ex.stop - sig * 0.25); }
+      }
+      let ok = true;
+      if (ex.stop != null) for (let i = fillBars[0]; i <= fillBars[1]; i++) { if (d0 > 0 ? Math.min(D.o[i], D.c[i]) <= ex.stop : Math.max(D.o[i], D.c[i]) >= ex.stop) ok = false; }
+      const got = scalper(D, 'closes', -d0).map((s) => s.i);
+      if (got.length !== expect.length || got.some((v, j) => v !== expect[j])) ok = false;
+      best = { D, fillBars, expect, sigs: scalper(D, 'closes', -d0), ok };
+      if (ok) break;
+    }
+    return best;
+  }
+  // ---------- the book's worked trades (levels from the book; bar paths simulated) ----------
+  // unit: 'pt' with mult = $ per point per contract, or 'pip' with pip size + pipUsd (the book's stated $/pip)
+  const EX = {
+    es1003: { name: 'ES · Dec 2004 · Oct 3, 2004 · 233-tick', fig: '14.1', pages: 'pdf p303–304', fills: [1133.25, 1138.50], dirs: [1], ends: ['sig'], seg: [36], sig: 0.5, dp: 2, mult: 50, unit: 'pt',
+      labs: ['long 1133.25', 'out 1138.50'], extraHl: [{ v: 1135, col: 'c3', label: 'oscillators overbought ≈ 1135 (book)', dash: [2, 3], leg: 'where oscillators read overbought (book)' }],
+      steps: ['Painted bar = first of three higher closes on the 233-tick chart (his point 1).', 'Long at the market, filled 1133.25 = close of the third bar (point 2).', 'Many more higher closes during the rally: ignored, the long signal already fired.', 'Three lower closes paint the next bar: sell at the market, out 1138.50 (point 4). +5.25 points, which he rounds to $262 a contract.', 'Oscillators said "overbought" near 1135.00 during the trade; the setup ignores them.'] },
+    es1005: { name: 'ES · Dec 2004 · Oct 5, 2004 · 15-minute', fig: '14.2', pages: 'pdf p304–305', fills: [1137.00, 1134.00, 1133.75, 1136.50], dirs: [-1, 1, 1], ends: ['sig', 'time', 'sig'], seg: [8, 5, 16], sig: 0.6, dp: 2, mult: 50, unit: 'pt',
+      labs: ['short 1137.00 (~1 pm)', 'cover + long 1134.00 (~3 pm)', '4:10 pm exit 1133.75', '24-hour trader out 1136.50 (~8 pm)'], timeExit: 2,
+      steps: ['Short signal near 1:00 p.m. eastern; short at the market, filled 1137.00.', 'Near 3:00 p.m. a long signal: cover the short and go long at 1134.00. Short leg +3.00 points.', 'No new signal before the close, and this is a 15-minute chart, so out at 4:10 p.m. eastern at 1133.75: −0.25 point.', 'The next signal came near 8:00 p.m. A 24-hour trader would have held to it and got out at 1136.50 for +2.50. Carter does not recommend it: after-hours index futures are slow; trade forex after 4 p.m. instead.'] },
+    es0930: { name: 'ES · Dec 2004 · Sep 30, 2004 · 60-minute', fig: '14.3', pages: 'pdf p305', fills: [1114.75, 1136.50], dirs: [1], ends: ['sig'], seg: [40], sig: 1.5, dp: 2, mult: 50, unit: 'pt',
+      labs: ['12:30 fill 1114.75', 'Oct 4 exit 1136.50'], paintLab: '10:30 bar painted',
+      steps: ['The 10:30 a.m. bar is painted, but the signal only exists at the close of the third bar, 12:30 p.m. (10:30, 11:30, 12:30).', 'Long at the market at 12:30, filled 1114.75.', 'Next signal a few days later, on October 4: out at 1136.50. +21.75 points = $1,087.50 a contract.', 'The 60-minute chart catches 2-to-5-day swings, suits people with a full-time job, and stops losing day traders from overtrading.'] },
+    es0628: { name: 'ES · Sep 2004 · Jun 28, 2004 · daily', fig: '14.4', pages: 'pdf p306', fills: [1132.50, 1096.00], dirs: [-1], ends: ['sig'], seg: [22], sig: 5, stop: 1153.50, dp: 1, mult: 50, unit: 'pt',
+      labs: ['short 1132.50 (Jun 28 close)', 'out 1096.00 (Jul 28 close)'], paintLab: 'Jun 24 bar painted',
+      steps: ['The June 28 close completes three lower closes and paints the June 24 bar (June 26–27 was a weekend).', 'Short at the close of the third day, 1132.50. Stop 1153.50 = high of the June 24 bar. In his experience the stop is rarely hit: a reversal signal usually comes first.', 'July 28: a reversal signal. The book says it paints the July 24 bar, but July 24, 2004 was a Saturday, so that date looks like a slip (three daily bars ending July 28 start on July 26).', 'Out at the close, 1096.00: +36.50 points = $1,825 a contract.'] },
+    ym0810: { name: 'YM · Sep 2004 · Aug 10, 2004 · daily', fig: '14.5', pages: 'pdf p306–307', fills: [9916, 10278], dirs: [1], ends: ['sig'], seg: [20], sig: 35, stop: 9809, dp: 0, mult: 5, unit: 'pt',
+      labs: ['long 9916 (Aug 10 close)', 'out 10,278 (Sep 7)'], paintLab: 'Aug 6 bar painted',
+      steps: ['Long signal on August 10 paints the August 6 bar (Aug 6 Fri, Aug 9 Mon, Aug 10 Tue).', 'Long at the August 10 close, 9916. Stop at the August 6 low, 9809.', 'Next signal on September 7, nearly a month later.', 'Out at 10,278: +362 points = $1,810 a contract. He likens swing trades to a rental property run by a management company.'] },
+    klac: { name: 'KLAC (stock) · Apr 5, 2004 · daily', fig: '14.6', pages: 'pdf p307–308', fills: [52.51, 42.96], dirs: [-1], ends: ['sig'], seg: [20], sig: 0.8, stop: 53.97, dp: 2, mult: 1, unit: 'share',
+      labs: ['short 52.51', 'cover 42.96 (May 3)'],
+      steps: ['Reversal (sell) signal on April 5, 2004.', 'Short at the close, 52.51. Stop = high of the signal bar, 53.97.', 'About a month later, May 3: reversal signal.', 'Cover at 42.96: +9.55 a share. For stock-only traders, a good daily-chart reversal setup.'] },
+    crude: { name: 'Crude oil · "Sep 2004" contract · Sep 9, 2004 · daily', fig: '14.7', pages: 'pdf p308–309', fills: [43.60, 49.50], dirs: [1], ends: ['sig'], seg: [13], sig: 0.7, dp: 2, mult: 1000, unit: 'pt', tail: 'reentry',
+      labs: ['long 43.60', 'out 49.50 (Sep 28)', 'long again (price not given)'],
+      steps: ['Pure price action, so it works in every market. Reversal (buy) signal painted on September 9, 2004.', 'Long at 43.60.', 'September 28: the reversal painted bar is in. Out at 49.50: +5.90.', 'That exit bar also became a new long signal: the market turned straight back up with three higher closes.', '$1 move = $1,000 on the big contract (CL), $500 on the mini (QM): +5.90 = $5,900 (CL) or $2,950 (QM). Live prices need the NYMEX feed (eSignal, TradeStation and most robust vendors offer it).'] },
+    ym1006: { name: 'YM · Dec 2004 · Oct 6, 2004 · 5-minute', fig: '14.8', pages: 'pdf p309–310', fills: [10176, 10169, 10186, 10173, 10183], dirs: [-1, 1, -1, 1], ends: ['sig', 'sig', 'sig', 'open'], seg: [4, 20, 8, 7], sig: 2.2, dp: 0, mult: 5, unit: 'pt', clock: [10, 35, 5],
+      labs: ['2 · short 10,176', '4 · cover + long 10,169', '6 · sell + short 10,186', '8 · cover + long 10,173', 'last 10,183 (Fig 14.8)'],
+      steps: ['First signal painted at 10:35 a.m. eastern (point 1): short at the close of the third bar, 10,176 (point 2).', 'Next reversal at point 3: cover at 10,169 and go long at the same time (point 4).', 'Next signal at point 5: out of the long and short at 10,186 (point 6). The wording in the book here has him going long and short at 10,186 at the same time; since he was already long, it must mean sell the long and go short.', 'Next signal at point 7: cover the short at 10,173 and go long (point 8).'] },
+    eurusd: { name: 'EURUSD · Oct 15, 2004 · daily', fig: '14.9', pages: 'pdf p310–311', fills: [1.2469, 1.3467], dirs: [1], ends: ['sig'], seg: [55], sig: 0.006, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 10,
+      labs: ['long 1.2469', 'out 1.3467 (Jan 3, 2005)'],
+      steps: ['Long signal October 15, 2004: long near 1.2469. Stop = low of the signal bar.', 'Steady rise, a week-long pause in early November, a hard run into late December, then a roll-over where many traders took profits. No sell signal through any of it: sit on your hands.', 'January 3, 2005, nearly 2½ months later: sell signal. Out at 1.3467 = +998 pips.', '$10 a pip = $9,980 per standard lot, with $1,000 of account money needed per lot.'] },
+    gbp0509: { name: 'GBPUSD · May 9, 2005 · daily', fig: '14.10', pages: 'pdf p311–312', fills: [1.8837, 1.8148], dirs: [-1], ends: ['sig'], seg: [19], sig: 0.007, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 10,
+      labs: ['short 1.8837', 'cover 1.8148 (Jun 3)'],
+      steps: ['Short signal May 9, 2005: short at 1.8837.', 'Steady sell-off; reversal signal June 3: cover at 1.8148. +689 pips = $6,890 a lot: almost seven large in forex slang.'] },
+    gbp0802: { name: 'GBPUSD · Aug 2, 2005 · 5-minute', fig: '14.11', pages: 'pdf p312–313', fills: [1.7696, 1.7724], dirs: [1], ends: ['sig'], seg: [12], sig: 0.0006, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 10,
+      labs: ['long 1.7696', 'out 1.7724'],
+      steps: ['The same signal works intraday: long on a 5-minute chart at 1.7696.', 'About an hour later the reversal signal: out at 1.7724, +28 pips = $280 a lot.'] },
+    aud: { name: 'AUDUSD · Jul 31, 2005 · 60-minute', fig: '14.12', pages: 'pdf p313', fills: [0.7560, 0.7604], dirs: [1], ends: ['sig'], seg: [20], sig: 0.0007, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 10,
+      labs: ['long 0.7560', 'out 0.7604 (Aug 1)'],
+      steps: ['Long signal on the 60-minute chart, entry 0.7560 (July 31 was a Sunday: the forex week opens Sunday evening, US time).', 'Next day a reversal signal: out at 0.7604, +44 pips = $440 a lot (any pair ending in USD is $10 a pip per standard lot).'] },
+    chf: { name: 'USDCHF · Jul 21, 2005 · 60-minute', fig: '14.13', pages: 'pdf p313–314', fills: [1.2855, 1.2971], dirs: [1], ends: ['sig'], seg: [36], sig: 0.0012, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 7,
+      labs: ['long 1.2855', 'out 1.2971 (Jul 24)'],
+      steps: ['Long signal on the 60-minute chart at 1.2855.', 'A few days later (July 24) a reversal: out at 1.2971, +116 pips. The pair does not end in USD, so the pip was worth about $7 then: $812 a lot.'] },
+    jpy0720: { name: 'USDJPY · Jul 20, 2005 · 120-minute', fig: '14.14', pages: 'pdf p314–315', fills: [112.85, 110.40], dirs: [-1], ends: ['sig'], seg: [12], sig: 0.45, dp: 2, unit: 'pip', pip: 0.01, pipUsd: 8,
+      labs: ['short 112.85', 'cover 110.40 (Jul 21)'],
+      steps: ['Short signal on the 120-minute chart at 112.85.', 'Next day (July 21) a reversal: out at 110.40, +245 pips. About $8 a pip then: $1,960 a lot, or 2½ large.'] },
+    jpy0722: { name: 'USDJPY · Jul 22, 2005 · chart period not stated', fig: '14.15', pages: 'pdf p315–316', fills: [111.12, 112.10], dirs: [1], ends: ['sig'], seg: [30], sig: 0.12, dp: 2, unit: 'pip', pip: 0.01, pipUsd: 8,
+      labs: ['long 111.12', 'out 112.10 (Jul 28)'],
+      steps: ['Long signal at 111.12; the market goes quiet, then grinds steadily higher.', 'About a week later (July 28) a reversal: out at 112.10. The book says +95 pips and $784; but 112.10 − 111.12 = 0.98 = 98 pips, and 98 × $8 = $784, so "95" looks like a typo for 98.'] },
+    cad: { name: 'USDCAD · Jul 21, 2005 · chart period not stated', fig: '14.16', pages: 'pdf p316', fills: [1.2169, 1.2360], dirs: [1], ends: ['sig'], seg: [30], sig: 0.0025, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 6,
+      labs: ['long 1.2169', 'out 1.2360 (Jul 27)'],
+      steps: ['Long signal at 1.2169. Consolidates for a few days and nearly stops out, but no sell signal: wait. Emotion makes a poor exit signal.', 'About a week later (July 27) a reversal: out at 1.2360, +191 pips, almost two large. About $6 a pip by the book: $1,146 a lot.'] },
+    eurjpy: { name: 'EURJPY · Aug 2, 2005 · 15-minute', fig: '14.17', pages: 'pdf p316–317', fills: [136.66, 136.18], dirs: [-1], ends: ['sig'], seg: [9], sig: 0.1, dp: 2, unit: 'pip', pip: 0.01, pipUsd: 8,
+      labs: ['short 136.66', 'cover 136.18'],
+      steps: ['Short signal on the 15-minute chart at 136.66; chops for about an hour, then breaks down.', 'Nearly two hours later the reversal: out at 136.18, +48 pips. About $8 a pip then: $384 a lot.'] },
+    eurgbp: { name: 'EURGBP · Jul 19, 2005 · 240-minute', fig: '14.18', pages: 'pdf p317–318', fills: [0.6912, 0.6970], dirs: [1], ends: ['sig'], seg: [12], sig: 0.0011, dp: 4, unit: 'pip', pip: 0.0001, pipUsd: 18,
+      labs: ['long 0.6912', 'out 0.6970'],
+      steps: ['Long signal on the 240-minute chart at 0.6912; the market grinds higher.', 'Two days later three lower closes: out at 0.6970, +58 pips. About $18 a pip: $1,044 a lot. A quiet pair that, once it moves, moves steadily: they call it "the tank".'] }
+  };
+  // ---------- a hand-built bull flag (deterministic, not market data) ----------
+  function flagBars() {
+    const c = [120, 119, 117.6, 116.4, 115.2, 114.5, 113.4, 112.6, 111.8, 111, 111.9, 113, 114.3, 115.1, 116.4, 117.2, 116.7, 118, 119.4, 120.2, 121.5, 122.1, 123.4, 124.6, 125.2,
+      124.7, 124.25, 123.8, 123.4, 123.0, 122.7, 123.6, 124.9, 126.2, 127.4, 128.1, 129.5, 130.6, 131.1, 132.4, 133.6];
+    const D = { o: [], h: [], l: [], c: [], t: [] };
+    for (let i = 0; i < c.length; i++) {
+      const o = i ? c[i - 1] : 120.4; const flag = i >= 25 && i <= 30;
+      const up = flag ? 0.35 : 0.55, dn = flag ? 0.55 : 0.55;
+      D.o.push(o); D.c.push(c[i]); D.h.push(Math.max(o, c[i]) + up); D.l.push(Math.min(o, c[i]) - dn);
+    }
+    return D;
+  }
+
+  // ---------- trades arriving one by one: time bars vs tick bars ----------
+  // rate(t) trades per minute; t in minutes after midnight ET. Each trade moves price one tick up (30%), down (30%) or not at all (40%).
+  function tickTape(sd, quiet) {
+    const r = rng(sd * 101 + 9); const T0 = 240, T1 = 720;
+    const rate = (t) => (t < 570 ? quiet : t < 630 ? 130 : 60);
+    let t = T0, p = 1130; const tt = [], pp = [];
+    for (;;) { t += -Math.log(1 - r()) / rate(t); if (t >= T1) break; const u = r(); if (u < 0.3) p += 0.25; else if (u < 0.6) p -= 0.25; tt.push(t); pp.push(p); }
+    return { t: tt, p: pp, T0, T1 };
+  }
+  const hhmm = (m) => { const h = Math.floor(m / 60), mm = Math.floor(m % 60); return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm; };
+  function timeBars(tp, mins) {
+    const D = { o: [], h: [], l: [], c: [], t: [], tm: [], n: [] }; const nb = Math.round((tp.T1 - tp.T0) / mins); let k = 0, last = tp.p[0];
+    for (let b = 0; b < nb; b++) {
+      const end = tp.T0 + (b + 1) * mins; let o = null, h = -Infinity, l = Infinity, cnt = 0;
+      while (k < tp.t.length && tp.t[k] < end) { const p = tp.p[k]; if (o == null) o = last; h = Math.max(h, p); l = Math.min(l, p); last = p; k++; cnt++; }
+      if (o == null) { o = last; h = last; l = last; }
+      D.o.push(o); D.h.push(Math.max(h, o)); D.l.push(Math.min(l, o)); D.c.push(last); D.tm.push(end); D.n.push(cnt);
+      D.t.push(((end - mins) % 60 === 0) ? hhmm(end - mins) : '');
+    }
+    return D;
+  }
+  function tickBars(tp, N) {
+    const D = { o: [], h: [], l: [], c: [], t: [], tm: [], n: [] }; let last = tp.p[0]; let lastHour = -1;
+    for (let k = 0; k + N <= tp.t.length; k += N) {
+      let h = -Infinity, l = Infinity; for (let j = k; j < k + N; j++) { h = Math.max(h, tp.p[j]); l = Math.min(l, tp.p[j]); }
+      const o = last; last = tp.p[k + N - 1]; const tm = tp.t[k + N - 1];
+      D.o.push(o); D.h.push(Math.max(h, o)); D.l.push(Math.min(l, o)); D.c.push(last); D.tm.push(tm); D.n.push(N);
+      const hr = Math.floor(tm / 60); D.t.push(hr !== lastHour ? hhmm(hr * 60) : ''); lastHour = hr;
+    }
+    return D;
+  }
+  function exKurt(a) { const n = a.length; if (n < 4) return 0; const m = a.reduce((x, y) => x + y, 0) / n; let m2 = 0, m4 = 0; a.forEach((x) => { const d = x - m; m2 += d * d; m4 += d * d * d * d; }); m2 /= n; m4 /= n; return m2 ? m4 / (m2 * m2) - 3 : 0; }
+  const diffs = (c) => c.slice(1).map((v, i) => v - c[i]);
+
+  // ---------- "too low" vs "confirmed" bottom buying ----------
+  function knifePath(sd) {
+    const r = rng(sd * 7 + 1); const L1 = 25 + Math.floor(r() * 40);
+    return marketBars([{ n: L1, drift: -0.006, vol: 0.012 }, { n: 50, drift: 0.005, vol: 0.012 }], sd * 3 + 11, 100, 0.006);
+  }
+  function knifeTrades(D, X) {
+    const n = D.c.length; const top = D.c[0]; let lowI = 0; for (let i = 1; i < n; i++) if (D.l[i] < D.l[lowI]) lowI = i;
+    let a = -1; for (let i = 0; i < n; i++) if (D.c[i] <= top * (1 - X)) { a = i; break; }
+    let b = -1; if (a >= 0) { const sigs = scalper(D, 'closes', -1); const s = sigs.find((x) => x.dir === 1 && x.i >= a); if (s) b = s.i; }
+    const evalE = (i) => { if (i < 0) return null; let mn = Infinity; for (let j = i + 1; j < n; j++) mn = Math.min(mn, D.l[j]); return { i, px: D.c[i], early: i < lowI, dd: mn / D.c[i] - 1, end: D.c[n - 1] / D.c[i] - 1 }; };
+    return { lowI, A: evalE(a), B: evalE(b) };
+  }
+
+  // ---------- pivots (Ch.8 formula) ----------
+  function pivots(H, L, C) { const P = (H + L + C) / 3, R1 = 2 * P - L, S1 = 2 * P - H, R2 = P + (H - L), S2 = P - (H - L); return { P, R1, S1, R2, S2, R3: R1 + (H - L), S3: S1 - (H - L) }; }
+  function pivotDay(sd) {
+    const M = genMarket([{ n: 156, drift: 0, vol: 0.0009 }], sd * 5 + 3, 1130);
+    const c = M.c.map((v) => Math.round(v * 4) / 4); const D = barsFrom(c, rng(sd * 11 + 2), 0.6);
+    for (let i = 0; i < D.c.length; i++) { D.h[i] = Math.ceil(D.h[i] * 4) / 4; D.l[i] = Math.floor(D.l[i] * 4) / 4; }
+    let H = -Infinity, L = Infinity; for (let i = 0; i < 78; i++) { H = Math.max(H, D.h[i]); L = Math.min(L, D.l[i]); }
+    return { D, pv: pivots(H, L, D.c[77]) };
+  }
+
+  // ======================= 1 · three closes, one painted bar =======================
+  let D1 = null, D1seed = -1;
+  const d1 = reg(() => {
+    if (D1seed !== seed) { D1 = marketBars(regimeSegs('trend', seed, 90), seed + 1, 100, 0.005); D1seed = seed; }
+    const mode = $('sel1').value; const up = Math.min(val('st1'), D1.c.length - 1);
+    const all = scalper(D1, mode, 0); const sigs = all.filter((s) => s.i <= up);
+    bplot('sc1', D1, { upto: up, paint: sigs.map((s) => s.paint), marks: sigs.map((s) => ({ i: s.i, kind: s.dir > 0 ? 'buy' : 'sell' })), legend: [['buy at the close of the 3rd bar', 'buy'], ['sell at the close of the 3rd bar', 'sell']] });
+    let html = '';
+    for (let i = Math.max(1, up - 5); i <= up; i++) {
+      if (mode === 'highs') { const hh = D1.h[i] > D1.h[i - 1], ll = D1.l[i] < D1.l[i - 1]; html += `<div class="${hh && !ll ? 'up' : ll && !hh ? 'dn' : 'eq'}">${hh && ll ? 'HH+LL' : hh ? 'HH' : ll ? 'LL' : '–'}<small>bar ${i}</small></div>`; }
+      else { const d = Math.sign(D1.c[i] - D1.c[i - 1]); html += `<div class="${d > 0 ? 'up' : d < 0 ? 'dn' : 'eq'}">${d > 0 ? '▲ close' : d < 0 ? '▼ close' : '='}<small>bar ${i}</small></div>`; }
+    }
+    $('strip1').innerHTML = html;
+    let su = 0, sd = 0;
+    for (let i = up; i >= 1; i--) { const d = D1.c[i] - D1.c[i - 1]; if (d > 0 && !sd) su++; else if (d < 0 && !su) sd++; else break; }
+    const last = sigs[sigs.length - 1];
+    const st = last ? `<b class="${last.dir > 0 ? 'good' : 'bad'}">${last.dir > 0 ? 'long' : 'short'}</b> since bar ${last.i} (painted bar ${last.paint}, filled at ${D1.c[last.i].toFixed(2)})` : 'no signal yet';
+    $('r1').innerHTML = `bar <b>${up}</b> · current close streak: <b>${su ? su + ' higher' : sd ? sd + ' lower' : '0'}</b> · position: ${st} · signals so far <b>${sigs.length}</b> (whole chart: ${all.length}) · ${mode === 'highs' ? 'highs/lows mode: the version Carter rejects' : 'closes mode: the book\'s rule'}`;
+  });
+  bindRange('st1', d1); onChange('sel1', d1);
+  $('bk1').addEventListener('click', () => { setR('st1', Math.max(4, val('st1') - 1)); d1(); });
+  $('fw1').addEventListener('click', () => { setR('st1', Math.min(89, val('st1') + 1)); d1(); });
+
+  // ======================= 2 · the filter =======================
+  const FL = flagBars();
+  const d2 = reg(() => {
+    const m = $('det2').value; const s = scalper(FL, m, -1); const tr = runSys(FL, s, { sess: 0, stop: false, cost: 0 });
+    bplot('fl2', FL, { paint: s.map((x) => x.paint), marks: s.map((x) => ({ i: x.i, kind: x.dir > 0 ? 'buy' : 'sell', txt: (x.dir > 0 ? 'buy ' : 'sell ') + FL.c[x.i].toFixed(1) })), shade: [{ a: 25, b: 30, col: 'c2', alpha: 0.14 }], legend: [['bull flag (lower closes, overlapping bars)', 'c2']] });
+    const pts = tr.reduce((a, t) => a + t.dir * (t.ex - t.ent), 0);
+    const name = m === 'closes' ? 'Three closes' : m === 'confirm' ? 'Price-confirmed' : 'Highs/lows';
+    $('r2').innerHTML = `${name}: <b>${s.length}</b> signals · ` + tr.map((t) => `${t.dir > 0 ? 'long' : 'short'} ${t.ent.toFixed(1)} → ${t.ex.toFixed(1)} <b class="${t.dir * (t.ex - t.ent) >= 0 ? 'good' : 'bad'}">${sgn(t.dir * (t.ex - t.ent), 1)}</b>${t.why === 'open' ? ' (still open)' : ''}`).join(' · ') + ` · total <b>${sgn(pts, 1)}</b> points`;
+  });
+  onChange('det2', d2);
+  let D2 = null, D2seed = -1;
+  const d2b = reg(() => {
+    if (D2seed !== seed) { D2 = marketBars(regimeSegs('trend', seed + 3, 120), seed + 5, 100, 0.005); D2seed = seed; }
+    const m = $('det2b').value, o = m === 'closes' ? 'confirm' : 'closes';
+    const s = scalper(D2, m, 0), t = scalper(D2, o, 0);
+    bplot('cm2', D2, { paint: s.map((x) => x.paint), marks: s.map((x) => ({ i: x.i, kind: x.dir > 0 ? 'buy' : 'sell' })).concat(t.map((x) => ({ i: x.i, v: D2.c[x.i], kind: 'x', col: 'c3' }))), legend: [[(m === 'closes' ? 'three closes' : 'price-confirmed') + ' signals (triangles)', 'buy'], [(o === 'closes' ? 'three closes' : 'price-confirmed') + ' signals (×)', 'c3']] });
+    const match = (a, b) => a.filter((x) => b.some((y) => y.dir === x.dir && Math.abs(y.i - x.i) <= 2)).length;
+    const sc = m === 'closes' ? s : t, cf = m === 'closes' ? t : s;
+    $('r2b').innerHTML = `three closes: <b>${sc.length}</b> signals · price-confirmed: <b>${cf.length}</b> · three-closes signals with a same-direction confirmed signal within 2 bars: <b>${match(sc, cf)} of ${sc.length}</b> · simulated market #${seed}`;
+  });
+  onChange('det2b', d2b);
+
+  // ======================= 3 · time frames =======================
+  let D3 = null, D3seed = -1, T3html = '';
+  function tfPool() {
+    const ks = [1, 5, 15, 60], rows = ks.map(() => ({ sig: 0, mv: 0, nt: 0, hold: 0 })); const runs = 200, nb = 1200;
+    for (let sd = 1; sd <= runs; sd++) {
+      const B = marketBars([{ n: nb, drift: 0, vol: 0.002 }], sd * 3 + 1, 100, 0.0012);
+      ks.forEach((k, j) => { const A = k === 1 ? B : aggregate(B, k); const s = scalper(A, 'closes', 0); rows[j].sig += s.length; const tr = runSys(A, s, { sess: 0, stop: false, cost: 0 }).filter((x) => x.why !== 'open'); tr.forEach((x) => { rows[j].mv += Math.abs(x.ex / x.ent - 1); rows[j].hold += (x.b - x.a) * k; rows[j].nt++; }); });
+    }
+    return '<table><tr><th>Bar size</th><th>Signals per 1,000 base bars</th><th>Average move per trade</th><th>Average hold (base bars)</th></tr>' + ks.map((k, j) => `<tr><td class="num">${k}</td><td class="num">${(rows[j].sig / runs / nb * 1000).toFixed(1)}</td><td class="num">${pc(rows[j].mv / Math.max(1, rows[j].nt), 2)}</td><td class="num">${(rows[j].hold / Math.max(1, rows[j].nt)).toFixed(0)}</td></tr>`).join('') + '</table><p>200 simulated random walks of 1,200 base bars each, 0.2% volatility per base bar (beyond the book).</p>';
+  }
+  const d3 = reg(() => {
+    if (D3seed !== seed) { D3 = marketBars(regimeSegs('trend', seed + 7, 1200).map((s) => ({ n: s.n, drift: s.drift / 5, vol: 0.002 })), seed + 9, 100, 0.0012); D3seed = seed; }
+    const k = +$('k3').value; const A = k === 1 ? D3 : aggregate(D3, k); const s = scalper(A, 'closes', 0);
+    bplot('tf3', A, { paint: s.map((x) => x.paint), marks: s.map((x) => ({ i: x.i, kind: x.dir > 0 ? 'buy' : 'sell' })), legend: [['buy', 'buy'], ['sell', 'sell']] });
+    const tr = runSys(A, s, { sess: 0, stop: false, cost: 0 }).filter((x) => x.why !== 'open');
+    const mv = tr.length ? tr.reduce((a, x) => a + Math.abs(x.ex / x.ent - 1), 0) / tr.length : 0;
+    $('r3').innerHTML = `1 bar = ${k} base bar${k > 1 ? 's' : ''} · bars on chart <b>${A.c.length}</b> · signals <b>${s.length}</b> · average move per completed trade <b>${pc(mv, 2)}</b> (this simulated market)`;
+    if (!T3html) { T3html = tfPool(); $('t3').innerHTML = T3html; }
+  });
+  onChange('k3', d3);
+
+  // ======================= 4 · tick charts =======================
+  let TP = null, TPkey = '';
+  const FIB = [89, 144, 233, 377, 610, 987, 1597, 2584, 4181];
+  const d4 = reg(() => {
+    const q = val('q4'), N = +$('N4').value, T = +$('T4').value; const key = seed + '|' + q;
+    if (key !== TPkey) { TP = tickTape(seed, q); TPkey = key; }
+    const tb = timeBars(TP, T), kb = tickBars(TP, N);
+    const sT = scalper(tb, 'closes', 0), sK = scalper(kb, 'closes', 0);
+    const oT = tb.tm.findIndex((x) => x > 570), oK = kb.tm.findIndex((x) => x > 570);
+    bplot('tb4', tb, { paint: sT.map((s) => s.paint), marks: sT.map((s) => ({ i: s.i, kind: s.dir > 0 ? 'buy' : 'sell' })), seps: oT >= 0 ? [oT] : [], dp: 2, legend: [[T + '-minute bars (simulated)', 'price']] });
+    bplot('kb4', kb, { paint: kb.c.length ? sK.map((s) => s.paint) : [], marks: sK.map((s) => ({ i: s.i, kind: s.dir > 0 ? 'buy' : 'sell' })), seps: oK >= 0 ? [oK] : [], dp: 2, legend: [[N + '-tick bars (simulated)', 'price']] });
+    const nb = 16, bt = new Array(nb).fill(0), bk = new Array(nb).fill(0);
+    tb.tm.forEach((t) => { bt[Math.min(nb - 1, Math.floor((t - 0.001 - 240) / 30))]++; });
+    kb.tm.forEach((t) => { bk[Math.min(nb - 1, Math.max(0, Math.floor((t - 240) / 30)))]++; });
+    plot('bc4', { n: nb, ymin: 0, lines: [{ d: bt, col: 'c2', w: 2, step: true, label: T + '-min bars per 30 min' }, { d: bk, col: 'c1', w: 2, step: true, label: N + '-tick bars per 30 min' }], vlines: [{ i: 0, label: '04:00' }, { i: 11, label: '9:30 open', col: 'c3' }] });
+    const pre = (D) => D.tm.filter((x) => x <= 570).length;
+    const preS = (D, s) => s.filter((x) => D.tm[x.i] <= 570).length;
+    const flat = tb.n.filter((x) => x === 0).length;
+    $('r4').innerHTML = `simulated trades <b>${TP.t.length.toLocaleString('en-US')}</b> · ${T}-min chart: <b>${pre(tb)}</b> bars before 9:30, <b>${tb.c.length - pre(tb)}</b> after (${flat} bars with no trades at all), signals before / after 9:30: <b>${preS(tb, sT)} / ${sT.length - preS(tb, sT)}</b> · ${N}-tick chart: <b>${pre(kb)}</b> bars before 9:30, <b>${kb.c.length - pre(kb)}</b> after, signals <b>${preS(kb, sK)} / ${sK.length - preS(kb, sK)}</b> · excess kurtosis of bar-to-bar changes (0 = normal curve): time bars <b>${exKurt(diffs(tb.c)).toFixed(1)}</b>, tick bars <b>${exKurt(diffs(kb.c)).toFixed(1)}</b>`;
+  });
+  bindRange('q4', d4); onChange('N4', d4); onChange('T4', d4);
+  const dFib = () => {
+    const tpd = Math.max(1, +$('tpd4').value || 0);
+    $('fib4').innerHTML = FIB.map((N) => { const b = tpd / N; return `${N}-tick: <b>${b < 10 ? b.toFixed(1) : Math.round(b).toLocaleString('en-US')}</b> bars (≈ ${(390 / b).toFixed(b > 390 ? 2 : 1)} min each over a 390-minute day)`; }).join(' · ') + ' · rule of thumb from the book: more volume → higher tick count. The minutes per bar is only an average; real bars bunch up at the open and close.';
+  };
+  $('tpd4').addEventListener('input', dFib); dFib();
+
+  // ======================= 5 · the five rules as a system =======================
+  let P5key = '';
+  function pool5(tf, det, cost) {
+    const regs = [['trend', 'trending stretches'], ['random', 'random walk'], ['chop', 'range-bound']]; const runs = 300;
+    const opt = { sess: tf === 'intra' ? 26 : 0, stop: tf === 'daily', cost };
+    const rows = regs.map(([rg, nm]) => {
+      let all = [], prof = 0; const maes = [];
+      for (let sd = 1; sd <= runs; sd++) { const D = marketBars(regimeSegs(rg, sd, 400), sd, 100, 0.005); const tr = runSys(D, scalper(D, det, 0), opt); all = all.concat(tr); if (tr.reduce((a, t) => a + t.ret, 0) > 0) prof++; if (tr.length) maes.push(Math.min(...tr.map((t) => t.mae))); }
+      const st = tstats(all); maes.sort((a, b) => a - b);
+      return `<tr><td>${nm}</td><td class="num">${(st.n / runs).toFixed(1)}</td><td class="num">${pc(st.win)}</td><td class="num">${pcs(st.aw)}</td><td class="num">${pcs(st.al)}</td><td class="num"><b>${pcs(st.exp, 3)}</b></td><td class="num">${pc(prof / runs, 0)}</td><td class="num">${pcs(maes.length ? maes[Math.floor(maes.length / 2)] : 0, 1)}</td></tr>`;
+    });
+    return '<table><tr><th>Simulated market</th><th>Trades / run</th><th>Win rate</th><th>Avg win</th><th>Avg loss</th><th>Expectancy / trade (after costs)</th><th>Runs net positive</th><th>Median worst MAE per run</th></tr>' + rows.join('') + `</table><p>Pooled over seeds 1–${runs} (all of them, none picked), 400 bars each, 1% volatility per bar; "trending stretches" = random 30–80-bar legs with a steady drift. Beyond the book; simulated results are not evidence about real markets.</p>`;
+  }
+  const d5 = reg(() => {
+    const tf = $('tf5').value, rg = $('reg5').value, det = $('det5').value, cost = val('cost5') / 100;
+    const opt = { sess: tf === 'intra' ? 26 : 0, stop: tf === 'daily', cost };
+    const D = marketBars(regimeSegs(rg, seed + 11, 260), seed + 13, 100, 0.005);
+    const s = scalper(D, det, 0); const tr = runSys(D, s, opt); const st = tstats(tr);
+    const marks = []; const hl = [];
+    tr.forEach((t) => { marks.push({ i: t.a, kind: t.dir > 0 ? 'buy' : 'sell' }); if (t.why !== 'open') marks.push({ i: t.b, v: t.ex, kind: 'x', col: t.why === 'stop' ? 'sell' : t.why === 'time' ? 'c3' : 'muted' }); if (t.stp != null) hl.push({ v: t.stp, col: 'sell', dash: [3, 3], w: 1, from: t.paint, to: t.b, noScale: true }); });
+    const seps = []; if (opt.sess) for (let i = opt.sess; i < D.c.length; i += opt.sess) seps.push(i);
+    if (hl.length) hl[0].leg = 'stop at the painted bar (daily rule)';
+    bplot('sy5', D, { paint: s.map((x) => x.paint), marks, hl, seps, legend: [['entry', 'buy'], ['exit on signal (×)', 'muted']].concat(opt.sess ? [['flat at session end (4:10 rule) ×', 'c3']] : []).concat(opt.stop ? [['stopped out ×', 'sell']] : []) });
+    const by = (w) => tr.filter((t) => t.why === w).length;
+    $('r5').innerHTML = `this market: trades <b>${st.n}</b> · win rate <b>${pc(st.win)}</b> · avg win <b>${pcs(st.aw)}</b> · avg loss <b>${pcs(st.al)}</b> · expectancy <b class="${st.exp >= 0 ? 'good' : 'bad'}">${pcs(st.exp, 3)}</b> a trade · sum <b class="${st.sum >= 0 ? 'good' : 'bad'}">${pcs(st.sum, 1)}</b> · exits: ${by('signal')} on signal, ${by('time')} at session end, ${by('stop')} stopped${by('open') ? ', 1 still open' : ''} · worst move against a trade (MAE) <b>${pcs(st.mae, 1)}</b>`;
+    const key = tf + '|' + det + '|' + cost; if (key !== P5key) { P5key = key; $('t5').innerHTML = pool5(tf, det, cost); }
+  });
+  ['tf5', 'reg5', 'det5'].forEach((id) => onChange(id, d5)); bindRange('cost5', d5);
+
+  // ======================= 6–10 · replays of the book's trades =======================
+  const exKeys = Object.keys(EX);
+  const fmtP = (ex, v) => v.toLocaleString('en-US', { minimumFractionDigits: ex.dp, maximumFractionDigits: ex.dp });
+  function legText(ex, a, b, d, tag) {
+    const mv = d * (b - a);
+    if (ex.unit === 'pip') { const p = Math.round(mv / ex.pip); return `${d > 0 ? 'long' : 'short'} ${fmtP(ex, a)} → ${fmtP(ex, b)} = <b class="${p >= 0 ? 'good' : 'bad'}">${p >= 0 ? '+' : '−'}${Math.abs(p)} pips</b> × ~$${ex.pipUsd} = ${usd(p * ex.pipUsd)} a lot${tag || ''}`; }
+    if (ex.unit === 'share') return `${d > 0 ? 'long' : 'short'} ${fmtP(ex, a)} → ${fmtP(ex, b)} = <b class="${mv >= 0 ? 'good' : 'bad'}">${sgn(mv, 2)}</b> a share${tag || ''}`;
+    return `${d > 0 ? 'long' : 'short'} ${fmtP(ex, a)} → ${fmtP(ex, b)} = <b class="${mv >= 0 ? 'good' : 'bad'}">${sgn(mv, ex.dp)} pts</b> × $${ex.mult.toLocaleString('en-US')} = ${usd(mv * ex.mult, Math.abs(mv * ex.mult - Math.round(mv * ex.mult)) > 0.001 ? 2 : 0)}${tag || ''}`;
+  }
+  function makeReplay(sfx, fixedKey) {
+    const cache = {}; let lastKey = null;
+    const draw = reg(() => {
+      const k = fixedKey || $('ex' + sfx).value; const ex = EX[k];
+      const ck = k + '|' + seed; if (!cache[ck]) cache[ck] = buildEx(ex, seed * 13 + exKeys.indexOf(k) + 1);
+      const B = cache[ck], D = B.D, n = D.c.length, F = ex.fills, fb = B.fillBars;
+      const stEl = $('st' + sfx); stEl.max = n; if (k !== lastKey) { stEl.value = n; lastKey = k; }
+      const show = Math.max(1, Math.min(+stEl.value, n)); $('st' + sfx + 'o').textContent = show; const upto = show - 1;
+      const pE = fb[0] - 2;
+      D.t = new Array(n).fill('');
+      if (ex.clock) { const [h0, m0, step] = ex.clock; for (let i = 0; i < n; i++) { const m = h0 * 60 + m0 + step * (i - pE); if (m < 0 || m >= 24 * 60) continue; if (step >= 60 && (i < pE || i > pE + 2)) continue; if ((i - pE) % (step >= 15 ? 1 : 3) === 0) D.t[i] = hhmm(m); } }
+      if (k === 'es1005') { for (let i = 0; i < n; i++) { const m = 13 * 60 + 15 * (i - fb[0]); D.t[i] = (m >= 0 && m < 24 * 60 && (i - fb[0]) % 4 === 0) ? hhmm(m) : ''; } }
+      const marks = [], hl = [], vl = [];
+      fb.forEach((b, j) => {
+        if (j === 0) marks.push({ i: b, kind: ex.dirs[0] > 0 ? 'buy' : 'sell', txt: ex.labs[0] });
+        else if (j < ex.dirs.length && ex.dirs[j] !== ex.dirs[j - 1] && ex.dirs[j]) marks.push({ i: b, kind: ex.dirs[j] > 0 ? 'buy' : 'sell', txt: ex.labs[j] });
+        else marks.push({ i: b, v: F[j], kind: 'x', col: ex.ends[j - 1] === 'sig' ? 'c1' : 'c3', txt: ex.labs[j] });
+      });
+      if (ex.tail === 'reentry') marks.push({ i: B.expect[B.expect.length - 1], kind: 'buy', txt: ex.labs[ex.labs.length - 1] });
+      hl.push({ v: F[0], col: 'muted', dash: [5, 4], w: 1, from: fb[0], to: fb[1], label: 'entry ' + fmtP(ex, F[0]), below: ex.dirs[0] < 0 });
+      if (ex.stop != null) hl.push({ v: ex.stop, col: 'sell', dash: [3, 3], from: pE, to: fb[1], label: 'stop ' + fmtP(ex, ex.stop), below: ex.dirs[0] > 0, leg: 'stop = far end of the painted bar' });
+      (ex.extraHl || []).forEach((h) => hl.push(Object.assign({ from: fb[0], to: fb[1] }, h)));
+      if (ex.timeExit != null) vl.push({ i: fb[ex.timeExit], col: 'c3', label: '4:10 pm ET: Carter is flat', row: 1 });
+      if (ex.paintLab) vl.push({ i: pE, col: 'c1', label: ex.paintLab, row: 0 });
+      const cid = 'rp' + sfx; bplot(cid, D, { upto, paint: B.sigs.map((s) => s.paint), marks, hl, vl, dp: ex.dp, tEvery: 1, legend: [['entry / flip', 'buy'], ['exit ×', 'c1']] });
+      const legs = [];
+      for (let j = 1; j < F.length; j++) {
+        if (fb[j] > upto) break; const d = ex.dirs[j - 1]; if (!d) continue;
+        const tag = ex.timeExit != null && j > ex.timeExit ? ' <i>(24-hour trader only)</i>' : ex.ends[j - 1] === 'open' ? ' <i>(still open at the last price on Fig 14.8)</i>' : ex.ends[j - 1] === 'time' ? ' <i>(4:10 pm exit)</i>' : '';
+        legs.push(legText(ex, F[j - 1], F[j], d, tag));
+      }
+      $('r' + sfx).innerHTML = `<b>${ex.name}</b> · ${ex.pages} · Fig ${ex.fig} blank in this copy${ex.fig === '14.8' ? ' (except this one: printed)' : ''} → bars simulated, prices from the book${legs.length ? '<br>' + legs.join('<br>') : '<br>step forward to see the legs'}${B.ok ? '' : ' · (simulated path is approximate)'}`.replace('Fig 14.8 blank in this copy (except this one: printed)', 'Fig 14.8 printed in this copy; bars here are still simulated');
+      const reached = fb.filter((b) => b <= upto).length;
+      $('li' + sfx).innerHTML = ex.steps.map((t, j) => `<li${j === Math.min(ex.steps.length - 1, Math.max(0, reached - 1)) ? ' class="now"' : ''}>${t}</li>`).join('');
+    });
+    if (!fixedKey) onChange('ex' + sfx, draw);
+    $('st' + sfx).addEventListener('input', draw);
+    return draw;
+  }
+  makeReplay('6'); makeReplay('7'); makeReplay('8', 'ym1006'); makeReplay('9'); makeReplay('10');
+
+  // ---------- 8 · double the order ----------
+  const d8b = () => { const n = val('n8'); $('r8b').innerHTML = `long <b>${n}</b> → send <b>sell ${2 * n}</b> at the market → ${n} close the long, ${n} open the short → short <b>${n}</b>. Reversing back: <b>buy ${2 * n}</b>. On Fig 14.8's four signals that is 1 order of ${n} to start, then 3 orders of ${2 * n}; the closed legs (+7, +17, +13 points) make <b>${usd(37 * 5 * n)}</b> at $5 a YM point (my arithmetic).`; };
+  bindRange('n8', d8b); d8b();
+
+  // ---------- 9 · forex size and slang ----------
+  const d9b = () => { const lots = val('lots9'), pips = val('pips9'); $('r9b').innerHTML = `${lots} lots = <b>$${(lots * 100000).toLocaleString('en-US')}</b> of currency = <b>${(lots / 10).toLocaleString('en-US')} buck${lots === 10 ? '' : 's'}</b> · ${pips} pips = <b>${(pips / 100).toLocaleString('en-US')} large</b> · on a pair ending in USD: ${pips} × $10 × ${lots} = <b>${usd(pips * 10 * lots)}</b> · account money at the book's $1,000 per lot: <b>${usd(lots * 1000)}</b> (100:1 leverage) · interbank minimum $1,000,000 = 10 lots${lots >= 10 ? ': this size would clear it' : ''}`; };
+  bindRange('lots9', d9b); bindRange('pips9', d9b); d9b();
+
+  // ---------- 10 · pip value ----------
+  const PAIRS = {
+    USDCHF: { lab: 'USDCHF rate', def: 1.2971, f: (r) => 10 / r, how: '10 ÷ USDCHF', book: 7 },
+    USDJPY: { lab: 'USDJPY rate', def: 110.40, f: (r) => 1000 / r, how: '1,000 ÷ USDJPY', book: 8 },
+    USDCAD: { lab: 'USDCAD rate', def: 1.2360, f: (r) => 10 / r, how: '10 ÷ USDCAD', book: 6 },
+    EURJPY: { lab: 'USDJPY rate (to convert yen)', def: 111.0, f: (r) => 1000 / r, how: '1,000 ÷ USDJPY', book: 8 },
+    EURGBP: { lab: 'GBPUSD rate (to convert pounds)', def: 1.77, f: (r) => 10 * r, how: '10 × GBPUSD', book: 18 },
+    EURUSD: { lab: 'no conversion needed', def: 1.0, f: () => 10, how: '10 (quote currency is already USD)', book: 10 }
+  };
+  let lastPair = null;
+  const d10b = () => {
+    const pr = $('pair10').value, P = PAIRS[pr];
+    if (pr !== lastPair) { $('rate10').value = P.def; $('rl10').textContent = P.lab; lastPair = pr; }
+    const r = parseFloat($('rate10').value) || P.def; const v = P.f(r);
+    $('r10b').innerHTML = `${pr}: pip value = ${P.how} = <b>$${v.toFixed(2)}</b> per standard lot · book's figure: <b>~$${P.book}</b> · per mini lot ($10,000): $${(v / 10).toFixed(2)}${pr === 'EURJPY' ? ' · the book gives no USDJPY rate for Aug 2, 2005; 111 is my assumption' : ''}${pr === 'EURGBP' ? ' · 1.77 ≈ GBPUSD on Aug 2, 2005 per the book\'s own GBPUSD trade' : ''}`;
+  };
+  onChange('pair10', d10b); $('rate10').addEventListener('input', d10b); d10b();
+
+  // ======================= 11 · the ledger, as % of price =======================
+  const LG = [['ES 233t', 'i', 5.25 / 1133.25], ['ES 15m', 'i', 3 / 1137], ['ES 60m', 'h', 21.75 / 1114.75], ['ES D', 'd', 36.5 / 1132.5], ['YM D', 'd', 362 / 9916], ['KLAC D', 'd', 9.55 / 52.51], ['CL D', 'd', 5.9 / 43.6], ['YM 5m (avg leg)', 'i', 37 / 3 / 10176], ['EURUSD D', 'd', 0.0998 / 1.2469], ['GBPUSD D', 'd', 0.0689 / 1.8837], ['GBPUSD 5m', 'i', 0.0028 / 1.7696], ['AUDUSD 60m', 'h', 0.0044 / 0.756], ['USDCHF 60m', 'h', 0.0116 / 1.2855], ['USDJPY 120m', 'h', 2.45 / 112.85], ['USDJPY ?', 'u', 0.98 / 111.12], ['USDCAD ?', 'u', 0.0191 / 1.2169], ['EURJPY 15m', 'i', 0.48 / 136.66], ['EURGBP 240m', 'h', 0.0058 / 0.6912]];
+  const GC = { i: 'c2', h: 'c3', d: 'c1', u: 'muted' };
+  const d11 = reg(() => {
+    plot('lg11', { n: LG.length, ymin: 0, bars: [{ d: LG.map((x) => x[2] * 100), col: (i) => colorOf(GC[LG[i][1]], 0.8) }], legend: [['intraday (tick, 5-, 15-min)', 'c2'], ['60–240-min', 'c3'], ['daily', 'c1'], ['period not stated', 'muted']] });
+    const med = (g) => { const a = LG.filter((x) => x[1] === g).map((x) => x[2]).sort((p, q) => p - q); return a.length ? a[Math.floor((a.length - 1) / 2)] : 0; };
+    $('r11').innerHTML = `gain as % of entry price, trades 1–18 left to right · median intraday <b>${pc(med('i'), 2)}</b> · median 60–240-min <b>${pc(med('h'), 2)}</b> · median daily <b>${pc(med('d'), 1)}</b> · bigger time frame, bigger move, as rule 1 says (computed from the book's prices)`;
+  });
+
+  // ======================= 12 · falling knife =======================
+  let K12key = '';
+  const d12 = reg(() => {
+    const X = val('x12') / 100; const D = knifePath(seed + 21); const k = knifeTrades(D, X);
+    const marks = [{ i: k.lowI, v: D.l[k.lowI], kind: 'x', col: 'muted', txt: 'the low' }];
+    if (k.A) marks.push({ i: k.A.i, kind: 'buy', txt: 'A: "too low"' });
+    if (k.B) marks.push({ i: k.B.i, kind: 'buy', txt: 'B: confirmed' });
+    const sigs = scalper(D, 'closes', -1);
+    bplot('kn12', D, { paint: sigs.filter((s) => s.dir > 0).map((s) => s.paint), marks, hl: [{ v: D.c[0] * (1 - X), col: 'c3', dash: [4, 4], label: '−' + (X * 100).toFixed(0) + '% from the top', leg: '"too low" line' }] });
+    const ln = (e, nm) => e ? `${nm}: bought ${e.early ? '<b class="bad">before</b>' : '<b class="good">after</b>'} the low · worst drop after entry <b>${pcs(e.dd, 1)}</b> · at the end <b>${pcs(e.end, 1)}</b>` : `${nm}: never triggered`;
+    $('r12').innerHTML = ln(k.A, 'A "too low"') + ' · ' + ln(k.B, 'B confirmed') + ` · simulated path #${seed}`;
+    const key = String(X); if (key !== K12key) {
+      K12key = key; const S = { A: [0, 0, 0, 0], B: [0, 0, 0, 0] };
+      for (let sd = 1; sd <= 400; sd++) { const kk = knifeTrades(knifePath(sd), X); ['A', 'B'].forEach((w) => { const e = kk[w]; if (e) { S[w][0]++; S[w][1] += e.early ? 1 : 0; S[w][2] += e.dd; S[w][3] += e.end; } }); }
+      const row = (w, nm) => { const s = S[w]; return `<tr><td>${nm}</td><td class="num">${s[0]}</td><td class="num">${pc(s[1] / Math.max(1, s[0]), 0)}</td><td class="num">${pcs(s[2] / Math.max(1, s[0]), 1)}</td><td class="num">${pcs(s[3] / Math.max(1, s[0]), 1)}</td></tr>`; };
+      $('t12').innerHTML = `<table><tr><th>400 simulated paths</th><th>Entries</th><th>Bought before the low</th><th>Avg worst drop after entry</th><th>Avg gain at the end</th></tr>${row('A', 'A: buy when ' + (X * 100).toFixed(0) + '% down')}${row('B', 'B: first scalper buy after that')}</table>`;
+    }
+  });
+  bindRange('x12', d12);
+
+  // ======================= 13 · pivots + scalper =======================
+  let T13key = '';
+  const PVN = ['S3', 'S2', 'S1', 'P', 'R1', 'R2', 'R3'];
+  function nearPivot(D, s, pv, tol) { const ext = s.dir > 0 ? D.l[s.paint] : D.h[s.paint]; let best = null; PVN.forEach((nm) => { const d = Math.abs(ext - pv[nm]); if (d <= tol + 1e-9 && (!best || d < best.d)) best = { nm, d }; }); return best; }
+  const d13 = reg(() => {
+    const tol = val('tol13') * 0.25; const { D, pv } = pivotDay(seed + 31);
+    const sigs = scalper(D, 'closes', 0).filter((s) => s.paint >= 78);
+    let lo = Infinity, hi = -Infinity; for (let i = 78; i < D.c.length; i++) { lo = Math.min(lo, D.l[i]); hi = Math.max(hi, D.h[i]); }
+    const span = hi - lo;
+    const hl = PVN.filter((nm) => pv[nm] > lo - span * 0.3 && pv[nm] < hi + span * 0.3).map((nm) => ({ v: pv[nm], col: nm === 'P' ? 'c1' : nm[0] === 'R' ? 'sell' : 'buy', dash: nm === 'P' ? [] : [4, 3], w: 1.1, label: nm + ' ' + pv[nm].toFixed(2), from: 78 }));
+    const near = sigs.map((s) => nearPivot(D, s, pv, tol));
+    const marks = sigs.map((s, j) => ({ i: s.i, kind: s.dir > 0 ? 'buy' : 'sell', txt: near[j] ? 'at ' + near[j].nm : '' }));
+    D.t = D.c.map((_, i) => (i >= 78 && (i - 78) % 12 === 0 ? hhmm(570 + (i - 78) * 5) : ''));
+    bplot('pv13', D, { x0: 78, paint: sigs.map((s) => s.paint), marks, hl, dp: 2, legend: [['pivot P', 'c1'], ['R levels', 'sell'], ['S levels', 'buy']] });
+    $('r13').innerHTML = `simulated day #${seed} (5-minute ES-like bars; pivots from the simulated prior day H ${D.h.slice(0, 78).reduce((a, b) => Math.max(a, b)).toFixed(2)}, L ${D.l.slice(0, 78).reduce((a, b) => Math.min(a, b)).toFixed(2)}, C ${D.c[77].toFixed(2)}) · signals <b>${sigs.length}</b>, at a pivot (painted bar's extreme within ${tol.toFixed(2)} points) <b>${near.filter((x) => x).length}</b>`;
+    const key = String(tol); if (key !== T13key) {
+      T13key = key; const G = { y: [0, 0, 0], n: [0, 0, 0] };
+      for (let sd = 1; sd <= 400; sd++) { const pd = pivotDay(sd); const ss = scalper(pd.D, 'closes', 0).filter((s) => s.paint >= 78 && s.i + 12 < pd.D.c.length); ss.forEach((s) => { const f = s.dir * (pd.D.c[s.i + 12] - pd.D.c[s.i]); const g = nearPivot(pd.D, s, pd.pv, tol) ? G.y : G.n; g[0]++; g[1] += f; g[2] += f > 0 ? 1 : 0; }); }
+      const row = (g, nm) => `<tr><td>${nm}</td><td class="num">${g[0]}</td><td class="num">${sgn(g[1] / Math.max(1, g[0]), 2)} pts</td><td class="num">${pc(g[2] / Math.max(1, g[0]), 0)}</td></tr>`;
+      $('t13').innerHTML = `<table><tr><th>400 simulated random-walk days</th><th>Signals</th><th>Avg move 12 bars later (in the signal's direction)</th><th>Positive</th></tr>${row(G.y, 'at a pivot')}${row(G.n, 'not at a pivot')}</table><p>Beyond the book. No real traders inside a simulation, so no reason for pivots to matter here; both rows should hover near zero. Only real data can test Carter's claim.</p>`;
+    }
+  });
+  bindRange('tol13', d13);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

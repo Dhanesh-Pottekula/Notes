@@ -1,0 +1,1741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.7 Breakout</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+/* ---- module 7 additions ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+.dots { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 3px; max-width: 560px; }
+.dots span { aspect-ratio: 1; border-radius: 2px; display: block; }
+q { font-style: italic; }
+td.good { color: var(--buy); font-weight: 600; } td.bad { color: var(--sell); font-weight: 600; }
+.two > .box { align-content: start; }
+.controls label { flex-wrap: wrap; max-width: 100%; }
+.controls select { max-width: 100%; min-width: 0; }
+.controls input[type=number] { font-family: var(--mono); font-size: 13px; padding: 3px 5px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+<!-- illus-css:start --><style>
+figure.illus { margin: 6px 0 10px; background: #f6f1e7; border: 1px solid var(--rule); border-radius: 12px; padding: 6px; }
+figure.illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+</style><!-- illus-css:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All modules</a><a href="ch06_failure_test.html">← Module 6 · Failure test</a><a href="ch08_pattern_failure.html">Module 8 · Pattern failure →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Adam Grimes · The Art and Science of Trading: Course Workbook (2017) · Module 7 · pdf p275–311</div>
+  <h1>Breakouts, and the <em>plan</em> that has to come first</h1>
+  <p class="lede">Module 7 adds the last pattern, the breakout, and then spends most of its pages on what makes any pattern tradable: a written plan, a research journal, a disciplined process, multiple-timeframe rules, stops and exits, risk management, and where trading ideas come from. Everything is here in the module's order, in plain words, with a live tool for every idea that has a mechanism. Every price on this page is simulated: it is built to show one idea, and it is not market evidence.</p>
+  <div class="topbar">
+    <button id="reroll" type="button">Roll a new market</button>
+    <span class="readout">market #<b id="seedOut">1</b> · feeds the breakout tester, the leak demo and the exit manager</span>
+  </div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the module fits together</h2><span class="chip">read this first</span></div>
+  <p>The module has two halves. First come five short exercises (Sections 1–5). Then come thirteen of Grimes' blog essays, grouped under four headings, that explain the thinking behind those exercises. The chain below is the logic that ties them together.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the module">
+    <div class="row"><span class="tag">Patterns</span><span class="node">Pullback (M4)</span><span class="node">Anti (M5)</span><span class="node">Failure test (M6)</span><span class="arr">+</span><span class="node key">Breakout (M7)</span><span class="arr">=</span><span class="node">a complete directional tool set</span></div>
+    <div class="row"><span class="tag">Prove it</span><span class="node key">S1 Breakout backtest</span><span class="arr">→</span><span class="node">level · formation · execution rules</span></div>
+    <div class="row"><span class="tag">Write it</span><span class="node key">S2 Trading plan</span><span class="arr">→</span><span class="node">business plan · CRG sheet · setup sheets</span><span class="node">How good is your plan?</span></div>
+    <div class="row"><span class="tag">Follow it</span><span class="node">Many hats</span><span class="node">Process</span><span class="node">5 questions per trade</span><span class="node">5 steps</span><span class="node">Be boring</span></div>
+    <div class="row"><span class="tag">Other TFs</span><span class="node key">S4 MTF project</span><span class="arr">→</span><span class="node">fighting the trend (crude)</span><span class="node">triggering entries (gold)</span></div>
+    <div class="row"><span class="tag">Manage it</span><span class="node">Stops: proper, not tight</span><span class="arr">→</span><span class="node">Exits</span><span class="arr">→</span><span class="node">Risk = survive any one loss</span><span class="arr">→</span><span class="node">Adding rule</span></div>
+    <div class="row"><span class="tag">Grow it</span><span class="node key">S3 Research journal</span><span class="arr">→</span><span class="node">Finding ideas</span><span class="arr">→</span><span class="node">Quality matters</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Module overview</a>
+    <a href="#s2"><span>02</span>S1 · Breakout backtest</a>
+    <a href="#s3"><span>03</span>S2 · Your trading plan</a>
+    <a href="#s4"><span>04</span>S3 · Research journal</a>
+    <a href="#s5"><span>05</span>S4 · Multiple timeframe project</a>
+    <a href="#s6"><span>06</span>S5 · Readings</a>
+    <a href="#s7"><span>07</span>How good is your plan?</a>
+    <a href="#s8"><span>08</span>Your many hats</a>
+    <a href="#s9"><span>09</span>Nothing matters more than process</a>
+    <a href="#s10"><span>10</span>Five questions before each trade</a>
+    <a href="#s11"><span>11</span>Five steps to a process</a>
+    <a href="#s12"><span>12</span>Trading should be boring</a>
+    <a href="#s13"><span>13</span>Multiple timeframe influences</a>
+    <a href="#s14"><span>14</span>Cutting losses quickly or properly?</a>
+    <a href="#s15"><span>15</span>Exits</a>
+    <a href="#s16"><span>16</span>What good risk management means</a>
+    <a href="#s17"><span>17</span>Adding to positions: one rule</a>
+    <a href="#s18"><span>18</span>How to find trading ideas</a>
+    <a href="#s19"><span>19</span>Quality matters</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · MODULE 7: BREAKOUTS (INTRODUCTION)</div><h2>The last pattern, and four jobs for this module</h2></div><span class="chip">pdf p275</span></div>
+  <p>Grimes says this module finishes the set of specific chart patterns. By now you can trade a trend while it is moving, trade when a trend may be ending, and trade inside a range. Breakouts add the last case: a market leaving a range and starting a new trend leg. With that, he calls the tool set complete: it is the base for any directional technical trade.</p>
+  <p>The module has four jobs:</p>
+  <ul class="plain">
+    <li><b>Breakouts:</b> backtest one version of the pattern (Section 1).</li>
+    <li><b>The trading plan:</b> one of the tasks that separate winning from losing traders. Writing a plan doesn't guarantee success, but building and revising it forces you to think hard about your performance and your problems. Grimes calls it one of the best tools for moving toward consistent profits.</li>
+    <li><b>Multiple timeframe influences:</b> how forces on higher and lower timeframes shape a pattern on one timeframe, and how to put that into the plan, either by looking at several charts or by inferring the other timeframes from one chart.</li>
+    <li><b><i>Your own trading book</i>:</b> a research journal of observations and thoughts that, over time, becomes a source of growth and a lasting edge.</li>
+  </ul>
+  <div class="fig">
+    <svg viewBox="0 0 720 210" role="img" aria-label="A price path through range, breakout, trend, pullback and trend end, with the module that trades each part">
+      <rect x="20" y="105" width="210" height="60" fill="var(--c2)" opacity="0.10" stroke="var(--c2)" stroke-dasharray="4 4"/>
+      <polyline points="20,140 45,118 70,155 95,112 120,150 145,115 170,152 195,118 220,140 240,100 270,80 300,92 325,60 350,74 380,36 410,50 440,30 470,58 500,40 530,76 560,62 600,104 640,94 690,140" fill="none" stroke="var(--price)" stroke-width="2.4"/>
+      <circle cx="240" cy="100" r="6" fill="none" stroke="var(--c1)" stroke-width="2.5"/>
+      <text x="40" y="186">range: trade inside it</text>
+      <text x="40" y="201" fill="var(--muted)">failure tests at the edges (M6)</text>
+      <text x="200" y="22" fill="var(--c1)">breakout: range → new trend leg (M7)</text>
+      <line x1="240" y1="28" x2="240" y2="92" stroke="var(--c1)" stroke-dasharray="3 3"/>
+      <text x="300" y="128">trend moving: pullbacks (M4)</text>
+      <line x1="350" y1="80" x2="350" y2="116" stroke="var(--muted)" stroke-dasharray="3 3"/>
+      <text x="520" y="150">trend may be ending:</text>
+      <text x="520" y="166" fill="var(--muted)">anti (M5), failure test (M6)</text>
+      <line x1="560" y1="68" x2="560" y2="136" stroke="var(--muted)" stroke-dasharray="3 3"/>
+    </svg>
+    <p class="readout">Which module covers which part of the path is my own summary of the module intros (M4 pdf p156, M5 p182, M6 p209); Grimes lists only the four market situations.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A toolbox with four drawers: one for trends in motion, one for trends getting tired, one for sideways markets, and now one for the moment a sideways market wakes up. The rest of the module is about the workshop rules: when you may open which drawer, how much wood you may cut, and how you write all of that down.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Module 4 (<a href="ch04_pullback.html">Pullback</a>) taught the bar-by-bar manual backtest; Section 1 below asks you to repeat that method on breakouts.</li>
+    <li>Module 6 (<a href="ch06_failure_test.html">Failure test</a>) is the mirror image of a breakout: the attempt to break a level that fails. Module 8 (<a href="ch08_pattern_failure.html">Pattern failure</a>) brings both together.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · SECTION 1: BREAKOUT BACKTEST</div><h2>Backtest one exact kind of breakout</h2></div><span class="chip">pdf p275–276</span></div>
+  <p>The task: use the same techniques as before to backtest a variation of the breakout. Write a rule set for the exact type of breakout you will trade, then do a careful manual backtest, bar by bar, and track the P&amp;L carefully and consistently to see what edge the pattern may have.</p>
+  <p>Grimes names three things that make this pattern harder to test than the earlier ones:</p>
+  <ul class="plain">
+    <li><b>Execution.</b> Bid/ask spreads can be wide right at breakout points.</li>
+    <li><b>Hidden volatility.</b> Volatility around the break can be extreme and can be hidden inside a single bar. Watching the bar form live feels very different from the static chart you backtest on.</li>
+    <li><b>News.</b> Many breakouts are caused by news or new information. Decide whether reacting to news is part of your strategy, and whether it even could be, given how fast you can realistically react.</li>
+  </ul>
+  <p>And at least three questions you must answer <em>before</em> starting the test:</p>
+  <ol class="plain">
+    <li><b>How will you define the level</b> beyond which you take the breakout trade?</li>
+    <li><b>Will you require a price formation before the break?</b> If so, define it well, but beware: making it too specific can shrink your sample size a lot.</li>
+    <li><b>How will you execute?</b> A resting order at the level, entering when you see the break, or entering on the close of the bar. Think through the trade-offs, then test one consistent rule set.</li>
+  </ol>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_gate_three_positions.svg" alt="People wait at a stadium gate in three positions: at the gate with tickets, running from nearby when it opens, and arriving after the crowd has settled." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A crowd pressing on a gate. The level is the gate. The question "how will I execute?" is where you stand: already waiting at the gate with a ticket (resting order), running over when you hear it open (see it, then act), or arriving after the crowd has settled (close of the bar). Each spot gives a different price and catches a different set of gate openings.</p></div>
+  <div class="fig">
+    <h3>A manual backtest you can step through</h3>
+    <canvas id="c2" class="tall" aria-label="Simulated candles revealed bar by bar with the breakout level, entries, stops and exits"></canvas>
+    <div class="legend" id="c2L"></div>
+    <div class="controls">
+      <label for="sel2m">Market <select id="sel2m"><option value="regime">ranges then trends (built in)</option><option value="rw">pure random walk (no edge)</option></select></label>
+      <label for="sel2n">Level = highest high of last <select id="sel2n"><option value="20">20 bars</option><option value="10">10 bars</option><option value="55">55 bars</option></select></label>
+      <label for="sel2x">Execution <select id="sel2x"><option value="stop">resting buy-stop at level</option><option value="see">see it, then market order</option><option value="close">on the close of the bar</option></select></label>
+    </div>
+    <div class="controls">
+      <label for="n2c">Spread + slippage per side (bps) <input id="n2c" type="range" min="0" max="40" step="1" value="10"><output id="n2co">10</output></label>
+      <label><input id="chk2f" type="checkbox"> require a quiet market first</label>
+      <label for="n2f">5-bar ATR ÷ 40-bar ATR below <input id="n2f" type="range" min="0.5" max="1" step="0.05" value="0.8"><output id="n2fo">0.8</output></label>
+    </div>
+    <div class="controls"><button id="b2next" type="button">Next bar ▶</button><button id="b2jump" type="button">Jump to next event ▶▶</button><button id="b2end" type="button">Show all</button><button id="b2reset" type="button">Reset</button></div>
+    <div class="readout" id="r2"></div>
+    <div class="tablewrap" id="t2"></div>
+  </div>
+  <div class="formula">My example rule set (not Grimes'), long side only:
+Level   highest high of the previous N bars
+Filter  optional: 5-bar ATR ÷ 40-bar ATR below a limit
+        just before the break (a quiet market)
+Entry   resting stop: fill at the level (or the open,
+          if the bar gaps above it)
+        see it, act: fill 0.2 ATR past the level
+          (reaction delay), never above the bar's high
+        bar close: only if the bar CLOSES above the
+          level; fill at that close
+Stop    2 × ATR(20) below the fill. If the entry bar's
+        low also reaches it, count the trade as stopped:
+        a bar hides the order of its ticks, so assume
+        the worst.
+Exit    the stop, or the close 10 bars after entry
+Cost    spread + slippage on each side
+Result  R = (exit − fill) ÷ (fill − stop)</div>
+  <div class="box behind"><b>What's happening behind it</b><p>The three execution choices don't just give different prices; they select <em>different trades</em>. The resting order catches every poke above the level, including ones that reverse in the same bar. Waiting for the close skips those intrabar fakes, but pays a worse price on the real ones. The "assume the worst" rule for the entry bar is Grimes' second complication made concrete: a static bar hides whether price hit your stop before or after your entry. Raise the bps slider and watch how much of a small edge the spread eats; at breakout points that cost is at its widest.</p></div>
+  <div class="fig">
+    <h3>Pool the test over 150 simulated markets</h3>
+    <div class="controls"><button id="b2pool" type="button">Run pooled test (150 markets)</button></div>
+    <div class="tablewrap" id="p2"></div>
+    <p class="readout" id="r2p"></p>
+  </div>
+  <div class="box behind"><b>Read the pooled table honestly (beyond the book)</b><p><b>Random walk:</b> no rule can have an edge here. Set the cost slider to 0 and the resting order and the close rule land near 0R (within about two ± of it; ± is one standard error, the size of luck). "See it, then act" loses about 0.1R even at zero cost: it pays 0.2 ATR more on a 2-ATR risk, and that is all reaction delay costs. Costs then pull every row down. <b>Ranges then trends:</b> here I built trends that start after ranges, so plain breakouts make money <em>by construction</em>; that is not evidence about real markets. The surprise is the "quiet first" filter: it sounds sensible, yet in my runs it loses, because most quiet bars sit <em>inside</em> ranges, where 20-bar highs keep failing, while the few breaks that start a trend come once per range. A formation rule can pick exactly the wrong trades, and it cuts the sample to about a quarter. Both are Grimes' warnings about formations, measured. (Bars here are built so the high and low are the extremes of a random path between open and close, which makes a resting order at the level a fair fill.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your playbook's swing setup S-1 (breakout + volume) already cites this module: daily close above the 50-day high on volume above 1.5× the 20-day average, stop 2–3 ATR, trail at the 20-day low (<code>intraday_swing_playbook.md</code>). Your daily breakout backtest made 13–18%/yr but was no better than just holding the same stocks (<code>backtest_results_summary.md</code>).</li>
+    <li>Cost of execution: your FYERS note puts the break-even move at about 0.1–0.2% intraday and 0.3–0.4% for delivery (<code>breakeven_move_fyers.md</code>). That is before the wider spread at the break. Your 15-minute opening-range breakout failed the Nifty 200 re-check; the 5-minute version is only a lead.</li>
+    <li>Later in this same workbook: Module 3 notes that most breakouts fail and that the best ones show higher lows pressing into resistance (pdf p145–146). Module 16 tests N-day channel breakouts: 20-day breakouts in stocks behaved like mean reversion, while futures leaned with the break, more clearly at 100 days (pdf p562–566); a volatility-compression breakout was one of the most convincing results but occurs only about once in 500 trading days (pdf p577–578).</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · SECTION 2: YOUR TRADING PLAN</div><h2>Three plans: business plan, CRG sheet, setup sheets</h2></div><span class="chip">pdf p276–282</span></div>
+  <p>A good trading plan is an essential tool for a professional trader. Grimes starts with four things it does:</p>
+  <ul class="plain">
+    <li>It is a tool to <b>monitor your behaviour</b>. Everyone says follow the plan, but you can't without one.</li>
+    <li>It <b>removes a lot of psychological struggle</b>: once you have a plan, your only job is to follow it.</li>
+    <li>It is a <b>clear statement of your edge</b>.</li>
+    <li>Its <b>changes over time</b> are a record of how you evolved as a trader.</li>
+  </ul>
+  <h3>The balance: complete but usable</h3>
+  <p><b>Complete:</b> ideally you could hand your plan to someone else who, with some training, could copy your trading closely. (Discretionary elements make this harder, and they are allowed.) Since your performance will be judged by how well you follow the plan, a vague plan is useless. <b>Usable:</b> if the plan is too detailed you will ignore it; if it is too big you can't revise it, so it stops matching how you really trade. Then you start telling yourself it's fine to ignore a rule you no longer use, and that thought opens the door to serious breaks in discipline.</p>
+  <p>There is no single answer; know yourself. Most people benefit from more structure, but it has to respect your personality: someone with an accountant's mind won't keep records like a painter does. That is why one-size-fits-all plans tend to fail. Finding the right depth of detail for you is one of the first planning tasks.</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 280" role="img" aria-label="Three nested plans: business plan, CRG sheet, setup sheets">
+      <rect x="10" y="10" width="700" height="260" rx="6" fill="var(--c3)" opacity="0.10" stroke="var(--c3)"/>
+      <text x="24" y="32" fill="var(--c3)" font-weight="600">Plan #1 · Trading business plan (10–25 pages)</text>
+      <text x="24" y="50" fill="var(--muted)">purpose · goals · schedule · edge &amp; development · disaster recovery · risk cutoffs</text>
+      <rect x="40" y="64" width="650" height="194" rx="6" fill="var(--c2)" opacity="0.10" stroke="var(--c2)"/>
+      <text x="54" y="86" fill="var(--c2)" font-weight="600">Plan #2 · CRG sheet (usually one page)</text>
+      <text x="54" y="104" fill="var(--muted)">Classes → Risk (₹ or %, not shares) → Goals → Setups</text>
+      <rect x="70" y="120" width="190" height="122" rx="5" fill="var(--c1)" opacity="0.12" stroke="var(--c1)"/>
+      <rect x="275" y="120" width="190" height="122" rx="5" fill="var(--c1)" opacity="0.12" stroke="var(--c1)"/>
+      <rect x="480" y="120" width="190" height="122" rx="5" fill="var(--c1)" opacity="0.12" stroke="var(--c1)" stroke-dasharray="4 3"/>
+      <text x="82" y="142" fill="var(--c1)" font-weight="600">Plan #3 · Sheet A</text>
+      <text x="82" y="164">Setup</text><text x="82" y="184">Trigger</text><text x="82" y="204">Stop location</text><text x="82" y="224">Profit taking</text>
+      <text x="287" y="142" fill="var(--c1)" font-weight="600">Sheet B</text>
+      <text x="287" y="164">Setup</text><text x="287" y="184">Trigger</text><text x="287" y="204">Stop location</text><text x="287" y="224">Profit taking</text>
+      <text x="492" y="142" fill="var(--c1)" font-weight="600">… 2 to maybe 5</text>
+      <text x="492" y="164" fill="var(--muted)">10 is too many</text>
+    </svg>
+  </div>
+  <h3>Plan #1: your trading business plan</h3>
+  <p>Grimes thinks most traders need three plans, and he covers the second and third in depth. The first is a business plan for your trading as it fits into your life. It should cover:</p>
+  <ul class="plain">
+    <li>Your purpose and place in the universe, and how trading serves it (abstract, but important).</li>
+    <li>Your trading goals and plans: managing other people's money? financial independence? moving somewhere? Be careful about setting timelines and rupee amounts too early; you don't know how fast you will develop.</li>
+    <li>Your style and approach to trading (kept high level).</li>
+    <li>Markets and timeframes you will trade.</li>
+    <li>Your working time and how that work is structured: finding setups, managing trades, journaling, record keeping, daily or weekly.</li>
+    <li>The specific structure of your trading work and tasks.</li>
+    <li>How you will develop and monitor your edge.</li>
+    <li>How you will monitor your own development, and how you'll know you've moved from one stage to the next.</li>
+    <li>Your brokerage platforms and financing arrangements.</li>
+    <li>Disaster recovery plans, perhaps with an attachment of phone and account numbers.</li>
+    <li>Risk management guidelines, including trading cutoffs.</li>
+    <li>Strategic alliances and educational resources you rely on.</li>
+  </ul>
+  <p>A good Plan 1 often includes family, spirituality, exercise, health and diet: an operating plan for you and your life as a business. It does <em>not</em> include the specifics of your trading method. Typical length: <b>10–25 pages</b>.</p>
+  <h3>Plan #2: Classes, Risk and Goals (the CRG sheet)</h3>
+  <ul class="plain">
+    <li><b>Classes:</b> split your trades into high-level types. You may have only one class; keep the heading anyway for later.</li>
+    <li><b>Risk:</b> start with risk per trade, a fixed money amount or a percentage of equity. This is <em>not</em> a number of shares or contracts; it is the money you lose if the trade is stopped out. You may also set weekly and monthly risk limits.</li>
+    <li><b>Goals:</b> both activity (how many trades per day/week/month) and profit (how much you'll net over those periods). These are broad goals; you can't force trades, so you'll land above or below them. You can't set them well until you understand your system and edge, which is why the plan is refined as data comes in.</li>
+    <li><b>Setups:</b> the specific setups that belong to each class.</li>
+  </ul>
+  <p>Be as specific as possible. These are rule sheets, not suggestion sheets. Only the goals section is looser, because normal market variation will move your results around.</p>
+  <h3>Plan #3: setup sheets</h3>
+  <p>The CRG sheet points to setup sheets. Err on the side of complete: you may reread a sheet years later. Many traders write them as if teaching a third person to trade the system. The four sections every sheet needs:</p>
+  <ol class="plain">
+    <li><b>Setup:</b> what conditions tell you to start looking for an entry?</li>
+    <li><b>Trigger:</b> what actually gets you into the trade? Rarely, setup and trigger are the same; usually some setup conditions come first and don't trigger entries.</li>
+    <li><b>Stop location:</b> where do you get out if you're wrong?</li>
+    <li><b>Profit taking:</b> where and how do you get out if you're right?</li>
+  </ol>
+  <p>Optional deeper sections: the concept behind the setup (and its source, if you didn't develop it); how to calculate any indicators or special measures; trade management (where to add, other exits such as time stops, trades in related markets); size (some setups need different sizes; daytraders may just use a fixed size; most sizing is better handled on the CRG sheet; change the sheet if you change how you trade); discretionary elements, written clearly enough that you can lay each real trade beside the sheet and say plainly whether you followed the rules or broke one; execution notes (leg in and out of spreads or not? market orders or the midpoint?); and notes from backtesting or past experience.</p>
+  <h3>Making your own</h3>
+  <p>Start over from scratch even if you have some version already: decide what you want, then work bottom up. Expect a good plan to take <b>at least a few weeks</b>: write it, rethink it, go through several versions. Without a written plan, Grimes says, your chances of success are much smaller.</p>
+  <ul class="plain">
+    <li><b>Setup sheets first:</b> put each setup into the Setup / Trigger / Stop / Profit-taking format. Most developing traders should have <b>two to maybe five</b>; ten is too many. Then refine each until it matches exactly how you trade. Every condition you consider (technical, fundamental, news, feelings) belongs on the sheet. Don't trade until this is done.</li>
+    <li><b>Then the CRG sheet:</b> usually one sheet of paper, with Risk, Goals and Setup headings under each class. Writing "????" where you don't know yet is fine. Starting at all puts you ahead of most developing traders.</li>
+  </ul>
+  <div class="fig">
+    <h3>CRG risk line: money at risk, then shares</h3>
+    <div class="controls">
+      <label for="n3a">Account ₹ <input id="n3a" type="number" min="10000" step="10000" value="1000000" style="width:9em"></label>
+      <label for="sel3m">Risk per trade <select id="sel3m"><option value="pct">% of equity</option><option value="fixed">fixed ₹</option></select></label>
+      <label for="n3r">value <input id="n3r" type="number" min="0" step="0.25" value="1" style="width:6em"></label>
+    </div>
+    <div class="controls">
+      <label for="n3e">Entry ₹ <input id="n3e" type="number" min="1" step="1" value="1000" style="width:6em"></label>
+      <label for="n3s">Stop ₹ <input id="n3s" type="number" min="0" step="1" value="960" style="width:6em"></label>
+      <label for="n3w">Weekly cutoff (losing trades) <input id="n3w" type="range" min="1" max="10" step="1" value="3"><output id="n3wo">3</output></label>
+    </div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th colspan="2">Example CRG sheet and one setup sheet (my illustration in Grimes' format, not from the book)</th></tr></thead>
+    <tbody>
+      <tr><td>Class</td><td>Swing breakouts, NSE cash stocks, daily chart</td></tr>
+      <tr><td>Risk</td><td>1% of equity per trade · stop trading for the week after 3 full losses · month: ????</td></tr>
+      <tr><td>Goals</td><td>Activity: 2–6 trades a month. Profit: ???? (unknown until the backtest and paper trades say what the edge is)</td></tr>
+      <tr><td>Setups</td><td>Sheet A: 20-day high breakout after a quiet period</td></tr>
+      <tr><td>A · Setup</td><td>Nifty above its 200-day average; stock's 5-day ATR below 0.8 × its 40-day ATR; price within 1 ATR of its 20-day high</td></tr>
+      <tr><td>A · Trigger</td><td>Daily close above the 20-day high; enter at the close</td></tr>
+      <tr><td>A · Stop</td><td>2 ATR(20) below entry; never moved further away</td></tr>
+      <tr><td>A · Profit taking</td><td>Half at 1R; trail the rest under the prior day's low once 1R is hit; time exit after 15 days</td></tr>
+      <tr><td>A · Notes</td><td>Skip on results days. Backtest notes: ????</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><p>A restaurant. The business plan is why the restaurant exists, its hours and its fire-escape plan. The CRG sheet is the kitchen's rule board: which dishes we serve and how much we can spend on each. Each setup sheet is one recipe card, written so a new cook could make the dish exactly the same way.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The CRG sheet sizes risk in money, not shares, so every trade costs the same when it fails. The calculator turns that money into shares: shares = risk ₹ ÷ (entry − stop). A stop twice as far away means half the shares and the same rupee loss. That's why Grimes says most sizing belongs on the CRG sheet, not on each setup sheet. And a written trigger lets you audit yourself: either the trade matched the card, or you broke a rule.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your backtests found fixed 1% risk sizing with ATR stops as good as or better than volatility targeting (<code>backtest_results_summary.md</code>); <code>using_equations_to_trade.md</code> suggests 0.5–1% risk per trade. That is a CRG risk line you already have evidence for.</li>
+    <li>Module 8 (<a href="ch08_pattern_failure.html">Pattern failure</a>) opens by sending you back to revise these documents until you'd be comfortable showing them to investors.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · SECTION 3: YOUR RESEARCH JOURNAL</div><h2>A journal of ideas you'll keep for a career</h2></div><span class="chip">pdf p282–283</span></div>
+  <p>Start a research journal: a document you'll use, in some form, for the rest of your trading career. Nobody can tell you the right format; it has to fit you and your lifestyle. Grimes' thoughts:</p>
+  <ul class="plain">
+    <li><b>It comes in cycles.</b> Some periods you'll use it a lot, others hardly at all. That's normal, but plan for some research-heavy, focused periods.</li>
+    <li><b>Research cures overtrading.</b> When the market doesn't suit your style, doing research is one of the best cures for forcing trades, for long-term traders as much as daytraders. It is a better use of time than suboptimal trades.</li>
+    <li><b>Research is learning from the market itself.</b> The journal is simply a collection of ideas to investigate, and it guides that process.</li>
+    <li><b>Paper and electronic.</b> Grimes keeps bound paper journals and jots down dated observations, ideas and questions whenever they come. Paper can't be revised, so it's a faithful record of what he saw and thought at the time.</li>
+    <li><b>A funnel.</b> Then the work starts: move the ideas into an electronic format, keep the ones worth investigating and drop the rest. Any software works; even an email draft or a spreadsheet is enough to start.</li>
+    <li><b>Room for inspiration.</b> Research isn't cold and sterile. Even when logic drives every step, most discoveries need a leap or a flash of inspiration at some point, and those come from deep work and exposure to data. The journal keeps you in that flow.</li>
+  </ul>
+  <p>Start now, today: take a piece of paper and write down a few ideas from the course you want to investigate. What matters is that you do it.</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 220" role="img" aria-label="Research funnel from paper notes to setup sheet">
+      <polygon points="30,20 690,20 560,80 160,80" fill="var(--c1)" opacity="0.16" stroke="var(--c1)"/>
+      <polygon points="160,86 560,86 470,140 250,140" fill="var(--c2)" opacity="0.16" stroke="var(--c2)"/>
+      <polygon points="250,146 470,146 410,196 310,196" fill="var(--c3)" opacity="0.18" stroke="var(--c3)"/>
+      <text x="360" y="44" text-anchor="middle" font-weight="600">Bound paper journal: every dated idea, question, sketch</text>
+      <text x="360" y="64" text-anchor="middle" fill="var(--muted)">unrevisable → an honest record of what you saw then</text>
+      <text x="360" y="110" text-anchor="middle" font-weight="600">Electronic list: keep what deserves a test, drop the rest</text>
+      <text x="360" y="128" text-anchor="middle" fill="var(--muted)">spreadsheet, email draft, any software</text>
+      <text x="360" y="176" text-anchor="middle" font-weight="600">Test → setup sheet</text>
+      <text x="360" y="214" text-anchor="middle" fill="var(--muted)">the last two steps are the statistics work of Sections 1 and 4</text>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_gold_panner_ideas.svg" alt="A gold panner scoops river gravel with a shovel, washes it in a pan, and keeps the few gold flakes left at the bottom." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A gold panner. The paper notebook is the shovel: scoop everything, don't judge yet. The electronic list is the pan: wash away most of it. What's left in the bottom, after testing, becomes a setup sheet.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>Notes/trading</code> folder already works like the electronic end of the funnel: ideas from videos and books (VWAP course, Currency Pros checklist, Stochastic RSI + MACD) went in, were tested, and most were dropped as "not worth trading" (<code>backtest_results_summary.md</code>). What's missing is the dated paper end that records the first observation.</li>
+    <li>Section 18 below (How to find trading ideas) is the essay version of this exercise.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · SECTION 4: MULTIPLE TIMEFRAME PROJECT</div><h2>Test whether another timeframe really helps</h2></div><span class="chip">pdf p283–284</span></div>
+  <p>Investigate what multiple timeframe analysis might, or might not, add to your trading and to pattern analysis. Grimes' suggested method:</p>
+  <ol class="plain">
+    <li><b>Name your trading timeframe</b>, the one you focus on.</li>
+    <li><b>Define precise conditions</b> under which another timeframe is allowed to influence it. The influence can come from a higher or a lower timeframe.</li>
+    <li><b>Pick one pattern and one influence</b>: either a higher-timeframe influence or a lower-timeframe one. Not both; that adds too many complications at this stage. Examples: trade pullbacks but skip them when the higher timeframe shows one of several trend-termination patterns; or trade pullbacks and enter on failure tests on the lower timeframe.</li>
+    <li><b>Expect small samples.</b> With even a few multiple-timeframe conditions, it may be hard to collect enough trades to analyse.</li>
+    <li><b>Work through the bars</b>, as paper trading or as an event study.</li>
+    <li><b>Watch for leakage.</b> Few software packages let you see the higher-timeframe bar as it forms, so you'll usually be looking at <em>completed</em> higher-timeframe bars while the trading timeframe unfolds. Some information from the future is almost unavoidable.</li>
+    <li><b>Compare three things:</b> the market's baseline return, the plain pattern on the trading timeframe, and the pattern with the timeframe filter. The goal is to understand how much (or how little) timeframes influence each other, and to sharpen your chart reading.</li>
+  </ol>
+  <div class="fig">
+    <h3>See the leak: the forming week vs the finished week</h3>
+    <canvas id="c5d" class="short" aria-label="Daily candles up to the selected day"></canvas>
+    <canvas id="c5w" class="short" aria-label="Weekly candles built from the daily bars, honest or leaky"></canvas>
+    <div class="legend" id="c5wL"></div>
+    <div class="controls">
+      <label for="n5">Today = day <input id="n5" type="range" min="40" max="119" step="1" value="62"><output id="n5o">62</output></label>
+      <label><input id="chk5" type="checkbox"> show the finished week (leaky)</label>
+    </div>
+    <div class="readout" id="r5"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A weekly bar is five daily bars glued together. On Tuesday, the honest weekly bar has only Monday and Tuesday in it. A charting package that shows the <em>finished</em> bar already knows Friday's close. Any rule like "only buy if the week is up" then quietly uses the future. Drag "today" to a Monday or Tuesday and tick the box: the last weekly candle jumps to its final shape.</p></div>
+  <div class="fig">
+    <h3>How big can a leak look? Pooled over 100 random walks (beyond the book)</h3>
+    <p>Rule tested: on each day except Friday, buy at the close if the weekly bar is up, sell at the next day's close. On a random walk the true edge of every rule is zero.</p>
+    <div class="controls"><button id="b5pool" type="button">Run the leak test</button></div>
+    <div class="tablewrap" id="p5"></div>
+  </div>
+  <div class="box behind"><b>Why the leaky row wins</b><p>"The finished week is up" partly <em>means</em> "the days after today went up", so the filter picks days that are followed by gains. That's not an edge; it's tomorrow's answer copied into today's question. The honest row uses only the days already printed and sits near zero, like the baseline. Grimes' advice to compare against the baseline and the unfiltered pattern is exactly what exposes this.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your backtest summary lists a daily-trend filter on 1-hour trades as something that helped out-of-sample, and the Currency Pros checklist with a higher-timeframe premium/discount condition beat its core setup (<code>backtest_results_summary.md</code>). Both are this project. Worth checking how the higher-timeframe bar was built in that code: completed daily bars only, or the forming one?</li>
+    <li>Section 13 below shows Grimes' two chart examples of timeframe influence (crude oil and gold).</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · SECTION 5: READINGS</div><h2>Assigned reading from the 2012 book</h2></div><span class="chip">pdf p284</span></div>
+  <p>The readings come from Grimes' book <i>The Art and Science of Technical Analysis: Market Structure, Price Action, and Trading Strategies</i> (Wiley, 2012). The page numbers are <b>printed pages of that book</b>, not pages of this workbook PDF. That book is not in your library.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Topic</th><th>Printed pages (2012 book)</th><th>Where this page covers the idea</th></tr></thead>
+    <tbody>
+      <tr><td>Breakouts</td><td class="num">174–188</td><td>02 (backtest)</td></tr>
+      <tr><td>Breakout examples</td><td class="num">337–345</td><td>02, 18</td></tr>
+      <tr><td>Multiple timeframe analysis</td><td class="num">213–230</td><td>05, 13</td></tr>
+      <tr><td>Trade management</td><td class="num">231–253</td><td>14–17</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · ON THE TRADING PLAN · HOW GOOD IS YOUR PLAN?</div><h2>Two documents: a business plan and a trading plan</h2></div><span class="chip">pdf p284–285</span></div>
+  <p>Everyone knows the slogans about planning. Grimes asks the harder question: is your plan good enough? Does it have enough detail, and can it do everything you need? If not, fix it today.</p>
+  <p>He splits planning into two parts. The <b>business plan</b> is the overall control document for you and your trading business: what time of day you work, disaster recovery, how you'll find and develop edges, and every other part of the business. The <b>trading plan</b> covers exactly how and when you get into and out of trades. Traders often write a trading plan; few write the business plan. You need both, or you haven't really planned.</p>
+  <p>He saw this while coaching traders who had some experience and already knew a lot about what <em>not</em> to do, yet lacked the business side. Without that big-picture plan you lack guidance and vision. It is as much about you (who you are, your purpose, how trading fits your routine and life, how you'll grow) as about trading. A good one is substantial, <b>perhaps ten to twenty typed pages</b> (note: Section 2 gives 10–25 pages for the same Plan #1), and it evolves as the business grows.</p>
+  <div class="two">
+    <div class="box behind"><b>Purpose 1: control</b><p>It controls your behaviour by stating clearly what you will and won't do.</p></div>
+    <div class="box behind"><b>Purpose 2: communicate</b><p>It describes your business to investors. Even if you never trade anyone else's money, work at that level of professionalism: be as careful with your own money as with a client's. You are your own client, and you owe that client a lot.</p></div>
+  </div>
+  <p>Picture the path of development: at one end, someone who just learned to read a bar chart; at the other, someone who has traded for years, may even make some money, but lacks the success or consistency they want. Anywhere on that path, refining the business plan is time well spent, and if you have none, start today.</p>
+  <div class="fig">
+    <h3>Plan audit: which parts do you have in writing?</h3>
+    <div class="controls">
+      <label><input id="chk7a" type="checkbox"> work hours &amp; routine</label>
+      <label><input id="chk7b" type="checkbox"> disaster recovery</label>
+      <label><input id="chk7c" type="checkbox"> how I find &amp; develop edges</label>
+      <label><input id="chk7d" type="checkbox"> purpose &amp; how trading fits my life</label>
+    </div>
+    <div class="controls">
+      <label><input id="chk7e" type="checkbox"> exact entry rules</label>
+      <label><input id="chk7f" type="checkbox"> exact exit rules</label>
+      <label><input id="chk7g" type="checkbox"> risk per trade</label>
+    </div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A shop owner who has perfect recipes but no opening hours, no accounts and no plan for a fire. The recipes are the trading plan; everything else is the business plan. Grimes' coaching clients had good recipes and no shop.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 03's three-plan structure: this essay's "business plan" is Plan #1; its "trading plan" is the CRG sheet plus setup sheets.</li>
+    <li>Your <code>backtest_results_summary.md</code> "Next" list (paper trade, fix survivorship, keep the 200-DMA filter) is the seed of the edge-development part of a business plan.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · ON THE TRADING PLAN · YOUR MANY HATS</div><h2>Trader, system developer, boss: one hat at a time</h2></div><span class="chip">pdf p286–289</span></div>
+  <p>"Trader" is a misleading job title. A truck driver drives trucks and a baker bakes, but a trader's job is not simply to trade. Thinking it is leads to overtrading: nothing shows an edge, but you're a trader, so you put on a boredom trade, and it ends badly. Rethink the job as <b>placing the trades your methodology and system call for</b>, and many discipline problems solve themselves.</p>
+  <h3>What is your job?</h3>
+  <p>Your job is not to make money, not to put on trades, and not to catch every move. The market may make a huge move that your system never signalled, and that is fine (depending on your style). Your job is to follow your system and do what it says at the right time: to be a disciplined trader.</p>
+  <h3>Your two hats</h3>
+  <p>Grimes often sees developing traders change the system after each trade or two, so nobody can tell whether the system works because it never stays the same. Trading psychology is like an unruly child: it soon finds the "out" that any action can be justified by saying the rules now include it. His answer to that is one word: no.</p>
+  <p>A short aside on risk management, which he thinks is one of the main reasons individual traders fail. The best he ever saw was at the Nymex: when a trader started having trouble, he got a little louder, you could almost feel a storm cloud over his desk, and soon the risk manager appeared behind him, tapped his shoulder, and invited him to step away and talk. Sometimes the trader came back a changed man; sometimes he was in a much better frame of mind the next day. At-home traders (and poorly managed prop traders, which Grimes says are basically the same) blow out accounts because they have no boss. Ask yourself: if you had to justify your recent trades to a boss, would you get a bonus or be fired?</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Hat</th><th>What it does</th><th>What it never does</th></tr></thead>
+    <tbody>
+      <tr><td><b>Trader</b></td><td>Executes and follows the system: a deliberately "dumb" role. If something seems wrong, writes a note for the developer.</td><td>Changes, overrides or ignores the system.</td></tr>
+      <tr><td><b>System developer</b></td><td>Analytical and unemotional. Monitors performance, tweaks after an appropriate amount of time, always trying to make the edge a bit stronger; hands the new version to the trader.</td><td>Hands over a system found on a website or a chat-room tip (Grimes' example: buying at some Fibonacci extension). Reacts to yesterday's emotional results.</td></tr>
+      <tr><td><b>Boss</b></td><td>Accountability. Tough but nurturing; helps the trader and developer grow. Takes a serious look at what you're doing, and fires you if you can't keep the discipline.</td><td>Lets broken discipline slide.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Switching hats</h3>
+  <p>Wear one hat at a time and switch slowly. Intraday trader: the developer hat goes on at weekends, or maybe once a month, and <em>never</em> in the middle of the trading day; that breach would get you fired. Don't stay until 7 PM rewriting the system every day either; the developer needs more data. Swing trader: maybe once a month or less. Long-term investor: perhaps a few times a year. Whether the system is technical, fundamental or (hopefully not) astrological, be clear on when you trade and when you may tweak.</p>
+  <div class="fig">
+    <h3>Which hat? (scenario check)</h3>
+    <div class="controls"><label for="sel8a">It's 11:40 on a trading day; your system's signal looks wrong to you. <select id="sel8a"><option value="">choose…</option><option value="t">Trader: take it, note the doubt</option><option value="d">Developer: change the rule now</option></select></label></div>
+    <div class="controls"><label for="sel8b">Saturday; you swing trade; 4 losses in a row this month. <select id="sel8b"><option value="">choose…</option><option value="d">Developer: review, but wait for more data</option><option value="t">Trader: skip the next signal</option></select></label></div>
+    <div class="controls"><label for="sel8c">You broke your stop rule twice this week. <select id="sel8c"><option value="">choose…</option><option value="b">Boss: serious review of discipline</option><option value="d">Developer: widen the stop rule</option></select></label></div>
+    <div class="readout" id="r8a"></div>
+  </div>
+  <div class="fig">
+    <h3>Why the developer must wait: how many trades show an edge? (beyond the book)</h3>
+    <canvas id="c8" aria-label="Simulated cumulative R paths for a system with a fixed small edge"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls">
+      <label for="sel8">True system <select id="sel8"><option value="0.40">40% win, +2R / −1R → +0.20R per trade</option><option value="0.35">35% win, +2R / −1R → +0.05R</option><option value="0.3333">33.3% win, +2R / −1R → 0 (no edge)</option></select></label>
+      <label for="n8">Trades so far <input id="n8" type="range" min="10" max="400" step="10" value="30"><output id="n8o">30</output></label>
+    </div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each line is the same unchanging system, just a different random order of wins and losses. After 30 trades, a real +0.2R edge still shows as a loss in about one run in six (the readout counts 4,000 runs), and a system with no edge at all still shows a profit about 40% of the time. A developer who changes the rules after every bad week is reacting to this noise. The spread of results grows like √N while the edge grows like N, so only many trades separate them.</p></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_cook_rewrites_recipe.svg" alt="A cook keeps rewriting the recipe after every complaint while the owner insists the recipe be followed and the head chef reviews it monthly." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A restaurant where the cook rewrites the recipe after every complaint. After a month nobody knows if the dish was ever good. The owner (boss) makes the cook follow the recipe; the head chef (developer) reviews it monthly with all the feedback in hand.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>using_equations_to_trade.md</code> sets your pass bar as positive expectancy over at least ~100 trades; the fan chart shows why fewer is not enough.</li>
+    <li>Your <code>price_physics_basics.md</code> note: drift grows with t, noise with √t. Same maths as this chart, with trades instead of days.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · ON THE TRADING PLAN · WHAT MATTERS MORE THAN YOUR PROCESS?</div><h2>Nothing: process is the hub of the wheel</h2></div><span class="chip">pdf p289–290</span></div>
+  <p>"Process" is a buzzword but a useful one: it covers everything you do and reminds you to do it consistently. If your patterns, indicators or system work about half the time, it's tempting to doubt the next one and skip it. With a defined process the job is simple: follow the process.</p>
+  <p>The plan is part of it, but a process goes further and covers everything you do around markets: how you do homework, how you handle conflicts, how the plan evolves, how you evaluate performance, how you look after yourself, how you manage the process itself. Somewhere in it should be the instruction: follow the trading plan.</p>
+  <h3>Handling conflicts</h3>
+  <p>Trades often set up against conventional wisdom. Grimes' examples of trades that would have looked silly at the time: shorting gold and silver in 2011, buying stocks in October 2014, shorting the EUR in 2014, shorting crude in 2015. Each would have been hard to defend on CNBC, and had they failed, it would have been easy to blame yourself afterwards for missing something obvious.</p>
+  <p>His approach: treat narrative, news and conventional wisdom as a possible <em>input</em> to the process. Can you measure their influence on your trades, to know whether they're worth attention? If you can't, you're bolting an unmeasured extra influence onto the end of your method. You don't understand it, so how can it help? It's just another <b>degree of freedom</b>. Grimes calls his life's quest simplifying and removing degrees of freedom, and says that's where he found much of his edge. He sees the future only through a cloudy glass of uncertainty; his best guide is a slight statistical tilt. So the answer to conflicts is: work the process.</p>
+  <h3>Working your process</h3>
+  <p>So he can ignore the narrative and the crowd. That makes him brilliantly contrarian at times (without trying to be) and a brilliant trend follower at other times, getting in early and riding most of a move. He looks equally dumb at other times: shaken out of trades, buying the exact high or selling the exact low, trades that explode against him immediately, or a long hold stopped out just before the move takes off. Unpleasant but unavoidable. Process is the hub that holds the wheel together; in a very real way, it is all there is.</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 220" role="img" aria-label="A wheel with process at the hub and spokes for homework, conflicts, evolving the plan, evaluation, self-care, follow the plan">
+      <circle cx="360" cy="110" r="96" fill="none" stroke="var(--rule)" stroke-width="6"/>
+      <circle cx="360" cy="110" r="34" fill="var(--c1)" opacity="0.22" stroke="var(--c1)" stroke-width="2"/>
+      <text x="360" y="115" text-anchor="middle" font-weight="600">process</text>
+      <g stroke="var(--muted)" stroke-width="1.5">
+        <line x1="360" y1="76" x2="360" y2="14"/><line x1="389" y1="93" x2="443" y2="62"/><line x1="389" y1="127" x2="443" y2="158"/>
+        <line x1="360" y1="144" x2="360" y2="206"/><line x1="331" y1="127" x2="277" y2="158"/><line x1="331" y1="93" x2="277" y2="62"/>
+      </g>
+      <text x="368" y="24">follow the plan</text>
+      <text x="452" y="62">homework</text>
+      <text x="452" y="166">handle conflicts</text>
+      <text x="368" y="204">evaluate performance</text>
+      <text x="268" y="166" text-anchor="end">look after yourself</text>
+      <text x="268" y="62" text-anchor="end">evolve the plan</text>
+    </svg>
+  </div>
+  <div class="fig">
+    <h3>A slight tilt still looks brilliant and dumb (beyond the book)</h3>
+    <div class="dots" id="g9" aria-label="100 simulated trades coloured by win or loss"></div>
+    <div class="controls"><button id="b9" type="button">Deal 100 new trades</button><span class="readout">same system each time: 40% wins of +2R, 60% losses of −1R (+0.2R per trade)</span></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>With a small edge, streaks are normal: at a 60% loss rate the longest losing run in 100 trades is typically around 7 (the readout shows this deal's), and winning runs that make you feel like a genius turn up too. Neither streak says anything about the system. If you judge each trade by the story around it (the news, what CNBC thinks), you add a new rule after every streak: one more degree of freedom, never measured. The process ignores the story and keeps dealing.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your own tests show the degrees-of-freedom problem: each confluence the VWAP course adds made its setups less bad but never positive, and your Stochastic RSI + MACD re-test with extra rules still lost on Nifty 50 in all but 2 of 168 versions (<code>backtest_results_summary.md</code>).</li>
+    <li>Section 19 (Quality matters) is the same idea applied to tools: fewer, better ingredients.</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · ON THE TRADING PLAN · FIVE QUESTIONS TO ASK BEFORE EACH TRADE</div><h2>Five questions that test an idea before money does</h2></div><span class="chip">pdf p290–292</span></div>
+  <p>Good trading is largely about asking the right questions; many serious mistakes come from accepting our ideas and perceptions at face value. Grimes' checklist:</p>
+  <ol class="plain">
+    <li><b>Do I understand this idea?</b> Every decision rests on an idea. Even an algorithm's signal rests on an idea that something should happen after some conditions. At the other end, maybe it's a hunch. Where does it come from: someone on social media? fundamental, macro, technical? Do you fully understand it and its source? Is it reproducible, something you can execute again and again? Good programmes are built on consistency, so the idea must be repeatable.</li>
+    <li><b>Do I understand how the market should move if I'm right?</b> When should it move? How long is flat acceptable? What if it drops a little, or a lot? What would strongly confirm the idea? When has it become consensus and vulnerable to reversal (when is good too good)? And does your position actually capture the move? Simple: you expect Nasdaq futures to beat the day's high in 30 minutes, so you buy Nasdaq futures. Not simple: you expect stock volatility to rise and trade VIX futures, a leveraged ETP, or options on either: do you know how they respond? Or you think Delta Airlines will beat its competitors: is buying DAL the right play?</li>
+    <li><b>Do I understand my risk?</b> Not just where the stop is. What is the worst that can happen, and how likely is it? Accept the worst case first, then think about lesser risks. Don't assume your risk equals your stop.</li>
+    <li><b>What might I be missing?</b> Hard, because you're asking about what you don't know. Always ask; always be learning.</li>
+    <li><b>What mistakes might I be making?</b> The literature increasingly studies cognitive mistakes. Our perception of patterns, risk and probability is flawed at a basic level, and you can't fix most biases, so ask how to work with them and limit the harm.</li>
+  </ol>
+  <p>The questions won't solve every problem, but they point toward solutions to the most serious ones.</p>
+  <div class="fig">
+    <h3>Pre-trade checklist</h3>
+    <div class="controls"><label><input id="chk10a" type="checkbox"> 1 · I can state the idea, its source, and that it's repeatable</label></div>
+    <div class="controls"><label><input id="chk10b" type="checkbox"> 2 · I know when/how far it should move, how long flat is OK, and my instrument captures it</label></div>
+    <div class="controls"><label><input id="chk10c" type="checkbox"> 3 · I know the worst case and its rough probability, not just my stop</label></div>
+    <div class="controls"><label><input id="chk10d" type="checkbox"> 4 · I asked what I might be missing (results date, index event, news)</label></div>
+    <div class="controls"><label><input id="chk10e" type="checkbox"> 5 · I named the bias most likely to fool me on this trade</label></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="fig">
+    <h3>Question 2, worked: does buying DAL capture "DAL beats its competitors"? (beyond the book)</h3>
+    <div class="controls">
+      <label for="n10s">Whole airline sector moves <input id="n10s" type="range" min="-20" max="20" step="1" value="-10"><output id="n10so">-10</output>%</label>
+      <label for="n10o">DAL beats the sector by <input id="n10o" type="range" min="-5" max="10" step="1" value="3"><output id="n10oo">3</output>%</label>
+    </div>
+    <canvas id="c10" class="short" aria-label="Profit of long DAL versus long DAL short the sector"></canvas>
+    <div class="readout" id="r10b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Long DAL alone earns (sector move + DAL's extra). Your idea is only about the extra, but the position also bets on the whole sector. Pairing it (long DAL, short an equal amount of competitors) earns roughly just the extra. If the sector falls 10% and DAL beats it by 3%, you were <em>right</em> and still lose 7% on plain long DAL. That's what "does your position capture the move?" means. (Pairs carry their own costs and risks; your pairs backtest lost even before costs.)</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Question 3 is Section 16 (risk is more than the stop: gaps, events, tail risk) and Section 14 (stop size and gap risk).</li>
+    <li>Your <code>trading_equations.md</code> eq 14 (expected move from implied volatility) is one way to answer question 3 before an event.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · ON THE TRADING PLAN · FIVE STEPS TO A SUCCESSFUL INVESTMENT PROCESS</div><h2>A process: what, how, when, how judged, how changed</h2></div><span class="chip">pdf p292–294</span></div>
+  <p>Anyone can place a winning trade; no skill or edge is needed for one. Making consistent money, month after month and year after year, is hard and needs a process. A process defines <b>what</b> you'll do, <b>how</b>, <b>when</b>, <b>how you'll evaluate it</b> and <b>how you'll modify it</b>. A full trading plan includes all of that, so the plan is a guide to your process, and discipline is "simply" following the plan. Beginners often have no plan and no process, but even experienced traders can smooth rough edges; it's an ongoing journey.</p>
+  <ol class="plain">
+    <li><b>Do you have an edge?</b> Without one, nothing else matters. Money management may make you lose slower and discipline may stop one disastrous trade, but you can't make money. The process serves the edge; if you have none, aim the process squarely at developing one.</li>
+    <li><b>What and how will you trade?</b> Which markets, what size, what timeframe, and exactly (Grimes stresses exactly) how you find trades. Lay out the precise rules for getting in and out.</li>
+    <li><b>When will you do the work?</b> Your daily or weekly schedule, both for finding trades and for evaluating results, and what the workflow looks like: charts first, news, a watchlist?</li>
+    <li><b>How will you evaluate the process and your performance?</b> Easy to get wrong both ways: too short-term and you analyse noise; too long-term and you don't correct errors often enough.</li>
+    <li><b>How and when will you change the process?</b> Changing plans, looking at an indicator you don't use, or trading a different timeframe can all be warning signs of a break in discipline. Your job is to follow the plan, but the plan is a living thing: it should change and grow as you do, in a disciplined way. Plan for change.</li>
+  </ol>
+  <p><b>Get to work.</b> Make the plan realistic: an 80-page document full of rules you won't follow is pointless; everything in it should be meaningful and real. But a rough outline isn't enough either, especially for developing traders. Balance detail against ease of use. Then sit down with pen and paper, write freely on these questions, and reread your plan with fresh eyes: what could you do better, what does it say you'll do that you don't, what must change? Process makes us better and leads to consistency.</p>
+  <div class="fig">
+    <h3>Question 4, measured: how long should the evaluation window be? (beyond the book)</h3>
+    <canvas id="c11" aria-label="Rolling average R of a system whose edge disappears halfway"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="controls">
+      <label for="n11">Judge on the last <input id="n11" type="range" min="10" max="200" step="10" value="30"><output id="n11o">30</output> trades</label>
+      <button id="b11" type="button">Another run</button>
+    </div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>My model: a system earns +0.2R per trade for 300 trades (40% wins of +2R), then quietly breaks and loses −0.1R per trade (30% wins). You raise the alarm the first time the rolling average of the last W trades drops below zero. Pooled over 400 runs, a short window raises false alarms on the healthy system almost every time (you'd "fix" a working system), while a long window rarely false-alarms but keeps trading the broken system for many more trades. That is Grimes' warning (too short analyses noise, too long corrects too slowly) put into numbers. The right window depends on how many trades you make a month.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your <code>using_equations_to_trade.md</code> 5-step workflow ends with a kill switch; this chart is a way to choose its window instead of guessing.</li>
+    <li>Section 08: changing the process belongs to the developer hat, on a schedule, not mid-session.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · ON THE TRADING PLAN · IS YOUR TRADING BORING? IT SHOULD BE.</div><h2>Be a bricklayer</h2></div><span class="chip">pdf p294–295</span></div>
+  <p>Grimes remembers his first trades: months of feverish study, the thrill of brokerage forms and first statements, the rush of phoning in the first orders, and the imagined fountain of money. Then the botched trades and painful losses, sometimes taken well past his stop. Nothing worked, and the emotional roller coaster was extreme. He never liked gambling, but he could see how the rush, and even rare partial success, could become addictive.</p>
+  <p>The turning point came after a long struggle: he put on a trade and, deep down, simply did not care whether it won or lost. He had found one of the keys to trading psychology: <b>be unattached to the outcome of any single trade</b>. That can feel scary, especially for developing traders. Too many people come to trading for the excitement (his mock interview answer about wanting a fast-paced, exciting job gets the game-show buzzer).</p>
+  <p>Professional trading is routine and, ideally, predictable. A friend of his compared it to bricklaying: brick, mortar, smooth, next brick, all day, every day. Eventually there's a big wall, but laying each brick is routine. What we need is structure, routine and a method aimed at the repeating parts of market behaviour, not excitement.</p>
+  <p>Grimes recalls Ed Seykota's line: <q>Win or lose, everybody gets what they want out of the market.</q> Come for excitement and you'll find it; but exciting trading and making money rarely overlap. You can have whatever you want, so what do you really want?</p>
+  <div class="fig">
+    <h3>The wall, not the brick (beyond the book)</h3>
+    <canvas id="c12" class="short" aria-label="A wall of bricks, one per simulated trade, growing with cumulative R"></canvas>
+    <div class="controls"><button id="b12" type="button">Lay 20 more bricks</button><button id="b12r" type="button">Start a new wall</button></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Each brick is one trade from the same small-edge system as section 09 (green = win of 2R, red = loss of 1R). Bricks stack in columns of ten. Look at any single brick and it tells you nothing; look at the height of the wall after 200 bricks and it tells you whether the system works. Caring about one brick is caring about noise.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Module 9 (<a href="ch09_practical_trading_psychology.html">Practical trading psychology</a>) goes deeper into the psychology Grimes only touches here.</li>
+    <li>Your weekly pullback system has a win rate around 61% (<code>backtest_results_summary.md</code>): about four in ten bricks will still be red.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · ON MULTIPLE TIMEFRAMES · HIDDEN IN PLAIN SIGHT</div><h2>When the bigger chart disagrees</h2></div><span class="chip">pdf p295–300 · charts p297, p299</span></div>
+  <p>Multiple timeframe analysis is close to a buzzword. In more than twenty years around markets, Grimes has watched techniques take the spotlight as traders hope for a key to consistent profits (neural nets, quantitative analysis, scalping, multiple timeframes) and then fade when they don't deliver the hype. There is no magic formula, only disciplined risk management lined up with the market's very small statistical edges. Still, these fads often carry real lessons. The lesson here: understand how trends develop and end on several timeframes, and use that for an edge in <em>some</em> trades.</p>
+  <p>Often the other timeframes have nothing to say. Market action is mostly random; most markets offer no tactical edge most of the time, and opportunities (imbalances of buying and selling) are fleeting. Even when one appears, there may be no timeframe influence. It's a tool for some situations.</p>
+  <h3>Fighting the trend?</h3>
+  <p>One situation: a trade against the higher-timeframe trend. Grimes' crude oil futures example (p297): imagine you're long because the <b>daily</b> chart is in an uptrend. The <b>weekly</b> chart, quite literally the bigger picture, has been in a downtrend for a long time and may still be; the daily rally could just be a pullback before another weekly selloff. What to do depends on who you are and how you see risk. His three options:</p>
+  <ul class="plain">
+    <li><b>Skip the daily trade</b> because you don't trade against the longer trend. Fine, but the weekly may have bottomed; if you always skip these you'll never catch turns on the higher timeframe.</li>
+    <li><b>Take it, but tighten stops faster and take profits sooner</b>, because if the daily trade fails it may fail into a sharp selloff driven by the weekly pattern.</li>
+    <li><b>Ignore the higher timeframe</b> and trade what one timeframe shows. If you built your system properly, you have an edge and can focus on it.</li>
+  </ul>
+  <p>All three are valid, each with good arguments. The key: decide before you trade. It has to be in your plan.</p>
+  <h3>Triggering entries</h3>
+  <p>Other timeframes can also <em>trigger</em> entries. Grimes' gold futures example (p299): a fairly unimpressive daily failure test (a short entry). The weekly chart showed a pullback in a market pressing on what looked like multi-year support. Being short into that pressure makes sense, and the weak daily signal gains weight. Is it countertrend? A failure test is a countertrend trade and the daily was in an uptrend, but it is <em>with</em> the trend on the higher timeframe. Label it however you like, but be clear about the influences and what you're trying to do.</p>
+  <p>The usual advice is never to trade against the higher-timeframe trend. Grimes sees serious problems with that advice. Better: learn to read market structure, understand the conflicting flows, and have a clear plan for them, whether you ignore them, use them to trigger entries, or use them for risk management.</p>
+  <div class="fig">
+    <h3>Grimes' two examples, recreated with simulated prices</h3>
+    <div class="controls"><label for="sel13">Example <select id="sel13"><option value="crude">Fighting the trend (crude, p297)</option><option value="gold">Triggering entries (gold, p299)</option></select></label></div>
+    <canvas id="c13d" aria-label="Simulated daily chart for the selected example"></canvas>
+    <canvas id="c13w" aria-label="Simulated weekly chart built from the same daily prices"></canvas>
+    <div class="legend" id="c13wL"></div>
+    <p class="readout" id="r13"></p>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Policy for a daily long against a weekly downtrend</th><th>What you gain</th><th>What you give up</th></tr></thead>
+    <tbody>
+      <tr><td>Skip it</td><td>Avoid trades that fail into a weekly selloff</td><td>Every early entry at a weekly turn</td></tr>
+      <tr><td>Take it, manage tighter</td><td>Smaller damage if it fails</td><td>Part of the move if it's a real turn; more stop-outs</td></tr>
+      <tr><td>Ignore the weekly</td><td>Simplicity; one timeframe's tested edge</td><td>No protection from the higher-timeframe pattern</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box picture"><b>Picture it</b><!-- illus --><figure class="illus"><img src="illus/ch07_boat_waves_current.svg" alt="A rower on a wide river rides small waves while a strong current flows the other way, with the decision made on the bank before setting out." width="960" height="640" loading="lazy" decoding="async"></figure><!-- /illus --><p>A boat on a river. The daily chart is the waves, the weekly chart is the current. Rowing with a wave but against the current can work for a while; the question is what you do about the current, and you must decide that on the bank, not in the middle of the river.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The weekly chart in the demo is built from exactly the same daily prices (five days per candle), so it holds no new information, only a different summary of it: longer swings stand out and short ones disappear. A daily uptrend of a few weeks is just two or three weekly candles, small enough to be a pullback in the weekly downtrend. Which reading is right is only known later, which is why Grimes asks for a written policy rather than a forecast.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 05 (the project to test this) and the leak demo there.</li>
+    <li>Module 6 (<a href="ch06_failure_test.html">Failure test</a>) defines the failure test used in the gold example.</li>
+    <li>Your own evidence: the daily-trend filter on 1-hour trades helped out-of-sample, and your weekly pullback uses a weekly trend (close &gt; 50-week &gt; 200-week average) to qualify entries (<code>backtest_results_summary.md</code>).</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · ON TRADE MANAGEMENT · CUTTING LOSSES QUICKLY OR PROPERLY?</div><h2>Proper stops, not tight stops</h2></div><span class="chip">pdf p300–301</span></div>
+  <p>A reader asks what it really means to cut losses quickly. If a pullback trader puts the stop where the pattern has failed, isn't that cutting losses quickly? Exiting whenever a trade sputters creates turmoil: you get out, then it goes your way (and the reverse happens too). Isn't it more consistent to set stops and targets from your risk rules and let the trade play out?</p>
+  <p>Grimes agrees: trades need enough room. How much depends on the market, but it must reflect volatility; more volatile markets need wider stops. Measure it with <b>ATR or another range-aware measure</b>, which he thinks fits better than historical volatility. Historical volatility comes from the standard deviation of <em>closes</em>, but your stop will probably be hit <em>inside</em> a bar, by highs and lows. A measure that never sees highs and lows is a slight logical mismatch for setting stops.</p>
+  <p>So stops can't sit in the market's noise. Rule of thumb: <b>stops closer than 1 ATR are probably too close</b>, with a few exceptions; beyond that, adjust for your style and pattern.</p>
+  <p>Very close stops actually carry very large risk; marketing to beginners that talks about low-risk trades is disingenuous. If you size properly, no trade is low risk: a tight stop means a big position, which is a big risk, especially on a gap. Even trading one lot, a tight stop is very likely to be hit, and the real risk is the loss size <em>times</em> its probability. And even a genuinely low-risk trade is a low-reward trade that eats a disproportionate share of your mental and emotional energy. Grimes' conclusion: good risk management means the right stop, which is not necessarily a tight one.</p>
+  <p>Cutting losses quickly means cutting them <em>appropriately</em>: minutes for some traders, weeks for others. A key skill is letting markets fluctuate; people who can't end up getting in, getting nervous, getting out and getting right back in. Doing the right thing has two parts: knowing what it is (how markets move, what works, how probability rules results) and actually doing it with perfect discipline.</p>
+  <div class="fig">
+    <h3>Why ATR fits stops better than historical volatility</h3>
+    <canvas id="c14" aria-label="Candles with long wicks: a 1-sigma band from closes and a 1-ATR band"></canvas>
+    <div class="legend" id="c14L"></div>
+    <div class="controls"><label for="n14w">Wick size <input id="n14w" type="range" min="0.5" max="4" step="0.25" value="1.5"><output id="n14wo">1.5</output>× close-to-close noise</label></div>
+    <div class="readout" id="r14"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>These bars are built with calm closes but long wicks. Historical volatility only measures how far each close is from the last close, so it reports "quiet". ATR takes each bar's true range (including the wicks and any gap), so it reports how far price really travels inside a day. A stop placed one historical-σ below the last close gets touched by wicks far more often than one placed 1 ATR below. Slide the wick size and watch the two measures split.</p></div>
+  <div class="fig">
+    <h3>Tight stops: big size, frequent hits, ugly gaps (beyond the book)</h3>
+    <div class="controls"><label for="n14k">Stop distance <input id="n14k" type="range" min="0.25" max="4" step="0.25" value="0.5"><output id="n14ko">0.5</output> × ATR</label></div>
+    <canvas id="c14b" class="short" aria-label="Probability the stop is hit within 10 bars versus stop distance"></canvas>
+    <div class="legend" id="c14bL"></div>
+    <div class="readout" id="r14b"></div>
+  </div>
+  <div class="box behind"><b>Worked example</b><p>₹10 lakh account, 1% risk = ₹10,000. Stock at ₹1,000 with ATR ₹20. A 0.5-ATR stop is ₹10 away, so you buy 1,000 shares: a ₹10 lakh position, your whole account. An overnight 5% gap (₹50) through that stop costs ₹50,000 = <b>5R</b>, five times the risk you planned. With a 3-ATR stop (₹60) you buy 166 shares; the same gap lands inside the stop and costs about ₹8,300, under 1R. The probability readout comes from simulated random-walk bars (pooled over 20 markets), so it measures noise only.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><code>trading_equations.md</code> eq 10 (ATR) works the same sizing: ATR ₹28 on a ₹1,450 stock, 2-ATR stop ₹56, ₹10,000 risk → 178 shares.</li>
+    <li>Your weekly pullback uses a 2.5-ATR stop; Tori's method skips breaks more than 3 ATR from the safety line (<code>tori_trendlines_explained.md</code>). Both sit inside Grimes' 2–4 ATR range from section 15.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · ON TRADE MANAGEMENT · EXITS: KNOW WHEN TO HOLD 'EM, KNOW WHEN TO FOLD 'EM</div><h2>Every way out of a trade</h2></div><span class="chip">pdf p302–304</span></div>
+  <p>We spend a lot (maybe too much) attention on entries. Grimes looks at exits, sorted into categories: exit at a <b>loss</b> or at a <b>profit</b>. (Not the same as "at a stop or at a target": a trailing stop is often a way to take profit.) Each splits again: losses at the <b>initial</b> stop or a <b>reduced</b> loss; profits <b>against a stop</b> or <b>at a limit</b>.</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 170" role="img" aria-label="Tree of exit types">
+      <rect x="300" y="8" width="120" height="30" rx="4" fill="var(--paper)" stroke="var(--rule)"/><text x="360" y="28" text-anchor="middle" font-weight="600">exit</text>
+      <line x1="340" y1="38" x2="190" y2="66" stroke="var(--muted)"/><line x1="380" y1="38" x2="530" y2="66" stroke="var(--muted)"/>
+      <rect x="120" y="66" width="140" height="30" rx="4" fill="var(--sell)" opacity="0.15" stroke="var(--sell)"/><text x="190" y="86" text-anchor="middle">at a loss</text>
+      <rect x="460" y="66" width="140" height="30" rx="4" fill="var(--buy)" opacity="0.15" stroke="var(--buy)"/><text x="530" y="86" text-anchor="middle">at a profit</text>
+      <line x1="170" y1="96" x2="90" y2="124" stroke="var(--muted)"/><line x1="210" y1="96" x2="280" y2="124" stroke="var(--muted)"/>
+      <line x1="510" y1="96" x2="440" y2="124" stroke="var(--muted)"/><line x1="550" y1="96" x2="630" y2="124" stroke="var(--muted)"/>
+      <text x="90" y="140" text-anchor="middle">initial stop</text><text x="90" y="156" text-anchor="middle" fill="var(--muted)">2–4 ATR</text>
+      <text x="280" y="140" text-anchor="middle">reduced loss</text><text x="280" y="156" text-anchor="middle" fill="var(--muted)">tightened / time stop</text>
+      <text x="440" y="140" text-anchor="middle">at a limit</text><text x="440" y="156" text-anchor="middle" fill="var(--muted)">target ≈ 1R</text>
+      <text x="630" y="140" text-anchor="middle">against a stop</text><text x="630" y="156" text-anchor="middle" fill="var(--muted)">trailing stop</text>
+    </svg>
+  </div>
+  <h3>Initial stops</h3>
+  <p>Most important: have one. Know where you get out before you get in. Every trade needs a clearly defined maximum loss that you work hard never to exceed (some styles differ, but if you trade one, you already know). Bad things still happen: a nasty gap past your stop can produce losses that are whole multiples of your planned risk. Grimes remembers a −4.5× loss in YHOO. Such events are rare, but they're why you never risk 10% of the account on one trade: 4.5 × 10% would be a 45% loss, a disaster, while 4.5 × a sensible 1–2% is merely annoying.</p>
+  <p>He thinks much of the stop advice online uses stops that are too tight; he has never seen anyone trade successfully with stops a few ticks wide. His own initial stops usually end up around <b>2–4 ATRs</b> from entry. Many find that uncomfortable; the fix is simply a smaller position. Taking losses may be the most important thing you do as a trader, so do it properly.</p>
+  <h3>Partial profits: tightened stops</h3>
+  <p>The initial stop is (ideally) never exceeded, but many traders move it fairly quickly. A <b>time stop</b> also cuts risk when the trade doesn't move within a set time: tighten the stop, reduce the position, or exit completely. Grimes has argued against reducing the position at a loss, because it "deleverages" your P&amp;L in the loss space; he finds taking whole, but smaller-than-initial, losses works better (your experience may differ). Key point: entry, exit, size, stop moves, targets, re-entries, adding and partial exits all work together; change one and the whole system changes, which is why a technique can work in one setting and not another. Simplest view: move the stop in when the trade doesn't go far enough your way quickly, and consider time stops.</p>
+  <h3>Partial profits: profit targets</h3>
+  <p>Targets are usually limit orders (stops are usually stop orders). He likes to leave profit-taking limits working in 24-hour markets, though maybe not stops after hours: people do silly things after hours, and he's happy to supply liquidity at the right price. Targets vs. letting winners run? It depends on style: <b>trend traders must let profits run; countertrend traders must take quick profits</b>, usually at pre-defined areas. He hasn't found chart points more effective than a target <b>1× the initial risk</b> on the other side of the entry. Many use pivots or trendlines, but across tens of thousands of trades from his short-term years he hasn't found them that effective (though for intraday traders, the day's high and low deserve respect). Consider the trade-offs of simplifying.</p>
+  <h3>Trailing stops</h3>
+  <p>Very effective in many kinds of trading. You can trail at a volatility-adjusted distance, or sometimes trail very tight, effectively hoping to be stopped out. A nice problem: you trail at yesterday's low and the trade grinds your way week after week, so you're forced to stay in and make more money. But guard against hubris: often when this happened to Grimes he was positioned into a climax move, and those tend to end dramatically, so ring the register and step away.</p>
+  <h3>Putting it all together</h3>
+  <p>His swing-trading combination: a pre-set target for part of the position, a trailing stop on the rest, and moving quickly to reduce the initial risk of his fairly wide stops. Consistency matters, but consistently doing something that doesn't work just loses money consistently. Build a system with an edge that you can actually follow, trade with appropriate size and risk, and monitor performance.</p>
+  <div class="fig">
+    <h3>Manage one trade, bar by bar</h3>
+    <canvas id="c15" class="tall" aria-label="One simulated long trade with its stop path, target and exits"></canvas>
+    <div class="legend" id="c15L"></div>
+    <div class="controls">
+      <label for="n15s">Initial stop <input id="n15s" type="range" min="1" max="4" step="0.5" value="3"><output id="n15so">3</output> ATR</label>
+      <label><input id="chk15t" type="checkbox" checked> sell half at 1R</label>
+      <label for="sel15tr">Trail the rest <select id="sel15tr"><option value="low">under the prior bar's low</option><option value="atr">2 ATR below the close</option><option value="none">don't trail</option></select></label>
+      <label for="n15t">Time stop: if not +1R by bar <input id="n15t" type="range" min="0" max="20" step="1" value="8"><output id="n15to">8</output>, cut risk to 0.5R (0 = off)</label>
+    </div>
+    <div class="controls"><button id="b15next" type="button">Next bar ▶</button><button id="b15end" type="button">Play to exit</button><button id="b15new" type="button">New trade</button></div>
+    <div class="readout" id="r15"></div>
+  </div>
+  <div class="fig">
+    <h3>Do exits create an edge? Pooled on driftless random walks (beyond the book)</h3>
+    <div class="controls"><button id="b15pool" type="button">Compare exit plans (2,400 trades each)</button></div>
+    <div class="tablewrap" id="p15"></div>
+    <p class="readout">200 random-walk markets, one random entry every 45 bars (trades don't overlap); 3-ATR initial stop, 40-bar maximum hold, no costs. ± is one standard error.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>On a random walk every exit plan averages about 0R: exits can't manufacture an edge out of no edge. What they do change is the <em>shape</em>: a 1R target gives a high win rate with capped wins; a tight trail gives many small losses and the odd big winner; the combination sits between. That's Grimes' point that all the pieces work together, and his warning that consistency without an edge just loses consistently. Choose the shape that fits your setup (trend vs countertrend), and get the edge from the entry.</p></div>
+  <div class="fig">
+    <h3>The YHOO lesson as a calculator</h3>
+    <div class="controls">
+      <label for="n15g">Risk per trade <input id="n15g" type="range" min="0.5" max="10" step="0.5" value="1"><output id="n15go">1</output>%</label>
+      <label for="n15m">Gap loss <input id="n15m" type="range" min="1" max="6" step="0.5" value="4.5"><output id="n15mo">4.5</output> × planned risk</label>
+    </div>
+    <div class="readout" id="r15g"></div>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Your weekly pullback: 2.5-ATR stop and a 2R target; playbook S-1 trails the 20-day low and warns not to take early profits on breakouts, i.e. a trend-style exit (<code>backtest_results_summary.md</code>, <code>intraday_swing_playbook.md</code>).</li>
+    <li><code>using_equations_to_trade.md</code> Monte Carlo: at a 45% win rate (+0.25R), risking 6.8% per trade gave a 79% chance of a ≥ 50% drawdown; at 1% it was 0%. The YHOO arithmetic in another form.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · ON TRADE MANAGEMENT · WHAT DOES "GOOD RISK MANAGEMENT" MEAN?</div><h2>No single loss may put you out of business</h2></div><span class="chip">pdf p305–306</span></div>
+  <p>The first question Grimes ever answered on his blog. His summary of technical trading: (1) find patterns that suggest a statistical edge, (2) take the right position, (3) manage the risk. Most developing traders, and many firms, stumble on step 3.</p>
+  <p>A common retail myth is that risk management just means keeping losses small. But many small losses add up. Small, nearly certain losses drain the account steadily, and developing traders are often blind to the costs that feed them: commissions, fees, and paying the spread.</p>
+  <p>The root of risk management: <b>make sure no one loss can take you out of business</b>. That means correctly sized positions (too small is as bad as too large, because you aren't paid properly for the risk you take) and awareness of anything that could change the position's volatility. Most of us size from expected volatility; if future volatility turns out much higher, the position carries more risk than planned. Often that is predictable (earnings, economic reports, scheduled macro events, a key competitor's earnings), and such events are often priced into options' implied volatility, so a quick look at implied pricing is usually prudent. Other shocks can't be foreseen (acts of God, takeovers, surprise announcements, weather) and can cause tail losses many times the plan. They usually can't be hedged effectively; they are a cost of doing business, and if you trade long enough you'll meet some.</p>
+  <p>Risk management is also <b>position management</b>. First, exit at your initial loss point; no excuses. The market has told you you're wrong, so book the loss. Beyond that: do you have a plan for taking profits at specific points, for booking partial losses, for adding back? Understand the consequences of each choice and have a plan that says what to do in every situation.</p>
+  <div class="fig">
+    <h3>Death by small losses: what costs do to tight stops (beyond the book)</h3>
+    <div class="controls">
+      <label for="n16s">Stop distance <input id="n16s" type="range" min="0.2" max="5" step="0.1" value="0.5"><output id="n16so">0.5</output>% of price</label>
+      <label for="n16c">Round-trip cost <input id="n16c" type="range" min="0" max="0.6" step="0.01" value="0.35"><output id="n16co">0.35</output>%</label>
+      <button id="b16i" type="button">FYERS intraday ≈ 0.15%</button><button id="b16d" type="button">FYERS delivery ≈ 0.35%</button>
+    </div>
+    <div class="controls">
+      <label for="n16p">Win rate <input id="n16p" type="range" min="20" max="70" step="1" value="40"><output id="n16po">40</output>%</label>
+      <label for="n16rr">Win size <input id="n16rr" type="range" min="0.5" max="4" step="0.1" value="2"><output id="n16rro">2</output> R</label>
+    </div>
+    <canvas id="c16" class="short" aria-label="Net expectancy in R versus stop distance"></canvas>
+    <div class="legend" id="c16L"></div>
+    <div class="readout" id="r16"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Costs are paid in percent of price, but results are counted in R, the stop distance. So the cost of one round trip, measured in R, is cost% ÷ stop%. With a 0.5% stop and 0.35% delivery costs, every trade pays 0.7R before it starts: a +0.2R edge becomes −0.5R. Widen the stop to 2% and the same cost is only 0.18R. (This assumes the win rate and win size in R stay the same as the stop widens, which real setups only roughly do.) That is the steady drain Grimes describes, made visible, and one more reason tight stops are rarely good.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>The cost presets come from <code>breakeven_move_fyers.md</code>: break-even about 0.1–0.2% intraday and 0.3–0.4% for delivery. Your backtests found exactly this: intraday signals held as delivery lost heavily because delivery costs (~0.28%/trade) exceed intraday-sized moves.</li>
+    <li>Implied volatility as an early warning: <code>trading_equations.md</code> eq 14, 1σ move ≈ price × IV × √(days/365).</li>
+  </ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · ON TRADE MANAGEMENT · ADDING TO POSITIONS: A SIMPLE RULE</div><h2>If an add fails, get out of more than you added</h2></div><span class="chip">pdf p306–307</span></div>
+  <p>Grimes' rule, which has worked well for him: you're in a position, you become confident it's right, you add to it. If the trade then doesn't work out as expected, <b>you must exit more than you added</b>.</p>
+  <p>His numbers: long 5,000 shares; the trade moves your way and you get a signal to add (the "signal" could be many things), so you add 2,000. Later it stops working, probably below the price where you added. You know you must reduce, but by how much? <b>More than 2,000, and probably closer to 4,000 than 2,100.</b> You end up below your original size, you've booked a loss on part of the position, but you've cut risk on a trade that isn't developing as planned.</p>
+  <p>A classic mistake is turning a winner into a loser by adding badly. Pressing a good trade can help some traders, but aggression means more risk, and the swing from aggressive to wrong is one of the hardest emotional experiences in trading; many mistakes happen there. The rule protects you from yourself. It doesn't fit every style: for example, if your plan is to scale in as the trade moves <em>against</em> you. But for simple directional technical trading it often helps. Much of trading is avoiding errors, and correct rules lead to good trading.</p>
+  <div class="fig">
+    <h3>Worked example: Grimes' 5,000 + 2,000 in rupees</h3>
+    <div class="controls">
+      <label for="n17pe">First buy ₹ <input id="n17pe" type="number" step="1" value="100" style="width:5em"></label>
+      <label for="n17pa">Add ₹ <input id="n17pa" type="number" step="1" value="110" style="width:5em"></label>
+      <label for="n17pn">Now ₹ <input id="n17pn" type="number" step="1" value="106" style="width:5em"></label>
+      <label for="n17st">Stop ₹ <input id="n17st" type="number" step="1" value="100" style="width:5em"></label>
+    </div>
+    <div class="controls"><label for="n17s">Sell now <input id="n17s" type="range" min="0" max="7000" step="100" value="4000"><output id="n17so">4000</output> shares</label></div>
+    <canvas id="c17" class="short" aria-label="Position size and open risk before and after the cut"></canvas>
+    <div class="readout" id="r17"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>You raised your bet because you were sure. The trade is now telling you that "sure" was wrong. Going back only to your old bet acts as if the mistake never happened; going below it pays a small fee for having been wrong and leaves you calmer and smaller while you find out what's really going on.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>After the add, every rupee the stock falls costs 7,000 rupees instead of 5,000, and the newest shares were bought at the worst price. Selling only the 2,000 you added returns you to the old position but still at a moment when the trade is misbehaving. Selling ~4,000 cuts the open risk to the stop well below what you started with. The readout compares risk to the stop at each stage.</p></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · ON RESEARCH · HOW TO FIND TRADING IDEAS</div><h2>Ideas come from exposure, tests come later</h2></div><span class="chip">pdf p307–309</span></div>
+  <p>Patterns in prices exist, no doubt. A small set can help trading; some are worthless; some aren't there at all, products of our own cognitive biases. The course has spent a lot of time on sorting gold from dross, testing for significance and guarding against cognitive errors. But before any of that there must be an idea.</p>
+  <p>In later stages (testing, system development, trading) there are right and wrong ways. In the earliest stage of idea generation there are none; you can't make a mistake. Approach it with a childlike sense of wonder and play. A complete beginner might stumble on a good idea, but usually the ideas that end up profitable come from experience and exposure: be in the flow of the market. To speed things up:</p>
+  <ul class="plain">
+    <li><b>See a lot of market data, and pay attention.</b> Attention is precious and you choose where it goes. Notice what happens after other things happen; connections will come.</li>
+    <li><b>Look at a lot of charts.</b> Screen time: different timeframes, different markets, relationships between charts, timeframes you don't trade. Just look at patterns.</li>
+    <li><b>Take notes.</b> This is not testing; it's opening your perception wide. Jot pattern ideas, sketch chart patterns you'd like to trade, note relationships among highs, lows and closes, keep a page of questions. Even mindless doodles while looking at charts may be messages from a deeper part of your mind.</li>
+    <li><b>Read and listen a lot.</b> Most of it will be garbage, as is most of what you see; you're looking for the few seeds. Better inputs, better results: hype-titled trading books and a $0.99 ebook on moving averages won't add much; better books, academic research, interviews and news might.</li>
+  </ul>
+  <p><b>What next?</b> Hard work comes later. First, immerse yourself and let the pattern-recognition machine in your head make connections. Sorting false connections from good ones, illusion from reality, is the job of statistics and system development; but it all starts with ideas.</p>
+  <div class="fig">
+    <h3>Some patterns aren't even there: breakouts in pure noise (beyond the book)</h3>
+    <canvas id="c18" class="tall" aria-label="A random walk with every 20-bar breakout marked"></canvas>
+    <div class="legend" id="c18L"></div>
+    <div class="controls"><label><input id="chk18" type="checkbox"> show only the dramatic winners (what example charts in books show)</label><button id="b18" type="button">New random walk</button></div>
+    <div class="readout" id="r18"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>This chart is a coin-flip random walk: no pattern in it can have an edge. Yet tick the box and you get a convincing gallery of breakouts that took off. Every one of them is real in the data and meaningless as evidence. That's why idea generation must be followed by testing that counts <em>every</em> breakout, and why Grimes keeps the two stages apart: the eye is for finding ideas, statistics is for judging them.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Module 3 in this workbook makes the same warning about books full of dramatic breakouts: most breakouts fail (pdf p145).</li>
+    <li>Section 04 (research journal) is where these notes and doodles go.</li>
+  </ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · ON RESEARCH · QUALITY MATTERS</div><h2>Simple only works with flawless ingredients</h2></div><span class="chip">pdf p309–311</span></div>
+  <p>Grimes often argues for simplicity: you could probably throw out most of your tools and the things you look at, and your results would likely improve. The catch: the simpler the recipe, the more each ingredient matters.</p>
+  <p>His food analogy: he enjoys elaborate tasting menus, but the dishes he dreams about are simple ones with perfect ingredients, like a tomato sauce he can only make a couple of weeks a year from dew-covered morning tomatoes, a plate of scrambled egg with butter, black truffle and good rye bread, and a dashi broth with matsutake and a hint of yuzu made by a master chef. Flawless ingredients, prepared simply and perfectly.</p>
+  <p>Trading is the same. Complexity hides problems: a serious fault can be buried in the noise of competing influences, so performance is poor and you can't find why; a useless tool gets lost in the mix. If you simplify, simplify to things that actually work.</p>
+  <p>If your trading is going well, take this with a grain of salt and make only small, incremental changes; many traders abandon something that works in search of something shinier, usually a mistake. If you're struggling, ask hard questions: which tools do you use, how well do they work, do they give a real, verifiable edge (most common technical tools don't), how do you know, and how can you simplify to only the best? Dare to ask, and don't fear the answers.</p>
+  <div class="fig">
+    <h3>Your ingredient audit (from your own backtests)</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Ingredient you tested</th><th>Verifiable edge?</th><th>What your test said</th></tr></thead>
+      <tbody id="t19"></tbody>
+    </table></div>
+    <div class="controls"><label for="sel19">Show <select id="sel19"><option value="all">all</option><option value="keep">keep (passed)</option><option value="drop">drop or unproven</option></select></label></div>
+    <p class="readout">All rows taken from <code>Notes/trading/backtest_results_summary.md</code> (Oct 2026). Not from the book.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A sauce with fifteen ingredients and one spoiled one: you taste "a bit off" and can't say why. A sauce with three ingredients and one spoiled one: you know at once. Simplicity makes faults visible, which is why each remaining ingredient has to be excellent.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 09: removing degrees of freedom is the same move as dropping ingredients.</li>
+    <li>Module 14 (<a href="ch14_moving_averages.html">Moving averages</a>) and Module 13 (<a href="ch13_fibonacci_retracements.html">Fibonacci retracements</a>) are where Grimes tests some common tools quantitatively.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Name Grimes' three complications for backtesting breakouts, and his three must-answer questions.</summary><p>Complications: wide spreads at breakout points; extreme volatility hidden inside single bars; many breakouts are news-driven. Questions: how you define the level; whether you require a prior formation (careful: too specific shrinks the sample); how you execute (resting order, on seeing it, or on the bar's close), tested as one consistent rule set (section 02).</p></details>
+  <details><summary>2. In the tester, why can "resting stop order" and "on the close" give different trade lists from the same level?</summary><p>The resting order fills on any poke above the level, including bars that close back below; the close rule only trades bars that close above. Different execution = different trades, not just different prices (section 02).</p></details>
+  <details><summary>3. What are the four required sections of a setup sheet, and how many setup sheets should a developing trader have?</summary><p>Setup, trigger, stop location, profit taking. Two to maybe five; ten is too many (section 03).</p></details>
+  <details><summary>4. Your CRG sheet says "risk 1% per trade". Why is that not a number of shares?</summary><p>Risk is the money lost if stopped out. Shares come from it: risk ₹ ÷ (entry − stop). A wider stop means fewer shares and the same rupee loss (section 03).</p></details>
+  <details><summary>5. You test "buy pullbacks only if the weekly bar is up" and the edge is huge. What should you suspect first?</summary><p>Information leakage: using the finished weekly bar mid-week. Grimes warns that most software shows completed higher-timeframe bars. Compare against the baseline and the unfiltered pattern (section 05).</p></details>
+  <details><summary>6. When may an intraday trader put on the system-developer hat? A swing trader? A long-term investor?</summary><p>Intraday: weekends or maybe monthly, never mid-session. Swing: about monthly or less. Long-term: a few times a year (section 08).</p></details>
+  <details><summary>7. CNBC says gold can only go up; your process says short. How does Grimes handle the conflict?</summary><p>Narrative is an unmeasured extra degree of freedom unless you can measure its influence. Work the process (section 09).</p></details>
+  <details><summary>8. You think Delta will beat its rivals and buy DAL; the whole sector drops 10% and DAL beats it by 3%. Right or wrong?</summary><p>Right on the idea, still −7% on the position: it didn't isolate the idea. That's question 2: will your position capture the move you expect (section 10)?</p></details>
+  <details><summary>9. Why does Grimes prefer ATR to historical volatility for stops?</summary><p>Historical volatility uses closes only; stops are usually hit intrabar by highs and lows, which ATR includes (section 14).</p></details>
+  <details><summary>10. Why is a "low-risk" trade with a very tight stop often high risk?</summary><p>Proper sizing makes the position huge; a gap through the stop then costs many R; the stop is also very likely to be hit, and risk = loss × probability. Under ~1 ATR is probably too close (section 14).</p></details>
+  <details><summary>11. Grimes once lost 4.5× his planned risk on YHOO. What does that same gap do at 1%, 2% and 10% risk per trade?</summary><p>4.5%, 9% and 45% of the account. The first two are annoying; the last is a disaster, which is why you never risk 10% (section 15).</p></details>
+  <details><summary>12. Trend trader or countertrend trader: who uses a 1R target and who lets winners run?</summary><p>Countertrend traders take quick profits at pre-defined areas (Grimes uses about 1× initial risk); trend traders must let profits run, usually with trailing stops (section 15).</p></details>
+  <details><summary>13. Delivery costs 0.35% round trip and your stop is 0.5% away. What does each trade pay in R before it starts?</summary><p>0.35 ÷ 0.5 = 0.7R. Small, nearly certain losses plus costs are the drain Grimes warns about (section 16).</p></details>
+  <details><summary>14. You're long 5,000, add 2,000, and the trade turns below your add price. How much do you sell?</summary><p>More than you added: more like 4,000 than 2,100, leaving you below your original size (section 17).</p></details>
+</section>
+
+<footer>Built from Adam Grimes, <i>The Art and Science of Trading: Course Workbook</i> (2017), Module 7 "Breakouts" and its essays (PDF pages 275–311), summarised in my own words; the only direct quote is Ed Seykota's line as Grimes cites it. The two chart examples (pdf p297, p299) are recreated with simulated prices. Everything marked "beyond the book" (simulations, the DAL pair, cost and leak tests, links to my notes) is my addition. Simulated results are not market evidence. Education, not investment advice.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // ---------- module 7 helpers ----------
+  // OHLC generator. segment: {n, drift, vol, revert, gap, wick, kind}
+  // Each bar: open = last close ± a small gap; close = open × (1 + drift + vol·z); high/low sampled as the max/min
+  // of a random path between open and close, so a stop touched inside a bar is filled fairly.
+  function genOHLC(segs, seedv, start = 100) {
+    const r = rng(seedv); const o = [], h = [], l = [], c = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        const op = p * (1 + (s.gap != null ? s.gap : s.vol * 0.25) * gauss(r));
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - op) / op;
+        const cl = Math.max(1, op * (1 + ret));
+        o.push(op); c.push(cl);
+        if (s.wick != null) { // hand-built wicks (used only where a plate says so)
+          const wick = op * s.vol * s.wick;
+          h.push(Math.max(op, cl) + wick * Math.abs(gauss(r)));
+          l.push(Math.max(0.5, Math.min(op, cl) - wick * Math.abs(gauss(r))));
+        } else { // high/low = extremes of a Brownian path from open to close (bridge formula), so intrabar fills are fair
+          const s2 = (op * s.vol) ** 2, d2 = (cl - op) ** 2;
+          let u = r(); while (!u) u = r(); let w = r(); while (!w) w = r();
+          h.push((op + cl + Math.sqrt(d2 - 2 * s2 * Math.log(u))) / 2);
+          l.push(Math.max(0.5, (op + cl - Math.sqrt(d2 - 2 * s2 * Math.log(w))) / 2));
+        }
+        kind.push(s.kind || 'trend'); p = cl;
+      }
+    }
+    return { o, h, l, c, kind, n: c.length };
+  }
+  // Wilder ATR
+  function atr(D, n) {
+    const out = nulls(D.n); let a = 0;
+    for (let i = 1; i < D.n; i++) {
+      const tr = Math.max(D.h[i] - D.l[i], Math.abs(D.h[i] - D.c[i - 1]), Math.abs(D.l[i] - D.c[i - 1]));
+      if (i < n) { a += tr; if (i === n - 1) { a /= (n - 1); out[i] = a; } }
+      else { a = (a * (n - 1) + tr) / n; out[i] = a; }
+    }
+    return out;
+  }
+  // weekly bars from daily: honest = only days up to `upto`; leak = whole week containing `upto`
+  function toWeekly(D, k, upto, leak) {
+    const last = upto == null ? D.n - 1 : (leak ? Math.min(D.n - 1, Math.floor(upto / k) * k + k - 1) : upto);
+    const W = { o: [], h: [], l: [], c: [], start: [], n: 0 };
+    for (let s = 0; s <= last; s += k) {
+      const e = Math.min(last, s + k - 1); let hi = -Infinity, lo = Infinity;
+      for (let i = s; i <= e; i++) { if (D.h[i] > hi) hi = D.h[i]; if (D.l[i] < lo) lo = D.l[i]; }
+      W.o.push(D.o[s]); W.h.push(hi); W.l.push(lo); W.c.push(D.c[e]); W.start.push(s);
+    }
+    W.n = W.c.length; return W;
+  }
+  const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+  const se = (a) => { if (a.length < 2) return 0; const m = mean(a); let v = 0; a.forEach((x) => { v += (x - m) ** 2; }); return Math.sqrt(v / (a.length - 1) / a.length); };
+  const sgn = (v, d = 2) => (v >= 0 ? '+' : '') + v.toFixed(d);
+  const inr = (v) => '₹' + Math.round(v).toLocaleString('en-IN');
+  function setupCanvas(id) {
+    const cv = $(id); if (!cv) return null;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return null;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.font = '11px ' + css('mono');
+    return { g, W, H };
+  }
+  function arrow(g, x0, y0, x1, y1, col, w) {
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w || 2.2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    const a = Math.atan2(y1 - y0, x1 - x0), s = 9;
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - s * Math.cos(a - 0.4), y1 - s * Math.sin(a - 0.4)); g.lineTo(x1 - s * Math.cos(a + 0.4), y1 - s * Math.sin(a + 0.4)); g.closePath(); g.fill();
+  }
+  // candlestick chart. sp: {D, x0, x1, upto, lines:[{d,col,w,dash,step,label,noScale}], hls:[{v,col,dash,label,noScale}],
+  //   marks:[{i,v,kind:'buy'|'sell'|'x'|'dot',col,label}], segs:[{i0,v0,i1,v1,col,w}], shade:[{a,b,col,alpha}], legend:[[t,c]], ymin, ymax}
+  function cplot(id, sp) {
+    const S = setupCanvas(id); if (!S) return; const { g, W, H } = S;
+    const D = sp.D; const x0 = sp.x0 != null ? Math.max(0, sp.x0) : 0; const x1 = sp.x1 != null ? sp.x1 : D.n - 1;
+    const upto = Math.min(sp.upto != null ? sp.upto : x1, x1, D.n - 1);
+    const padL = 6, padR = 54, padT = 10, padB = 10;
+    const cw = (W - padL - padR) / (x1 - x0 + 1);
+    const X = (i) => padL + (i - x0 + 0.5) * cw;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = x0; i <= upto; i++) { if (D.h[i] > hi) hi = D.h[i]; if (D.l[i] < lo) lo = D.l[i]; }
+    (sp.lines || []).forEach((L) => { if (L.noScale) return; for (let i = x0; i <= upto; i++) { const v = L.d[i]; if (v != null && isFinite(v)) { if (v > hi) hi = v; if (v < lo) lo = v; } } });
+    (sp.hls || []).forEach((q) => { if (q.noScale) return; if (q.v > hi) hi = q.v; if (q.v < lo) lo = q.v; });
+    if (sp.ymin != null) lo = sp.ymin; if (sp.ymax != null) hi = sp.ymax;
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    const pad = (hi - lo) * 0.07 || 1; lo -= pad; hi += pad;
+    const Hm = H - padT - padB; const Y = (v) => padT + (hi - v) / (hi - lo) * Hm;
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - cw / 2, padT, (s.b - s.a + 1) * cw, Hm); });
+    g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1; g.fillStyle = colorOf('muted');
+    niceTicks(lo, hi, Hm > 150 ? 4 : 3).forEach((t) => { const y = Y(t); if (y < padT || y > padT + Hm) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+    const bw = Math.max(1, Math.min(9, cw * 0.62));
+    for (let i = x0; i <= upto; i++) {
+      const up = D.c[i] >= D.o[i]; const col = colorOf(up ? 'buy' : 'sell');
+      g.strokeStyle = col; g.lineWidth = 1; const x = X(i);
+      g.beginPath(); g.moveTo(x, Y(D.h[i])); g.lineTo(x, Y(D.l[i])); g.stroke();
+      const yo = Y(D.o[i]), yc = Y(D.c[i]); const top = Math.min(yo, yc), hgt = Math.max(1, Math.abs(yo - yc));
+      if (up) { g.fillStyle = colorOf('plate'); g.fillRect(x - bw / 2, top, bw, hgt); g.strokeRect(x - bw / 2, top, bw, hgt); }
+      else { g.fillStyle = col; g.fillRect(x - bw / 2, top, bw, hgt); }
+    }
+    (sp.lines || []).forEach((L) => strokeSeries(g, L.d, X, Y, x0, upto, colorOf(L.col, L.alpha != null ? L.alpha : 1), L.w || 1.6, L.dash, L.step));
+    (sp.hls || []).forEach((q) => {
+      const y = Y(q.v); if (y < padT - 1 || y > padT + Hm + 1) return;
+      g.strokeStyle = colorOf(q.col || 'muted'); g.lineWidth = q.w || 1.3; g.setLineDash(q.dash || [5, 4]);
+      const xa = q.from != null ? X(q.from) : padL, xb = q.to != null ? X(q.to) : W - padR;
+      g.beginPath(); g.moveTo(xa, y); g.lineTo(xb, y); g.stroke(); g.setLineDash([]);
+      if (q.label) { g.fillStyle = colorOf(q.col || 'muted'); g.fillText(q.label, xa + 4, y - 4); }
+    });
+    (sp.segs || []).forEach((s) => arrow(g, X(s.i0), Y(s.v0), X(s.i1), Y(s.v1), colorOf(s.col), s.w));
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > upto || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = 5;
+      if (m.kind === 'buy') { g.fillStyle = colorOf(m.col || 'buy'); g.beginPath(); g.moveTo(x, y + 3); g.lineTo(x - s, y + 3 + s * 1.6); g.lineTo(x + s, y + 3 + s * 1.6); g.closePath(); g.fill(); }
+      else if (m.kind === 'sell') { g.fillStyle = colorOf(m.col || 'sell'); g.beginPath(); g.moveTo(x, y - 3); g.lineTo(x - s, y - 3 - s * 1.6); g.lineTo(x + s, y - 3 - s * 1.6); g.closePath(); g.fill(); }
+      else if (m.kind === 'x') { g.strokeStyle = colorOf(m.col || 'ink'); g.lineWidth = 2; g.beginPath(); g.moveTo(x - 4, y - 4); g.lineTo(x + 4, y + 4); g.moveTo(x + 4, y - 4); g.lineTo(x - 4, y + 4); g.stroke(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, 3.5, 0, Math.PI * 2); g.fill(); }
+      if (m.label) { g.fillStyle = colorOf(m.col || 'ink'); const tw = g.measureText(m.label).width; let tx = x + 7; if (tx + tw > W - padR) tx = x - tw - 7; g.fillText(m.label, tx, m.kind === 'sell' ? y - 10 : y + 16); }
+    });
+    if (sp.note) { g.fillStyle = colorOf('muted'); g.fillText(sp.note, padL + 4, padT + 12); }
+    const Lg = $(id + 'L'); if (Lg) Lg.innerHTML = (sp.legend || []).map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    return { X, Y };
+  }
+  // horizontal bars: items [{label, v, col, txt}]
+  function hbars(id, items, fmtv) {
+    const S = setupCanvas(id); if (!S) return; const { g, W, H } = S;
+    const padL = Math.min(200, W * 0.4), padR = 70; const rowH = (H - 12) / items.length;
+    let mn = 0, mx = 0; items.forEach((it) => { mn = Math.min(mn, it.v); mx = Math.max(mx, it.v); }); if (mx === mn) mx = mn + 1;
+    const X = (v) => padL + (v - mn) / (mx - mn) * (W - padL - padR);
+    g.strokeStyle = colorOf('muted', 0.7); g.beginPath(); g.moveTo(X(0), 4); g.lineTo(X(0), H - 4); g.stroke();
+    items.forEach((it, k) => {
+      const y = 6 + k * rowH; const xa = X(Math.min(0, it.v)), xb = X(Math.max(0, it.v));
+      g.fillStyle = colorOf(it.col, 0.75); g.fillRect(xa, y + rowH * 0.22, Math.max(1.5, xb - xa), rowH * 0.56);
+      g.fillStyle = colorOf('ink'); g.fillText(it.label, 6, y + rowH * 0.58);
+      const t = it.txt || fmtv(it.v); const tw = g.measureText(t).width;
+      g.fillText(t, it.v >= 0 ? Math.min(xb + 5, W - tw - 2) : Math.max(xa - tw - 5, padL), y + rowH * 0.58);
+    });
+  }
+
+  // ---------- data shared by several plates ----------
+  let seed = 7;
+  let M;
+  const REG = [
+    { n: 60, drift: 0, vol: 0.008, revert: 0.08, kind: 'range' }, { n: 45, drift: 0.004, vol: 0.015, kind: 'trend' },
+    { n: 50, drift: 0, vol: 0.008, revert: 0.08, kind: 'range' }, { n: 40, drift: -0.004, vol: 0.015, kind: 'trend' },
+    { n: 50, drift: 0, vol: 0.008, revert: 0.08, kind: 'range' }, { n: 45, drift: 0.004, vol: 0.015, kind: 'trend' },
+    { n: 40, drift: 0, vol: 0.008, revert: 0.08, kind: 'range' }
+  ];
+  const RW = [{ n: 330, drift: 0, vol: 0.013, kind: 'rw' }];
+  const makeMarket = (type, s) => genOHLC(type === 'rw' ? RW : REG, s);
+  function buildData() { M = makeMarket($('sel2m').value, seed); $('seedOut').textContent = seed; }
+
+  // ---------- 02 breakout backtest ----------
+  function breakoutTrades(D, opt) {
+    const C = D._c || (D._c = {}); const A = C.a20 || (C.a20 = atr(D, 20)), a5 = C.a5 || (C.a5 = atr(D, 5)), a40 = C.a40 || (C.a40 = atr(D, 40));
+    const lvl = C['h' + opt.n] || (C['h' + opt.n] = chanHi(D.h, opt.n));
+    const cost = opt.bps / 10000; const trades = []; let i = Math.max(opt.n, 41);
+    while (i < D.n - 1) {
+      const L = lvl[i], ap = A[i - 1];
+      if (L == null || ap == null) { i++; continue; }
+      let ok = opt.exec === 'close' ? D.c[i] > L : D.h[i] > L;
+      if (ok && opt.filter) ok = a5[i - 1] / a40[i - 1] < opt.ratio;
+      if (!ok) { i++; continue; }
+      let fill;
+      if (opt.exec === 'stop') fill = Math.max(L, D.o[i]);
+      else if (opt.exec === 'see') fill = Math.min(D.h[i], Math.max(L, D.o[i]) + 0.2 * ap);
+      else fill = D.c[i];
+      fill *= 1 + cost;
+      const stop = fill - 2 * ap; const risk = fill - stop;
+      let j = i, exit = null, why = '';
+      if (opt.exec !== 'close' && D.l[i] <= stop) { exit = stop; why = 'stop in entry bar'; }
+      while (exit == null) {
+        j++;
+        if (j >= D.n) { j = D.n - 1; exit = D.c[j]; why = 'data end'; break; }
+        if (D.o[j] <= stop) { exit = D.o[j]; why = 'gap through stop'; }
+        else if (D.l[j] <= stop) { exit = stop; why = 'stop'; }
+        else if (j - i >= 10) { exit = D.c[j]; why = '10-bar time exit'; }
+      }
+      exit *= 1 - cost;
+      trades.push({ i, j, L, fill, stop, exit, R: (exit - fill) / risk, why });
+      i = j + 1;
+    }
+    return trades;
+  }
+  const opt2 = () => ({ n: +$('sel2n').value, exec: $('sel2x').value, bps: val('n2c'), filter: $('chk2f').checked, ratio: val('n2f') });
+  let T2 = [], cur2 = 60;
+  function compute2() { T2 = breakoutTrades(M, opt2()); }
+  const d2 = reg(() => {
+    const D = M; cur2 = Math.max(45, Math.min(cur2, D.n - 1));
+    const o = opt2(); const lvl = chanHi(D.h, o.n);
+    const x0 = Math.max(0, cur2 - 100), x1 = Math.min(D.n - 1, x0 + 119);
+    const marks = [], hls = [];
+    let closed = [], open = null;
+    T2.forEach((t) => {
+      if (t.i > cur2) return;
+      marks.push({ i: t.i, v: t.fill, kind: 'buy' });
+      if (t.j <= cur2) { closed.push(t); marks.push({ i: t.j, v: t.exit, kind: 'x', col: t.R >= 0 ? 'buy' : 'sell' }); }
+      else open = t;
+    });
+    if (open) { hls.push({ v: open.stop, col: 'sell', label: 'stop', from: open.i, to: Math.min(x1, open.i + 10), noScale: true }); }
+    const lvlShow = lvl.map((v, i) => (i <= cur2 ? v : null));
+    const kindShade = [];
+    cplot('c2', { D, x0, x1, upto: cur2, lines: [{ d: lvlShow, col: 'c1', w: 1.6, step: true }], hls, marks, shade: kindShade,
+      legend: [['candles: simulated', 'price'], [o.n + '-bar high (the level)', 'c1'], ['entry ▲', 'buy'], ['exit ✕', 'muted'], ['open stop', 'sell']] });
+    const tot = closed.reduce((s, t) => s + t.R, 0);
+    let txt = `bar <b>${cur2}</b> of ${D.n - 1} · closed trades <b>${closed.length}</b> · total <b class="${tot >= 0 ? 'good' : 'bad'}">${sgn(tot)}R</b>`;
+    if (closed.length) txt += ` · average <b>${sgn(tot / closed.length)}R</b>`;
+    if (open) txt += ` · <b>open</b> since bar ${open.i}: fill ${fmt(open.fill)}, stop ${fmt(open.stop)}, now ${sgn((D.c[cur2] - open.fill) / (open.fill - open.stop))}R`;
+    else txt += ' · flat';
+    $('r2').innerHTML = txt;
+    const rows = closed.slice(-6).reverse().map((t) => `<tr><td class="num">${t.i}</td><td class="num">${fmt(t.L)}</td><td class="num">${fmt(t.fill)}</td><td class="num">${fmt(t.stop)}</td><td class="num">${t.j}</td><td>${t.why}</td><td class="num">${sgn(t.R)}R</td></tr>`).join('');
+    $('t2').innerHTML = closed.length ? `<table><thead><tr><th>entry bar</th><th>level</th><th>fill</th><th>stop</th><th>exit bar</th><th>why</th><th>result</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="readout">No closed trades yet: step forward. Your trade log appears here (last 6 trades).</p>';
+  });
+  function next2Event() { const ev = []; T2.forEach((t) => { ev.push(t.i, t.j); }); const nx = ev.filter((v) => v > cur2).sort((a, b) => a - b)[0]; cur2 = nx != null ? nx : M.n - 1; d2(); }
+  ['sel2n', 'sel2x', 'chk2f'].forEach((id) => $(id).addEventListener('change', () => { compute2(); d2(); pool2(); }));
+  bindRange('n2c', () => { compute2(); d2(); pool2(); });
+  bindRange('n2f', () => { compute2(); d2(); pool2(); });
+  $('sel2m').addEventListener('change', () => { buildData(); compute2(); cur2 = 60; e15 = 60; cur15 = 60; compute15(); redrawAll(); pool2(); });
+  $('b2next').addEventListener('click', () => { cur2++; d2(); });
+  $('b2jump').addEventListener('click', next2Event);
+  $('b2end').addEventListener('click', () => { cur2 = M.n - 1; d2(); });
+  $('b2reset').addEventListener('click', () => { cur2 = 60; d2(); });
+  const poolCache = {};
+  function poolMarkets(type) { if (!poolCache[type]) { poolCache[type] = []; for (let s = 0; s < 150; s++) poolCache[type].push(makeMarket(type, 5000 + s * 13)); } return poolCache[type]; }
+  function pool2() {
+    const type = $('sel2m').value; const mk = poolMarkets(type); const base = opt2();
+    const names = { stop: 'resting buy-stop', see: 'see it, then act', close: 'bar close' };
+    const rows = [];
+    ['stop', 'see', 'close'].forEach((ex) => [false, true].forEach((f) => {
+      const Rs = []; mk.forEach((D) => breakoutTrades(D, Object.assign({}, base, { exec: ex, filter: f })).forEach((t) => Rs.push(t.R)));
+      const m = mean(Rs), e = se(Rs), w = Rs.length ? Rs.filter((x) => x > 0).length / Rs.length * 100 : 0;
+      rows.push(`<tr${ex === base.exec && f === base.filter ? ' style="background:var(--tint)"' : ''}><td>${names[ex]}</td><td>${f ? 'quiet first (&lt; ' + base.ratio.toFixed(2) + ')' : 'none'}</td><td class="num">${Rs.length}</td><td class="num">${sgn(m)} ± ${e.toFixed(2)}</td><td class="num">${w.toFixed(0)}%</td></tr>`);
+    }));
+    $('p2').innerHTML = `<table><thead><tr><th>Execution</th><th>Formation filter</th><th>Trades</th><th>Avg R ± 1 SE</th><th>Win %</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    $('r2p').innerHTML = `Market: <b>${type === 'rw' ? 'pure random walk' : 'ranges then trends (my construction)'}</b> · ${base.n}-bar level · ${base.bps} bps per side · highlighted row = your current settings. Simulated; not evidence about real markets.`;
+  }
+  $('b2pool').addEventListener('click', pool2);
+
+  // ---------- 03 CRG calculator ----------
+  const d3 = reg(() => {
+    const acct = Math.max(0, +$('n3a').value || 0), mode = $('sel3m').value, v = Math.max(0, +$('n3r').value || 0);
+    const e = +$('n3e').value || 0, s = +$('n3s').value || 0; const risk = mode === 'pct' ? acct * v / 100 : v; const dist = e - s;
+    if (dist <= 0) { $('r3').innerHTML = '<b class="bad">For a long trade the stop must be below the entry.</b>'; return; }
+    const sh = Math.floor(risk / dist), pos = sh * e, sh2 = Math.floor(risk / (2 * dist));
+    $('r3').innerHTML = `risk per trade <b>${inr(risk)}</b> (${acct ? (risk / acct * 100).toFixed(2) : '–'}% of equity) · stop distance <b>${inr(dist)}</b> = ${(dist / e * 100).toFixed(1)}% · buy <b>${sh.toLocaleString('en-IN')} shares</b> · position <b>${inr(pos)}</b> (${acct ? (pos / acct * 100).toFixed(0) : '–'}% of account) · stop twice as far → <b>${sh2.toLocaleString('en-IN')}</b> shares, same ${inr(risk)} at risk · weekly cutoff after ${val('n3w')} full losses = <b>${inr(val('n3w') * risk)}</b>`;
+  });
+  ['n3a', 'n3r', 'n3e', 'n3s'].forEach((id) => $(id).addEventListener('input', d3));
+  $('sel3m').addEventListener('change', () => { $('n3r').value = $('sel3m').value === 'pct' ? 1 : 10000; d3(); });
+  bindRange('n3w', d3);
+
+  // ---------- 05 multiple timeframe leak ----------
+  let D5 = genOHLC([{ n: 120, drift: 0.0004, vol: 0.013 }], 51);
+  const rebuild5 = () => { D5 = genOHLC([{ n: 120, drift: 0.0004, vol: 0.013 }], 51 + seed); };
+  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const d5 = reg(() => {
+    const d = val('n5'), leak = $('chk5').checked; const ws = Math.floor(d / 5) * 5, we = Math.min(D5.n - 1, ws + 4);
+    cplot('c5d', { D: D5, x0: d - 39, x1: d, upto: d, shade: [{ a: ws, b: d, col: 'c2', alpha: 0.13 }], note: 'daily · shaded = this week so far' });
+    const Wk = toWeekly(D5, 5, d, leak);
+    const k = Wk.n - 1; const Wd = { o: Wk.o, h: Wk.h, l: Wk.l, c: Wk.c, n: Wk.n };
+    cplot('c5w', { D: Wd, x0: Math.max(0, k - 11), x1: k + 1, upto: k, shade: [{ a: k, b: k, col: leak ? 'sell' : 'c2', alpha: 0.15 }],
+      note: leak ? 'weekly · last bar = FINISHED week (uses future days)' : 'weekly · last bar = week so far (honest)',
+      legend: [[leak ? 'leaky: finished weekly bar' : 'honest: forming weekly bar', leak ? 'sell' : 'c2']] });
+    const hc = D5.c[d], fc = D5.c[we], wo = D5.o[ws]; const fut = we - d;
+    $('r5').innerHTML = `today is <b>${DOW[d % 5]}</b> (day ${d}) · week opened ${fmt(wo)} · close so far ${fmt(hc)} (${hc >= wo ? 'up' : 'down'} week so far) · finished week closes ${fmt(fc)} (${fc >= wo ? 'up' : 'down'}) · ` +
+      (fut > 0 ? (leak ? `<b class="bad">the leaky bar contains ${fut} day${fut > 1 ? 's' : ''} you can't know yet</b>` : `<b class="good">honest: ${fut} day${fut > 1 ? 's' : ''} of this week not seen yet</b>`) : '<b>Friday: honest and leaky bars are the same</b>');
+  });
+  bindRange('n5', d5); $('chk5').addEventListener('change', d5);
+  function pool5() {
+    const base = [], hon = [], lk = [];
+    for (let s = 0; s < 100; s++) {
+      const D = genOHLC([{ n: 1000, drift: 0, vol: 0.012 }], 7000 + s * 17);
+      for (let d = 0; d < D.n - 1; d++) {
+        if (d % 5 === 4) continue; const ws = Math.floor(d / 5) * 5, we = Math.min(D.n - 1, ws + 4);
+        const nx = (D.c[d + 1] / D.c[d] - 1) * 10000; base.push(nx);
+        if (D.c[d] > D.o[ws]) hon.push(nx);
+        if (D.c[we] > D.o[ws]) lk.push(nx);
+      }
+    }
+    const row = (name, a, cls) => `<tr><td>${name}</td><td class="num">${a.length}</td><td class="num ${cls || ''}">${sgn(mean(a), 1)} ± ${se(a).toFixed(1)} bps</td><td class="num">${(a.filter((x) => x > 0).length / a.length * 100).toFixed(1)}%</td></tr>`;
+    $('p5').innerHTML = `<table><thead><tr><th>Rule (100 random walks × 1,000 days)</th><th>Days</th><th>Next-day return ± 1 SE</th><th>Up days</th></tr></thead><tbody>${row('baseline: every Mon–Thu', base)}${row('honest: week so far is up', hon)}${row('leaky: finished week is up', lk)}</tbody></table>`;
+  }
+  $('b5pool').addEventListener('click', pool5);
+
+  // ---------- 07 plan audit ----------
+  const d7 = () => {
+    const biz = ['chk7a', 'chk7b', 'chk7c', 'chk7d'].filter((id) => $(id).checked).length, tr = ['chk7e', 'chk7f', 'chk7g'].filter((id) => $(id).checked).length;
+    let msg = `business plan <b>${biz}/4</b> · trading plan <b>${tr}/3</b> · `;
+    if (biz === 4 && tr === 3) msg += '<b class="good">both documents exist: now check they are realistic and used</b>';
+    else if (tr > biz) msg += '<b class="bad">the common gap Grimes describes: trading rules without the business plan</b>';
+    else if (biz > tr) msg += '<b class="bad">vision without exact rules: you can\'t follow a plan that doesn\'t say what to do</b>';
+    else msg += 'tick what you have in writing';
+    $('r7').innerHTML = msg;
+  };
+  ['chk7a', 'chk7b', 'chk7c', 'chk7d', 'chk7e', 'chk7f', 'chk7g'].forEach((id) => $(id).addEventListener('change', d7)); d7();
+
+  // ---------- 08 hats + sample size ----------
+  const d8a = () => {
+    const ans = { sel8a: 't', sel8b: 'd', sel8c: 'b' }; let right = 0, done = 0;
+    Object.keys(ans).forEach((id) => { const v = $(id).value; if (v) { done++; if (v === ans[id]) right++; } });
+    $('r8a').innerHTML = done ? `<b>${right}/${done}</b> as Grimes would answer · trader mid-session: follow, note doubts · developer: on schedule, with more data · boss: discipline problems` : 'pick an answer for each scenario';
+  };
+  ['sel8a', 'sel8b', 'sel8c'].forEach((id) => $(id).addEventListener('change', d8a)); d8a();
+  const d8 = reg(() => {
+    const p = +$('sel8').value, N = val('n8'); const r = rng(seed * 31 + 8); const lines = [];
+    for (let k = 0; k < 60; k++) { const d = [0]; let s = 0; for (let t = 0; t < N; t++) { s += r() < p ? 2 : -1; d.push(s); } lines.push({ d, col: 'c2', w: 1, alpha: 0.28 }); }
+    const ev = p * 2 - (1 - p); lines.push({ d: Array.from({ length: N + 1 }, (_, i) => i * ev), col: 'c1', w: 2.6, label: 'true edge × trades' });
+    lines[0].label = 'one run of the same system (60 shown)';
+    plot('c8', { n: N + 1, lines, zero: true });
+    const r2 = rng(seed * 31 + 9); const ends = [];
+    for (let k = 0; k < 4000; k++) { let s = 0; for (let t = 0; t < N; t++) s += r2() < p ? 2 : -1; ends.push(s); }
+    ends.sort((a, b) => a - b); const neg = ends.filter((x) => x < 0).length / ends.length * 100;
+    $('r8').innerHTML = `after <b>${N}</b> trades (4,000 runs): <b class="${neg > 20 ? 'bad' : 'good'}">${neg.toFixed(0)}%</b> of runs are losing · median <b>${sgn(ends[2000], 0)}R</b> · middle 90% from ${sgn(ends[200], 0)}R to ${sgn(ends[3799], 0)}R · true edge ${sgn(ev)}R per trade`;
+  });
+  $('sel8').addEventListener('change', d8); bindRange('n8', d8);
+
+  // ---------- 09 streaks ----------
+  let s9 = 1;
+  function d9() {
+    const r = rng(9100 + s9 * 7); const o = []; for (let k = 0; k < 100; k++) o.push(r() < 0.4 ? 1 : 0);
+    $('g9').innerHTML = o.map((w) => `<span style="background:${colorOf(w ? 'buy' : 'sell', 0.8)}"></span>`).join('');
+    let lw = 0, ll = 0, cw = 0, cl = 0, eq = 0, pk = 0, dd = 0;
+    o.forEach((w) => { if (w) { cw++; cl = 0; eq += 2; } else { cl++; cw = 0; eq -= 1; } lw = Math.max(lw, cw); ll = Math.max(ll, cl); pk = Math.max(pk, eq); dd = Math.max(dd, pk - eq); });
+    $('r9').innerHTML = `wins <b>${o.filter((x) => x).length}</b>/100 · longest winning streak <b>${lw}</b> · longest losing streak <b>${ll}</b> · deepest drawdown <b>${dd}R</b> · net <b class="${eq >= 0 ? 'good' : 'bad'}">${sgn(eq, 0)}R</b>`;
+  }
+  reg(d9); $('b9').addEventListener('click', () => { s9++; d9(); });
+
+  // ---------- 10 checklist + DAL ----------
+  const d10 = () => { const n = ['chk10a', 'chk10b', 'chk10c', 'chk10d', 'chk10e'].filter((id) => $(id).checked).length; $('r10').innerHTML = n === 5 ? '<b class="good">5/5: the idea has been questioned; the plan decides the rest</b>' : `<b>${n}/5</b> answered · an unanswered question is a risk you haven't priced`; };
+  ['chk10a', 'chk10b', 'chk10c', 'chk10d', 'chk10e'].forEach((id) => $(id).addEventListener('change', d10)); d10();
+  const d10b = reg(() => {
+    const s = val('n10s'), o = val('n10o'); const lone = s + o, pair = o;
+    hbars('c10', [{ label: 'long DAL', v: lone, col: lone >= 0 ? 'buy' : 'sell' }, { label: 'long DAL, short peers', v: pair, col: pair >= 0 ? 'buy' : 'sell' }], (v) => sgn(v, 0) + '%');
+    $('r10b').innerHTML = `your idea (DAL beats peers) is <b class="${o > 0 ? 'good' : 'bad'}">${o > 0 ? 'right' : o < 0 ? 'wrong' : 'flat'}</b> · long DAL <b>${sgn(lone, 0)}%</b> · pair ≈ <b>${sgn(pair, 0)}%</b> · ${o > 0 && lone < 0 ? '<b class="bad">right idea, losing position</b>' : 'the pair isolates the idea; plain long adds a sector bet'}`;
+  });
+  bindRange('n10s', d10b); bindRange('n10o', d10b);
+
+  // ---------- 11 evaluation window ----------
+  const R11 = (() => { const r = rng(1111); const runs = []; for (let k = 0; k < 400; k++) { const a = new Float64Array(600); for (let t = 0; t < 600; t++) a[t] = r() < (t < 300 ? 0.4 : 0.3) ? 2 : -1; runs.push(a); } return runs; })();
+  let ex11 = 0;
+  function alarms(a, W) {
+    let s = 0, fa = false, det = null; const roll = nulls(a.length);
+    for (let t = 0; t < a.length; t++) { s += a[t]; if (t >= W) s -= a[t - W]; if (t >= W - 1) { roll[t] = s / W; if (roll[t] < 0) { if (t < 300) fa = true; else if (det == null) det = t; } } }
+    return { roll, fa, det };
+  }
+  const d11 = reg(() => {
+    const W = val('n11'); let fa = 0; const delays = []; let missed = 0;
+    R11.forEach((a) => { const z = alarms(a, W); if (z.fa) fa++; if (z.det == null) missed++; else delays.push(z.det - 299); });
+    delays.sort((a, b) => a - b); const med = delays.length ? delays[Math.floor(delays.length / 2)] : null;
+    const z = alarms(R11[ex11 % 400], W);
+    const truth = Array.from({ length: 600 }, (_, t) => (t < 300 ? 0.2 : -0.1));
+    const firstFA = z.roll.findIndex((v, t) => t < 300 && v != null && v < 0);
+    const vl = [{ i: 300, col: 'muted', label: 'edge breaks' }];
+    if (firstFA >= 0) vl.push({ i: firstFA, col: 'sell', label: 'false alarm', row: 1 });
+    if (z.det != null) vl.push({ i: z.det, col: 'c1', label: 'alarm', row: 2 });
+    plot('c11', { n: 600, lines: [{ d: z.roll, col: 'c2', w: 1.6, label: `rolling mean of last ${W} trades (R)` }, { d: truth, col: 'c1', w: 2.2, dash: [6, 4], label: 'true edge per trade' }], zero: true, vlines: vl });
+    $('r11').innerHTML = `window <b>${W}</b> trades · pooled over 400 runs: false alarm on the healthy system in <b class="${fa / 4 > 30 ? 'bad' : 'good'}">${(fa / 4).toFixed(0)}%</b> of runs · median delay to notice the break <b>${med != null ? med + ' trades' : '–'}</b>${missed ? ` · not noticed by trade 600 in ${(missed / 4).toFixed(0)}%` : ''} · model, not market data`;
+  });
+  bindRange('n11', d11); $('b11').addEventListener('click', () => { ex11++; d11(); });
+
+  // ---------- 12 brick wall ----------
+  let bricks = [], s12 = 1;
+  function addBricks(k) { const r = rng(1200 + s12 * 101 + bricks.length); for (let i = 0; i < k && bricks.length < 200; i++) bricks.push(r() < 0.4 ? 1 : 0); }
+  function d12() {
+    const S = setupCanvas('c12'); if (!S) return; const { g, W, H } = S;
+    const cols = 20, rows = 10, bw = (W - 70) / cols, bh = (H - 20) / rows;
+    bricks.forEach((w, k) => { const col = Math.floor(k / rows), row = k % rows; const off = row % 2 ? bw * 0.25 : 0; g.fillStyle = colorOf(w ? 'buy' : 'sell', 0.72); g.fillRect(10 + col * bw + off, H - 10 - (row + 1) * bh + 1, bw - 3, bh - 2); });
+    let eq = 0; const pts = bricks.map((w) => (eq += w ? 2 : -1));
+    const mx = Math.max(10, ...pts.map(Math.abs)); g.strokeStyle = colorOf('ink'); g.lineWidth = 2; g.beginPath();
+    pts.forEach((v, k) => { const x = 10 + (k + 0.5) / rows * bw, y = H / 2 - v / mx * (H / 2 - 12); k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+    g.fillStyle = colorOf('muted'); g.fillText('line = running total R', W - 150, 14);
+    const wins = bricks.filter((x) => x).length;
+    $('r12').innerHTML = `bricks laid <b>${bricks.length}</b>/200 · green <b>${wins}</b> · red <b>${bricks.length - wins}</b> · wall height (net) <b class="${eq >= 0 ? 'good' : 'bad'}">${sgn(eq, 0)}R</b> · per brick ${bricks.length ? sgn(eq / bricks.length) : '0'}R (true edge +0.20R)`;
+  }
+  addBricks(40); reg(d12);
+  $('b12').addEventListener('click', () => { addBricks(20); d12(); });
+  $('b12r').addEventListener('click', () => { s12++; bricks = []; addBricks(20); d12(); });
+
+  // ---------- 13 multiple timeframe examples ----------
+  const crudeD = genOHLC([{ n: 150, drift: 0.0004, vol: 0.011 }, { n: 170, drift: -0.0045, vol: 0.016 }, { n: 30, drift: 0, vol: 0.016, revert: 0.08 }, { n: 70, drift: 0.0035, vol: 0.013 }], 8, 100);
+  const goldD = (() => {
+    const D = genOHLC([{ n: 120, drift: -0.002, vol: 0.011 }, { n: 200, drift: 0, vol: 0.011, revert: 0.05 }, { n: 60, drift: -0.0016, vol: 0.011 }, { n: 22, drift: 0.0024, vol: 0.009 }], 88, 140);
+    let X = -Infinity; for (let i = D.n - 12; i < D.n; i++) X = Math.max(X, D.h[i]);
+    const last = D.c[D.n - 1]; const add = (o, h, l, c) => { D.o.push(o); D.h.push(h); D.l.push(l); D.c.push(c); D.kind.push('x'); D.n++; };
+    add(last, X * 1.004, Math.min(last, X * 0.986) - X * 0.002, X * 0.988); D.ftI = D.n - 1; D.ftX = X;
+    let p = X * 0.988; [-0.004, 0.002, -0.006].forEach((r) => { const c = p * (1 + r); add(p, Math.max(p, c) * 1.003, Math.min(p, c) * 0.997, c); p = c; });
+    return D;
+  })();
+  const d13 = reg(() => {
+    const sc = $('sel13').value; const D = sc === 'crude' ? crudeD : goldD; const Wk = toWeekly(D, 5, null, false);
+    const x0 = D.n - 110; const ma = sma(D.c, 20), wma10 = sma(Wk.c, 10);
+    if (sc === 'crude') {
+      let li = x0; for (let i = x0; i < D.n - 30; i++) if (D.l[i] < D.l[li]) li = i;
+      cplot('c13d', { D, x0, x1: D.n - 1, lines: [{ d: ma, col: 'c2', w: 1.4 }], segs: [{ i0: li, v0: D.l[li] * 0.985, i1: D.n - 2, v1: D.c[D.n - 2] * 0.985, col: 'buy' }], note: 'daily · uptrend: you are long here' });
+      let pk = 0; for (let i = 0; i < 40; i++) if (Wk.h[i] > Wk.h[pk]) pk = i;
+      let lw = pk; for (let i = pk; i < Wk.n; i++) if (Wk.l[i] < Wk.l[lw]) lw = i;
+      cplot('c13w', { D: Wk, lines: [{ d: wma10, col: 'c2', w: 1.4 }], segs: [{ i0: pk + 2, v0: Wk.h[pk] * 1.02, i1: lw - 1, v1: Wk.l[lw] * 1.1, col: 'sell' }, { i0: lw, v0: Wk.l[lw] * 0.97, i1: Wk.n - 1, v1: Wk.l[Wk.n - 1] * 0.98, col: 'buy', w: 1.6 }], shade: [{ a: Wk.n - 22, b: Wk.n - 1, col: 'c2', alpha: 0.1 }], note: 'weekly · same prices, 5 days per candle', legend: [['20-day / 10-week average', 'c2'], ['shaded = the daily chart\'s span', 'c2']] });
+      $('r13').innerHTML = 'Daily: a clean uptrend, so a long makes sense. Weekly: a long downtrend whose last candles are that same rally. Is it a new uptrend or a pullback before the next leg down? Grimes\' three answers: skip, take it but manage tighter, or ignore the weekly. Built with simulated prices to show the idea.';
+    } else {
+      const sup = Math.min(...Wk.l.slice(24, 64));
+      cplot('c13d', { D, x0, x1: D.n - 1, lines: [{ d: ma, col: 'c2', w: 1.4 }], hls: [{ v: D.ftX, col: 'c1', dash: [2, 3], from: D.ftI - 12, to: D.ftI, label: 'prior high' }], marks: [{ i: D.ftI, v: D.h[D.ftI], kind: 'sell', label: 'failure test: short' }], note: 'daily · small uptrend, unimpressive failure test' });
+      cplot('c13w', { D: Wk, lines: [{ d: wma10, col: 'c2', w: 1.4 }], hls: [{ v: sup, col: 'c3', dash: [6, 4], label: 'multi-year support' }], marks: [{ i: Wk.n - 1, v: Wk.h[Wk.n - 1], kind: 'sell' }], shade: [{ a: Wk.n - 22, b: Wk.n - 1, col: 'c2', alpha: 0.1 }], note: 'weekly · pullback pressing on support', legend: [['20-day / 10-week average', 'c2'], ['support', 'c3'], ['shaded = the daily chart\'s span', 'c2']] });
+      $('r13').innerHTML = 'Daily: an uptrend and a weak failure test at the prior high (a countertrend short). Weekly: a market drifting down onto long-term support. Short on the daily is countertrend there, but with the trend on the weekly; the weekly pressure gives the weak daily signal more weight. Simulated prices built to show the idea.';
+    }
+  });
+  $('sel13').addEventListener('change', d13);
+
+  // ---------- 14 HV vs ATR, stop width ----------
+  const d14 = reg(() => {
+    const w = val('n14w'); const D = genOHLC([{ n: 90, drift: 0, vol: 0.006, gap: 0.0015, wick: w }], 140, 100);
+    const ret = D.c.map((v, i) => (i ? Math.log(v / D.c[i - 1]) : 0)); const sd = rollStd(ret, 20); const A = atr(D, 14);
+    const hvB = nulls(D.n), atB = nulls(D.n); let nh = 0, na = 0, cnt = 0;
+    for (let i = 22; i < D.n; i++) {
+      hvB[i] = D.c[i - 1] * (1 - sd[i - 1]); atB[i] = D.c[i - 1] - A[i - 1]; cnt++;
+      if (D.l[i] < hvB[i]) nh++; if (D.l[i] < atB[i]) na++;
+    }
+    cplot('c14', { D, x0: 20, x1: D.n - 1, lines: [{ d: hvB, col: 'c3', w: 1.6, step: true }, { d: atB, col: 'c1', w: 1.6, step: true }],
+      legend: [['stop 1 historical σ below prior close', 'c3'], ['stop 1 ATR(14) below prior close', 'c1']], note: 'simulated: calm closes, long wicks' });
+    const last = D.n - 1;
+    $('r14').innerHTML = `historical σ (20 closes) <b>${(sd[last] * 100).toFixed(2)}%</b> · ATR(14) <b>${(A[last] / D.c[last] * 100).toFixed(2)}%</b> of price · lows that hit the σ stop <b class="bad">${(nh / cnt * 100).toFixed(0)}%</b> of bars · hit the ATR stop <b>${(na / cnt * 100).toFixed(0)}%</b>`;
+  });
+  bindRange('n14w', d14);
+  const K14 = Array.from({ length: 16 }, (_, k) => 0.25 * (k + 1));
+  const P14 = (() => {
+    const hits = new Array(16).fill(0); let n = 0;
+    for (let s = 0; s < 20; s++) {
+      const D = genOHLC([{ n: 500, drift: 0, vol: 0.015 }], 300 + s); const A = atr(D, 14);
+      for (let i = 20; i < D.n - 11; i += 3) {
+        let mn = Infinity; for (let j = i + 1; j <= i + 10; j++) mn = Math.min(mn, D.l[j]);
+        n++; K14.forEach((k, q) => { if (mn <= D.c[i] - k * A[i]) hits[q]++; });
+      }
+    }
+    return hits.map((h) => h / n * 100);
+  })();
+  const d14b = reg(() => {
+    const k = val('n14k'); const q = Math.round(k / 0.25) - 1;
+    plot('c14b', { n: 16, lines: [{ d: P14, col: 'c2', w: 2.2, label: '% of entries stopped within 10 bars (random walk)' }], ymin: 0, ymax: 100,
+      marks: [{ i: q, v: P14[q], r: 5, col: 'c1' }], vlines: [3, 7, 11, 15].map((i) => ({ i, col: 'muted', label: K14[i] + ' ATR' })) });
+    const dist = k * 20, sh = Math.floor(10000 / dist), gapR = 50 / dist;
+    $('r14b').innerHTML = `stop ${k} ATR → hit within 10 bars in <b>${P14[q].toFixed(0)}%</b> of random entries · worked example (₹10L, 1% risk, ₹1,000 stock, ATR ₹20): stop ₹${dist.toFixed(0)} away → <b>${sh.toLocaleString('en-IN')} shares</b> = ${inr(sh * 1000)} position · a ₹50 (5%) gap down costs <b class="${gapR > 1 ? 'bad' : 'good'}">${inr(sh * 50)} = ${gapR.toFixed(2)}R</b>${gapR > 1 ? ' (stop jumped)' : ' (gap stays inside the stop)'}`;
+  });
+  bindRange('n14k', d14b);
+
+  // ---------- 15 exits ----------
+  function manage(D, A, i0, op) {
+    const entry = D.c[i0], R = op.k * A[i0]; let stop = entry - R; const target = entry + R;
+    let pos = 1, partial = false, trailing = op.trailStart, timeCut = false, maxFav = 0; const ev = [], stopPath = nulls(D.n), exits = []; let realized = 0;
+    ev.push({ j: i0, t: `entry ${fmt(entry)} · stop ${fmt(stop)} (${op.k} ATR) · 1R = ${fmt(R)}` });
+    let j = i0;
+    while (pos > 0) {
+      j++;
+      if (j >= D.n) { j = D.n - 1; realized += pos * (D.c[j] - entry) / R; exits.push({ j, v: D.c[j], why: 'data end' }); pos = 0; break; }
+      stopPath[j] = stop;
+      if (D.o[j] <= stop) { realized += pos * (D.o[j] - entry) / R; exits.push({ j, v: D.o[j], why: 'gap through stop' }); ev.push({ j, t: `gapped through stop: out ${Math.round(pos * 100)}% at ${fmt(D.o[j])}` }); pos = 0; break; }
+      if (D.l[j] <= stop) { realized += pos * (stop - entry) / R; exits.push({ j, v: stop, why: 'stop' }); ev.push({ j, t: `stopped: out ${Math.round(pos * 100)}% at ${fmt(stop)} (${sgn((stop - entry) / R)}R)` }); pos = 0; break; }
+      if ((op.partial || op.targetAll) && !partial && D.h[j] >= target) {
+        const fr = op.targetAll ? pos : 0.5; realized += fr * 1; pos -= fr; partial = true; exits.push({ j, v: target, why: 'target' });
+        ev.push({ j, t: `target hit: sold ${Math.round(fr * 100)}% at +1R` }); if (pos <= 1e-9) { pos = 0; break; }
+        if (op.trail !== 'none') trailing = true;
+      }
+      maxFav = Math.max(maxFav, D.h[j] - entry);
+      if (!op.partial && !op.targetAll && op.trail !== 'none' && maxFav >= R) trailing = true;
+      if (op.T > 0 && !timeCut && j - i0 >= op.T && maxFav < R) { const ns = entry - 0.5 * R; if (ns > stop) { stop = ns; ev.push({ j, t: `time stop: not +1R by bar ${op.T}, risk cut to 0.5R` }); } timeCut = true; }
+      if (trailing) { const ns = op.trail === 'low' ? D.l[j] : op.trail === 'atr' ? D.c[j] - 2 * A[j] : stop; if (ns > stop) stop = ns; }
+      if (j - i0 >= op.maxHold) { realized += pos * (D.c[j] - entry) / R; exits.push({ j, v: D.c[j], why: 'max hold' }); ev.push({ j, t: `max hold (${op.maxHold} bars): out at ${fmt(D.c[j])}` }); pos = 0; break; }
+    }
+    return { entry, R, target, stopPath, exits, ev, realized, end: j };
+  }
+  let e15 = 60, cur15 = 60, Z15 = null, A15 = null;
+  const op15 = () => ({ k: val('n15s'), partial: $('chk15t').checked, targetAll: false, trail: $('sel15tr').value, trailStart: false, T: val('n15t'), maxHold: 40 });
+  function compute15() { A15 = atr(M, 14); if (e15 > M.n - 50) e15 = 60; Z15 = manage(M, A15, e15, op15()); cur15 = Math.min(Math.max(cur15, e15), Z15.end); }
+  const d15 = reg(() => {
+    if (!Z15) compute15(); const Z = Z15; const sp = Z.stopPath.map((v, i) => (i <= cur15 ? v : null));
+    const marks = [{ i: e15, v: Z.entry, kind: 'buy', label: 'entry' }];
+    Z.exits.forEach((x) => { if (x.j <= cur15) marks.push({ i: x.j, v: x.v, kind: 'x', col: x.v >= Z.entry ? 'buy' : 'sell' }); });
+    const hls = [{ v: Z.entry, col: 'muted', dash: [2, 3], from: e15, label: '' }, { v: Z.entry - Z.R, col: 'sell', dash: [2, 4], from: e15, label: 'initial stop' }];
+    if ($('chk15t').checked) hls.push({ v: Z.target, col: 'buy', dash: [6, 4], from: e15, label: '+1R target' });
+    cplot('c15', { D: M, x0: e15 - 15, x1: Math.min(M.n - 1, e15 + 45), upto: cur15, lines: [{ d: sp, col: 'sell', w: 2, step: true }], hls, marks,
+      legend: [['stop path', 'sell'], ['+1R target', 'buy'], ['entry level', 'muted']], note: 'random entry for practice · simulated prices' });
+    const done = cur15 >= Z.end; const evs = Z.ev.filter((x) => x.j <= cur15).slice(-3).map((x) => `bar +${x.j - e15}: ${x.t}`).join(' · ');
+    const openR = done ? 0 : (M.c[cur15] - Z.entry) / Z.R;
+    $('r15').innerHTML = `${done ? `<b>closed</b> · result <b class="${Z.realized >= 0 ? 'good' : 'bad'}">${sgn(Z.realized)}R</b>` : `<b>open</b> · bar +${cur15 - e15} · price ${sgn(openR)}R from entry`} · ${evs}`;
+  });
+  ['chk15t', 'sel15tr'].forEach((id) => $(id).addEventListener('change', () => { compute15(); d15(); }));
+  bindRange('n15s', () => { compute15(); d15(); }); bindRange('n15t', () => { compute15(); d15(); });
+  $('b15next').addEventListener('click', () => { if (!Z15) compute15(); cur15 = Math.min(cur15 + 1, Z15.end); d15(); });
+  $('b15end').addEventListener('click', () => { if (!Z15) compute15(); cur15 = Z15.end; d15(); });
+  $('b15new').addEventListener('click', () => { e15 += 37; if (e15 > M.n - 50) e15 = 45 + (e15 % 17); cur15 = e15; compute15(); d15(); });
+  function pool15() {
+    const plans = [
+      ['3-ATR stop, exit after 40 bars', { k: 3, partial: false, targetAll: false, trail: 'none', trailStart: false, T: 0, maxHold: 40 }],
+      ['3-ATR stop, all out at 1R target', { k: 3, partial: false, targetAll: true, trail: 'none', trailStart: false, T: 0, maxHold: 40 }],
+      ['Grimes-style combo: ½ at 1R, trail rest under prior low, time stop at 8 bars', { k: 3, partial: true, targetAll: false, trail: 'low', trailStart: false, T: 8, maxHold: 40 }],
+      ['tight trail under prior bar low from entry', { k: 3, partial: false, targetAll: false, trail: 'low', trailStart: true, T: 0, maxHold: 40 }]
+    ];
+    const mk = []; for (let s = 0; s < 200; s++) { const D = genOHLC([{ n: 600, drift: 0, vol: 0.014 }], 8000 + s * 11); mk.push([D, atr(D, 14)]); }
+    const rows = plans.map(([name, op]) => {
+      const Rs = []; mk.forEach(([D, A]) => { for (let i = 20; i < D.n - 45; i += 45) Rs.push(manage(D, A, i, op).realized); });
+      const w = Rs.filter((x) => x > 0), l = Rs.filter((x) => x <= 0);
+      return `<tr><td>${name}</td><td class="num">${Rs.length}</td><td class="num">${(w.length / Rs.length * 100).toFixed(0)}%</td><td class="num">${sgn(mean(w))}R</td><td class="num">${sgn(mean(l))}R</td><td class="num">${sgn(mean(Rs))} ± ${se(Rs).toFixed(2)}R</td></tr>`;
+    });
+    $('p15').innerHTML = `<table><thead><tr><th>Exit plan</th><th>Trades</th><th>Win %</th><th>Avg win</th><th>Avg loss</th><th>Expectancy ± 1 SE</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  }
+  $('b15pool').addEventListener('click', pool15);
+  const d15g = () => { const r = val('n15g'), m = val('n15m'), loss = r * m; $('r15g').innerHTML = `one bad gap = <b class="${loss >= 20 ? 'bad' : loss >= 8 ? '' : 'good'}">${loss.toFixed(1)}%</b> of the account · ${loss >= 20 ? 'a disaster (Grimes: 4.5 × 10% = 45%)' : loss >= 8 ? 'painful but survivable' : 'merely annoying, as Grimes puts it for 1–2% risk'} · to get back you need <b>${(100 / (100 - Math.min(99, loss)) * 100 - 100).toFixed(1)}%</b>`; };
+  bindRange('n15g', d15g); bindRange('n15m', d15g); d15g();
+
+  // ---------- 16 costs vs tight stops ----------
+  const d16 = reg(() => {
+    const s = val('n16s'), c = val('n16c'), p = val('n16p') / 100, rr = val('n16rr');
+    const gross = p * rr - (1 - p); const xs = Array.from({ length: 49 }, (_, i) => 0.2 + 0.1 * i);
+    const net = xs.map((x) => gross - c / x); const q = Math.round((s - 0.2) / 0.1);
+    plot('c16', { n: xs.length, ymax: Math.max(0.5, gross + 0.45), lines: [{ d: net, col: 'c2', w: 2.2, label: 'net expectancy (R) vs stop %' }, { d: xs.map(() => gross), col: 'c1', dash: [6, 4], w: 1.6, label: 'gross edge before costs' }], zero: true,
+      marks: [{ i: q, v: net[q], r: 5, col: 'c1' }], vlines: [3, 8, 18, 28, 38, 48].map((i) => ({ i, col: 'muted', label: xs[i].toFixed(1) + '%' })) });
+    const cr = c / s, n = gross - cr;
+    $('r16').innerHTML = `gross edge <b>${sgn(gross)}R</b> · cost per trade = ${c.toFixed(2)}% ÷ ${s.toFixed(1)}% = <b class="bad">${cr.toFixed(2)}R</b> · net <b class="${n >= 0 ? 'good' : 'bad'}">${sgn(n)}R per trade</b> · break-even stop ≥ <b>${gross > 0 ? (c / gross).toFixed(2) + '%' : 'none (no gross edge)'}</b>`;
+  });
+  ['n16s', 'n16c', 'n16p', 'n16rr'].forEach((id) => bindRange(id, d16));
+  $('b16i').addEventListener('click', () => { $('n16c').value = 0.15; $('n16co').textContent = '0.15'; d16(); });
+  $('b16d').addEventListener('click', () => { $('n16c').value = 0.35; $('n16co').textContent = '0.35'; d16(); });
+
+  // ---------- 17 adding rule ----------
+  const d17 = reg(() => {
+    const O = 5000, Ad = 2000; const pe = +$('n17pe').value, pa = +$('n17pa').value, pn = +$('n17pn').value, st = +$('n17st').value, q = val('n17s');
+    const rem = O + Ad - q; const fromAdd = Math.min(q, Ad), fromOrig = Math.max(0, q - Ad);
+    const riskAfterAdd = (O + Ad) * Math.max(0, pn - st), riskNow = rem * Math.max(0, pn - st), riskOrig = O * Math.max(0, pn - st);
+    hbars('c17', [{ label: 'original position', v: O, col: 'c2', txt: '5,000 sh · risk ' + inr(riskOrig) }, { label: 'after the add', v: O + Ad, col: 'c1', txt: '7,000 sh · risk ' + inr(riskAfterAdd) }, { label: 'after selling ' + q.toLocaleString('en-IN'), v: rem, col: rem < O ? 'buy' : 'sell', txt: rem.toLocaleString('en-IN') + ' sh · risk ' + inr(riskNow) }], (v) => v);
+    let verdict;
+    if (q <= Ad) verdict = '<b class="bad">rule broken: you must sell MORE than the 2,000 you added</b>';
+    else if (q < 3500) verdict = '<b>rule met, barely: Grimes says closer to 4,000 than 2,100</b>';
+    else verdict = '<b class="good">rule met: below your original size, risk cut</b>';
+    const bAdd = fromAdd * (pn - pa), bOrig = fromOrig * (pn - pe); const sg = (v) => (v >= 0 ? '+' : '−') + inr(Math.abs(v));
+    $('r17').innerHTML = `${verdict} · counting the added lot as sold first: P&amp;L booked on the add <b class="${bAdd >= 0 ? 'good' : 'bad'}">${sg(bAdd)}</b>${fromOrig ? `, P&amp;L on ${fromOrig.toLocaleString('en-IN')} original shares <b>${sg(bOrig)}</b>` : ''} · open risk to the ₹${st} stop: ${inr(riskAfterAdd)} → <b>${inr(riskNow)}</b> (original 5,000 shares at today's price: ${inr(riskOrig)})`;
+  });
+  ['n17pe', 'n17pa', 'n17pn', 'n17st'].forEach((id) => $(id).addEventListener('input', d17)); bindRange('n17s', d17);
+
+  // ---------- 18 random breakouts ----------
+  let s18 = 1;
+  const d18 = reg(() => {
+    const D = genOHLC([{ n: 400, drift: 0, vol: 0.013 }], 1800 + s18 * 29); const A = atr(D, 14); const hi = chanHi(D.c, 20);
+    const bo = []; let lastB = -10;
+    for (let i = 21; i < D.n - 21; i++) if (D.c[i] > hi[i] && i - lastB > 3) { lastB = i; let mx = -Infinity; for (let j = i + 1; j <= i + 20; j++) mx = Math.max(mx, D.h[j]); bo.push({ i, dram: mx - D.c[i] >= 2.5 * A[i], ft: D.c[i + 10] > D.c[i] }); }
+    const only = $('chk18').checked; const shown = only ? bo.filter((b) => b.dram) : bo;
+    cplot('c18', { D, x0: 0, x1: D.n - 1, lines: [{ d: hi, col: 'c1', w: 1.3, step: true, alpha: 0.8 }], marks: shown.map((b) => ({ i: b.i, v: D.l[b.i], kind: 'buy', col: b.dram ? 'buy' : 'muted' })),
+      legend: [['20-bar closing high', 'c1'], ['breakout that ran ≥ 2.5 ATR within 20 bars', 'buy'], ['other breakouts', 'muted']], note: 'pure random walk' });
+    const dr = bo.filter((b) => b.dram).length, ft = bo.filter((b) => b.ft).length;
+    $('r18').innerHTML = `breakouts <b>${bo.length}</b> · dramatic winners <b>${dr}</b> (${bo.length ? (dr / bo.length * 100).toFixed(0) : 0}%) · higher 10 bars later <b>${ft}</b> (${bo.length ? (ft / bo.length * 100).toFixed(0) : 0}%; a coin flip is ~50%) · ${only ? '<b class="bad">showing only the winners: this is how example galleries mislead</b>' : 'showing every breakout'}`;
+  });
+  $('chk18').addEventListener('change', d18); $('b18').addEventListener('click', () => { s18++; d18(); });
+
+  // ---------- 19 ingredient audit ----------
+  const AUD = [
+    ['Momentum rotation (monthly, top 20 Nifty 200)', 'Passed', '27%/yr, Sharpe ~1.15; beat equal-weight hold and 20 random portfolios. Catch: survivorship bias.', 'keep'],
+    ['Weekly pullback (20-week EMA dip, 2.5 ATR stop, 2R)', 'Passed', '18.5–26%/yr; all 8 settings profitable out-of-sample; beat 20 random-entry runs.', 'keep'],
+    ['200-day market filter', 'Passed', 'The one consistent winner: +0.26 Sharpe, −8 points drawdown out-of-sample on average.', 'keep'],
+    ['Fixed 1% risk + ATR stops', 'Passed', 'As good as or better than volatility targeting.', 'keep'],
+    ['Daily breakout', 'Unproven', '13–18%/yr but no better than just holding the same stocks.', 'drop'],
+    ['Weekly MACD, weekly trendline break', 'Below hold', '12–16%/yr, below an equal-weight hold of the same stocks (18.9%).', 'drop'],
+    ['MACD crossover, 1-min to weekly', 'No', 'Not worth trading anywhere; on weekly, random buy weeks with the same sell rule did as well.', 'drop'],
+    ['VWAP course setups', 'No', 'Every setup\'s median Sharpe stayed negative.', 'drop'],
+    ['Stochastic RSI + MACD', 'No', 'Not worth trading; one small 15-min intraday sell lead.', 'drop'],
+    ['15-min opening-range breakout', 'No', 'All 43 settings lost on the Nifty 200 re-check; 5-min version only a lead.', 'drop'],
+    ['GARCH size cut, HMM filter, vol targeting', 'No', 'No consistent improvement.', 'drop'],
+    ['Pairs trading', 'No', 'Lost even before costs.', 'drop']
+  ];
+  const d19 = () => { const f = $('sel19').value; $('t19').innerHTML = AUD.filter((a) => f === 'all' || a[3] === f).map((a) => `<tr><td>${a[0]}</td><td class="${a[3] === 'keep' ? 'good' : 'bad'}">${a[1]}</td><td>${a[2]}</td></tr>`).join(''); };
+  $('sel19').addEventListener('change', d19); d19();
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); rebuild5(); compute2(); cur2 = 60; e15 = 60; cur15 = 60; compute15(); redrawAll(); });
+  buildData(); compute2(); compute15(); redrawAll(); pool2(); pool5(); pool15();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

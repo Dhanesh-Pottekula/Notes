@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Builds index.html for each LLM book folder and Notes/llm/index.html. Run: python3 build_index.py"""
 import os, re
+from theme_toggle import add_theme
 HERE = os.path.dirname(os.path.abspath(__file__))
 HEAD = open(os.path.join(HERE, "..", "system_design", "ddia", "index.html"), encoding="utf-8").read()
 STYLE = HEAD[HEAD.index("<style>"):HEAD.index("</style>") + 8]
@@ -71,7 +72,7 @@ BOOKS = [
 ]
 
 def page(title, body):
-    return f'<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>{title}</title>\n{FONTS}\n{STYLE}\n</head>\n<body>\n<div class="wrap">\n{body}\n</div>\n</body>\n</html>\n'
+    return add_theme(f'<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>{title}</title>\n{FONTS}\n{STYLE}\n</head>\n<body>\n<div class="wrap">\n{body}\n</div>\n</body>\n</html>\n')
 
 for folder, name, kicker, h1, lede, groups in BOOKS:
     total = len({l.split("\t")[0] for l in open(os.path.join(HERE, folder, "figs", "MANIFEST.tsv"), encoding="utf-8")})

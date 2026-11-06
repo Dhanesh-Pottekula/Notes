@@ -1,0 +1,1807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.4 Implementing B-Trees</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* ---- page-specific additions (ch04) ---- */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.box.beyond { background: var(--plate); border: 1px dashed var(--c3); }
+.box.papers { background: var(--paper); border: 1px solid var(--rule); }
+.box.work { background: var(--paper); border-left: 3px solid var(--c1); border-radius: 0 4px 4px 0; }
+.box a, footer a { color: var(--c2); }
+code { font-family: var(--mono); font-size: .88em; }
+pre.code { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; max-width: 100%; white-space: pre; }
+.box pre.code { background: var(--plate); }
+.svgbox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); padding: 8px; min-height: 60px; }
+.svgbox svg { display: block; margin: 0 auto; height: auto; }
+.msg { font-family: var(--mono); font-size: 13px; background: var(--tint2); border-radius: 4px; padding: 8px 10px; min-height: 2.6em; line-height: 1.5; }
+.stackbox { font-family: var(--mono); font-size: 13px; border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; background: var(--paper); }
+.stackbox table { font-size: 13px; }
+.stackbox td, .stackbox th { padding: 3px 6px; }
+input[type=number] { font-family: var(--mono); font-size: 13px; width: 5.5em; padding: 3px 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.hex { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; font-family: var(--mono); font-size: 11px; max-width: 560px; }
+.hex span { text-align: center; padding: 2px 0; border-radius: 2px; background: var(--paper); color: var(--muted); }
+.hex span.hd { color: var(--ink); font-weight: 600; }
+.hex span.pb { box-shadow: inset 0 2px 0 var(--c3); }
+.hex span.ok { background: var(--buy); color: var(--plate); }
+.hex span.no { background: var(--sell); color: var(--plate); }
+.bars { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.bars .bar { display: grid; grid-template-columns: 9.5em 1fr; gap: 10px; align-items: center; }
+.bars .track { background: var(--paper); border: 1px solid var(--rule); border-radius: 3px; height: 22px; position: relative; overflow: hidden; }
+.bars .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--c2); opacity: .8; }
+.bars .rng { position: absolute; top: 3px; bottom: 3px; border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); }
+.bars .val { position: absolute; right: 6px; top: 2px; color: var(--ink); }
+@media (max-width: 560px) { .bars .bar { grid-template-columns: 1fr; gap: 2px; } }
+/* svg drawing classes (colors via tokens so both themes work) */
+svg .cell { fill: var(--plate); stroke: var(--ink); stroke-width: 1; }
+svg .cell.empty { fill: var(--paper); stroke: var(--rule); stroke-dasharray: 3 2; }
+svg .nd.hl .cell { fill: var(--tint); stroke: var(--c1); stroke-width: 2; }
+svg .nd.crumb .cell { stroke: var(--c2); stroke-width: 2; }
+svg .nd.chg .cell { fill: var(--tint3); stroke: var(--c3); stroke-width: 2; }
+svg .nd.over .cell { stroke: var(--sell); stroke-width: 2; }
+svg .edge { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+svg .edge.hl { stroke: var(--c1); stroke-width: 2.6; }
+svg .sib { stroke: var(--c2); stroke-width: 1.6; fill: none; }
+svg .sib.hl { stroke: var(--c1); stroke-width: 2.6; }
+svg .ah { fill: var(--muted); }
+svg .ah.hl, svg .ah.c1 { fill: var(--c1); }
+svg .ah.c2 { fill: var(--c2); }
+svg .dot { fill: var(--muted); }
+svg .dot.hl { fill: var(--c1); }
+svg .lbl { font-size: 11px; fill: var(--muted); }
+svg .big { font-size: 13px; font-weight: 600; }
+svg .t-c1 { fill: var(--c1); } svg .t-c2 { fill: var(--c2); } svg .t-sell { fill: var(--sell); } svg .t-buy { fill: var(--buy); }
+svg .f-hdr { fill: var(--c3); fill-opacity: .35; stroke: var(--c3); }
+svg .f-slot { fill: var(--c1); fill-opacity: .35; stroke: var(--c1); stroke-width: .8; }
+svg .f-live { fill: var(--c2); fill-opacity: .3; stroke: var(--c2); stroke-width: .8; }
+svg .f-dead { fill: var(--sell); fill-opacity: .18; stroke: var(--sell); stroke-width: .8; stroke-dasharray: 3 2; }
+svg .f-free { fill: var(--plate); stroke: var(--rule); }
+svg .f-sel { fill: var(--tint); stroke: var(--c1); stroke-width: 2; }
+svg .f-r1 { fill: var(--c1); fill-opacity: .35; stroke: var(--c1); }
+svg .f-r2 { fill: var(--c2); fill-opacity: .35; stroke: var(--c2); }
+svg .f-r3 { fill: var(--c3); fill-opacity: .35; stroke: var(--c3); }
+svg .f-r4 { fill: var(--buy); fill-opacity: .35; stroke: var(--buy); }
+svg .gridl { stroke: var(--ink); stroke-width: 1.4; }
+svg .ln { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+svg .ln.dash { stroke-dasharray: 4 3; stroke: var(--muted); }
+svg .ln.c1 { stroke: var(--c1); stroke-width: 2.4; }
+svg .ln.c2 { stroke: var(--c2); stroke-width: 2; }
+svg .ln.sell { stroke: var(--sell); stroke-width: 2; }
+svg .seg { fill: var(--c2); fill-opacity: .12; }
+svg .seg.on { fill: var(--c1); fill-opacity: .35; }
+svg .seg.out { fill: var(--sell); fill-opacity: .2; }
+.fig, .svgbox, .controls { min-width: 0; max-width: 100%; }
+.plate > * { min-width: 0; }
+.controls label { max-width: 100%; }
+.controls select { max-width: calc(100vw - 130px); text-overflow: ellipsis; }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch03_file_formats.html">← Ch.3 File Formats</a><a href="ch05_transaction_processing_and_recovery.html">Ch.5 Transaction Processing and Recovery →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals (2019) · Chapter 4 · pdf p111–140</div>
+  <h1>Implementing B-Trees: from the textbook tree to <em>real pages</em></h1>
+  <p class="lede">Chapter 2 gave you the B-Tree as an algorithm and Chapter 3 gave you bytes, cells and slotted pages. This chapter is the glue: what goes in a page header, where the "extra" pointer lives, what to do with values bigger than a page, how a search walks sorted pointers to unsorted cells, how a split finds its way back up, and the tricks (rebalancing, right-only appends, bulk loading, compression, vacuum) that real engines add. Every simulation on this page runs the small JavaScript B-Tree printed in the plates, on made-up keys. Numbers marked "modelled" or "simulated" come from that code, not from the book or from a real database.</p>
+  <div class="topbar"><button id="reroll" type="button">New random seed for the simulations</button><span class="readout">seed <b id="seedOut">7</b></span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">pdf p111 · read this first</span></div>
+  <p>Petrov splits the chapter into three groups (pdf p111). First, <b>organisation</b>: how keys and pointers relate, and what headers and links between pages look like. Second, what happens on the <b>root-to-leaf descent</b>: binary search inside a node, and remembering the path so a split or merge can climb back up. Third, <b>optimisation and maintenance</b>: rebalancing, right-only appends, bulk loading, compression, and garbage collection.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Organise</span><span class="node key">Page header</span><span class="arr">→</span><span class="node">Magic number</span><span class="node">Sibling links</span><span class="node">Rightmost pointer</span><span class="arr">or</span><span class="node">High key</span><span class="arr">→</span><span class="node">Overflow pages</span></div>
+    <div class="row"><span class="tag">Descend</span><span class="node key">Binary search over sorted offsets → unsorted cells</span><span class="arr">→</span><span class="node">Path back up: parent pointers</span><span class="arr">or</span><span class="node key">Breadcrumbs (a stack)</span></div>
+    <div class="row"><span class="tag">Optimise</span><span class="node">Rebalance / B*: postpone splits</span><span class="node">Right-only appends: fastpath, quickbalance</span><span class="node">Bulk load bottom-up</span><span class="node">Compression</span></div>
+    <div class="row"><span class="tag">Maintain</span><span class="node">Deletes & updates leave garbage</span><span class="arr">→</span><span class="node">Fragmented page</span><span class="arr">→</span><span class="node key">Vacuum / compaction + freelist</span></div>
+    <div class="row"><span class="tag">Why</span><span class="node key">Fixed-size pages + variable-size data + concurrent users</span><span class="arr">=</span><span class="node">every trick in this chapter</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Page header</a>
+    <a href="#s2"><span>02</span>Magic numbers</a>
+    <a href="#s3"><span>03</span>Sibling links</a>
+    <a href="#s4"><span>04</span>Rightmost pointers</a>
+    <a href="#s5"><span>05</span>Node high keys</a>
+    <a href="#s6"><span>06</span>Overflow pages</a>
+    <a href="#s7"><span>07</span>Binary search (with indirection)</a>
+    <a href="#s8"><span>08</span>Propagating splits: parent pointers</a>
+    <a href="#s9"><span>09</span>Breadcrumbs</a>
+    <a href="#s10"><span>10</span>Rebalancing and B*-Trees</a>
+    <a href="#s11"><span>11</span>Right-only appends</a>
+    <a href="#s12"><span>12</span>Bulk loading</a>
+    <a href="#s13"><span>13</span>Compression</a>
+    <a href="#s14"><span>14</span>Vacuum and maintenance</a>
+    <a href="#s15"><span>15</span>Fragmentation from updates and deletes</a>
+    <a href="#s16"><span>16</span>Page defragmentation</a>
+    <a href="#s17"><span>17</span>Summary, trade-offs, reading</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+  <div class="box behind"><b>The one convention this page uses</b><p>The simulations use a B+-Tree style (my choice, not something the book fixes): keys live in the leaves; when a <b>leaf</b> splits, the first key of the new right leaf is <b>copied</b> up as the separator; when an <b>internal</b> node splits, its middle key <b>moves</b> up. A node's capacity is counted in keys. A child pointer <i>i</i> covers keys with K<sub>i−1</sub> ≤ key &lt; K<sub>i</sub>, as in the book (pdf p118).</p></div>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · PAGE HEADER</div><h2>The label on every page</h2></div><span class="chip">pdf p112</span></div>
+  <p>Every page starts with a <b>header</b>: a small block of metadata used for <b>navigation</b>, <b>maintenance</b> and <b>optimisations</b>. Petrov lists what it usually holds:</p>
+  <ul class="plain">
+    <li><b>flags</b> describing the page's contents and layout (leaf or internal, for example);</li>
+    <li>the <b>number of cells</b> in the page;</li>
+    <li><b>lower and upper offsets</b> that mark where the empty space starts and ends. New cell offsets are appended at the lower end, new cell data at the upper end;</li>
+    <li>other useful metadata.</li>
+  </ul>
+  <p>His examples: <b>PostgreSQL</b> stores the page size and layout version in the header. <b>MySQL InnoDB</b>'s page header holds the number of heap records, the level, and other implementation-specific values. <b>SQLite</b>'s holds the number of cells and a <b>rightmost pointer</b> (section 04).</p>
+  <div class="box picture"><b>Picture it</b><p>A warehouse shelf with a clipboard at the front. Boxes (cells) are stacked from the back wall forward; the index cards that say where each box is (offsets) are pinned from the front backward. The clipboard says "cards end at line 40, boxes start at line 300". Anyone can see the free gap from the clipboard alone, without walking the shelf.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="hd_svg" role="img" aria-label="Slotted page: header, offset array, free space, cells"></div>
+    <div class="legend"><span style="--sw:var(--c3)">header</span><span style="--sw:var(--c1)">cell offsets (grow →)</span><span style="--sw:var(--c2)">cells (grow ←)</span></div>
+    <div class="controls">
+      <label for="hd_preset">Page <select id="hd_preset"><option value="toy">Toy page: 1 KB, 24 B header, 4 B offsets</option><option value="pg">PostgreSQL-like: 8 KB, 24 B header, 4 B item ids</option><option value="sq">SQLite-like leaf: 4 KB, 8 B header, 2 B pointers</option></select></label>
+      <label for="hd_size">Record bytes <input id="hd_size" type="range" min="16" max="400" value="96"><output id="hd_sizeo">96</output></label>
+      <button id="hd_add" type="button">Insert record</button><button id="hd_fill" type="button">Fill until full</button><button id="hd_reset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="hd_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The two offsets turn "how much room is left?" into one subtraction: <code>free = upper − lower</code>. An insert needs <code>record size + one offset entry</code> bytes. It writes the record just below <code>upper</code> (so <code>upper</code> moves left), appends an offset at <code>lower</code> (so <code>lower</code> moves right), and the page is full when they would cross. The cell count is just <code>(lower − header) ÷ offset size</code>, but storing it saves a calculation on every visit. Flags tell the reader how to <em>interpret</em> the rest of the bytes before it touches them: leaf cells and internal cells have different layouts (Chapter 3).</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>PostgreSQL-like page: 8,192 bytes, a 24-byte header, 4-byte item ids. Each 100-byte record costs 100 + 4 = 104 bytes, so (8,192 − 24) ÷ 104 = 78.5, which means <b>78 records</b> fit. Halve the record to 50 bytes and the offset overhead grows from 4% to 7% of each record's cost: (8,168 ÷ 54) = 151 records. Try it with the PostgreSQL-like preset and 100 or 50 bytes. (Real PostgreSQL also spends bytes on tuple headers, alignment padding and, in index pages, a "special space" at the end; this model leaves those out.)</p></div>
+  <div class="box beyond"><b>Beyond the book: real headers</b>
+    <p><b>PostgreSQL</b> (verified in the docs, <a href="https://www.postgresql.org/docs/current/storage-page-layout.html">storage-page-layout</a>): the 24-byte <code>PageHeaderData</code> holds <code>pd_lsn</code> (8 B, WAL position of the last change), <code>pd_checksum</code> (2 B), <code>pd_flags</code> (2 B), <code>pd_lower</code> and <code>pd_upper</code> (2 B each: start and end of free space), <code>pd_special</code> (2 B: start of the access method's special space), <code>pd_pagesize_version</code> (2 B) and <code>pd_prune_xid</code> (4 B). Item identifiers are 4 bytes each; the default page is 8 kB. In B-tree indexes the special space holds the left and right sibling links (section 03).</p>
+    <p><b>SQLite</b> (<a href="https://www.sqlite.org/fileformat2.html">file format</a>): a B-tree page header is 8 bytes on leaf pages and 12 bytes on interior pages; the extra 4 bytes are the right-most child pointer. Cell pointers are 2-byte offsets.</p>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Chapter 3 "Slotted Pages" (pdf p98) and "Combining Cells into Slotted Pages" (pdf p103): this header is what makes a slotted page work. <a href="ch03_file_formats.html">Ch.3 page</a>.</li>
+    <li>Section 14–16 below: the same lower/upper picture explains fragmentation and vacuum.</li>
+    <li>Chapter 5: the PostgreSQL <code>pd_lsn</code> field is how recovery knows whether a page already contains a logged change. <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · MAGIC NUMBERS</div><h2>A 4-byte "is this really a page?" check</h2></div><span class="chip">pdf p113</span></div>
+  <p>A value often placed in the file or page header is a <b>magic number</b>: a multibyte block holding a constant. It can say "this block is a page", say what <b>kind</b> of page it is, or identify its <b>version</b>. Magic numbers are used for <b>validation and sanity checks</b> [GIAMPAOLO98]. The logic: it is very unlikely that the bytes at a random offset happen to equal the magic number, so if they do match, the offset is probably right. Petrov's example: on write, put <code>50 41 47 45</code> (hex for the ASCII text <code>PAGE</code>) into the header; on read, compare the first four bytes of the header with that sequence to check the page was loaded and aligned correctly.</p>
+  <div class="box picture"><b>Picture it</b><p>Each page begins with the same stamp, like the "%PDF" at the start of every PDF file. If you open a file at the wrong position and don't see the stamp, you know immediately that you are reading from the middle of something, before you trust any of the numbers that follow.</p></div>
+  <div class="fig">
+    <div class="hex" id="mg_hex" role="img" aria-label="Hex dump of three toy pages"></div>
+    <div class="controls">
+      <label for="mg_off">Read header at byte offset <input id="mg_off" type="range" min="0" max="188" value="64"><output id="mg_offo">64</output></label>
+      <label for="mg_bad"><input id="mg_bad" type="checkbox"> Page 2 overwritten with garbage</label>
+    </div>
+    <div class="readout" id="mg_r"></div>
+  </div>
+  <p>The dump shows a toy file of three 64-byte pages (simulated). Each page starts with <code>50 41 47 45</code>, then a 2-byte page id, a flags byte and a cell count. Slide the offset: only 0, 64 and 128 pass. Tick the box to see a damaged page fail at the correct offset.</p>
+  <div class="box behind"><b>What's happening behind it</b><p>The check is one 32-bit comparison, so it costs nothing next to the disk read. If the bytes were uniformly random, a false match would happen with probability 1 ÷ 2<sup>32</sup> = 1 in 4,294,967,296 ≈ 2.3 × 10<sup>−10</sup> (my calculation, assuming random bytes; real data is not random, so "PAGE" could appear inside a text value). That's why it is a <em>sanity</em> check for gross mistakes such as a wrong offset, a wrong file, or a page of the wrong kind. It does <em>not</em> detect a flipped bit in the middle of the page; that is what checksums are for.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li><b>SQLite</b>'s file starts with the 16-byte string <code>"SQLite format 3"</code> plus a NUL byte (<a href="https://www.sqlite.org/fileformat2.html">file format</a>).</li>
+    <li><b>PostgreSQL</b> pages carry a 2-byte <code>pd_checksum</code> (filled when data checksums are enabled, see section 01). Magic number = "right kind of block?"; checksum = "are these bytes intact?". Before → after: without either, a misaligned or torn read is silently interpreted as data; a magic number catches the first, a checksum the second.</li>
+  </ul></div>
+  <div class="box papers"><b>Reference</b><p>[GIAMPAOLO98] Giampaolo, Dominic. 1998. <i>Practical File System Design with the Be File System.</i> Morgan Kaufmann. A file-system designer's book; it is where the "use magic numbers for sanity checks" habit is discussed. Worth it if you want to see the same page/block problems from the file-system side.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 3 "File Formats": the file header and page header are where magic numbers live. <a href="ch03_file_formats.html">Ch.3 page</a>.</li><li>Chapter 5 recovery: torn or half-written pages are a real failure mode that a recovery system must handle.</li></ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · SIBLING LINKS</div><h2>Walk sideways instead of up and down</h2></div><span class="chip">pdf p114–115 · Fig 4-1</span></div>
+  <p>Some implementations store <b>forward and backward links</b> to the left and right sibling pages. They let you find a neighbour without climbing back to the parent. Without them (Fig 4-1a), you have to go through the parent, and this can climb all the way to the <b>root</b>, because a parent can only point to its <em>own</em> children. With the links in the header (Fig 4-1b), you just follow them to the previous or next node on the same level.</p>
+  <p>The cost: links make <b>splits and merges</b> more complex because the sibling offsets must be updated too. Example from the book: when a node that is <em>not</em> the rightmost splits, its right sibling's backward pointer (which pointed to the node that split) must be re-bound to the newly created node. And because that update happens in the <em>sibling</em> node, not in the node being split or merged, it may need <b>extra locking</b>. Petrov returns to this in "Blink-Trees" (Chapter 5).</p>
+  <div class="box picture"><b>Picture it</b><p>Houses on a street. With sibling links, you walk next door. Without them, you must go back to the street junction (the parent), and if your house is the last one on that block, back to the main road (the grandparent), then down the next block's road to its first house.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="sb_svg" role="img" aria-label="Moving from one leaf to the next, by parent links or by sibling links"></div>
+    <div class="controls">
+      <label for="sb_mode">Route <select id="sb_mode"><option value="parent">(a) through parents</option><option value="sib">(b) sibling links</option></select></label>
+      <label for="sb_from">From leaf # <input id="sb_from" type="range" min="0" max="7" value="2"><output id="sb_fromo">2</output></label>
+    </div>
+    <div class="readout" id="sb_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Going from leaf <i>i</i> to leaf <i>i</i>+1 through parents means climbing to their lowest common ancestor and coming back down the same number of levels. Stepping from a leaf that is not its parent's last child costs 2 node visits (up to the parent, down to the next leaf); stepping from a parent's last child costs 4 (up to the grandparent and back down two levels), and so on for each extra level climbed. A range scan does this for every leaf it crosses. With sibling links, every step is exactly one visit. The price is paid on writes: a split now touches three nodes (the old node, the new node, and the old right sibling).</p>
+  <pre class="code">// split of node A (not rightmost) into A and A2, with double links
+A2.next = A.next;  A2.prev = A;
+A.next.prev = A2;  // the re-bind the book describes: a write to the SIBLING page
+A.next = A2;</pre></div>
+  <div class="box work"><b>Measured on a model: average visits per "next leaf" step</b>
+    <div class="controls"><label for="sb_f">Fanout f <input id="sb_f" type="range" min="2" max="200" value="3"><output id="sb_fo">3</output></label><label for="sb_h">Height h <input id="sb_h" type="range" min="2" max="6" value="3"><output id="sb_ho">3</output></label></div>
+    <div class="readout" id="sb_cr"></div>
+    <p>Model: a full tree with f<sup>h−1</sup> leaves; visits = up-hops + down-hops. For f = 3, h = 3 there are 9 leaves and 8 steps; 6 steps climb one level (2 visits) and 2 steps climb two levels (4 visits): (6×2 + 2×4) ÷ 8 = <b>2.5 visits vs 1</b>. With real fanouts in the hundreds the average falls to just over 2, because few leaves are the last child. The bigger win is concurrency, not the count (Chapter 5).</p>
+  </div>
+  <div class="box beyond"><b>Beyond the book: where it's used</b><ul>
+    <li><b>PostgreSQL</b>: B-tree index pages keep left and right sibling links in the page's special space (<a href="https://www.postgresql.org/docs/current/storage-page-layout.html">docs</a>). Its nbtree README describes Lehman &amp; Yao right-links: if the search key is greater than a page's high key, the page "must've been split concurrently", so the search follows the right-link (<a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">README</a>).</li>
+    <li><b>WiredTiger</b> (MongoDB) is the book's counter-example: it walks leaves through parent pointers instead (section 08).</li>
+  </ul></div>
+  <div class="box papers"><b>Reference papers</b><ul>
+    <li>[LEHMAN81] Lehman, Philip L., and S. Bing Yao. 1981. "Efficient locking for concurrent operations on B-trees." <i>ACM TODS</i> 6(4): 650–670. Introduces right-links + high keys so readers can survive a concurrent split without locks on the way down. The basis of PostgreSQL's nbtree. Read it before Chapter 5's Blink-Trees.</li>
+    <li>[MILLER78] Miller, R., and L. Snyder. 1978. "Multiple access to B-trees." Conference on Information Sciences and Systems, Johns Hopkins University. Early work on concurrent access, cited with LEHMAN81 for the deadlock risk of sibling pointers (section 08).</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 5 "Blink-Trees" (pdf p186): Blink-Trees build on B*-Trees and add high keys and sibling links; a node can be "half-split" (reachable from its left sibling but not yet from its parent). <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Section 08: the alternative of walking through parent pointers.</li></ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · RIGHTMOST POINTERS</div><h2>N keys, N + 1 pointers: where does the extra one live?</h2></div><span class="chip">pdf p116–117 · Fig 4-2, 4-3</span></div>
+  <p>Separator keys split the tree into subtrees and guide navigation, so there is <b>always one more child pointer than there are keys</b>. That's the "+1" from "Counting Keys" in Chapter 2. In many implementations a node looks like Fig 4-2: each separator key is stored in a cell together with a child pointer, and the <b>last pointer is stored separately</b> because it has no key to pair with (compare with Fig 2-10). That extra pointer can live in the <b>page header</b>, as SQLite does.</p>
+  <p>When the <b>rightmost child splits</b> and a new cell is appended to its parent, the rightmost pointer must be <b>reassigned</b> (Fig 4-3). After the split, the cell appended to the parent holds the <b>promoted key</b> and points to the node that was split; the pointer to the <b>new</b> node replaces the old rightmost pointer. SQLite describes and implements a similar approach (the book's footnote points to its <code>balance_deeper</code> function).</p>
+  <div class="box picture"><b>Picture it</b><p>A row of numbered fence posts with rails between them: three posts (keys) make four gaps (pointers) if you count the open ground after the last post. Petrov's layout puts "the gap before post <i>i</i>" on post <i>i</i>'s label, and writes "everything after the last post" on the gate (the header).</p></div>
+  <div class="fig">
+    <div class="svgbox" id="rp_svg" role="img" aria-label="Rightmost pointer before and after the rightmost child splits"></div>
+    <div class="controls"><button id="rp_prev" type="button">← Back</button><button id="rp_next" type="button">Next step →</button><span class="readout">step <b id="rp_no">1</b>/3</span></div>
+    <div class="msg" id="rp_msg"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each cell is a (pointer, key) pair: the pointer next to K<sub>i</sub> covers keys below K<sub>i</sub> (and at or above K<sub>i−1</sub>). Keys at or above the last key go to the header pointer. When the rightmost child splits into a left half and a new right half, the promoted key becomes the new <em>last</em> separator: its cell takes over the old child (the left half, everything below the promoted key), and the header pointer moves to the new right node (everything from the promoted key up). Nothing else in the parent moves, which is why this path is cheap.</p>
+  <pre class="code">// parent: cells[] = (childPtr, key) pairs; header.rightmost = last pointer
+function onRightmostChildSplit(parent, splitNode, promotedKey, newNode) {
+  parent.cells.push({ ptr: splitNode, key: promotedKey }); // new last cell → left half
+  parent.header.rightmost = newNode;                      // header → new right half
+}</pre></div>
+  <div class="box beyond"><b>Beyond the book</b><p><b>SQLite</b>: interior b-tree pages have a 12-byte header instead of 8; the extra 4 bytes at offset 8 are the page number of the right-most child (<a href="https://www.sqlite.org/fileformat2.html">file format</a>). That's exactly the "rightmost pointer in the header" of Fig 4-2.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 2 "Separator Keys" (pdf p74, Fig 2-10) and "Counting Keys" (pdf p78). <a href="ch02_b_tree_basics.html">Ch.2 page</a>.</li><li>Section 05: storing a high key instead, so that every pointer gets a key.</li><li>Section 11: with auto-increment keys, nearly every split is a rightmost split, so this code path is the hot one.</li></ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · NODE HIGH KEYS</div><h2>Give the last pointer a key too: the upper bound</h2></div><span class="chip">pdf p118–119 · Fig 4-4, 4-5</span></div>
+  <p>A slightly different approach: store the rightmost pointer in a cell together with the node's <b>high key</b>, the highest possible key that can be present in the subtree under the current node. PostgreSQL uses this; the structure is called a <b>B<sup>link</sup>-Tree</b>.</p>
+  <p>The notation: a node has N keys K<sub>i</sub> and N + 1 pointers P<sub>i</sub>. In each subtree, keys are bounded by <b>K<sub>i−1</sub> ≤ K<sub>s</sub> &lt; K<sub>i</sub></b>. K<sub>0</sub> = −∞ is implicit and not stored. B<sup>link</sup>-Trees add a key <b>K<sub>N+1</sub></b> to each node: the upper bound for the subtree that P<sub>N</sub> points to, and so the upper bound for everything under the current node (Fig 4-4). Now pointers can be stored <b>pairwise</b>: every cell has a pointer, which removes edge cases around the rightmost pointer. Fig 4-5 shows how the search space is split: up to +∞ without a high key, up to K<sub>3</sub> with one.</p>
+  <div class="box picture"><b>Picture it</b><p>Two shops' opening-hours signs. One says "last entry: whenever". The other says "last entry: 6 pm". If you arrive at 7 pm, the first shop lets you in and you search for nothing; the second tells you at the door that you're in the wrong place, so go next door.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="hk_svg" role="img" aria-label="Number line of the key ranges each pointer covers, with and without a high key"></div>
+    <div class="controls"><label for="hk_k">Searched key <input id="hk_k" type="range" min="0" max="100" value="47"><output id="hk_ko">47</output></label></div>
+    <div class="readout" id="hk_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Without a high key the last pointer's range is open-ended: the node itself cannot tell whether a key belongs anywhere under it. With a high key the node knows its whole range [low, high). That costs one extra key per node, and buys two things. (1) <b>Uniform cells</b>: every cell is (key, pointer), so there is no special header slot to keep in sync. (2) <b>Self-checking during concurrency</b>: if a reader arrives at a node and its key is ≥ the high key, the node must have been split while the reader was on its way down, and the rest of the keys are to the right. That's the Blink-Tree move-right rule (Chapter 5).</p></div>
+  <div class="box work"><b>Worked example</b><p>Node keys 20 and 40, high key 60. Search 47: both layouts follow P<sub>2</sub> (40 ≤ 47 &lt; +∞ or &lt; 60). Search 70: layout (a) still follows P<sub>2</sub> and searches a subtree that cannot hold 70. Layout (b) sees 70 ≥ 60 and knows at once the key is not under this node. Slide to 70 above.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>PostgreSQL's nbtree README: each page carries a high key that is "an upper bound on the keys that are allowed on that page"; a search key greater than it means a concurrent split happened, so the scan moves right (<a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">README</a>).</p></div>
+  <div class="box papers"><b>Reference paper</b><p>[LEHMAN81] (see section 03). The high key plus the right-link is the core of their algorithm.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 5 "Blink-Trees" (pdf p186): half-split detection is "search key exceeds high key". <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Section 04 (the alternative: rightmost pointer in the header).</li></ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · OVERFLOW PAGES</div><h2>When a value is bigger than its share of a page</h2></div><span class="chip">pdf p120–122 · Fig 4-6</span></div>
+  <p>Node size and fanout are <b>fixed</b>; they don't change at runtime. No single value is ideal: if values vary in size and some are large, only a few fit in a page; if values are tiny, reserved space is wasted. The B-Tree algorithm says a node holds a certain <em>number</em> of items, so with variable sizes a node can be "not full" by count while its fixed-size page has <b>no space left</b>. Resizing the page means copying already written data to a new region, which is often impractical.</p>
+  <p>The fix: build a node from <b>several linked pages</b>. Example from the book: the default page size is 4 K; after a few inserts the data has grown past 4 K. Instead of arbitrary sizes, nodes grow in <b>4 K increments</b>: allocate a 4 K extension page and link it from the original. The extensions are <b>overflow pages</b>; the original is the <b>primary page</b>.</p>
+  <ul class="plain">
+    <li>Most implementations store only a fixed number of payload bytes in the node itself and spill the rest. That limit is <b>max_payload_size = node size ÷ fanout</b>. Then a page can never be left with no free space: it always has room for at least max_payload_size bytes.</li>
+    <li>If an inserted payload is larger than max_payload_size, check whether the node already has an overflow page with enough space. If so, the extra bytes go there; if not, allocate a new overflow page.</li>
+    <li>The first overflow page's ID is stored in the primary page's header. More overflow pages are chained: each stores the next one's ID in its header. Several pages may have to be traversed to reach a payload's overflow part.</li>
+    <li>Overflow pages need bookkeeping: they fragment like primary pages, their space must be reclaimable, and they must be discarded when no longer needed.</li>
+    <li><b>Keys</b> usually have high cardinality, so keeping a <em>part</em> of a key in the primary page makes sense: most comparisons can be decided on that trimmed part.</li>
+    <li><b>Data records</b> do need their overflow parts to be found and returned to the user, but that's infrequent. If <em>all</em> records are oversize, consider specialised blob storage.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>An office mailbox wall where each person gets one pigeonhole of fixed width. A parcel that doesn't fit leaves a slip in the pigeonhole ("rest in the back room, shelf 3"). The pigeonhole wall never jams, and most people only ever need their pigeonhole.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="ov_svg" role="img" aria-label="Primary page and chain of overflow pages"></div>
+    <div class="controls">
+      <label for="ov_page">Node size <select id="ov_page"><option value="4096">4096 B</option><option value="8192">8192 B</option><option value="16384">16384 B</option></select></label>
+      <label for="ov_fan">Fanout <input id="ov_fan" type="range" min="2" max="64" value="8"><output id="ov_fano">8</output></label>
+      <label for="ov_rec">Record bytes <input id="ov_rec" type="range" min="100" max="12000" step="100" value="1500"><output id="ov_reco">1500</output></label>
+      <button id="ov_add" type="button">Insert record</button><button id="ov_reset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="ov_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Capping each record's in-page share at node size ÷ fanout makes the <em>count</em>-based B-Tree rule and the <em>byte</em>-based page agree again: fanout records × max_payload_size = one node. The overflow chain is a singly linked list, so reaching the payload on the 3rd overflow page means reading the primary page and overflow pages 1, 2 and 3. In the simulation, overflow pages are shared by the node's records, as in Fig 4-6 (two records continue on the same overflow page); I assume a 24-byte primary header and a 4-byte "next page" header on each overflow page.</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>4,096-byte node, fanout 8: max_payload_size = 4,096 ÷ 8 = <b>512 bytes</b>. A 1,500-byte record keeps 512 bytes in the primary page and spills 988. An overflow page has 4,096 − 4 = 4,092 usable bytes, so four such records spill 3,952 bytes into one page and the fifth spills across into a second. Returning that fifth record reads the primary page plus <b>two</b> overflow pages. The simulation opens in exactly this state: five 1,500-byte records with the defaults.</p></div>
+  <div class="box beyond"><b>Beyond the book: real thresholds</b>
+    <p><b>SQLite</b> (<a href="https://www.sqlite.org/fileformat2.html">file format</a>), with U = usable page size: a table-leaf payload stays fully on the page if it is at most X = U − 35 bytes; an index payload if at most X = ((U − 12) × 64 ÷ 255) − 23. When it spills, at least M = ((U − 12) × 32 ÷ 255) − 23 bytes stay local. Each overflow page starts with a 4-byte next-page number (0 on the last page). For the node size you picked: <span class="readout" id="ov_sq"></span></p>
+    <p><b>PostgreSQL</b> does not let a row span pages; instead TOAST kicks in when a row is wider than about 2 kB, compressing and/or moving large field values out of line in chunks of about 2,000 bytes (<a href="https://www.postgresql.org/docs/current/storage-toast.html">TOAST docs</a>). Same idea as an overflow page, done per column value in a side table.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 3 "Variable-size data" and cell layouts. <a href="ch03_file_formats.html">Ch.3 page</a>.</li><li>Section 15: updates can create overflow pages, the one structural change an update normally causes.</li><li>Section 16: overflow pages fragment and need the same vacuum.</li></ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · BINARY SEARCH · BINARY SEARCH WITH INDIRECTION POINTERS</div><h2>Search the sorted pointers, compare the unsorted cells</h2></div><span class="chip">pdf p123–124 · Fig 4-7</span></div>
+  <p>Inside a node, the searched key is located with <b>binary search</b> (Chapter 2's lookup algorithm). Binary search works only on <b>sorted</b> data, which is why keeping keys in order (the sorted invariant) is essential.</p>
+  <p>The algorithm takes a sorted array and a key and returns a number. A <b>positive</b> result means the key was found, and the number is its position. A <b>negative</b> result means the key is absent, and it encodes the <b>insertion point</b>: the index of the first element greater than the key. Its absolute value is where the key can be inserted to keep the order; you insert by shifting the elements from that point one position over [SEDGEWICK11]. On higher levels most searches are <b>not exact matches</b>; what matters is the direction: find the first value greater than the searched key and follow the matching child link.</p>
+  <p><b>With indirection pointers</b>: cells in a B-Tree page are stored in <b>insertion order</b>, and only the <b>cell offsets</b> keep the logical (sorted) order. So binary search picks the middle offset, follows it to its cell, compares that cell's key with the searched key, and goes left or right, repeating until it finds the key or the insertion point (Fig 4-7).</p>
+  <div class="box picture"><b>Picture it</b><p>A library's card catalogue is alphabetical, but the books are shelved in the order they arrived. To find a title, you open the catalogue in the middle, walk to the shelf the card points to, read the spine, and decide whether to look earlier or later in the catalogue. Every comparison costs one trip to a shelf.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="bs_svg" role="img" aria-label="Binary search over the offset array, following pointers to cells"></div>
+    <div class="controls">
+      <label for="bs_key">Search for <select id="bs_key"><option value="61">61 (present)</option><option value="7">7 (present)</option><option value="99">99 (present)</option><option value="55">55 (absent)</option><option value="20">20 (absent)</option><option value="1">1 (absent, smaller than all)</option><option value="120">120 (absent, larger than all)</option></select></label>
+      <button id="bs_back" type="button">← Back</button><button id="bs_step" type="button">Next comparison →</button>
+    </div>
+    <div class="msg" id="bs_msg"></div>
+  </div>
+  <pre class="code">// the code the stepper runs. offsets[] is sorted by key; cells[] is in insertion order
+function binarySearchCells(offsets, cells, key) {
+  let lo = 0, hi = offsets.length - 1;
+  while (lo &lt;= hi) {
+    const mid = (lo + hi) &gt;&gt;&gt; 1;
+    const cellKey = cells[offsets[mid]].key;   // follow the indirection pointer
+    if (cellKey &lt; key) lo = mid + 1;
+    else if (cellKey &gt; key) hi = mid - 1;
+    else return mid;                           // found: its position
+  }
+  return -(lo + 1);                            // absent: insertion point = lo
+}</pre>
+  <div class="box behind"><b>What's happening behind it</b><p>Each round halves the range of offsets, so n cells need at most ⌈log<sub>2</sub>(n + 1)⌉ comparisons. Each comparison costs a jump from the offset array to a cell somewhere else in the page (a likely CPU cache miss), which is the price of the indirection. The benefit: inserting a cell never moves other cells, only a few small offsets, so keeping order is cheap.</p><p><b>A detail the book glosses over (not in the book):</b> "positive = found, negative = insertion point" is ambiguous when the answer is position 0, because there is no −0. Java's <code>Arrays.binarySearch</code> and the code above solve it by returning <code>−(insertionPoint) − 1</code>, so absent keys are always ≤ −1. Decode with <code>insertionPoint = −result − 1</code>.</p></div>
+  <div class="box work"><b>Worked example + calculator</b><p>12 cells, sorted keys 3, 7, 15, 23, 34, 42, 50, 61, 70, 77, 88, 99. Search 61: compare 42 (go right), 70 (go left), 50 (go right), 61: found at position 7 after <b>4</b> comparisons, each one a hop to a cell. Search 55 (absent): the same four comparisons, then lo (7) passes hi (6): insertion point 7, returned as −8. Linear scan would have needed 8 comparisons.</p>
+    <div class="controls"><label for="bs_n">Cells per node <input id="bs_n" type="range" min="4" max="1024" value="200"><output id="bs_no">200</output></label><label for="bs_h">Tree height <input id="bs_h" type="range" min="1" max="6" value="4"><output id="bs_ho">4</output></label></div>
+    <div class="readout" id="bs_cr"></div></div>
+  <div class="box beyond"><b>Beyond the book</b><p>PostgreSQL's B-tree search inside a page is a binary search over the line-pointer array (function <code>_bt_binsrch</code> in nbtsearch.c). Same shape as Fig 4-7: sorted 4-byte item ids, index tuples wherever they were written.</p></div>
+  <div class="box papers"><b>Reference</b><p>[SEDGEWICK11] Sedgewick, Robert, and Kevin Wayne. 2011. <i>Algorithms</i> (4th ed.). Pearson. The standard treatment of binary search and of insertion by shifting. Your syllabus lists this book and its free Coursera course (<code>Notes/syllabus.html</code>).</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 2 "B-Tree Lookup Algorithm" (pdf p77). <a href="ch02_b_tree_basics.html">Ch.2 page</a>.</li><li>Chapter 3 slotted pages: the offset array this search walks.</li><li>Your <code>Notes/syllabus.html</code> DSA table pairs "Binary Search" with "DB index lookup (B-tree)": this plate is that link.</li></ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · PROPAGATING SPLITS AND MERGES</div><h2>Finding the way back up: parent pointers</h2></div><span class="chip">pdf p125</span></div>
+  <p>Splits and merges can <b>propagate</b> to higher levels (Chapter 2), so we must be able to walk from the splitting leaf, or from a pair of merging leaves, back to the root. One way: nodes keep <b>parent pointers</b>. Because a lower-level page is always paged in by following a reference from a higher level, these pointers <b>don't need to be persisted on disk</b>: they can be filled in when the page is loaded.</p>
+  <p>Like sibling pointers, parent pointers must be <b>updated whenever the parent changes</b>: every time a separator key with its page identifier is moved from one node to another, i.e. during splits, merges or rebalancing <b>of the parent</b>.</p>
+  <p>Some implementations, for example <b>WiredTiger</b>, use parent pointers for <b>leaf traversal</b> to avoid <b>deadlocks</b> that can happen with sibling pointers [MILLER78], [LEHMAN81]. Instead of following sibling links, the algorithm goes through the parent, much like Fig 4-1a: follow the next pointer in the parent and descend. When it reaches the end of the parent after visiting all the siblings that share it, it continues upward recursively, possibly to the root, and back down to the leaf level.</p>
+  <div class="box picture"><b>Picture it</b><p>Every employee's badge says who their manager is. Useful, until a team is split in two: then HR has to re-print the badges of everyone who moved to the new team. That reprint is the hidden cost of parent pointers.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="pp_svg" role="img" aria-label="B-tree with nodes whose parent pointer changed highlighted"></div>
+    <div class="controls"><button id="pp_one" type="button">Insert 1 random key</button><button id="pp_five" type="button">Insert 5</button><button id="pp_reset" type="button">Reset</button></div>
+    <div class="legend"><span style="--sw:var(--c3)">parent pointer had to be (re)written by the last insert</span><span style="--sw:var(--c1)">leaf that received the key</span></div>
+    <div class="readout" id="pp_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A leaf split creates one new node, which needs its parent pointer set. An <b>internal</b> split is worse: every child that moves to the new right node now has a different parent. With fanout f that's about f ÷ 2 children, and each of them is a separate page whose in-memory header must be updated (and loaded, if it isn't already). A root split rewrites two more. The simulation counts these writes exactly by comparing every node's parent before and after the insert. With real fanouts of hundreds, an internal split means hundreds of pointer updates, which is why the breadcrumb approach (next section) is popular.</p></div>
+  <div class="box work"><b>Worked example</b><p>Capacity 3 keys: an internal node that overflows has 4 keys and 5 children. It keeps 2 keys and 3 children; 1 key moves up; the new right node gets 1 key and <b>2 children, whose 2 parent pointers must be rewritten</b>. The new right node itself needs its pointer set too (it hangs under the old parent), and the new leaf from the leaf split needs one. That is 4 writes in total, or 3 when the new leaf is itself one of the children that moved (its pointer is then written once, already pointing at the new node). The readout counts each node whose parent changed once. Click "Insert" until you see an internal split and check the readout.</p></div>
+  <div class="box beyond"><b>Beyond the book: why sibling walks can deadlock</b><p>If one thread walks leaves left to right holding a latch on the current leaf while acquiring the next, and another thread (a reverse scan, or a merge) latches right to left, each can hold what the other needs. Going through the parent keeps every latch acquisition top-down, a single global order, which rules out that cycle. PostgreSQL takes the other route: it keeps sibling links; a reader holds a page lock only while it examines that page, inserters couple locks only when moving right, and the nbtree README notes that backward scans need extra care.</p></div>
+  <div class="box papers"><b>Reference papers</b><p>[MILLER78] and [LEHMAN81], see section 03.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 2 "B-Tree Node Splits" (pdf p79) and merges. <a href="ch02_b_tree_basics.html">Ch.2 page</a>.</li><li>Chapter 5 "Latch crabbing" and deadlocks: the locking side of this choice. <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Section 03 (sibling links) and section 09 (breadcrumbs): the two alternatives.</li></ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · BREADCRUMBS</div><h2>Remember the path on the way down, use it on the way up</h2></div><span class="chip">pdf p126–127 · Fig 4-8</span></div>
+  <p>Instead of storing and maintaining parent pointers, keep track of the nodes you <b>traversed</b> on the way to the target leaf, and follow that chain in <b>reverse</b> if inserts cause cascading splits, or deletes cause merges.</p>
+  <ul class="plain">
+    <li>An operation that may change the structure (insert or delete) first descends from the root to the leaf to find the target node and the insertion point.</li>
+    <li>We don't know in advance whether it will split or merge (not until the leaf is found), so we collect <b>breadcrumbs</b> on the way: references to the nodes followed from the root.</li>
+    <li>The natural data structure is a <b>stack</b>, kept in <b>memory</b>. PostgreSQL calls it <code>BTStack</code> (the book's footnote 2 points to databass.dev/links/21).</li>
+    <li>Fig 4-8: each breadcrumb holds the visited node and the <b>index of the child pointer</b> followed. If the leaf splits, pop the top entry to get its immediate parent. If the parent has room, append the new cell at the cell index from the breadcrumb (assuming the index is still valid). Otherwise split the parent as well, and repeat until the stack is empty and we've reached the root, or a level didn't split.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Hansel and Gretel. You don't need a map with "way home" arrows painted on every tree (parent pointers); you drop crumbs on the way in, and pick them up in reverse order on the way out. Crumbs cost nothing when you never need to go back.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="bc_svg" role="img" aria-label="B-tree with the current breadcrumb path highlighted"></div>
+    <div class="controls">
+      <label for="bc_key">Insert key <input id="bc_key" type="number" min="0" max="999" value="41"></label>
+      <button id="bc_go" type="button">Run insert</button><button id="bc_prev" type="button">← Back</button><button id="bc_next" type="button">Next step →</button><button id="bc_reset" type="button">Reset tree</button>
+      <span class="readout">step <b id="bc_stepno">0/0</b></span>
+    </div>
+    <div class="two"><div class="msg" id="bc_msg"></div><div class="stackbox" id="bc_stack"></div></div>
+    <div class="legend"><span style="--sw:var(--c2)">on the breadcrumb stack</span><span style="--sw:var(--c1)">node being worked on</span></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The stack has exactly one entry per level, so it costs <i>height</i> small records of memory, and nothing at all on disk. Each entry stores <em>which pointer</em> we followed, so when a split pushes a separator up, we already know where it goes in the parent: right after that pointer. No search of the parent is needed. The catch in the book's phrase "assuming the index is still valid": if other threads changed the parent between our descent and our split, the remembered index can be stale, and the implementation must re-find the right position (or the right parent).</p>
+  <pre class="code">// descent (from the insert() this page runs)
+const stack = []; let n = T.root;
+while (!n.leaf) {
+  const i = upperBound(n.keys, k);   // first separator &gt; k
+  stack.push({ node: n, idx: i });  // breadcrumb: node + child index
+  n = n.kids[i];
+}
+// ...insert into leaf n; if it overflows, split and then:
+function attach(T, stack, left, sep, right) {
+  if (!stack.length) { T.root = mkNode(false, [sep], [left, right]); return; } // root split: tree grows
+  const { node: p, idx } = stack.pop();      // immediate parent
+  p.keys.splice(idx, 0, sep); p.kids.splice(idx + 1, 0, right);
+  if (p.keys.length &gt; T.cap) splitInternalAndAttach(T, stack, p); // may cascade
+}</pre></div>
+  <div class="box work"><b>Worked example (default tree, insert 41)</b><p>Root [13, 51]: 41 is between 13 and 51, so follow pointer 1 and push (root, 1). Node [23, 31, 37]: 41 ≥ 37, follow pointer 3 and push. Leaf [37, 40, 45] becomes [37, 40, 41, 45], over the capacity of 3. Split into [37, 40] and [41, 45]; pop → parent [23, 31, 37]; insert 41 at index 3 → [23, 31, 37, 41], over capacity. Split it: 37 moves up; pop → root; insert 37 at index 1 → [13, 37, 51]. The root had room, so the cascade stops with one entry used from each level. Run it: the root is now full (3 keys). Then insert 42, 43, 44, 46, 47 and 48 one at a time. The last insert splits leaf [45, 46, 47], then its parent [41, 43, 45], then the root itself, and the tree grows from height 3 to 4 with the new root [45] (checked with this page's code).</p></div>
+  <div class="box beyond"><b>Beyond the book</b><p>PostgreSQL's nbtree README says the stack built during descent is used to find parents, but it "does not help" when an inserter must go above the level that was the root when its descent began (the root split concurrently). Then it re-descends the tree to the right level and moves right as needed; downlinks are matched by block number, not by key (<a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">README</a>). That is the "index still valid?" caveat handled for real.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 08: parent pointers, the alternative.</li><li>Chapter 5 "Latch crabbing": while holding the breadcrumb path, which latches can be released early depends on whether the child is "safe" (won't split). <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Your <code>Notes/syllabus.html</code> lists "B-Trees / B+ Trees: implement in TypeScript" with "Database Internals Ch.2–4". The <code>insert</code> / <code>attach</code> code on this page is a compact starting point.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · REBALANCING</div><h2>Postpone the split: shift keys to a neighbour, or split two into three</h2></div><span class="chip">pdf p128–129 · Fig 4-9</span></div>
+  <p>Some implementations <b>postpone splits and merges</b> to amortise their cost: they rebalance elements within a level, moving them from more occupied nodes to less occupied ones for as long as possible before finally splitting or merging. This improves <b>node occupancy</b> and may reduce the <b>number of levels</b>, at a potentially higher maintenance cost.</p>
+  <ul class="plain">
+    <li>Load balancing can happen during inserts and deletes [GRAEFE11]. On <b>insert</b>, instead of splitting an overflowing node, move some elements to a sibling. On <b>delete</b>, instead of merging, move elements from a neighbour so the node stays at least half full.</li>
+    <li><b>B*-Trees</b> keep distributing between neighbours until <b>both</b> are full [KNUTH98]. Then, instead of splitting one node into two half-empty ones, they split <b>two nodes into three</b>, each <b>two-thirds full</b>. SQLite uses this variant.</li>
+    <li>This raises average occupancy by postponing splits, but needs extra tracking and balancing logic. Higher utilisation also means faster searches: the tree is shorter, so fewer pages are read on the way to a leaf.</li>
+    <li>Fig 4-9: elements move from the fuller left sibling to the emptier right one. Because this changes the min/max range of both siblings, the separator key and pointer in the <b>parent must be updated</b>.</li>
+    <li>SQLite implements a "balance-siblings" algorithm close to this. Balancing adds code complexity, but because its use is isolated, it can be added later as an optimisation.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Packing books into boxes. Plain splitting: when a box is full, open a new box and move half the books into it. Rebalancing: first check whether the box next to it has room and slide some books over. B*: when both neighbouring boxes are full, repack the two into three boxes, each two-thirds full. Fewer half-empty boxes, more lifting.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="rb_svg" role="img" aria-label="Small tree before and after an insert under the chosen policy"></div>
+    <div class="controls">
+      <label for="rb_pol">Policy <select id="rb_pol"><option value="rebalance">rebalance into a sibling</option><option value="split">plain split</option><option value="bstar">B* (rebalance, then 2→3)</option></select></label>
+      <label for="rb_pre">Start <select id="rb_pre"><option value="one">right sibling has room</option><option value="full">both siblings full</option></select></label>
+      <label for="rb_key">Insert <input id="rb_key" type="number" min="0" max="99" value="12"></label>
+      <button id="rb_go" type="button">Run</button><button id="rb_prev" type="button">← Back</button><button id="rb_next" type="button">Next step →</button>
+      <span class="readout">step <b id="rb_stepno">0/0</b></span>
+    </div>
+    <div class="msg" id="rb_msg"></div>
+  </div>
+  <div class="box work"><b>Worked example (my numbers, same idea as Fig 4-9)</b><p>Parent [18] over leaves [10, 13, 16] and [18], capacity 3. Insert 12. <b>Plain split</b>: [10, 12] | [13, 16], separator 13 goes up, parent [13, 18], three leaves. <b>Rebalance</b>: the right sibling has room; spread the five keys as [10, 12, 13] | [16, 18] and change the parent's separator from 18 to <b>16</b>; still two leaves. <b>B*</b> with both siblings full ([10, 13, 16] and [18, 20, 22]): seven keys become [10, 12, 13] | [16, 18] | [20, 22] and the parent's single separator 18 is replaced by 16 and 20.</p></div>
+  <div class="fig">
+    <h3>Measured on simulated inserts: occupancy vs work</h3>
+    <div class="controls">
+      <label for="rb_cap">Keys per leaf <input id="rb_cap" type="range" min="4" max="64" value="32"><output id="rb_capo">32</output></label>
+      <label for="rb_n">Random inserts <input id="rb_n" type="range" min="1000" max="20000" step="1000" value="10000"><output id="rb_no">10000</output></label>
+    </div>
+    <div class="bars" id="rb_bars" role="img" aria-label="Average leaf occupancy per policy"></div>
+    <div class="readout" id="rb_r"></div>
+    <p>Each bar pools 6 runs with different random key orders (simulated, using the same <code>insert()</code> code as the step-through; the range shows the lowest and highest run). "Keys moved" counts keys shifted between siblings by rebalancing, the extra maintenance work the book warns about.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>With random keys, a plain-splitting B-Tree settles at roughly 69–70% full: every split makes two half-full nodes, which then fill up to 100% before splitting again, so the average sits between. Sharing with a neighbour means a node only splits when its neighbourhood is full, so the average climbs to the mid-80s in this simulation, and B*'s two-thirds-full splits push it a little higher. Fuller leaves → fewer leaves → (sometimes) one level less, and fewer pages read per lookup and per range scan. The bill: every rebalance reads and rewrites a sibling and updates the parent, so a write touches three pages instead of one most of the time.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>The classic analytic result for plain splits under random inserts is about ln 2 ≈ 69% occupancy (A. C. Yao, "On random 2–3 trees", <i>Acta Informatica</i>, 1978; not in this book's bibliography). The simulation above lands on it.</li>
+    <li><b>InnoDB</b>, the delete side: if a page's fill drops below <code>MERGE_THRESHOLD</code> (50% by default), InnoDB tries to merge it with a neighbour (<a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-physical-structure.html">MySQL docs</a>).</li>
+  </ul></div>
+  <div class="box papers"><b>Reference papers</b><ul>
+    <li>[GRAEFE11] Graefe, Goetz. 2011. "Modern B-Tree Techniques." <i>Foundations and Trends in Databases</i> 3(4): 203–402. 200 pages covering almost every trick in this chapter (load balancing, bulk loading, compression, fragmentation). The single best follow-up read; Petrov lists it as Further Reading too.</li>
+    <li>[KNUTH98] Knuth, Donald E. 1998. <i>The Art of Computer Programming, Vol. 3: Sorting and Searching</i> (2nd ed.). Addison-Wesley. Where B*-Trees and the two-into-three split are described.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 5 "Blink-Trees" (pdf p186): Petrov describes Blink-Trees as an extension of B*-Trees that adds high keys and sibling links. <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Section 11: with sequential keys, plain splitting is at its worst (≈ 50%), and different tricks apply.</li></ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · RIGHT-ONLY APPENDS</div><h2>Auto-increment keys: every insert hits the rightmost leaf</h2></div><span class="chip">pdf p130</span></div>
+  <p>Many databases use <b>auto-incremented, monotonically increasing</b> primary keys. Then all inserts land at the end of the index, in the <b>rightmost leaf</b>, and most splits happen on the rightmost node of each level. Also, as long as updates and deletes are rare next to appends, non-leaf pages are <b>less fragmented</b> than with random keys. (Taken word for word, the book's sentence says the ratio of appends to updates and deletes is low; read in context, the intended meaning is that updates and deletes are the rare ones.)</p>
+  <ul class="plain">
+    <li><b>PostgreSQL "fastpath"</b>: if the new key is <b>strictly greater than the first key in the rightmost page</b>, and that page has room, the entry is inserted straight into the <b>cached</b> rightmost leaf, skipping the whole read path from the root.</li>
+    <li><b>SQLite "quickbalance"</b>: if the entry is inserted at the far right end and the target node is full (the new entry becomes the largest key in the tree), then instead of rebalancing or splitting, it allocates a <b>new rightmost node</b> and adds its pointer to the parent. The new page starts nearly empty (instead of half empty after a split), but it will very likely fill up soon.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A ledger book. When the last page fills, a normal B-Tree tears it in half and continues on a half-empty page, leaving a trail of half-empty pages behind forever (nobody will write in the past). Quickbalance just turns to a fresh page and leaves the full one full. The fastpath is keeping your finger on the last page instead of opening the book from the front each time.</p></div>
+  <div class="fig">
+    <canvas id="ra_c" aria-label="Fill percentage of every leaf, left to right"></canvas>
+    <div class="legend" id="ra_cL"></div>
+    <div class="controls">
+      <label for="ra_pol">On a full rightmost leaf <select id="ra_pol"><option value="split">split in the middle</option><option value="quick">quickbalance (new rightmost leaf)</option><option value="ff">split leaving 90% on the left (PostgreSQL-like)</option></select></label>
+      <label for="ra_ord">Keys <select id="ra_ord"><option value="seq">ascending (auto-increment)</option><option value="rand">random order</option></select></label>
+      <label for="ra_fast"><input id="ra_fast" type="checkbox" checked> fastpath</label>
+      <label for="ra_n">Inserts <input id="ra_n" type="range" min="100" max="5000" step="100" value="1000"><output id="ra_no">1000</output></label>
+    </div>
+    <div class="readout" id="ra_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>With ascending keys a middle split leaves the left half at 50% and nothing will ever be inserted there again, so the whole leaf level ends up half empty: twice the pages, twice the I/O for a range scan, a bigger cache footprint. Quickbalance (or a split that leaves the left page nearly full) fixes the occupancy. The fastpath fixes the CPU and buffer-pool cost: instead of reading <i>height</i> pages per insert, most inserts touch only the cached leaf; only the insert that fills it pays for a full descent. With random keys both tricks almost never trigger, and the tree behaves like section 10's plain splits (≈ 70%).</p></div>
+  <div class="box work"><b>Worked example (simulated, 16 keys per leaf, 1,000 ascending inserts)</b><p>Middle split: 124 leaves at 50% fill. Quickbalance: 63 leaves at 99% fill, half the pages. 90%-left split: 72 leaves at 87% fill. Node reads: about 2,840 without the fastpath (a full descent per insert) vs about 350 with it, roughly 8× fewer, because only about one insert in eight with middle splits (one in sixteen with quickbalance) needs to descend. These come from this page's code; real gains depend on page size and caching.</p></div>
+  <div class="box beyond"><b>Beyond the book: the same idea in production</b><ul>
+    <li><b>PostgreSQL</b>: B-tree fillfactor defaults to 90 and applies to leaf pages during initial index builds and "when extending the index at the right (adding new largest key values)" (<a href="https://www.postgresql.org/docs/current/sql-createindex.html">CREATE INDEX</a>). The fastpath caches the last page a backend inserted into if it was the rightmost leaf (<a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">nbtree README</a>).</li>
+    <li><b>InnoDB</b> leaves 1/16 of a clustered-index page free for future growth: with sequential inserts pages end up about <b>15/16 full</b>; with random inserts, anywhere from <b>1/2 to 15/16</b> (<a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-physical-structure.html">MySQL docs</a>). Before → after in one sentence: random UUID primary keys cost you page fill and cache space that sequential keys get for free.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 04: these are all rightmost-child splits, so the rightmost pointer is reassigned constantly.</li><li>Section 12: bulk loading pushes the same idea to its limit.</li><li>Chapter 5: a single hot rightmost leaf is also a <em>latch</em> hotspot under concurrent inserts.</li></ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · BULK LOADING</div><h2>Building a tree from sorted data: bottom-up, no splits</h2></div><span class="chip">pdf p131</span></div>
+  <p>If the data is already <b>sorted</b> (a bulk load, or rebuilding a tree, e.g. to defragment it), the right-only-append idea goes further. All items go to the rightmost position, so we can <b>avoid splits and merges altogether</b> and compose the tree <b>from the bottom up</b>: write it out level by level, or write higher-level nodes as soon as there are enough pointers to already-written lower-level nodes.</p>
+  <ul class="plain">
+    <li>One approach: write the sorted data to the leaf level <b>page-wise</b> (not element by element). After each leaf is written, propagate its <b>first key</b> to the parent, and build the higher levels with the normal algorithm [RAMAKRISHNAN03]. Since keys arrive in order, every split is on the rightmost node.</li>
+    <li>Because B-Trees are always built from the leaf level up, the whole leaf level can be written before any higher node is composed, so all child pointers are at hand when the higher levels are built.</li>
+    <li>Main benefits: <b>no splits or merges on disk</b>, and only a <b>minimal part</b> of the tree (the parents of the leaf being filled) has to be in memory during construction.</li>
+    <li><b>Immutable B-Trees</b> are built the same way, but need no spare space for later modifications because every operation on them is final: all pages can be <b>completely filled</b>, improving occupancy and performance.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Building a sorted filing cabinet from a sorted pile of papers. You don't insert each paper and reorganise drawers as they overflow; you fill drawer after drawer in order, and every time you finish a drawer you write its first label on the cabinet's index card.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="bl_svg" role="img" aria-label="Tree being built bottom-up from sorted keys"></div>
+    <div class="controls">
+      <label for="bl_n">Sorted keys <input id="bl_n" type="range" min="4" max="60" value="30"><output id="bl_no">30</output></label>
+      <label for="bl_fill">Fill <input id="bl_fill" type="range" min="50" max="100" step="5" value="100"><output id="bl_fillo">100%</output></label>
+      <button id="bl_prev" type="button">← Back</button><button id="bl_next" type="button">Next page →</button><button id="bl_end" type="button">Finish</button>
+      <span class="readout">step <b id="bl_step">1</b></span>
+    </div>
+    <div class="msg" id="bl_msg"></div>
+    <div class="readout" id="bl_r"></div>
+  </div>
+  <pre class="code">// streaming bulk load: open[l] is the node currently being filled at level l
+function addChild(l, child) {
+  let n = open[l];
+  if (n &amp;&amp; n.kids.length === perNode) { open[l] = null; addChild(l + 1, n); n = null; } // full: hand it up
+  if (!n) n = open[l] = mkNode(false);
+  if (n.kids.length) n.keys.push(minKey(child));  // the child's first key becomes a separator
+  n.kids.push(child);
+}
+for (let i = 0; i &lt; keys.length; i += perLeaf) addChild(1, mkNode(true, keys.slice(i, i + perLeaf)));
+// at the end, close the open nodes bottom-up; the highest one is the root</pre>
+  <div class="box behind"><b>What's happening behind it</b><p>Each leaf is written once, full (or at the fill you choose), and never touched again. Each internal node is written once, when it's full or the input ends. In memory you only hold the "right spine": one open node per level. That's <i>height</i> pages, a few KB, even for a billion-row index. Inserting the same sorted keys one at a time instead does a descent per key and a split every time the rightmost leaf fills, and (with middle splits) leaves every leaf half empty. The readout compares the two on the same keys.</p></div>
+  <div class="box work"><b>Worked example (simulated, capacity 3 keys)</b><p>30 sorted keys at 100% fill: 10 leaves of 3 keys, 3 internal nodes plus a root: 14 pages written, height 3, zero splits. Inserting the same 30 keys one at a time with middle splits: 19 splits, 15 half-full leaves, height 4. At 60 keys: 28 pages vs 40 splits and 30 leaves.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li><b>InnoDB</b> builds or rebuilds indexes with a "sorted index build" (a bulk load); <code>innodb_fill_factor</code> sets how full each page is made, and at 100 it still leaves 1/16 of clustered-index pages free (<a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-physical-structure.html">MySQL docs</a>).</li>
+    <li><b>PostgreSQL</b> <code>CREATE INDEX</code> sorts and fills leaf pages to the fillfactor (default 90) (<a href="https://www.postgresql.org/docs/current/sql-createindex.html">docs</a>). That's why <code>REINDEX</code> shrinks a bloated index: it's a bulk load.</li>
+  </ul></div>
+  <div class="box papers"><b>Reference</b><p>[RAMAKRISHNAN03] Ramakrishnan, Raghu, and Johannes Gehrke. 2002. <i>Database Management Systems</i> (3rd ed.). McGraw-Hill. The textbook description of bulk-loading a B+-tree from sorted data. A classic, readable DB course book.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 6 "Copy-on-Write" and immutable B-Tree variants (pdf p191). <a href="ch06_b_tree_variants.html">Ch.6 page</a>.</li><li>Chapter 7: LSM trees write their on-disk tables (SSTables) in the same spirit: from already-sorted data, in one sequential pass, immutable once written, with no space reserved for later changes.</li></ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · COMPRESSION</div><h2>Smaller pages, but disk blocks don't shrink with them</h2></div><span class="chip">pdf p132–133 · Fig 4-10</span></div>
+  <p>Storing raw data can mean significant overhead, and many databases offer compression. The trade-off is between <b>access speed</b> and <b>compression ratio</b>: higher ratios shrink data, so one access fetches more, but compressing and decompressing costs <b>RAM and CPU</b>.</p>
+  <ul class="plain">
+    <li><b>Whole-file</b> compression gives better ratios but has limited use: the whole file must be recompressed on an update. Compressing an entire index file is impractical and hard to do efficiently, because to reach one page you must access the whole file (or the section holding compression metadata) to locate the compressed section, decompress it, and make it available. Finer granularity suits larger datasets.</li>
+    <li><b>Page-wise</b> compression fits fixed-size pages: pages are compressed and decompressed independently, together with loading and flushing. But a compressed page may occupy only part of a <b>disk block</b>, and since transfers happen in whole blocks, extra bytes may be paged in [RAY95]. Fig 4-10: (a) a compressed page smaller than a block also pulls in bytes of another page; (b) a page that spans blocks forces an additional block read.</li>
+    <li><b>Data-only</b> compression, either <b>row-wise</b> (whole records) or <b>column-wise</b> (each column separately): page management and compression are decoupled.</li>
+    <li>Most open-source databases Petrov reviewed have <b>pluggable</b> compression using libraries such as <b>Snappy, zLib, lz4</b> and others. Results depend on the dataset and goals, so the book doesn't compare them; benchmarks such as the <b>Squash Compression Benchmark</b> evaluate algorithms on different block sizes using four metrics: <b>memory overhead, compression speed, decompression speed, and compression ratio</b>. Weigh these when choosing a library.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Vacuum-packing clothes to fit more in a suitcase, but the airline only accepts whole bags. A pack that's half a bag still costs a bag; a pack slightly bigger than a bag costs two. And you have to unpack before you can wear anything.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="cp_svg" role="img" aria-label="Compressed pages laid over fixed disk blocks"></div>
+    <div class="controls">
+      <label for="cp_page">Page <select id="cp_page"><option value="16384">16 KB</option><option value="8192">8 KB</option><option value="4096">4 KB</option></select></label>
+      <label for="cp_block">Disk block <select id="cp_block"><option value="4096">4 KB</option><option value="512">512 B</option></select></label>
+      <label for="cp_ratio">Ratio <input id="cp_ratio" type="range" min="10" max="50" value="23"><output id="cp_ratioo">2.3×</output></label>
+      <label for="cp_mode">Layout <select id="cp_mode"><option value="packed">packed back-to-back (Fig 4-10)</option><option value="padded">each page padded to whole blocks</option></select></label>
+    </div>
+    <div class="readout" id="cp_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two ways to place compressed pages, both with a cost. <b>Packed</b>: no wasted disk space, but a page usually straddles block boundaries, so reading it pulls in parts of its neighbours (Fig 4-10a and b). <b>Padded</b> to whole blocks: each page starts on a block boundary, but the tail of its last block is wasted disk space, and a 16 KB page compressed 2.3× (7.1 KB) still costs two 4 KB blocks, saving only half the I/O you hoped for. The readout averages over 200 consecutive pages (a model, not a measurement of any engine).</p></div>
+  <div class="box work"><b>Worked example (modelled)</b><p>16 KB page, 4 KB blocks, ratio 2.3×: compressed size 16,384 ÷ 2.3 ≈ 7,124 bytes. Padded: 2 blocks = 8,192 bytes per read and per page on disk (vs 4 blocks uncompressed: I/O halved, 13% of each read is padding). Packed: about 2.7 blocks per page read on average, because most pages cross three blocks, but disk space is exactly 7,124 bytes per page. Try ratio 4.0: a 4,096-byte page fits one block exactly when padded.</p></div>
+  <div class="box papers"><b>Reference</b><p>[RAY95] Ray, Gautam, Jayant Haritsa, and S. Seshadri. 1995. "Database Compression: A Performance Enhancement Tool." COMAD. An early study arguing that compression is a <em>performance</em> tool (less I/O), not just a space saver, and looking at granularity.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 1: row-oriented vs column-oriented storage; column-wise compression works so well because one column's values look alike. <a href="ch01_introduction_and_overview.html">Ch.1 page</a>.</li><li>Section 06: PostgreSQL's TOAST compresses large values individually (row/value-level, decoupled from pages).</li><li>Chapter 7: LSM engines compress immutable blocks, where the "recompress on update" problem disappears.</li></ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · VACUUM AND MAINTENANCE</div><h2>Live cells, garbage cells, and space you can't use</h2></div><span class="chip">pdf p134–135 · Fig 4-11</span></div>
+  <p>Besides user-facing operations, other processes run <b>in parallel with queries</b> to maintain storage integrity, reclaim space, reduce overhead and keep pages in order. Doing this in the <b>background</b> saves time and avoids paying for cleanup during inserts, updates and deletes.</p>
+  <p>Slotted pages (Chapter 3) need this maintenance. Splits and merges of internal nodes, or inserts, updates and deletes on leaves, can leave a page with enough <b>logical</b> space but not enough <b>contiguous</b> space: it is <b>fragmented</b>. Fig 4-11: the free space is split between two deleted (garbage) records and the gap between the header/cell pointers and the cells.</p>
+  <p>B-Trees are navigated from the root. Records you can reach by following pointers down from the root are <b>live</b> (addressable). Records you can't reach are <b>garbage</b>: nothing references them, they can't be read or interpreted, so their contents are as good as nullified. In a page, cells that still have an offset pointing at them are addressable; removed or overwritten ones are not. Zero-filling garbage is often <b>skipped</b> for performance, since the space will be overwritten by new data anyway.</p>
+  <div class="box picture"><b>Picture it</b><p>A parking lot where removed cars leave their painted bays behind. Three free single bays scattered between parked cars don't fit a bus, even though their total length would. Someone has to repaint the lot (compact it) before the bus can park.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="vm_svg" role="img" aria-label="A fragmented page: offsets, free space, live and garbage cells"></div>
+    <div class="legend"><span style="--sw:var(--c1)">cell offsets</span><span style="--sw:var(--c2)">live cell (has an offset)</span><span style="--sw:var(--sell)">garbage cell (no offset)</span></div>
+    <div class="readout" id="vm_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>"Free space" means two different numbers. <b>Logical free</b> = page size − header − offsets − live cells. <b>Contiguous free</b> = upper − lower, the only space a new cell can be written into without moving anything. Every delete or out-of-place update raises the first and leaves the second unchanged; the gap between them is fragmentation. A cell is garbage simply because no offset points to it. That's why "deleting" is just removing a 2–4 byte offset, and why the old bytes are still physically there until something overwrites them.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 3 "Slotted Pages" (pdf p98). <a href="ch03_file_formats.html">Ch.3 page</a>.</li><li>Your syllabus's PostgreSQL deep dive (2A) lists "MVCC, vacuum": this is the page-level picture underneath PostgreSQL's VACUUM (<code>Notes/syllabus.html</code>).</li></ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · FRAGMENTATION CAUSED BY UPDATES AND DELETES</div><h2>How a page ends up full of holes</h2></div><span class="chip">pdf p136–137</span></div>
+  <ul class="plain">
+    <li><b>Deletes</b> on the leaf level only remove the cell's <b>offset</b> from the header; the cell itself stays. It is no longer addressable, won't appear in results, and nothing needs to be nullified or moved.</li>
+    <li><b>Splits</b> only trim offsets: cells whose offsets were cut off (they moved to the new page) are unreachable here, and get overwritten when new data arrives or collected when vacuum runs.</li>
+    <li>Because deletes neither relocate the remaining cells nor physically remove the target, freed bytes end up <b>scattered</b> across the page: it is <b>fragmented</b> and needs <b>defragmentation</b>. A write usually needs one contiguous block of free bytes, so to gather the fragments the page must be <b>rewritten</b>.</li>
+    <li><b>Inserts</b> leave tuples in insertion order. That matters less, but naturally sorted tuples help <b>cache prefetch</b> during sequential reads.</li>
+    <li><b>Updates</b> matter mostly on the leaf level, because internal keys only guide navigation and define subtree boundaries. Updates are per key and generally cause no structural change, apart from creating <b>overflow pages</b>. On leaves, an update doesn't change cell order and tries to avoid rewriting the page, so <b>several versions of a cell</b> may be stored, only one of them addressable.</li>
+  </ul>
+  <div class="box behind"><b>Note from the book: garbage kept on purpose (MVCC)</b><p>Some databases rely on garbage collection and leave removed and updated cells in place for multiversion concurrency control. The old cells stay accessible to concurrently running transactions until the update completes, and can be collected once no other thread uses them. Some databases track <b>ghost records</b>, which are collected as soon as every transaction that may have seen them has completed [WEIKUM01].</p></div>
+  <div class="fig">
+    <div class="svgbox" id="fr_svg" role="img" aria-label="Interactive slotted page with inserts, deletes, updates and splits"></div>
+    <div class="legend"><span style="--sw:var(--c1)">cell offsets</span><span style="--sw:var(--c2)">live cell</span><span style="--sw:var(--sell)">garbage</span></div>
+    <div class="controls">
+      <label for="fr_size">Cell bytes <input id="fr_size" type="range" min="16" max="120" value="48"><output id="fr_sizeo">48</output></label>
+      <button id="fr_ins" type="button">Insert</button><button id="fr_del" type="button">Delete one</button><button id="fr_upd" type="button">Update one (grows)</button><button id="fr_split" type="button">Split (move upper half away)</button>
+      <label for="fr_auto"><input id="fr_auto" type="checkbox"> compact on write when needed</label>
+      <button id="fr_compact" type="button">Compact now</button><button id="fr_reset" type="button">Reset</button>
+    </div>
+    <div class="msg" id="fr_msg"></div>
+    <div class="readout" id="fr_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Watch the two free-space numbers. Delete: logical free goes up by the cell size + offset; contiguous free goes up only by the offset. Update: the new version is written as a new cell at <code>upper</code>, the offset is re-pointed to it, and the old version becomes garbage: one update costs the old cell's bytes until compaction. Split: half the offsets vanish in one go, leaving half the page as garbage. When an insert fails although logical free is enough, the page is fragmented: either compact it now (synchronous, the "on write" option) or let it split or overflow unnecessarily.</p></div>
+  <div class="box work"><b>Worked example (toy 512-byte page, 24-byte header, 4-byte offsets)</b><p>Nine 40–60 byte cells fill the page until only 2 contiguous bytes remain. Delete two cells (100 bytes between them): logical free becomes 110 bytes, but contiguous free is only 10 (the two freed offsets). A 60-byte insert fails as "fragmented". Compacting reclaims the 100 garbage bytes into one 110-byte gap and the insert succeeds. (These are the numbers from the test of this page's code.)</p></div>
+  <div class="box papers"><b>Reference</b><p>[WEIKUM01] Weikum, Gerhard, and Gottfried Vossen. 2001. <i>Transactional Information Systems</i>. Morgan Kaufmann. The deep reference on concurrency control and recovery theory, including ghost records and when old versions can be collected.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Chapter 5 "Multiversion Concurrency Control" (pdf p176). <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Section 06: an update that no longer fits creates an overflow page.</li></ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · PAGE DEFRAGMENTATION</div><h2>Compaction, vacuum, and the freelist</h2></div><span class="chip">pdf p138 · footnote 3 p140</span></div>
+  <p>The process that reclaims space and rewrites pages is called <b>compaction</b>, <b>vacuum</b>, or just <b>maintenance</b>. A page can be rewritten <b>synchronously on write</b> when it lacks free physical space (to avoid creating unnecessary overflow pages), but compaction usually means a separate, <b>asynchronous</b> process that walks through pages, collects garbage and rewrites their contents.</p>
+  <ul class="plain">
+    <li>It reclaims the space of dead cells and rewrites cells in their <b>logical (key) order</b>.</li>
+    <li>Rewritten pages may be <b>relocated</b> to new positions in the file. Unused in-memory pages go back to the <b>page cache</b>.</li>
+    <li>IDs of newly available on-disk pages go on the <b>free page list</b> (a <b>freelist</b>). This list must be <b>persisted</b>, so it survives crashes and restarts and free space is not lost or leaked.</li>
+    <li>Footnote 3: SQLite, for example, keeps a list of unused pages in which <b>trunk pages</b> form a linked list and hold the addresses of freed pages.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A night cleaning crew in an office. During the day people just push old papers aside (deletes). At night the crew tidies each desk (compaction), clears out desks nobody uses anymore, and writes their numbers on the "free desks" whiteboard at the entrance (freelist). If the whiteboard gets wiped in a power cut, those desks sit empty and unused forever: leaked.</p></div>
+  <div class="fig">
+    <div class="svgbox" id="df_svg" role="img" aria-label="Pages of a file with live, garbage and free space, plus the freelist"></div>
+    <div class="legend"><span style="--sw:var(--c2)">live bytes</span><span style="--sw:var(--sell)">garbage</span><span style="--sw:var(--c1)">vacuum position</span></div>
+    <div class="controls">
+      <button id="df_step" type="button">Vacuum next page</button><button id="df_all" type="button">Vacuum all</button><button id="df_alloc" type="button">Allocate a page</button><button id="df_crash" type="button">Crash + restart</button>
+      <label for="df_persist"><input id="df_persist" type="checkbox" checked> freelist persisted</label>
+      <button id="df_reset" type="button">Reset</button>
+    </div>
+    <div class="msg" id="df_msg"></div>
+    <div class="readout" id="df_r"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Vacuum does two separate jobs. Inside a page it is the compaction from section 15: drop garbage, write live cells back in key order, restore one contiguous free gap. Across the file it finds pages with nothing live left and returns them: the file doesn't shrink, but the next allocation reuses a freed page instead of growing the file. The freelist itself is metadata that must be written durably (and logged) like any other page; untick "freelist persisted", vacuum, then crash: the freed pages are neither in the tree nor in the list, so nothing will ever reuse them.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li><b>SQLite</b> freelist (<a href="https://www.sqlite.org/fileformat2.html">file format</a>): the database header stores the first trunk page at offset 32 and the total freelist page count at offset 36. Each trunk page holds the next trunk page number, a count L, and L page numbers of free "leaf" pages, which themselves contain no information.</li>
+    <li><b>PostgreSQL</b> nbtree (<a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">README</a>): a page is deleted only when completely empty, in two stages (unlinked from its parent, then from its siblings), and cannot be recycled immediately: it is stamped with the next transaction id and reused only once that is visible to everyone, because a concurrent scan might still be heading to it. Since PostgreSQL 14, VACUUM can also put newly deleted pages into the free space map at the end of its index scan.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 12: rebuilding by bulk load is the "big hammer" version of defragmentation.</li><li>Chapter 5: why the freelist must be durable, and how recovery treats such metadata. <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Chapter 7: LSM compaction is the same word for a different process (merging immutable files).</li></ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · SUMMARY · FURTHER READING</div><h2>The gap between the textbook and a real engine</h2></div><span class="chip">pdf p139–140</span></div>
+  <p>Petrov's summary groups the chapter into three parts. <b>On-disk organisation</b>: the page header (what it holds), rightmost pointers (not paired with separator keys, and how to handle them), high keys (the maximum key allowed in a node), and overflow pages (storing oversize and variable-size records in fixed-size pages). <b>Root-to-leaf traversal</b>: binary search with indirection pointers, and tracking the hierarchy with parent pointers or breadcrumbs. <b>Optimisation and maintenance</b>: rebalancing (moving elements between neighbours to reduce splits and merges), right-only appends (appending a new rightmost cell instead of splitting, assuming it will quickly fill), bulk loading (building a tree efficiently from sorted data), and garbage collection (rewriting pages, putting cells in key order, reclaiming space held by unaddressable cells).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Problem</th><th>Options</th><th>Pick this when…</th><th>Cost</th></tr></thead>
+    <tbody>
+      <tr><td>Reach a neighbouring node</td><td>Sibling links · parent pointers · re-descend with breadcrumbs</td><td>Range scans dominate → sibling links. Want a single top-down latch order (WiredTiger) → parents.</td><td>Links: extra page write + latch on every split. Parents: f/2 pointer rewrites per internal split.</td></tr>
+      <tr><td>Walk back up after a split</td><td>Parent pointers · breadcrumb stack</td><td>Almost always breadcrumbs: height entries, in memory only (PostgreSQL BTStack).</td><td>Index may go stale under concurrency; must re-check.</td></tr>
+      <tr><td>The N + 1-th pointer</td><td>In the header (SQLite) · paired with a high key (PostgreSQL)</td><td>High key if you want Blink-Tree concurrency and uniform cells.</td><td>One extra key per node.</td></tr>
+      <tr><td>Big values</td><td>Overflow pages · out-of-line value store (TOAST) · blob storage</td><td>Occasional big values → overflow. All values big → separate blob storage (the book's advice).</td><td>Extra page reads, a chain to traverse, more fragmentation to vacuum.</td></tr>
+      <tr><td>Node overflow</td><td>Split · rebalance · B* 2→3 · quickbalance on the right edge</td><td>Random keys: rebalance/B* for occupancy (≈ 70% → mid-80s simulated). Ascending keys: quickbalance or a high fill on the left.</td><td>Rebalance reads and writes a sibling and the parent.</td></tr>
+      <tr><td>Building from sorted data</td><td>Bulk load bottom-up · insert one by one</td><td>Index creation, rebuild, immutable trees: always bulk load.</td><td>Needs the data sorted first.</td></tr>
+      <tr><td>Compression</td><td>Whole file · per page · per row · per column</td><td>Pages for B-Trees; columns for analytics; never whole-file for an updatable index.</td><td>CPU + RAM; block padding or straddling (Fig 4-10).</td></tr>
+      <tr><td>Fragmentation</td><td>Compact on write · background vacuum · full rebuild</td><td>Background by default; on write only when the page would otherwise overflow or split.</td><td>Background I/O; freelist must be durable.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box papers"><b>Further reading listed by the book (pdf p140)</b><ul>
+    <li>Graefe, Goetz. 2011. "Modern B-Tree Techniques." <i>Foundations and Trends in Databases</i> 3(4): 203–402. https://doi.org/10.1561/1900000028</li>
+    <li>Healey, Christopher G. 2016. <i>Disk-Based Algorithms for Big Data</i> (1st ed.). CRC Press.</li>
+  </ul>
+  <p>All papers cited in the chapter, from the book's bibliography (pdf p489–516): GIAMPAOLO98 (§02), LEHMAN81 and MILLER78 (§03, §05, §08), SEDGEWICK11 (§07), GRAEFE11 and KNUTH98 (§10), RAMAKRISHNAN03 (§12), RAY95 (§13), WEIKUM01 (§15).</p></div>
+  <div class="box behind"><b>The book's footnotes</b><ul>
+    <li>1 (pdf p116): the rightmost-pointer split handling can be found in SQLite's <code>balance_deeper</code> function.</li>
+    <li>2 (pdf p126): more on PostgreSQL's <code>BTStack</code> at databass.dev/links/21.</li>
+    <li>3 (pdf p138): SQLite keeps a list of unused pages; trunk pages form a linked list and hold addresses of freed pages.</li>
+  </ul></div>
+  <div class="box beyond"><b>Sources checked for the "Beyond the book" boxes</b><ul>
+    <li>PostgreSQL docs: <a href="https://www.postgresql.org/docs/current/storage-page-layout.html">Database Page Layout</a>, <a href="https://www.postgresql.org/docs/current/sql-createindex.html">CREATE INDEX (fillfactor)</a>, <a href="https://www.postgresql.org/docs/current/storage-toast.html">TOAST</a>; source: <a href="https://github.com/postgres/postgres/blob/master/src/backend/access/nbtree/README">nbtree README</a>.</li>
+    <li>SQLite: <a href="https://www.sqlite.org/fileformat2.html">Database File Format</a>.</li>
+    <li>MySQL 8.0: <a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-physical-structure.html">The Physical Structure of an InnoDB Index</a>.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Next: Chapter 5 (buffer management, WAL, recovery, latches, Blink-Trees) builds directly on these pages. <a href="ch05_transaction_processing_and_recovery.html">Ch.5 page</a>.</li><li>Your <code>Notes/syllabus.html</code>: "B-Trees / B+ Trees — implement in TypeScript — CLRS Ch.18 + Database Internals Ch.2–4". The <code>insert</code>, <code>attach</code>, <code>binarySearchCells</code>, <code>bulkLoad</code> and slotted-page functions on this page together are a working skeleton for that exercise.</li></ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. A page has 900 bytes of logical free space but an insert of a 200-byte cell fails. How?</summary><p>The free space is fragmented: most of it is garbage cells scattered between live ones, and the contiguous gap (upper − lower) is under 204 bytes. The page needs compaction, not a split (sections 14–15).</p></details>
+  <details><summary>2. Why can parent pointers live only in memory, while sibling links usually live on disk?</summary><p>You can only reach a child page by following a pointer from its parent, so the parent is known when the child is loaded and the pointer can be filled in then. A sibling link is used to reach a page you <em>didn't</em> come from, so it has to be stored (sections 03, 08).</p></details>
+  <details><summary>3. An internal node with fanout 400 splits. What does that cost with parent pointers, and with breadcrumbs?</summary><p>Parent pointers: about 200 children move to the new node, so about 200 pages need their parent pointer updated (loaded if not cached). Breadcrumbs: nothing; the path is in an in-memory stack, one entry per level (sections 08–09).</p></details>
+  <details><summary>4. A Blink-Tree reader lands on a node with high key 60 while searching for 70. What happened and what does it do?</summary><p>The node was split concurrently after the reader read the parent; keys ≥ 60 now live in the right sibling. It follows the sibling (right) link instead of restarting (section 05; Chapter 5 Blink-Trees).</p></details>
+  <details><summary>5. Node size 8,192 bytes, fanout 16. What is max_payload_size, and why does it guarantee a page never runs out of room for a record?</summary><p>8,192 ÷ 16 = 512 bytes. Each record keeps at most 512 bytes in the node, so 16 records (the B-Tree's count limit) always fit in the node by bytes too; anything beyond 512 bytes spills to overflow pages (section 06).</p></details>
+  <details><summary>6. Binary search on [7, 15, 23] returns 0 for key 7. What should it return for key 3, and why not "−0"?</summary><p>Insertion point 0. "Negative means absent" can't express −0, so the common encoding returns −(0) − 1 = −1. Decode with insertionPoint = −r − 1. The book says "negative gives the insertion point" without this detail (section 07).</p></details>
+  <details><summary>7. With indirection pointers, how many cell reads does a binary search over 255 cells need at most, and why are they expensive?</summary><p>⌈log<sub>2</sub>(256)⌉ = 8 comparisons, each a hop from the offset array to a cell stored in insertion order somewhere else in the page, typically a CPU cache miss (section 07).</p></details>
+  <details><summary>8. Breadcrumbs store a child index per level. Why does the book add "assuming the index is still valid"?</summary><p>Between the descent and the split, another operation may have changed the parent (inserted or moved separators, or split it), so the remembered index or even the remembered parent can be stale. Real engines re-locate the downlink (PostgreSQL matches by block number and moves right) (section 09).</p></details>
+  <details><summary>9. Random inserts give about 70% full leaves with plain splits. What does B* change, and what does it cost?</summary><p>It shares keys with neighbours until both are full, then splits two nodes into three at two-thirds each, so occupancy rises (mid-80s in this page's simulation) and the tree can be shorter. Cost: reading and rewriting siblings and parent separators on many inserts, plus more complex code (section 10).</p></details>
+  <details><summary>10. Your table uses an auto-increment id. Why might the index be only half full, and what fixes it?</summary><p>Middle splits of the rightmost leaf leave a 50% page behind that never receives another key. Quickbalance (start a fresh rightmost page) or a split that leaves the left page ~90% full fixes it (PostgreSQL fillfactor 90 on right-edge splits; InnoDB ends near 15/16). The fastpath additionally skips the root-to-leaf descent (section 11).</p></details>
+  <details><summary>11. Why does bulk loading need only "height" pages of memory, however big the input is?</summary><p>Leaves are written once and never revisited; the only unfinished nodes are the rightmost open node on each level (the parents of the leaf being filled). Everything to their left is complete and already on disk (section 12).</p></details>
+  <details><summary>12. A 16 KB page compresses to 5 KB with 4 KB blocks. Padded layout: how many blocks per read and how much padding? Packed layout: what's the catch?</summary><p>Padded: 2 blocks (8 KB) per read, 3 KB padding per page. Packed: no wasted space, but pages straddle block boundaries, so a read pulls in bytes of neighbouring pages and often an extra block (Fig 4-10, section 13).</p></details>
+  <details><summary>13. Vacuum freed 50 pages, then the server crashed before the freelist was written. What happens?</summary><p>Those pages are no longer reachable from the tree and not on any free list: leaked. The file keeps growing for new allocations even though space exists. That's why the book says the freelist must be persisted (section 16).</p></details>
+  <details><summary>14. Updates on a leaf "try to avoid page rewrite". What does that leave behind, and which feature deliberately keeps it?</summary><p>Multiple versions of the same cell, only one addressable; the rest are garbage until vacuum. MVCC databases keep old versions on purpose while concurrent transactions may still read them (ghost records, collected once no transaction can see them) (section 15).</p></details>
+</section>
+
+<footer>Built from Alex Petrov, <i>Database Internals</i> (O'Reilly, 2019), Chapter 4 "Implementing B-Trees" (PDF pages 111–140; bibliography pdf p489–516), explained in my own words with my own examples and diagrams. Figures are recreated ideas, not copies. Simulations run the JavaScript on this page with made-up keys; numbers labelled simulated or modelled come from that code, not from the book or from a real database. Facts marked "Beyond the book" were checked against the linked PostgreSQL, SQLite and MySQL documentation (October 2026). Related: <code>Notes/syllabus.html</code> (B-Trees, PostgreSQL deep dive).</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  function buildData() { $('seedOut').textContent = seed; }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // =====================================================================
+  // B-TREE CORE: the same code every step-through and simulation runs.
+  // B+-style choice (mine, not the book's): leaves hold the keys; a leaf split
+  // COPIES its first right key up, an internal split MOVES its middle key up.
+  // =====================================================================
+  let NID = 0;
+  const mkNode = (leaf, keys, kids) => ({ id: ++NID, leaf, keys: keys || [], kids: kids || [] });
+  // first index whose key is > k  (which child pointer to follow: K[i-1] <= k < K[i])
+  function upperBound(a, k) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] <= k) lo = m + 1; else hi = m; } return lo; }
+  // first index whose key is >= k  (where a key sits / would be inserted in a leaf)
+  function lowerBound(a, k) { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < k) lo = m + 1; else hi = m; } return lo; }
+  function newTree(cap, opts) {
+    const root = mkNode(true);
+    return Object.assign({ cap, root, policy: 'split', fastpath: false, ff: 0.9, reads: 0, splits: 0, moves: 0, parentWrites: 0, fastHits: 0, rightLeaf: root }, opts || {});
+  }
+  const cloneNode = (n) => ({ id: n.id, leaf: n.leaf, keys: n.keys.slice(), kids: n.kids.map(cloneNode) });
+  function minKey(n) { while (!n.leaf) n = n.kids[0]; return n.keys[0]; }
+  function leavesOf(n, out) { out = out || []; if (n.leaf) out.push(n); else n.kids.forEach((c) => leavesOf(c, out)); return out; }
+  function heightOf(n) { let h = 1; while (!n.leaf) { n = n.kids[0]; h++; } return h; }
+
+  function insert(T, k, S) {
+    // PostgreSQL-style fastpath: key strictly greater than the first key of the cached rightmost leaf, and room there
+    if (T.fastpath && T.rightLeaf.keys.length && k > T.rightLeaf.keys[0] && T.rightLeaf.keys.length < T.cap) {
+      const L = T.rightLeaf, p = lowerBound(L.keys, k); if (L.keys[p] === k) return false;
+      L.keys.splice(p, 0, k); T.fastHits++;
+      if (S) S(`Fastpath: ${k} > first key of the cached rightmost leaf and it has room. Insert directly, no descent.`, [L.id], []);
+      return true;
+    }
+    const stack = []; let n = T.root;
+    while (!n.leaf) {
+      const i = upperBound(n.keys, k); stack.push({ node: n, idx: i }); T.reads++;
+      if (S) S(`Node [${n.keys.join(', ')}]: ${k} falls under child pointer ${i}. Push breadcrumb (node, ${i}) and go down.`, [n.id], stack);
+      n = n.kids[i];
+    }
+    T.reads++;
+    const p = lowerBound(n.keys, k);
+    if (n.keys[p] === k) { if (S) S(`${k} is already in the leaf. Nothing to do.`, [n.id], stack); return false; }
+    n.keys.splice(p, 0, k);
+    if (S) S(`Reached the leaf. Insert ${k} at position ${p}${n.keys.length > T.cap ? ': the leaf now holds ' + n.keys.length + ' keys, over its capacity of ' + T.cap : ''}.`, [n.id], stack);
+    if (n.keys.length > T.cap) leafOverflow(T, n, stack, k, S);
+    return true;
+  }
+
+  function leafOverflow(T, n, stack, k, S) {
+    const top = stack[stack.length - 1];
+    // SQLite-style quickbalance: appending the largest key to the full rightmost leaf -> new, nearly empty rightmost leaf
+    if (T.policy === 'quick' && n === T.rightLeaf && k === n.keys[n.keys.length - 1]) {
+      n.keys.pop(); const R = mkNode(true, [k]); T.rightLeaf = R; T.splits++; T.parentWrites++;
+      if (S) S(`quickbalance: ${k} is the new largest key. Instead of splitting, start a fresh rightmost leaf holding only ${k}; the old leaf stays full.`, [n.id, R.id], stack);
+      return attach(T, stack, n, k, R, S);
+    }
+    if ((T.policy === 'rebalance' || T.policy === 'bstar') && top) {
+      const p = top.node, i = top.idx, cand = [];
+      if (i > 0) cand.push(i - 1);
+      if (i < p.kids.length - 1) cand.push(i);
+      for (const j of cand) {
+        const sib = p.kids[j] === n ? p.kids[j + 1] : p.kids[j];
+        if (sib.keys.length < T.cap) {
+          const old = p.keys[j]; rebalancePair(T, p, j);
+          if (S) S(`Sibling [${sib.keys.join(', ')}] had room, so keys were shifted into it instead of splitting. Parent separator ${old} → ${p.keys[j]}.`, [p.kids[j].id, p.kids[j + 1].id, p.id], stack);
+          return;
+        }
+      }
+      if (T.policy === 'bstar' && cand.length) {
+        const j = cand[0]; split2to3(T, p, j);
+        if (S) S(`Both siblings are full: split TWO nodes into THREE (about two-thirds full each). Parent gains one separator.`, [p.kids[j].id, p.kids[j + 1].id, p.kids[j + 2].id, p.id], stack);
+        stack.pop(); return propagate(T, stack, p, S);
+      }
+    }
+    splitLeaf(T, n, stack, S);
+  }
+
+  function rebalancePair(T, p, j) {
+    const A = p.kids[j], B = p.kids[j + 1], all = A.keys.concat(B.keys), half = Math.ceil(all.length / 2);
+    T.moves += Math.abs(A.keys.length - half);
+    A.keys = all.slice(0, half); B.keys = all.slice(half); p.keys[j] = B.keys[0];
+  }
+  function split2to3(T, p, j) {
+    const A = p.kids[j], B = p.kids[j + 1], all = A.keys.concat(B.keys), t = all.length;
+    const s1 = Math.ceil(t / 3), s2 = Math.ceil((t - s1) / 2);
+    const C = mkNode(true, all.slice(s1 + s2));
+    T.moves += Math.abs(A.keys.length - s1) + C.keys.length;
+    A.keys = all.slice(0, s1); B.keys = all.slice(s1, s1 + s2);
+    p.kids.splice(j + 2, 0, C); p.keys.splice(j, 1, B.keys[0], C.keys[0]);
+    if (T.rightLeaf === B) T.rightLeaf = C;
+    T.splits++; T.parentWrites++;
+  }
+  function splitLeaf(T, n, stack, S) {
+    const isR = n === T.rightLeaf;
+    let cut = Math.floor(n.keys.length / 2); // split in the middle: two half-full leaves
+    if (T.policy === 'ff' && isR) cut = Math.max(1, Math.min(n.keys.length - 1, Math.round(T.cap * T.ff)));
+    const R = mkNode(true, n.keys.splice(cut)); if (isR) T.rightLeaf = R;
+    T.splits++; T.parentWrites++;
+    if (S) S(`Split the leaf: left keeps [${n.keys.join(', ')}], new right leaf gets [${R.keys.join(', ')}]. Its first key ${R.keys[0]} is copied up as the separator.`, [n.id, R.id], stack);
+    attach(T, stack, n, R.keys[0], R, S);
+  }
+  // put (separator, new right node) into the parent found by popping the breadcrumb stack
+  function attach(T, stack, left, sep, right, S) {
+    if (!stack.length) {
+      T.root = mkNode(false, [sep], [left, right]); T.parentWrites += 2;
+      if (S) S(`The breadcrumb stack is empty: we split the root. A new root [${sep}] is created and the tree grows by one level.`, [T.root.id], []);
+      return;
+    }
+    const { node: p, idx } = stack.pop();
+    p.keys.splice(idx, 0, sep); p.kids.splice(idx + 1, 0, right);
+    if (S) S(`Pop breadcrumb → parent [${p.keys.join(', ')}]. Separator ${sep} goes in at cell index ${idx}${p.keys.length > T.cap ? ', and now the parent is over capacity too' : ''}.`, [p.id, right.id], stack);
+    propagate(T, stack, p, S);
+  }
+  function propagate(T, stack, p, S) {
+    if (p.keys.length <= T.cap) return;
+    const m = p.keys.length >> 1, up = p.keys[m];
+    const R = mkNode(false, p.keys.slice(m + 1), p.kids.slice(m + 1));
+    p.keys = p.keys.slice(0, m); p.kids = p.kids.slice(0, m + 1);
+    T.splits++; T.parentWrites += R.kids.length;
+    if (S) S(`Split the internal node: [${p.keys.join(', ')}] | ${up} | [${R.keys.join(', ')}]. ${up} MOVES up; ${R.kids.length} children now have a new parent.`, [p.id, R.id], stack);
+    attach(T, stack, p, up, R, S);
+  }
+
+  // ---- binary search over a slotted page's sorted offset array (cells are in insertion order) ----
+  // returns index if found, otherwise -(insertionPoint) - 1  (the Java / Sedgewick-style encoding; not in the book)
+  function binarySearchCells(offsets, cells, key, trace) {
+    let lo = 0, hi = offsets.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      const cellKey = cells[offsets[mid]].key; // follow the indirection pointer to the cell
+      if (trace) trace({ lo, hi, mid, cell: offsets[mid], cellKey });
+      if (cellKey < key) lo = mid + 1; else if (cellKey > key) hi = mid - 1; else return mid;
+    }
+    return -(lo + 1);
+  }
+
+  // ---- bulk loading: sorted keys -> tree bottom-up, no splits; only the right spine is "open" in memory ----
+  function bulkLoad(keys, cap, fill, S) {
+    const perLeaf = Math.max(1, Math.round(cap * fill)), perNode = Math.max(3, Math.min(cap + 1, Math.round((cap + 1) * fill)));
+    const open = []; let written = 0; // open[l] = node being filled at level l (l >= 1)
+    const top = () => { for (let l = open.length - 1; l >= 1; l--) if (open[l]) return open[l]; return null; };
+    const spine = () => open.slice(1).filter(Boolean).reverse(); // unfinished nodes, highest level first
+    function addChild(l, child) {
+      let n = open[l];
+      if (n && n.kids.length === perNode) { open[l] = null; written++; addChild(l + 1, n); n = null; }
+      if (!n) n = open[l] = mkNode(false);
+      if (n.kids.length) n.keys.push(minKey(child));
+      n.kids.push(child);
+    }
+    for (let i = 0; i < keys.length; i += perLeaf) {
+      const leaf = mkNode(true, keys.slice(i, i + perLeaf)); written++;
+      if (i + perLeaf >= keys.length && i === 0) { if (S) S(`Only one leaf needed: it is the root.`, [leaf.id], [leaf], 0); return { root: leaf, written, perLeaf, perNode }; }
+      addChild(1, leaf);
+      if (S) S(`Write leaf [${leaf.keys.join(', ')}] to disk. It is attached to the open parent; its first key becomes a separator there (unless it is the parent's first child).`, [leaf.id], spine(), spine().length);
+    }
+    // finish: close the right spine bottom-up
+    for (let l = 1; l < open.length; l++) {
+      const n = open[l]; if (!n) continue;
+      const higher = open.slice(l + 1).some(Boolean);
+      if (!higher) { written++; if (S) S(`Close the last open node: it becomes the root.`, [n.id], [n], 0); return { root: n, written, perLeaf, perNode }; }
+      const parent = open[l + 1];
+      if (n.kids.length === 1 && parent && parent.kids.length) { // borrow one child so no node has a single pointer
+        const prev = parent.kids[parent.kids.length - 1]; const moved = prev.kids.pop(); prev.keys.pop();
+        n.kids.unshift(moved); n.keys.unshift(minKey(n.kids[1]));
+      }
+      open[l] = null; written++; addChild(l + 1, n);
+      if (S) S(`Input exhausted: write the open node at level ${l} and hand it to its parent.`, [n.id], spine(), spine().length);
+    }
+    return { root: top(), written, perLeaf, perNode };
+  }
+
+  // ---- slotted page with an offset array (fragmentation + vacuum) ----
+  function newPage(size, hdr, slot) { return { size, hdr, slot, cells: [], slots: [], nextId: 1, lastMsg: '' }; }
+  const pgLower = (P) => P.hdr + P.slots.length * P.slot;
+  const pgUpper = (P) => P.cells.reduce((m, c) => Math.min(m, c.off), P.size);
+  const pgLive = (P) => P.slots.reduce((s, c) => s + c.size, 0);
+  const pgGarbage = (P) => P.cells.filter((c) => !c.live).reduce((s, c) => s + c.size, 0);
+  const pgContig = (P) => pgUpper(P) - pgLower(P);
+  const pgLogical = (P) => P.size - pgLower(P) - pgLive(P);
+  function pgInsert(P, key, size, autoCompact) {
+    const need = size + P.slot;
+    if (pgContig(P) < need) {
+      if (pgLogical(P) >= need) {
+        if (!autoCompact) return 'fragmented';
+        pgCompact(P);
+      } else return 'full';
+    }
+    const c = { id: P.nextId++, key, size, off: pgUpper(P) - size, live: true };
+    P.cells.push(c);
+    const i = P.slots.findIndex((s) => s.key > key); P.slots.splice(i < 0 ? P.slots.length : i, 0, c);
+    return 'ok';
+  }
+  function pgDelete(P, idx) { const c = P.slots[idx]; if (!c) return false; c.live = false; P.slots.splice(idx, 1); return true; }
+  // update: write the new version as a new cell, re-point the slot, old version becomes garbage (no page rewrite)
+  function pgUpdate(P, idx, newSize) {
+    const old = P.slots[idx]; if (!old) return 'none';
+    if (pgContig(P) < newSize) return pgLogical(P) + old.size >= newSize ? 'fragmented' : 'full';
+    const c = { id: P.nextId++, key: old.key, size: newSize, off: pgUpper(P) - newSize, live: true };
+    P.cells.push(c); old.live = false; P.slots[idx] = c; return 'ok';
+  }
+  // compaction / vacuum: drop garbage, rewrite live cells in key order from the end of the page
+  function pgCompact(P) {
+    let off = P.size; const before = pgGarbage(P);
+    P.cells = P.slots.map((c) => { off -= c.size; c.off = off; return c; });
+    return before;
+  }
+
+  // =====================================================================
+  // DRAWING HELPERS (inline SVG; colours come from CSS classes → theme tokens)
+  // =====================================================================
+  function svgWrap(W, H, inner, label, minW) {
+    return `<svg viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" style="width:100%;max-width:${Math.round(W * 1.2)}px;min-width:${Math.min(Math.ceil(W), minW || 520)}px" role="img" aria-label="${label || ''}">${inner}</svg>`;
+  }
+  function ah(x, y, dir, cls) { // small arrowhead whose tip is at (x, y)
+    const d = { down: [[-4, -7], [4, -7]], up: [[-4, 7], [4, 7]], right: [[-7, -4], [-7, 4]], left: [[7, -4], [7, 4]] }[dir];
+    return `<polygon class="ah ${cls || ''}" points="${x},${y} ${x + d[0][0]},${y + d[0][1]} ${x + d[1][0]},${y + d[1][1]}"/>`;
+  }
+  // tree / forest renderer. o: {cap, hl:Set, crumb:Set, chg:Set, path:Set, siblings, sibHl, leafLabels}
+  function treeSVG(roots, o) {
+    o = o || {}; const cap = o.cap || 3, chh = 22, lh = o.lh || 62, gap = o.siblings ? 22 : 10;
+    let maxLen = 1; const walk = (n) => { n.keys.forEach((k) => { maxLen = Math.max(maxLen, String(k).length); }); n.kids.forEach(walk); }; roots.forEach(walk);
+    const cw = Math.max(24, maxLen * 7.6 + 8);
+    const lvl = (n) => heightOf(n) - 1; const top = Math.max(...roots.map(lvl));
+    const pos = new Map(); const leaves = []; let x = 6;
+    function place(n) {
+      const w = Math.max(n.keys.length, cap, 1) * cw, y = 8 + (top - lvl(n)) * lh;
+      if (n.leaf) { pos.set(n.id, { x0: x, w, y, n }); leaves.push(n); x += w + gap; return; }
+      n.kids.forEach(place);
+      const a = pos.get(n.kids[0].id), b = pos.get(n.kids[n.kids.length - 1].id);
+      pos.set(n.id, { x0: (a.x0 + a.w / 2 + b.x0 + b.w / 2) / 2 - w / 2, w, y, n });
+    }
+    roots.forEach(place);
+    let minX = Infinity, maxX = -Infinity; pos.forEach((p) => { minX = Math.min(minX, p.x0); maxX = Math.max(maxX, p.x0 + p.w); });
+    const sh = 6 - Math.min(0, minX); let s = '';
+    pos.forEach((p) => {
+      const n = p.n; if (n.leaf) return;
+      n.kids.forEach((c, i) => {
+        const q = pos.get(c.id); if (!q) return;
+        const x1 = p.x0 + i * cw + sh, y1 = p.y + chh, x2 = q.x0 + q.w / 2 + sh, y2 = q.y;
+        const on = !!(o.path && o.path.has(n.id) && o.path.has(c.id));
+        s += `<path class="edge${on ? ' hl' : ''}" d="M${x1},${y1} C${x1},${y1 + 20} ${x2},${y2 - 22} ${x2},${y2 - 6}"/>${ah(x2, y2, 'down', on ? 'hl' : '')}<circle class="dot${on ? ' hl' : ''}" cx="${x1}" cy="${y1}" r="2.6"/>`;
+      });
+    });
+    if (o.siblings) for (let i = 0; i + 1 < leaves.length; i++) {
+      const a = pos.get(leaves[i].id), b = pos.get(leaves[i + 1].id), y = a.y + chh / 2, on = o.sibHl === i;
+      s += `<line class="sib${on ? ' hl' : ''}" x1="${a.x0 + a.w + 2 + sh}" y1="${y - 3}" x2="${b.x0 - 2 + sh}" y2="${y - 3}"/>${ah(b.x0 - 2 + sh, y - 3, 'right', on ? 'hl' : 'c2')}`;
+      s += `<line class="sib" x1="${a.x0 + a.w + 2 + sh}" y1="${y + 4}" x2="${b.x0 - 2 + sh}" y2="${y + 4}"/>${ah(a.x0 + a.w + 2 + sh, y + 4, 'left', 'c2')}`;
+    }
+    pos.forEach((p) => {
+      const n = p.n, cls = ['nd'];
+      if (o.hl && o.hl.has(n.id)) cls.push('hl'); else if (o.chg && o.chg.has(n.id)) cls.push('chg'); else if (o.crumb && o.crumb.has(n.id)) cls.push('crumb');
+      if (n.keys.length > cap) cls.push('over');
+      s += `<g class="${cls.join(' ')}">`;
+      const slots = Math.max(n.keys.length, cap);
+      for (let i = 0; i < slots; i++) {
+        const has = i < n.keys.length, cx = p.x0 + i * cw + sh;
+        s += `<rect class="cell${has ? '' : ' empty'}" x="${cx}" y="${p.y}" width="${cw}" height="${chh}" rx="2"/>`;
+        if (has) s += `<text x="${cx + cw / 2}" y="${p.y + 15}" text-anchor="middle">${n.keys[i]}</text>`;
+      }
+      s += '</g>';
+    });
+    if (o.leafLabels) leaves.forEach((l, i) => { const p = pos.get(l.id); s += `<text class="lbl" x="${p.x0 + p.w / 2 + sh}" y="${p.y + chh + 14}" text-anchor="middle">leaf #${i}</text>`; });
+    return { s, W: maxX - Math.min(0, minX) + 12, H: 8 + top * lh + chh + (o.leafLabels ? 22 : 8) };
+  }
+  function drawTree(host, roots, o, label) { const t = treeSVG(roots, o); $(host).innerHTML = svgWrap(t.W, t.H, t.s, label, 520); }
+
+  // slotted page renderer
+  function pageSVG(P, o) {
+    o = o || {}; const W = 760, y = 40, h = 44, k = W / P.size, X = (b) => 10 + b * k; let s = '';
+    const lower = pgLower(P), upper = pgUpper(P);
+    s += `<rect class="f-free" x="${X(0)}" y="${y}" width="${W}" height="${h}"/>`;
+    s += `<rect class="f-hdr" x="${X(0)}" y="${y}" width="${Math.max(2, P.hdr * k)}" height="${h}"/>`;
+    P.slots.forEach((c, i) => { s += `<rect class="f-slot" x="${X(P.hdr + i * P.slot)}" y="${y}" width="${Math.max(0.8, P.slot * k)}" height="${h}"/>`; });
+    P.cells.forEach((c) => {
+      s += `<rect class="${c.live ? 'f-live' : 'f-dead'}" x="${X(c.off)}" y="${y}" width="${c.size * k}" height="${h}"/>`;
+      if (c.size * k > 20) s += `<text x="${X(c.off + c.size / 2)}" y="${y + h / 2 + 4}" text-anchor="middle" class="${c.live ? '' : 't-sell'}">${c.live ? c.key : '×'}</text>`;
+    });
+    let H = y + h + 26;
+    if (o.arrows && P.slots.length <= 16) {
+      P.slots.forEach((c, i) => {
+        const xs = X(P.hdr + (i + 0.5) * P.slot), xc = X(c.off + c.size / 2), yb = y + h + 8 + (i % 5) * 5;
+        s += `<path class="edge" d="M${xs},${y + h} V${yb} H${xc} V${y + h + 7}"/>${ah(xc, y + h + 1, 'up', '')}`;
+      });
+      H = y + h + 40;
+    }
+    const an = (xx) => (xx < 120 ? 'start' : xx > W - 110 ? 'end' : 'middle');
+    s += `<line class="ln c1" x1="${X(lower)}" y1="${y - 22}" x2="${X(lower)}" y2="${y + h}"/><text class="lbl" x="${X(lower)}" y="${y - 25}" text-anchor="${an(X(lower))}">lower ${lower}</text>`;
+    s += `<line class="ln c2" x1="${X(upper)}" y1="${y - 8}" x2="${X(upper)}" y2="${y + h}"/><text class="lbl" x="${X(upper)}" y="${y - 11}" text-anchor="${an(X(upper))}">upper ${upper}</text>`;
+    s += `<text class="lbl" x="${X(0)}" y="${H - 4}">0</text><text class="lbl" x="${X(P.size)}" y="${H - 4}" text-anchor="end">${P.size} bytes</text>`;
+    return svgWrap(W + 20, H, s, 'slotted page', 520);
+  }
+  const pageStats = (P) => `cells <b>${P.slots.length}</b> · garbage cells <b>${P.cells.length - P.slots.length}</b> (<b>${pgGarbage(P)}</b> B) · lower <b>${pgLower(P)}</b> · upper <b>${pgUpper(P)}</b> · contiguous free <b>${pgContig(P)}</b> B · logical free <b>${pgLogical(P)}</b> B`;
+
+  // stepper helper: frames of {roots, msg, hl, stack}
+  function record(T, k) {
+    const frames = [{ roots: [cloneNode(T.root)], msg: `Start: insert ${k}. The breadcrumb stack is empty.`, hl: new Set(), stack: [] }];
+    insert(T, k, (msg, hl, stack) => frames.push({ roots: [cloneNode(T.root)], msg, hl: new Set(hl || []), stack: (stack || []).map((x) => ({ id: x.node.id, idx: x.idx, keys: x.node.keys.slice() })) }));
+    return frames;
+  }
+  function onClick(id, f) { $(id).addEventListener('click', f); }
+  function onChange(id, f) { $(id).addEventListener('change', f); }
+  function onInput(id, f) { $(id).addEventListener('input', f); }
+
+  // =====================================================================
+  // 01 PAGE HEADER
+  // =====================================================================
+  const HDP = { toy: [1024, 24, 4], pg: [8192, 24, 4], sq: [4096, 8, 2] };
+  let hdPage, hdKey = 0, hdMsg = '';
+  function hdReset() { const p = HDP[$('hd_preset').value] || HDP.toy; hdPage = newPage(p[0], p[1], p[2]); hdKey = 0; hdMsg = ''; for (let i = 0; i < 4; i++) hdAdd(); }
+  function hdAdd() {
+    const size = val('hd_size'); hdKey++;
+    const res = pgInsert(hdPage, (hdKey * 7919) % 10007, size, false);
+    hdMsg = res === 'ok' ? '' : ` · <span class="bad">page full: ${size} + ${hdPage.slot} bytes don't fit between lower and upper</span>`;
+    return res;
+  }
+  function hdDraw() {
+    $('hd_svg').innerHTML = pageSVG(hdPage, { arrows: hdPage.slots.length <= 12 });
+    $('hd_r').innerHTML = `cells <b>${hdPage.slots.length}</b> · header <b>${hdPage.hdr}</b> B · lower <b>${pgLower(hdPage)}</b> · upper <b>${pgUpper(hdPage)}</b> · free = upper − lower = <b>${pgContig(hdPage)}</b> B · next insert costs <b>${val('hd_size') + hdPage.slot}</b> B${hdMsg}`;
+  }
+  onChange('hd_preset', () => { hdReset(); hdDraw(); });
+  bindRange('hd_size', hdDraw);
+  onClick('hd_add', () => { hdAdd(); hdDraw(); });
+  onClick('hd_fill', () => { let g = 0; while (hdAdd() === 'ok' && g++ < 2000); hdDraw(); });
+  onClick('hd_reset', () => { hdReset(); hdDraw(); });
+
+  // =====================================================================
+  // 02 MAGIC NUMBERS
+  // =====================================================================
+  const MAGIC = [0x50, 0x41, 0x47, 0x45];
+  let mgBytes = [];
+  const mgMatch = (o) => MAGIC.every((b, i) => mgBytes[o + i] === b);
+  function mgBuild() {
+    const r = rng(seed * 31 + 5); mgBytes = [];
+    for (let p = 0; p < 3; p++) { const pg = MAGIC.concat([0, p + 1, p === 0 ? 1 : 2, 3 + p]); while (pg.length < 64) pg.push(Math.floor(r() * 256)); mgBytes.push(...pg); }
+    if ($('mg_bad').checked) for (let i = 64; i < 72; i++) mgBytes[i] = Math.floor(r() * 256);
+    for (let o = 0; o + 3 < mgBytes.length; o++) if ((o % 64 !== 0 || ($('mg_bad').checked && o === 64)) && mgMatch(o)) mgBytes[o + 3] ^= 1;
+  }
+  const hx = (b) => b.toString(16).padStart(2, '0').toUpperCase();
+  function mgDraw() {
+    const off = val('mg_off'), ok = mgMatch(off);
+    $('mg_hex').innerHTML = mgBytes.map((b, i) => {
+      const cls = []; if (i % 64 < 8) cls.push('hd'); if (i % 64 < 16) cls.push('pb'); if (i >= off && i < off + 4) cls.push(ok ? 'ok' : 'no');
+      return `<span class="${cls.join(' ')}" title="byte ${i}">${hx(b)}</span>`;
+    }).join('');
+    const got = mgBytes.slice(off, off + 4).map(hx).join(' ');
+    const where = off % 64 === 0 ? `a page boundary (page ${off / 64 + 1})` : `${off % 64} bytes into page ${Math.floor(off / 64) + 1}`;
+    $('mg_r').innerHTML = `offset <b>${off}</b> is ${where} · read <b>${got}</b> · expected <b>50 41 47 45</b> → ${ok ? '<span class="good">valid page header: trust the fields that follow (page id ' + (mgBytes[off + 4] * 256 + mgBytes[off + 5]) + ')</span>' : '<span class="bad">reject: not a page start, or a damaged page</span>'}`;
+  }
+  bindRange('mg_off', mgDraw);
+  onChange('mg_bad', () => { mgBuild(); mgDraw(); });
+
+  // =====================================================================
+  // 03 SIBLING LINKS
+  // =====================================================================
+  const sbTree = bulkLoad(Array.from({ length: 18 }, (_, i) => (i + 1) * 10), 2, 1).root;
+  function pathTo(root, leaf) { const p = [root]; let n = root; while (!n.leaf) { n = n.kids[upperBound(n.keys, leaf.keys[0])]; p.push(n); } return p; }
+  function sbDraw() {
+    const i = val('sb_from'), mode = $('sb_mode').value, L = leavesOf(sbTree), A = L[i], B = L[i + 1];
+    const pa = pathTo(sbTree, A), pb = pathTo(sbTree, B); let d = 0; while (d < pa.length && pa[d] === pb[d]) d++;
+    const h = pa.length, up = h - d;
+    if (mode === 'parent') {
+      const path = new Set(pa.slice(d - 1).concat(pb.slice(d - 1)).map((n) => n.id));
+      drawTree('sb_svg', [sbTree], { cap: 2, hl: path, path, leafLabels: true }, 'route through parents');
+    } else drawTree('sb_svg', [sbTree], { cap: 2, hl: new Set([A.id, B.id]), siblings: true, sibHl: i, leafLabels: true }, 'route along sibling links');
+    $('sb_r').innerHTML = `leaf #${i} → leaf #${i + 1}: through parents <b>${2 * up}</b> node visits (up ${up}, down ${up}${up === h - 1 ? ', all the way to the root' : ''}) · with sibling links <b>1</b> visit`;
+  }
+  function sbCalc() {
+    const f = val('sb_f'), h = val('sb_h'), L = Math.pow(f, h - 1); let sum = 0;
+    for (let k = 1; k <= h - 1; k++) sum += L / Math.pow(f, k - 1) - 1;
+    const avg = L > 1 ? 2 * sum / (L - 1) : 0;
+    $('sb_cr').innerHTML = `leaves <b>${L >= 1e6 ? L.toExponential(2) : L}</b> · average visits per next-leaf step: through parents <b>${avg.toFixed(3)}</b> vs sibling links <b>1</b> · scanning 1,000 leaves ≈ <b>${Math.round(avg * 999).toLocaleString()}</b> vs <b>999</b> visits (modelled)`;
+  }
+  onChange('sb_mode', sbDraw); bindRange('sb_from', sbDraw); bindRange('sb_f', sbCalc); bindRange('sb_h', sbCalc);
+
+  // =====================================================================
+  // 04 RIGHTMOST POINTERS (hand-placed drawing of three states)
+  // =====================================================================
+  function bookNode(x, y, keys, slots, opt) {
+    opt = opt || {}; const cw = 40, W = slots * cw, cls = 'nd' + (opt.over ? ' over' : '') + (opt.hl ? ' hl' : '');
+    let s = `<g class="${cls}"><rect class="cell" x="${x}" y="${y}" width="${W - 22}" height="18"/><rect class="cell" x="${x + W - 22}" y="${y}" width="22" height="18"/>`;
+    for (let i = 0; i < slots; i++) {
+      const has = i < keys.length, gray = opt.gray === i;
+      s += `<rect class="cell${has ? '' : ' empty'}" x="${x + i * cw}" y="${y + 18}" width="${cw}" height="26"/>`;
+      if (gray) s += `<rect class="f-sel" x="${x + i * cw + 1}" y="${y + 19}" width="${cw - 2}" height="24"/>`;
+      if (has) s += `<circle class="dot" cx="${x + i * cw + 8}" cy="${y + 31}" r="3"/><text x="${x + i * cw + 25}" y="${y + 36}" text-anchor="middle">${keys[i]}</text>`;
+    }
+    s += `<circle class="dot${opt.hdrHl ? ' hl' : ''}" cx="${x + W - 11}" cy="${y + 9}" r="3"/></g>`;
+    return { s, cell: (i) => [x + i * cw + 8, y + 31], hdr: [x + W - 11, y + 9], top: (dx) => [x + (dx == null ? W / 2 : dx), y], W };
+  }
+  const elbow = (a, b, cls, viaY) => { const my = viaY != null ? viaY : a[1] + 16; return `<path class="${cls}" d="M${a[0]},${a[1]} V${my} H${b[0]} V${b[1] - 6}"/>${ah(b[0], b[1], 'down', /hl|c1/.test(cls) ? 'hl' : '')}`; };
+  const elbowR = (a, b, cls) => `<path class="${cls}" d="M${a[0]},${a[1]} H${b[0]} V${b[1] - 6}"/>${ah(b[0], b[1], 'down', /hl|c1/.test(cls) ? 'hl' : '')}`;
+  const stub = (x, y, txt) => `<rect class="cell empty" x="${x}" y="${y}" width="96" height="26"/><text class="lbl" x="${x + 48}" y="${y + 17}" text-anchor="middle">${txt}</text>`;
+  const RP_MSG = [
+    'Before: the parent has one cell (pointer, 20) covering keys below 20. Keys ≥ 20 are reached through the pointer stored in the parent\'s HEADER (the "rightmost pointer"). That child [30, 40, 50] is full (capacity 3).',
+    'Insert 60: it belongs to the rightmost child, which now holds 4 keys, over capacity. It must split.',
+    'After the split: [30] | 40 | [50, 60]. The promoted key 40 is APPENDED to the parent as a new cell (shaded) whose pointer goes to the node that split (now [30], keys 20–39). The header pointer is reassigned to the NEW node [50, 60], keys ≥ 40.'
+  ];
+  let rpI = 0;
+  function rpDraw() {
+    let s = '';
+    if (rpI < 2) {
+      const P = bookNode(170, 34, [20], 3, { hdrHl: true }), C = bookNode(330, 130, rpI === 0 ? [30, 40, 50] : [30, 40, 50, 60], rpI === 0 ? 3 : 4, { over: rpI === 1, hl: rpI === 1 });
+      s += stub(40, 138, 'keys < 20') + P.s + C.s + elbow(P.cell(0), [88, 138], 'edge') + elbowR(P.hdr, C.top(), 'ln c1');
+      s += `<text class="lbl" x="${P.hdr[0] + 8}" y="${P.hdr[1] - 4}">rightmost pointer (header)</text>`;
+    } else {
+      const P = bookNode(170, 34, [20, 40], 3, { gray: 1, hdrHl: true }), Lf = bookNode(250, 130, [30], 3), R = bookNode(420, 130, [50, 60], 3, { hl: true });
+      s += stub(40, 138, 'keys < 20') + P.s + Lf.s + R.s + elbow(P.cell(0), [88, 138], 'edge') + elbow(P.cell(1), Lf.top(60), 'ln c2', 108) + elbowR(P.hdr, R.top(), 'ln c1');
+      s += `<text class="lbl" x="${P.hdr[0] + 8}" y="${P.hdr[1] - 4}">header now → new node</text><text class="lbl t-c2" x="${Lf.top(60)[0] + 6}" y="124">promoted 40 → split node</text>`;
+    }
+    $('rp_svg').innerHTML = svgWrap(600, 190, s, 'rightmost pointer split', 520);
+    $('rp_msg').textContent = RP_MSG[rpI]; $('rp_no').textContent = rpI + 1;
+  }
+  onClick('rp_prev', () => { rpI = Math.max(0, rpI - 1); rpDraw(); });
+  onClick('rp_next', () => { rpI = Math.min(2, rpI + 1); rpDraw(); });
+
+  // =====================================================================
+  // 05 HIGH KEYS
+  // =====================================================================
+  function hkDraw() {
+    const k = val('hk_k'), X = (v) => 70 + v * 5.6; let s = '';
+    const pa = k < 20 ? 0 : k < 40 ? 1 : 2, pb = k >= 60 ? -1 : pa;
+    function line(y0, title, high) {
+      let t = `<text class="big" x="10" y="${y0}">${title}</text>`; const y = y0 + 46;
+      const segs = high ? [[0, 20, 'P0'], [20, 40, 'P1'], [40, 60, 'P2']] : [[0, 20, 'P0'], [20, 40, 'P1'], [40, 105, 'P2']];
+      const chosen = high ? pb : pa;
+      segs.forEach((g, i) => { t += `<rect class="seg${i === chosen ? ' on' : ''}" x="${X(g[0]) - (i === 0 ? 30 : 0)}" y="${y - 14}" width="${X(g[1]) - X(g[0]) + (i === 0 ? 30 : 0)}" height="14"/><text x="${(X(g[0]) + X(Math.min(g[1], 100))) / 2}" y="${y - 20}" text-anchor="middle" class="${i === chosen ? 't-c1' : ''}">${g[2]}</text>`; });
+      if (high) t += `<rect class="seg out${pb === -1 ? ' on' : ''}" x="${X(60)}" y="${y - 14}" width="${X(105) - X(60)}" height="14"/><text class="t-sell" x="${X(62)}" y="${y - 20}">≥ 60: not under this node → move right</text>`;
+      t += `<line class="ln" x1="${X(0) - 30}" y1="${y}" x2="${X(105)}" y2="${y}"/><text class="lbl" x="${X(0) - 34}" y="${y + 4}" text-anchor="end">−∞</text>`;
+      if (!high) t += `<text class="lbl" x="${X(105) + 4}" y="${y + 4}">+∞</text>`;
+      [[20, 'K1=20'], [40, 'K2=40']].concat(high ? [[60, 'K3=60 (high key)']] : []).forEach((q) => { t += `<line class="ln" x1="${X(q[0])}" y1="${y - 4}" x2="${X(q[0])}" y2="${y + 6}"/><text class="lbl" x="${X(q[0])}" y="${y + 18}" text-anchor="middle">${q[1]}</text>`; });
+      t += `<line class="ln c1" x1="${X(k)}" y1="${y - 30}" x2="${X(k)}" y2="${y + 4}"/>${ah(X(k), y + 4, 'down', 'hl')}<text class="t-c1 big" x="${X(k)}" y="${y + 34}" text-anchor="middle">key ${k}</text>`;
+      return t;
+    }
+    s += line(16, '(a) no high key: last pointer covers up to +∞', false) + line(122, '(b) high key K3 = 60 stored with P2', true);
+    $('hk_svg').innerHTML = svgWrap(700, 212, s, 'key ranges per pointer', 520);
+    $('hk_r').innerHTML = `(a) follow <b>P${pa}</b>${pa === 2 && k >= 60 ? ' <span class="bad">(searches a subtree that cannot hold ' + k + ')</span>' : ''} · (b) ${pb === -1 ? '<b class="bad">' + k + ' ≥ 60: not in this node\'s range; in a Blink-tree, follow the sibling link</b>' : 'follow <b>P' + pb + '</b>'}`;
+  }
+  bindRange('hk_k', hkDraw);
+
+  // =====================================================================
+  // 06 OVERFLOW PAGES (book's model: a node's overflow pages are shared by its records)
+  // =====================================================================
+  const OV_HDR = 24, OV_NEXT = 4, OV_PTR = 4;
+  let ov, ovMsg = '';
+  function ovReset() { ov = { recs: [], used: OV_HDR, chain: [] }; ovMsg = ''; }
+  function ovAdd() {
+    const page = +$('ov_page').value, fan = val('ov_fan'), size = val('ov_rec'), maxP = Math.floor(page / fan), usable = page - OV_NEXT;
+    if (ov.recs.length >= fan) { ovMsg = `The node already holds fanout = ${fan} records: by the B-Tree rule it would split now.`; return; }
+    const local = Math.min(size, maxP);
+    if (ov.used + local + OV_PTR > page) { ovMsg = 'No room in the primary page.'; return; }
+    const id = ov.recs.length + 1; let spill = size - local; const touched = [];
+    while (spill > 0) {
+      let last = ov.chain[ov.chain.length - 1];
+      if (!last || last.used >= usable) { last = { used: 0, segs: [] }; ov.chain.push(last); }
+      const take = Math.min(spill, usable - last.used); last.segs.push({ id, b: take }); last.used += take; spill -= take; touched.push(ov.chain.length - 1);
+    }
+    ov.used += local + OV_PTR; ov.recs.push({ id, size, local, spill: size - local, last: touched.length ? touched[touched.length - 1] : -1 });
+    ovMsg = '';
+  }
+  function ovDraw() {
+    const page = +$('ov_page').value, fan = val('ov_fan'), maxP = Math.floor(page / fan), W = 600, k = W / page, X0 = 96; let s = '', y = 8;
+    const row = (label, segs, used) => {
+      let t = `<text class="lbl" x="4" y="${y + 16}">${label}</text><rect class="f-free" x="${X0}" y="${y}" width="${W}" height="24"/>`; let x = X0;
+      segs.forEach((g) => { const w = g.b * k; t += `<rect class="${g.cls || 'f-r' + (((g.id - 1) % 4) + 1)}" x="${x}" y="${y}" width="${Math.max(0.8, w)}" height="24"/>`; if (w > 18 && g.id) t += `<text x="${x + w / 2}" y="${y + 16}" text-anchor="middle">r${g.id}</text>`; x += w; });
+      t += `<text class="lbl" x="${X0 + W + 4}" y="${y + 16}">${used}/${page}</text>`; y += 34; return t;
+    };
+    s += row('primary', [{ b: OV_HDR, cls: 'f-hdr' }].concat(ov.recs.map((r) => ({ id: r.id, b: r.local + OV_PTR }))), ov.used);
+    const show = ov.chain.slice(0, 6);
+    show.forEach((c, i) => { s += `<path class="edge" d="M${X0 - 10},${y - 22} v14"/>${ah(X0 - 10, y - 4, 'down', '')}`; s += row('overflow ' + (i + 1), [{ b: OV_NEXT, cls: 'f-hdr' }].concat(c.segs), c.used + OV_NEXT); });
+    if (ov.chain.length > 6) { s += `<text class="lbl" x="${X0}" y="${y + 10}">… ${ov.chain.length - 6} more overflow pages in the chain</text>`; y += 18; }
+    $('ov_svg').innerHTML = svgWrap(X0 + W + 70, y + 2, s, 'overflow pages', 520);
+    const last = ov.recs[ov.recs.length - 1];
+    const lastTxt = last ? ` · last record r${last.id}: <b>${last.local}</b> B local, <b>${last.spill}</b> B spilled → returning it reads <b>${1 + (last.last + 1)}</b> page${last.last >= 0 ? 's' : ''}` : '';
+    $('ov_r').innerHTML = `max_payload_size = ${page} ÷ ${fan} = <b>${maxP}</b> B · records <b>${ov.recs.length}</b>/${fan} · primary used <b>${ov.used}</b>/${page} B · overflow pages <b>${ov.chain.length}</b>${lastTxt}${ovMsg ? ' · <span class="bad">' + ovMsg + '</span>' : ''}`;
+    const U = page, M = Math.floor((U - 12) * 32 / 255) - 23;
+    $('ov_sq').innerHTML = `U = ${U}: table-leaf X = <b>${U - 35}</b> B · index X = <b>${Math.floor((U - 12) * 64 / 255) - 23}</b> B · M = <b>${M}</b> B`;
+  }
+  onChange('ov_page', () => { ovReset(); ovDraw(); });
+  bindRange('ov_fan', () => { ovReset(); ovDraw(); });
+  bindRange('ov_rec', ovDraw);
+  onClick('ov_add', () => { ovAdd(); ovDraw(); });
+  onClick('ov_reset', () => { ovReset(); ovDraw(); });
+
+  // =====================================================================
+  // 07 BINARY SEARCH WITH INDIRECTION
+  // =====================================================================
+  const BS_CELLS = [42, 7, 88, 23, 61, 15, 99, 34, 70, 50, 3, 77].map((key) => ({ key }));
+  const BS_OFF = BS_CELLS.map((c, i) => i).sort((a, b) => BS_CELLS[a].key - BS_CELLS[b].key);
+  let bsFrames = [], bsI = 0, bsRes = 0;
+  function bsRun() {
+    const key = +$('bs_key').value; bsFrames = [];
+    bsRes = binarySearchCells(BS_OFF, BS_CELLS, key, (t) => bsFrames.push(t));
+    bsI = 0;
+  }
+  function bsDraw() {
+    const key = +$('bs_key').value, cw = 54, x0 = 30, yS = 34, yC = 132; let s = '';
+    const f = bsFrames[Math.min(bsI, bsFrames.length - 1)]; const done = bsI >= bsFrames.length;
+    s += `<text class="lbl" x="${x0}" y="${yS - 8}">offset array (sorted by key) · slot index below</text><text class="lbl" x="${x0}" y="${yC + 58}">cells (stored in insertion order) · physical position above</text>`;
+    for (let i = 0; i < bsFrames.length && i < bsI; i++) { const g = bsFrames[i]; s += `<path class="edge" d="M${x0 + g.mid * cw + cw / 2},${yS + 26} L${x0 + g.cell * cw + cw / 2},${yC - 6}"/>`; }
+    BS_OFF.forEach((c, i) => {
+      const inR = f && !done && i >= f.lo && i <= f.hi, isMid = f && !done && i === f.mid;
+      const isAns = done && ((bsRes >= 0 && i === bsRes));
+      s += `<g class="nd${isMid || isAns ? ' hl' : inR ? ' crumb' : ''}"><rect class="cell" x="${x0 + i * cw}" y="${yS}" width="${cw}" height="26"/></g><text x="${x0 + i * cw + cw / 2}" y="${yS + 17}" text-anchor="middle">→c${c}</text><text class="lbl" x="${x0 + i * cw + cw / 2}" y="${yS - 20 + 6}" text-anchor="middle"></text>`;
+      s += `<text class="lbl" x="${x0 + i * cw + 4}" y="${yS + 38}">${i}</text>`;
+    });
+    if (done && bsRes < 0) { const ip = -bsRes - 1, xi = x0 + ip * cw; s += `<line class="ln sell" x1="${xi}" y1="${yS - 6}" x2="${xi}" y2="${yS + 32}"/><text class="t-sell" x="${xi + 3}" y="${yS - 10}">insert here (${ip})</text>`; }
+    BS_CELLS.forEach((c, i) => {
+      const isT = f && !done && i === f.cell, isAns = done && bsRes >= 0 && i === BS_OFF[bsRes];
+      s += `<g class="nd${isT || isAns ? ' hl' : ''}"><rect class="cell" x="${x0 + i * cw}" y="${yC}" width="${cw}" height="26"/></g><text x="${x0 + i * cw + cw / 2}" y="${yC + 17}" text-anchor="middle">${c.key}</text><text class="lbl" x="${x0 + i * cw + 4}" y="${yC + 40}">c${i}</text>`;
+    });
+    if (f && !done) s += `<path class="ln c1" d="M${x0 + f.mid * cw + cw / 2},${yS + 26} L${x0 + f.cell * cw + cw / 2},${yC - 6}"/>${ah(x0 + f.cell * cw + cw / 2, yC, 'down', 'hl')}`;
+    $('bs_svg').innerHTML = svgWrap(x0 * 2 + 12 * cw, yC + 66, s, 'binary search with indirection', 560);
+    let msg;
+    if (!done) { const c = f.cellKey; msg = `Comparison ${bsI + 1}: lo = ${f.lo}, hi = ${f.hi} → mid = ${f.mid}. Follow offset ${f.mid} → cell c${f.cell}, key ${c}. ${c < key ? c + ' < ' + key + ': search the right half.' : c > key ? c + ' > ' + key + ': search the left half.' : c + ' = ' + key + ': found.'}`; }
+    else msg = bsRes >= 0 ? `Done after ${bsFrames.length} comparisons: ${key} found at slot ${bsRes} (cell c${BS_OFF[bsRes]}). Return ${bsRes}.` : `Done after ${bsFrames.length} comparisons: lo passed hi, ${key} is absent. Insertion point ${-bsRes - 1} (first key greater than ${key}); return ${bsRes} = −(${-bsRes - 1}) − 1. On an internal node this is the child pointer to follow.`;
+    $('bs_msg').textContent = msg;
+  }
+  onChange('bs_key', () => { bsRun(); bsDraw(); });
+  onClick('bs_step', () => { bsI = Math.min(bsFrames.length, bsI + 1); bsDraw(); });
+  onClick('bs_back', () => { bsI = Math.max(0, bsI - 1); bsDraw(); });
+  function bsCalc() {
+    const n = val('bs_n'), h = val('bs_h'), c = Math.ceil(Math.log2(n + 1));
+    $('bs_cr').innerHTML = `per node: at most <b>${c}</b> comparisons (each a pointer hop to a cell) vs <b>${Math.ceil(n / 2)}</b> on average for a linear scan · per lookup through ${h} levels: <b>${c * h}</b> vs <b>${Math.ceil(n / 2) * h}</b>`;
+  }
+  bindRange('bs_n', bsCalc); bindRange('bs_h', bsCalc);
+
+  // =====================================================================
+  // 08 PARENT POINTERS
+  // =====================================================================
+  function pmap(root) { const m = new Map(); (function w(n) { n.kids.forEach((c) => { m.set(c.id, n.id); w(c); }); })(root); return m; }
+  let pp, ppR, ppStat;
+  function ppReset() {
+    ppR = rng(seed * 17 + 3); pp = newTree(3); ppStat = { last: 0, total: 0, ins: 0, chg: new Set(), leaf: null, msg: '' };
+    let g = 0; while (leavesOf(pp.root).reduce((a, l) => a + l.keys.length, 0) < 14 && g++ < 200) insert(pp, 1 + Math.floor(ppR() * 199));
+  }
+  function ppInsert() {
+    const count = leavesOf(pp.root).reduce((a, l) => a + l.keys.length, 0);
+    if (count >= 48) { ppStat.msg = ' · <span class="bad">the tree is getting too wide to draw: press Reset</span>'; return; }
+    let k, g = 0; do { k = 1 + Math.floor(ppR() * 199); } while (leavesOf(pp.root).some((l) => l.keys.includes(k)) && g++ < 500);
+    const before = pmap(pp.root), s0 = pp.splits; insert(pp, k); const after = pmap(pp.root);
+    const chg = new Set(); after.forEach((p, c) => { if (before.get(c) !== p) chg.add(c); });
+    ppStat.chg = chg; ppStat.last = chg.size; ppStat.total += chg.size; ppStat.ins++; ppStat.msg = ` · last key <b>${k}</b>, splits caused <b>${pp.splits - s0}</b>`;
+    ppStat.leaf = leavesOf(pp.root).find((l) => l.keys.includes(k));
+  }
+  function ppDraw() {
+    drawTree('pp_svg', [pp.root], { cap: 3, chg: ppStat.chg, hl: new Set(ppStat.leaf ? [ppStat.leaf.id] : []) }, 'tree with rewritten parent pointers highlighted');
+    $('pp_r').innerHTML = `parent-pointer writes by the last insert <b>${ppStat.last}</b> · total <b>${ppStat.total}</b> over <b>${ppStat.ins}</b> inserts · height <b>${heightOf(pp.root)}</b>${ppStat.msg}`;
+  }
+  onClick('pp_one', () => { ppInsert(); ppDraw(); });
+  onClick('pp_five', () => { let tot = 0; const all = new Set(); for (let i = 0; i < 5; i++) { ppInsert(); tot += ppStat.last; ppStat.chg.forEach((c) => all.add(c)); } ppStat.chg = all; ppStat.last = tot; ppDraw(); });
+  onClick('pp_reset', () => { ppReset(); ppDraw(); });
+
+  // =====================================================================
+  // 09 BREADCRUMBS
+  // =====================================================================
+  function fig48Tree() {
+    const L = (a) => mkNode(true, a);
+    const A = mkNode(false, [5, 9], [L([1, 3]), L([5, 7]), L([9, 11])]);
+    const B = mkNode(false, [23, 31, 37], [L([13, 17]), L([23, 29]), L([31, 35]), L([37, 40, 45])]);
+    const C = mkNode(false, [60, 70], [L([51, 55]), L([60, 65]), L([70, 80])]);
+    const T = newTree(3); T.root = mkNode(false, [13, 51], [A, B, C]); T.rightLeaf = C.kids[2]; return T;
+  }
+  let bcT, bcFrames, bcI;
+  function bcReset() { bcT = fig48Tree(); bcFrames = [{ roots: [cloneNode(bcT.root)], msg: 'Type a key and press "Run insert". Default 41 reproduces a two-level cascade.', hl: new Set(), stack: [] }]; bcI = 0; }
+  function bcDraw() {
+    const f = bcFrames[bcI];
+    drawTree('bc_svg', f.roots, { cap: 3, hl: f.hl, crumb: new Set(f.stack.map((x) => x.id)) }, 'breadcrumb descent and split propagation');
+    $('bc_msg').textContent = f.msg; $('bc_stepno').textContent = `${bcI + 1}/${bcFrames.length}`;
+    $('bc_stack').innerHTML = '<b>Breadcrumb stack</b> (top first)' + (f.stack.length ? '<table><tr><th>node</th><th>child index</th></tr>' + f.stack.slice().reverse().map((x) => `<tr><td>[${x.keys.join(', ')}]</td><td>${x.idx}</td></tr>`).join('') + '</table>' : '<div>(empty)</div>');
+  }
+  onClick('bc_go', () => {
+    const k = Math.round(+$('bc_key').value);
+    if (!isFinite(k)) return;
+    bcFrames = record(bcT, k); bcI = 0; bcDraw();
+  });
+  onClick('bc_next', () => { bcI = Math.min(bcFrames.length - 1, bcI + 1); bcDraw(); });
+  onClick('bc_prev', () => { bcI = Math.max(0, bcI - 1); bcDraw(); });
+  onClick('bc_reset', () => { bcReset(); bcDraw(); });
+
+  // =====================================================================
+  // 10 REBALANCING
+  // =====================================================================
+  function rbTree(pre, pol) {
+    const L = (a) => mkNode(true, a), kids = pre === 'full' ? [L([10, 13, 16]), L([18, 20, 22])] : [L([10, 13, 16]), L([18])];
+    const T = newTree(3, { policy: pol }); T.root = mkNode(false, [18], kids); T.rightLeaf = kids[1]; return T;
+  }
+  let rbFrames = [], rbI = 0;
+  function rbRun() { const T = rbTree($('rb_pre').value, $('rb_pol').value); rbFrames = record(T, Math.round(+$('rb_key').value) || 12); rbI = rbFrames.length - 1; }
+  function rbDraw() {
+    const f = rbFrames[rbI]; if (!f) return;
+    drawTree('rb_svg', f.roots, { cap: 3, hl: f.hl, crumb: new Set(f.stack.map((x) => x.id)) }, 'rebalancing step');
+    $('rb_msg').textContent = f.msg; $('rb_stepno').textContent = `${rbI + 1}/${rbFrames.length}`;
+  }
+  ['rb_pol', 'rb_pre'].forEach((id) => onChange(id, () => { rbRun(); rbDraw(); }));
+  onClick('rb_go', () => { rbRun(); rbI = 0; rbDraw(); });
+  onClick('rb_next', () => { rbI = Math.min(rbFrames.length - 1, rbI + 1); rbDraw(); });
+  onClick('rb_prev', () => { rbI = Math.max(0, rbI - 1); rbDraw(); });
+  function rbSim() {
+    const cap = val('rb_cap'), N = val('rb_n'), runs = 6, rows = [];
+    for (const [pol, name] of [['split', 'plain split'], ['rebalance', 'rebalance'], ['bstar', 'B* (2→3)']]) {
+      const occ = []; let leaves = 0, hs = 0, sp = 0, mv = 0;
+      for (let r = 1; r <= runs; r++) {
+        const R = rng(seed * 1000 + r * 77), T = newTree(cap, { policy: pol });
+        for (let i = 0; i < N; i++) insert(T, R());
+        const L = leavesOf(T.root); occ.push(L.reduce((a, l) => a + l.keys.length, 0) / (L.length * cap));
+        leaves += L.length; hs += heightOf(T.root); sp += T.splits; mv += T.moves;
+      }
+      const mean = occ.reduce((a, b) => a + b, 0) / runs;
+      rows.push({ name, mean, lo: Math.min(...occ), hi: Math.max(...occ), leaves: leaves / runs, h: hs / runs, sp: sp / runs, mv: mv / runs / N });
+    }
+    $('rb_bars').innerHTML = rows.map((r) => `<div class="bar"><span>${r.name}</span><div class="track"><div class="fill" style="width:${(r.mean * 100).toFixed(1)}%"></div><div class="rng" style="left:${(r.lo * 100).toFixed(1)}%;width:${Math.max(0.4, (r.hi - r.lo) * 100).toFixed(1)}%"></div><span class="val">${(r.mean * 100).toFixed(1)}% (${(r.lo * 100).toFixed(1)}–${(r.hi * 100).toFixed(1)})</span></div></div>`).join('');
+    $('rb_r').innerHTML = rows.map((r) => `${r.name}: leaves <b>${Math.round(r.leaves)}</b> · height <b>${r.h.toFixed(1)}</b> · splits <b>${Math.round(r.sp)}</b> · keys moved per insert <b>${r.mv.toFixed(2)}</b>`).join('<br>');
+  }
+  bindRange('rb_cap', rbSim); bindRange('rb_n', rbSim);
+
+  // =====================================================================
+  // 11 RIGHT-ONLY APPENDS
+  // =====================================================================
+  let raFills = [], raInfo = '';
+  function raRun() {
+    const N = val('ra_n'), ord = $('ra_ord').value, T = newTree(16, { policy: $('ra_pol').value, fastpath: $('ra_fast').checked, ff: 0.9 }), R = rng(seed * 7 + 11);
+    for (let i = 0; i < N; i++) insert(T, ord === 'seq' ? i + 1 : Math.floor(R() * 1e9));
+    const L = leavesOf(T.root); raFills = L.map((l) => l.keys.length / T.cap * 100);
+    const avg = raFills.reduce((a, b) => a + b, 0) / raFills.length;
+    raInfo = `leaves <b>${L.length}</b> · average fill <b>${avg.toFixed(1)}%</b> · height <b>${heightOf(T.root)}</b> · splits <b>${T.splits}</b> · node reads <b>${T.reads.toLocaleString()}</b> (<b>${(T.reads / N).toFixed(2)}</b> per insert) · fastpath hits <b>${T.fastHits}</b> of ${N} (simulated, 16 keys per leaf)`;
+  }
+  const raDraw = reg(() => {
+    plot('ra_c', { n: Math.max(2, raFills.length), bars: [{ d: raFills, col: 'c2', alpha: 0.75 }], ymin: 0, ymax: 100, label: 'fill % per leaf, leftmost leaf → rightmost (simulated)', legend: [['one bar per leaf', 'c2']] });
+    $('ra_r').innerHTML = raInfo;
+  });
+  ['ra_pol', 'ra_ord', 'ra_fast'].forEach((id) => onChange(id, () => { raRun(); raDraw(); }));
+  bindRange('ra_n', () => { raRun(); raDraw(); });
+
+  // =====================================================================
+  // 12 BULK LOADING
+  // =====================================================================
+  let blFrames = [], blI = 0, blSum = '';
+  function blRun() {
+    const n = val('bl_n'), fill = val('bl_fill') / 100, keys = Array.from({ length: n }, (_, i) => i + 1);
+    blFrames = [];
+    const R = bulkLoad(keys, 3, fill, (msg, hl, forest, open) => blFrames.push({ roots: forest.map(cloneNode), msg, hl: new Set(hl), open }));
+    const T = newTree(3); keys.forEach((k) => insert(T, k)); const L = leavesOf(T.root), LB = leavesOf(R.root);
+    const fillOf = (ls) => (ls.reduce((a, l) => a + l.keys.length, 0) / (ls.length * 3) * 100).toFixed(0);
+    blSum = `bulk load: <b>${R.written}</b> pages written once · height <b>${heightOf(R.root)}</b> · <b>0</b> splits · ${LB.length} leaves at ${fillOf(LB)}% · one-by-one inserts of the same keys: <b>${T.splits}</b> splits · ${L.length} leaves at ${fillOf(L)}% · height <b>${heightOf(T.root)}</b> (simulated, 3 keys per node)`;
+    blI = 0;
+  }
+  function blDraw() {
+    const f = blFrames[blI]; if (!f) return;
+    drawTree('bl_svg', f.roots, { cap: 3, hl: f.hl, crumb: new Set(f.roots.map((r) => r.id)) }, 'bulk loading');
+    $('bl_msg').textContent = `${f.msg} Unfinished (open) internal nodes in memory: ${f.open}.`;
+    $('bl_step').textContent = `${blI + 1}/${blFrames.length}`; $('bl_r').innerHTML = blSum;
+  }
+  bindRange('bl_n', () => { blRun(); blDraw(); });
+  onInput('bl_fill', () => { $('bl_fillo').textContent = val('bl_fill') + '%'; blRun(); blDraw(); });
+  onClick('bl_next', () => { blI = Math.min(blFrames.length - 1, blI + 1); blDraw(); });
+  onClick('bl_prev', () => { blI = Math.max(0, blI - 1); blDraw(); });
+  onClick('bl_end', () => { blI = blFrames.length - 1; blDraw(); });
+
+  // =====================================================================
+  // 13 COMPRESSION AND BLOCK PADDING
+  // =====================================================================
+  function cpDraw() {
+    const page = +$('cp_page').value, B = +$('cp_block').value, ratio = val('cp_ratio') / 10, mode = $('cp_mode').value;
+    $('cp_ratioo').textContent = ratio.toFixed(1) + '×';
+    const c = Math.ceil(page / ratio), slot = mode === 'packed' ? c : Math.ceil(c / B) * B;
+    let blocks = 0; const K = 200;
+    for (let k = 0; k < K; k++) { const a = k * slot, b = a + c - 1; blocks += Math.floor(b / B) - Math.floor(a / B) + 1; }
+    const avgB = blocks / K, read = avgB * B, uncompB = Math.ceil(page / B);
+    // drawing: first 4 pages over the block grid; page 2 (index 1) is the one being read
+    const total = slot * 4, W = 700, k = W / total, X = (b) => 20 + b * k; let s = '';
+    const a1 = slot, b1 = slot + c - 1, f1 = Math.floor(a1 / B), l1 = Math.floor(b1 / B);
+    for (let q = f1; q <= l1; q++) s += `<rect class="f-sel" x="${X(q * B)}" y="20" width="${Math.min(B, total - q * B) * k}" height="50"/>`;
+    for (let p = 0; p < 4; p++) s += `<rect class="${p === 1 ? 'f-r1' : 'f-r2'}" x="${X(p * slot)}" y="30" width="${c * k}" height="30"/><text x="${X(p * slot + c / 2)}" y="50" text-anchor="middle">page ${p + 1}</text>`;
+    for (let q = 0; q * B <= total; q++) s += `<line class="gridl" x1="${X(q * B)}" y1="16" x2="${X(q * B)}" y2="74" style="stroke-width:${B * k < 6 ? 0.4 : 1.2}"/>`;
+    s += `<text class="lbl" x="20" y="10">disk blocks of ${B} B (vertical lines); shaded = blocks read to load page 2</text><text class="lbl" x="20" y="90">compressed page = ${c.toLocaleString()} B${mode === 'padded' ? ', padded to ' + slot.toLocaleString() + ' B' : ', packed back to back'}</text>`;
+    $('cp_svg').innerHTML = svgWrap(740, 96, s, 'compressed pages over disk blocks', 520);
+    $('cp_r').innerHTML = `compressed <b>${c.toLocaleString()}</b> B · blocks per page read <b>${avgB.toFixed(2)}</b> (uncompressed: ${uncompB}) · bytes read per page <b>${Math.round(read).toLocaleString()}</b> → read amplification <b>${(read / c).toFixed(2)}×</b> · disk used per page <b>${slot.toLocaleString()}</b> B (vs ${page.toLocaleString()}) · I/O saved vs uncompressed <b>${((1 - avgB / uncompB) * 100).toFixed(0)}%</b> (modelled, averaged over ${K} pages)`;
+  }
+  ['cp_page', 'cp_block', 'cp_mode'].forEach((id) => onChange(id, cpDraw)); onInput('cp_ratio', cpDraw);
+
+  // =====================================================================
+  // 14 VACUUM: a fixed fragmented page
+  // =====================================================================
+  function vmDraw() {
+    const P = newPage(512, 24, 4);
+    [[10, 56], [20, 48], [30, 64], [40, 40], [50, 52], [60, 60], [70, 44]].forEach((x) => pgInsert(P, x[0], x[1]));
+    pgDelete(P, P.slots.findIndex((c) => c.key === 30)); pgDelete(P, P.slots.findIndex((c) => c.key === 60));
+    $('vm_svg').innerHTML = pageSVG(P, { arrows: true });
+    $('vm_r').innerHTML = pageStats(P) + ` · a 120-byte cell needs 124 B: <b class="bad">does not fit</b> although ${pgLogical(P)} B are logically free`;
+  }
+
+  // =====================================================================
+  // 15 FRAGMENTATION
+  // =====================================================================
+  let frP, frR, frKey, frMsg;
+  function frReset() {
+    frP = newPage(512, 24, 4); frR = rng(seed * 19 + 2); frKey = 100; let i = 0;
+    while (pgInsert(frP, (i * 7) % 50, 40 + (i % 3) * 10) === 'ok') i++;
+    frMsg = `Page filled with ${frP.slots.length} cells. Try "Delete one" twice, then insert a 60-byte cell.`;
+  }
+  function frDraw() { $('fr_svg').innerHTML = pageSVG(frP, { arrows: true }); $('fr_r').innerHTML = pageStats(frP); $('fr_msg').textContent = frMsg; }
+  onClick('fr_ins', () => {
+    const size = val('fr_size'), g0 = pgGarbage(frP), auto = $('fr_auto').checked, res = pgInsert(frP, frKey++, size, auto);
+    frMsg = res === 'ok' ? (auto && g0 > 0 && pgGarbage(frP) === 0 ? `Not enough contiguous space, so the page was compacted on write first (${g0} B of garbage reclaimed), then the ${size}-byte cell was written.` : `Inserted a ${size}-byte cell at upper, its offset at lower.`)
+      : res === 'fragmented' ? `Insert FAILED: ${size + frP.slot} B needed, only ${pgContig(frP)} B contiguous, yet ${pgLogical(frP)} B are logically free. The page is fragmented: compact it (or tick "compact on write").`
+      : `Insert failed: even after compaction only ${pgLogical(frP)} B would be free. This node must split (or spill to an overflow page).`;
+    frDraw();
+  });
+  onClick('fr_del', () => {
+    if (!frP.slots.length) { frMsg = 'No live cells left.'; frDraw(); return; }
+    const i = Math.floor(frR() * frP.slots.length), c = frP.slots[i]; pgDelete(frP, i);
+    frMsg = `Deleted key ${c.key}: only its ${frP.slot}-byte offset was removed. Its ${c.size} bytes are still in the page, now unreachable garbage.`; frDraw();
+  });
+  onClick('fr_upd', () => {
+    if (!frP.slots.length) { frMsg = 'No live cells to update.'; frDraw(); return; }
+    const i = Math.floor(frR() * frP.slots.length), old = frP.slots[i], ns = old.size + 16;
+    let res = pgUpdate(frP, i, ns);
+    if (res === 'fragmented' && $('fr_auto').checked) { pgCompact(frP); res = pgUpdate(frP, i, ns); }
+    frMsg = res === 'ok' ? `Updated key ${old.key} (${old.size} → ${ns} B): the new version was written as a new cell and the offset re-pointed. The old ${old.size} B version stays as garbage.` : res === 'fragmented' ? `Update needs ${ns} contiguous bytes; the page is fragmented. Compact first.` : `No room for the bigger version even after compaction: this is where an overflow page (or a split) would be created.`;
+    frDraw();
+  });
+  onClick('fr_split', () => {
+    if (frP.slots.length < 2) { frMsg = 'Need at least 2 cells to split.'; frDraw(); return; }
+    const cut = Math.ceil(frP.slots.length / 2), moved = frP.slots.splice(cut); moved.forEach((c) => { c.live = false; });
+    frMsg = `Split: ${moved.length} cells (keys ${moved.map((c) => c.key).join(', ')}) were copied to a new page. Here only their offsets were trimmed; their bytes became garbage.`; frDraw();
+  });
+  onClick('fr_compact', () => { const g = pgCompact(frP); frMsg = g ? `Compacted: ${g} B of garbage reclaimed, live cells rewritten in key order, one contiguous free gap.` : 'Nothing to reclaim.'; frDraw(); });
+  onChange('fr_auto', () => { frMsg = $('fr_auto').checked ? 'Synchronous compaction on write is ON.' : 'Synchronous compaction on write is OFF.'; frDraw(); });
+  onClick('fr_reset', () => { frReset(); frDraw(); });
+  bindRange('fr_size', () => {});
+
+  // =====================================================================
+  // 16 PAGE DEFRAGMENTATION + FREELIST
+  // =====================================================================
+  const DF_PAGE = 4096, DF_HDR = 24;
+  let df;
+  function dfReset() {
+    const r = rng(seed * 23 + 9); df = { pages: [], pos: 0, free: [], persisted: [], msg: 'Each bar is one 4 KB page of the file (simulated). Vacuum walks through them.' };
+    for (let i = 0; i < 12; i++) {
+      const dead = i % 4 === 2; const live = dead ? 0 : 600 + Math.floor(r() * 2200); const garbage = 150 + Math.floor(r() * Math.min(1600, DF_PAGE - DF_HDR - live - 100));
+      df.pages.push({ id: i, live, garbage, state: 'used', sorted: false });
+    }
+  }
+  function dfVacOne() {
+    while (df.pos < df.pages.length && df.pages[df.pos].state !== 'used') df.pos++;
+    if (df.pos >= df.pages.length) { df.pos = 0; df.msg = 'Vacuum pass complete; the next pass starts from page 0.'; return false; }
+    const p = df.pages[df.pos], g = p.garbage; p.garbage = 0; p.sorted = true;
+    if (p.live === 0) { p.state = 'free'; df.free.push(p.id); if ($('df_persist').checked) df.persisted = df.free.slice(); df.msg = `Page ${p.id}: nothing live, ${g} B garbage. The page is released; its ID goes on the freelist${$('df_persist').checked ? ' (written durably)' : ' (only in memory!)'}.`; }
+    else df.msg = `Page ${p.id}: ${g} B garbage reclaimed, ${p.live} B live cells rewritten in key order; ${DF_PAGE - DF_HDR - p.live} B now contiguous.`;
+    df.pos++; return true;
+  }
+  function dfDraw() {
+    const n = df.pages.length, per = 12, bw = 50, bh = 90; let s = '';
+    df.pages.forEach((p, i) => {
+      const x = 14 + (i % per) * (bw + 8), y = 22 + Math.floor(i / per) * (bh + 40), k = bh / DF_PAGE;
+      s += `<rect class="f-free" x="${x}" y="${y}" width="${bw}" height="${bh}"/>`;
+      if (p.state === 'used') { s += `<rect class="f-live" x="${x}" y="${y + bh - p.live * k}" width="${bw}" height="${p.live * k}"/><rect class="f-dead" x="${x}" y="${y + bh - (p.live + p.garbage) * k}" width="${bw}" height="${p.garbage * k}"/>`; }
+      else s += `<text class="${p.state === 'leaked' ? 't-sell' : 't-buy'}" x="${x + bw / 2}" y="${y + bh / 2 + 4}" text-anchor="middle">${p.state}</text>`;
+      s += `<text class="lbl" x="${x + bw / 2}" y="${y + bh + 14}" text-anchor="middle">p${p.id}${p.sorted && p.state === 'used' ? ' ✓' : ''}</text>`;
+      if (i === df.pos) s += ah(x + bw / 2, y - 3, 'down', 'hl') + `<text class="lbl t-c1" x="${x + bw / 2}" y="${y - 12}" text-anchor="middle">vacuum</text>`;
+    });
+    const rows = Math.ceil(n / per);
+    $('df_svg').innerHTML = svgWrap(14 + per * (bw + 8) + 6, 22 + rows * (bh + 40) - 14, s, 'file pages and freelist', 560);
+    const leaked = df.pages.filter((p) => p.state === 'leaked').length;
+    $('df_msg').textContent = df.msg;
+    $('df_r').innerHTML = `file size <b>${n}</b> pages · freelist (in memory) <b>[${df.free.join(', ')}]</b> · freelist on disk <b>[${df.persisted.join(', ')}]</b> · leaked pages <b class="${leaked ? 'bad' : ''}">${leaked}</b>`;
+  }
+  onClick('df_step', () => { dfVacOne(); dfDraw(); });
+  onClick('df_all', () => { let g = 0; while (dfVacOne() && g++ < 100); dfDraw(); });
+  onClick('df_alloc', () => {
+    if (df.free.length) { const id = df.free.pop(); const p = df.pages[id]; p.state = 'used'; p.live = 400; p.garbage = 0; p.sorted = true; if ($('df_persist').checked) df.persisted = df.free.slice(); df.msg = `Allocated page ${id} from the freelist: reused, the file did not grow.`; }
+    else { df.pages.push({ id: df.pages.length, live: 400, garbage: 0, state: 'used', sorted: true }); df.msg = `Freelist empty: the file grows to ${df.pages.length} pages.`; }
+    dfDraw();
+  });
+  onClick('df_crash', () => {
+    df.free = df.persisted.slice(); let lost = 0;
+    df.pages.forEach((p) => { if (p.state === 'free' && !df.free.includes(p.id)) { p.state = 'leaked'; lost++; } });
+    df.msg = lost ? `Crash: the in-memory freelist was lost. ${lost} freed page(s) are now in neither the tree nor the freelist: leaked until a full check rebuilds the list.` : 'Crash + restart: the freelist was read back from disk; nothing lost.';
+    dfDraw();
+  });
+  onChange('df_persist', () => { if ($('df_persist').checked) df.persisted = df.free.slice(); df.msg = $('df_persist').checked ? 'Freelist changes are now written durably.' : 'Freelist changes now stay in memory only. Vacuum, then crash.'; dfDraw(); });
+  onClick('df_reset', () => { dfReset(); dfDraw(); });
+
+  // ---------- initial render ----------
+  function resetSeeded() { mgBuild(); ppReset(); frReset(); dfReset(); }
+  function renderAll() {
+    hdDraw(); mgDraw(); sbDraw(); sbCalc(); rpDraw(); hkDraw(); ovDraw(); bsDraw(); bsCalc(); ppDraw(); bcDraw(); rbDraw(); rbSim(); raRun(); raDraw(); blDraw(); cpDraw(); vmDraw(); frDraw(); dfDraw();
+  }
+  hdReset(); ovReset(); for (let i = 0; i < 5; i++) ovAdd(); bsRun(); bcReset(); rbRun(); blRun(); resetSeeded();
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); resetSeeded(); renderAll(); });
+  buildData(); renderAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

@@ -1,0 +1,1865 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.6 B-Tree Variants</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* ---- ch06 additions ---- */
+.flow { display: grid; gap: 8px; }
+.flow .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.flow .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; font-size: 14px; background: var(--paper); }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.ds { display: grid; gap: 10px; font-family: var(--mono); font-size: 12px; overflow-x: auto; padding: 2px 0 4px; min-width: 0; }
+.ds .lvl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ds .lvl.bot { align-items: flex-end; }
+.ds .lab { color: var(--muted); font-size: 11px; min-width: 120px; }
+.ds .arr { color: var(--muted); }
+.ds small { color: var(--muted); font-size: 11px; }
+.pg { border: 1.5px solid var(--ink); border-radius: 4px; padding: 3px 6px; background: var(--plate); display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; max-width: 100%; }
+.pg.old { opacity: .5; border-style: dashed; }
+.pg.new { outline: 2px solid var(--buy); outline-offset: 1px; }
+.pg.hot { border-color: var(--c1); box-shadow: inset 0 0 0 1px var(--c1); }
+.cell { display: inline-block; min-width: 24px; text-align: center; border: 1px solid var(--rule); border-radius: 3px; padding: 1px 4px; background: var(--paper); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cell.buf { background: var(--tint); }
+.cell.pull { background: var(--tint3); border-color: var(--c3); }
+.cell.tomb { color: var(--sell); text-decoration: line-through; border-color: var(--sell); }
+.cell.hit { outline: 2px solid var(--c2); outline-offset: 1px; }
+.cell.gap { background: transparent; border-style: dashed; color: var(--muted); }
+.cell.moved { background: var(--tint2); border-color: var(--c2); }
+.tw { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.tw i { display: block; width: 20px; height: 4px; background: var(--c2); border-radius: 1px; }
+.bar { display: inline-block; width: 90px; height: 8px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--c1); }
+.log { font-family: var(--mono); font-size: 12.5px; color: var(--muted); display: grid; gap: 3px; max-height: 260px; overflow: auto; }
+.log b { color: var(--ink); }
+.good { color: var(--buy); } .bad { color: var(--sell); }
+pre.code { font-variant-ligatures: none; font-family: var(--mono); font-size: 12.5px; line-height: 1.45; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; white-space: pre; max-width: 100%; }
+.box pre.code { background: var(--plate); }
+.beyond { background: var(--tint3); border-left: 3px solid var(--c3); }
+.beyond a, .connect a, footer a { color: var(--ink); }
+.note { font-size: 14px; color: var(--muted); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+code { font-family: var(--mono); font-size: .88em; }
+input[type=number] { width: 70px; font-family: var(--mono); font-size: 13px; padding: 3px 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+#fcView, #vebSvg { overflow-x: auto; }
+@media (max-width: 560px) { .ds .lab { min-width: 100%; } .flow .tag { min-width: 100%; } }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch05_transaction_processing_and_recovery.html">← Ch.5 Transaction Processing</a><a href="ch07_log_structured_storage.html">Ch.7 Log-Structured Storage →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals · Chapter 6 · pdf p190–219</div>
+  <h1>B-Tree variants: same tree, <em>different bargains</em></h1>
+  <p class="lede">Chapters 2–5 built the classic B-Tree: pages updated in place, protected by latches, made durable by a write-ahead log. This chapter asks what happens if you change one of those choices. Never overwrite a page (copy-on-write). Don't write every change straight away (lazy buffers). Never do random writes at all (FD-Tree). Never take a latch (Bw-Tree). Never tune for a block size (cache-oblivious). Each plate below explains one variant in plain words, lets you run it step by step, and puts a number on what it fixes and what it costs.</p>
+  <div class="topbar"><button id="reroll" type="button">New random key stream</button><span class="readout">stream #<b id="seedOut">1</b> · one seed feeds every simulation below (keys are random, not real data)</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Every variant keeps what makes a B-Tree a B-Tree: a sorted tree, balanced by splits and merges, searched and deleted the same way. What changes is <b>how a change reaches the disk</b> and <b>how threads share the tree</b>. Read each row as "the problem → the trick → what it costs".</p>
+  <div class="flow" role="img" aria-label="Concept map of the chapter">
+    <div class="row"><span class="tag">Baseline</span><span class="node key">In-place B-Tree (Ch.2–5)</span><span class="arr">→ problems:</span><span class="node">latches for concurrency</span><span class="node">write amplification (rewrite a whole page per change)</span><span class="node">space amplification (empty space reserved in pages)</span></div>
+    <div class="row"><span class="tag">No overwrite</span><span class="node">Copy-on-write: copy the root→leaf path, swap the root pointer</span><span class="arr">→</span><span class="node">LMDB: two roots, mmap, no WAL</span></div>
+    <div class="row"><span class="tag">In memory</span><span class="node">Three ways to hold a node in memory</span><span class="arr">→</span><span class="node">lets the in-memory node live a different life from the disk page</span></div>
+    <div class="row"><span class="tag">Delay writes</span><span class="node key">Lazy B-Trees: buffer updates</span><span class="arr">→</span><span class="node">WiredTiger: per-page skiplist buffer</span><span class="node">LA-Tree: cascaded per-subtree buffers</span></div>
+    <div class="row"><span class="tag">Append only</span><span class="node key">FD-Tree: small head B-Tree + immutable sorted runs</span><span class="arr">uses</span><span class="node">fractional cascading (bridges)</span><span class="node">logarithmic runs (merge like LSM)</span><span class="node">tombstones</span></div>
+    <div class="row"><span class="tag">No latches</span><span class="node key">Bw-Tree: base node + delta chain</span><span class="arr">→</span><span class="node">mapping table + compare-and-swap</span><span class="node">split/merge as deltas</span><span class="node">consolidation + epoch GC</span></div>
+    <div class="row"><span class="tag">No tuning</span><span class="node key">Cache-oblivious B-Tree</span><span class="arr">=</span><span class="node">van Emde Boas layout (static tree)</span><span class="node">+ packed array with gaps</span></div>
+    <div class="row"><span class="tag">Next</span><span class="node">Ch.7: LSM Trees take "append, then merge" all the way</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>What varies between variants</a>
+    <a href="#s2"><span>02</span>Copy-on-write</a>
+    <a href="#s3"><span>03</span>Implementing CoW: LMDB</a>
+    <a href="#s4"><span>04</span>Abstracting node updates</a>
+    <a href="#s5"><span>05</span>Lazy B-Trees</a>
+    <a href="#s6"><span>06</span>WiredTiger</a>
+    <a href="#s7"><span>07</span>Lazy-Adaptive Tree</a>
+    <a href="#s8"><span>08</span>FD-Trees</a>
+    <a href="#s9"><span>09</span>Fractional cascading</a>
+    <a href="#s10"><span>10</span>Logarithmic runs</a>
+    <a href="#s11"><span>11</span>Bw-Trees: the three problems</a>
+    <a href="#s12"><span>12</span>Update chains</a>
+    <a href="#s13"><span>13</span>Compare-and-swap</a>
+    <a href="#s14"><span>14</span>Structural modifications</a>
+    <a href="#s15"><span>15</span>Consolidation &amp; garbage collection</a>
+    <a href="#s16"><span>16</span>Cache-oblivious B-Trees</a>
+    <a href="#s17"><span>17</span>van Emde Boas layout &amp; packed array</a>
+    <a href="#s18"><span>18</span>Summary &amp; further reading</a>
+    <a href="#s19"><span>19</span>Choosing between them (numbers)</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER 6 INTRODUCTION</div><h2>Same skeleton, different organs</h2></div><span class="chip">pdf p190</span></div>
+  <p>All B-Tree variants share four things: the <b>tree shape</b>, <b>balancing through splits and merges</b>, and the <b>lookup</b> and <b>delete</b> algorithms. What differs between implementations is everything around that: how they handle <b>concurrency</b>, how a page is <b>represented on disk</b>, whether sibling nodes are <b>linked</b>, and what <b>maintenance processes</b> run in the background.</p>
+  <p>The chapter walks through five techniques:</p>
+  <div class="tablewrap"><table>
+    <tr><th>Variant</th><th>The idea in one line</th><th>Main thing it fixes</th></tr>
+    <tr><td>Copy-on-write B-Tree</td><td>Nodes are immutable. To change a page, copy it, change the copy, write it to a new place.</td><td>Readers need no latches; a crash can't leave a half-written tree</td></tr>
+    <tr><td>Lazy B-Trees</td><td>Buffer updates to a node in memory so several writes to the same node cost one I/O.</td><td>Write amplification</td></tr>
+    <tr><td>FD-Tree</td><td>Buffer updates in a small B-Tree; when it fills, write it out as an immutable sorted run; runs cascade down levels, like an LSM Tree.</td><td>Random writes (limited to the small head tree)</td></tr>
+    <tr><td>Bw-Tree</td><td>Split a node into a base part plus small change records, written append-only; batch changes to different nodes together.</td><td>Cost of small writes, latches, space reserved in pages</td></tr>
+    <tr><td>Cache-oblivious B-Tree</td><td>Lay the tree out so it works well for any block size, like an in-memory structure.</td><td>Having to tune for page/cache-line sizes</td></tr>
+  </table></div>
+  <p>The book also points ahead: the <b>two-component LSM Tree</b> in Chapter 7 takes the "lazy" buffering idea further and turns it into a fully immutable B-Tree.</p>
+  <div class="box picture"><b>Picture it</b><p>A library card catalogue. Every variant keeps the same drawers in the same alphabetical order. They differ in the clerk's habits: one clerk rewrites a fresh card instead of erasing (copy-on-write), one collects corrections in a tray and files them at the end of the day (lazy), one never touches the drawers and just appends sticky notes with a lookup sheet saying where each drawer's newest note is (Bw-Tree).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.2 (B-Tree basics: splits, merges, lookups), Ch.4 (implementation: sibling links, rebalancing, vacuum), Ch.5 (latching, B<sup>link</sup>-Trees, page cache, WAL). Each variant below removes or replaces one of those pieces.</li>
+    <li>Your roadmap (<code>Notes/syllabus.html</code>) maps B-Trees to Database Internals Ch.2–4 and LSM Trees to Ch.7; this chapter is the bridge between the two.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · COPY-ON-WRITE</div><h2>Never overwrite: copy the path, then swap the root</h2></div><span class="chip">pdf p191–192 · Fig 6-1</span></div>
+  <p>Instead of building complicated latching, some databases use <b>copy-on-write</b> to keep data correct while operations run at the same time. When a page is about to change, its contents are copied, the <em>copy</em> is modified, and a <b>parallel tree hierarchy</b> is built next to the old one. Pages that were not touched are reused by both trees.</p>
+  <ul class="plain">
+    <li>Readers that started earlier keep using the <b>old tree version</b>.</li>
+    <li>Writers that need pages already being modified <b>wait</b> until the earlier write operations are complete.</li>
+    <li>When the new hierarchy is complete, the <b>pointer to the topmost page is switched atomically</b>.</li>
+  </ul>
+  <p><b>Costs.</b> More space (although old versions live only briefly: their pages can be reclaimed as soon as the operations still using them finish) and more processor time, because whole pages are copied. Since B-Trees are shallow, the simplicity usually wins anyway.</p>
+  <p><b>Biggest win.</b> Readers need no synchronization at all: written pages never change, so they can be read without latches. Writes go to copies, so readers never block writers. Nobody can see a half-modified page, and a crash cannot leave a corrupted tree, because the root pointer flips only after every page change is done.</p>
+  <div class="box picture"><b>Picture it</b><p>Editing a shared Google Doc by duplicating it, editing the duplicate, then changing the bookmark everyone uses to point at the new file. People who already had the old file open keep reading a complete, consistent version. Only the pages you changed need duplicating; the new copy links to the old unchanged chapters.</p></div>
+  <div class="fig">
+    <h3>Run it: a copy-on-write write, one step at a time</h3>
+    <div class="ds" id="cowTree" aria-label="Copy-on-write B-Tree state"></div>
+    <div class="controls">
+      <label for="cowLeaf">write to leaf <select id="cowLeaf"><option value="4">L4</option><option value="0">L0</option><option value="1">L1</option><option value="2">L2</option><option value="3">L3</option><option value="5">L5</option><option value="6">L6</option><option value="7">L7</option><option value="8">L8</option></select></label>
+      <button id="cowStep" type="button">Next step ▶</button>
+      <button id="cowRead" type="button">Start a reader on current root</button>
+      <button id="cowDone" type="button">Oldest reader finishes</button>
+      <button id="cowReset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="cowR"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A write copies exactly the pages on the path from the root to the target leaf: <b>one page per level</b>. Everything else is shared by pointer. The old root is still a complete, valid tree, so a reader holding it sees a perfect snapshot (this is MVCC for free). The commit point is a single pointer write; before it, the new pages are invisible; after it, the old ones are garbage once no reader holds them. Try: start a reader, do two writes, and watch how many old pages have to stay alive until that reader finishes.</p></div>
+  <div class="fig">
+    <h3>Measured cost: bytes copied per update (modelled)</h3>
+    <div class="controls">
+      <label for="cowN">keys 10^ <input id="cowN" type="range" min="3" max="11" value="8"><output id="cowNo">8</output></label>
+      <label for="cowF">fan-out <input id="cowF" type="range" min="8" max="512" step="8" value="200"><output id="cowFo">200</output></label>
+      <label for="cowP">page KB <input id="cowP" type="range" min="1" max="64" value="8"><output id="cowPo">8</output></label>
+    </div>
+    <div class="readout" id="cowCalc"></div>
+    <p class="note">Assumptions: every level is full at the given fan-out, the update changes one record in one leaf, and nothing splits. In-place means the leaf page alone is eventually written back (WAL record not counted).</p>
+  </div>
+  <details><summary>How to build it: path-copying insert (TypeScript)</summary>
+<pre class="code">// Immutable nodes: never mutate, always return a new node.
+type Node = { keys: number[]; kids?: Node[]; vals?: string[] };
+
+function cowPut(n: Node, k: number, v: string): Node {
+  if (!n.kids) {                                    // leaf: copy + change
+    const i = lowerBound(n.keys, k);
+    const keys = n.keys.slice(), vals = n.vals!.slice();
+    if (keys[i] === k) vals[i] = v; else { keys.splice(i, 0, k); vals.splice(i, 0, v); }
+    return { keys, vals };                          // (split if too big — omitted)
+  }
+  const i = childIndex(n.keys, k);
+  const kids = n.kids.slice();                      // copy this node's pointer array
+  kids[i] = cowPut(n.kids[i], k, v);                // only one child is new
+  return { keys: n.keys, kids };                    // siblings shared by pointer
+}
+
+let root: Node;                                     // the ONLY mutable thing
+function commit(k: number, v: string) {
+  const newRoot = cowPut(root, k, v);               // build the parallel path
+  root = newRoot;                                   // atomic pointer swap = commit
+}</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.5's latching and B<sup>link</sup>-Trees solve the same "readers vs writers" problem with locks; copy-on-write removes the need for readers to latch at all.</li>
+    <li>Sections 8–10 (FD-Tree) and 11–15 (Bw-Tree) are also "never modify in place" designs. At the start of Ch.7 (pdf p221) the book lists copy-on-write B-Trees, FD-Trees and Bw-Trees together as the immutable structures seen so far, then goes all the way with LSM Trees.</li>
+    <li>Paper the book recommends: Driscoll, Sarnak, Sleator, Tarjan, "Making data structures persistent", STOC '86 (pdf p218). It is the theory of keeping old versions alive by copying paths.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · IMPLEMENTING COPY-ON-WRITE: LMDB</div><h2>LMDB: a database that is just a memory map and two roots</h2></div><span class="chip">pdf p193 · footnote 1 p219</span></div>
+  <p>The <b>Lightning Memory-Mapped Database (LMDB)</b> is a key-value store used by the OpenLDAP project, and it is built on copy-on-write. Because of that design it needs <b>no page cache, no write-ahead log, no checkpointing and no compaction</b>.</p>
+  <ul class="plain">
+    <li><b>Single-level store.</b> Reads and writes go straight through the memory map. There is no application-level cache in between, pages don't need to be "materialized" into another form, and reads are served from the map without copying into a buffer.</li>
+    <li><b>Updates copy the path.</b> Every branch node from the root to the target leaf is copied and, where the update propagates, modified. The rest stays as it was.</li>
+    <li><b>Only two root versions.</b> LMDB keeps the latest root and the one where new changes will be committed. Two are enough, because every write has to go through the root. Once a new root exists, the old one is closed to new readers and writers; when the reads still using old tree sections finish, their pages are reclaimed and reused.</li>
+    <li><b>No sibling pointers.</b> Because of the append-only design, leaves don't point to their siblings (my explanation, not the book's: a sibling pointer would force copying the neighbour every time a leaf is copied). A sequential scan has to climb back up to the parent to find the next leaf.</li>
+    <li><b>Multiversioned by nature.</b> Keeping stale data inside copied nodes would be pointless: the old copy already exists and can serve MVCC and ongoing read transactions. Readers take no locks and never interfere with writers.</li>
+  </ul>
+  <p>Footnote 1 sends you to LMDB's code comments and a presentation for more detail.</p>
+  <div class="box picture"><b>Picture it</b><p>Two whiteboards labelled "current" and "next". Writers draw the new version on "next", then flip the label. Readers always walk to whichever says "current" and read it in peace. An old drawing can be wiped only after the last person reading it has left the room.</p></div>
+  <div class="fig">
+    <h3>The two meta slots, and what a long reader does to the file</h3>
+    <div class="ds" id="lmdbMeta" aria-label="LMDB meta slots"></div>
+    <div class="controls"><button id="lmdbCommit" type="button">Commit a write txn</button><button id="lmdbReader" type="button">Open a long read txn</button><button id="lmdbEnd" type="button">Close it</button></div>
+    <div class="readout" id="lmdbR"></div>
+    <canvas id="lmdbC" aria-label="Database file size over time with and without a long-running reader"></canvas>
+    <div class="legend" id="lmdbCL"></div>
+    <div class="controls">
+      <label for="lmdbH">pages copied per txn (tree height) <input id="lmdbH" type="range" min="2" max="6" value="4"><output id="lmdbHo">4</output></label>
+      <label for="lmdbD">long reader stays open for (txns) <input id="lmdbD" type="range" min="0" max="300" step="10" value="150"><output id="lmdbDo">150</output></label>
+    </div>
+    <div class="readout" id="lmdbCR"></div>
+    <p class="note">Modelled, not measured: 400 write txns, each copies one root-to-leaf path and frees the old one; a freed page can be reused only when no open reader started before the txn that freed it. A long reader opens at txn 50.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Freed pages are tagged with the transaction that freed them. A reader that started at snapshot <i>t</i> may still be walking any page that was live at <i>t</i>, so nothing freed after <i>t</i> can be recycled while it runs. With no long reader, the file stops growing almost immediately: each write reuses the pages the previous write freed. With a long reader, every write must take fresh pages from the end of the file, and the file grows by about one tree height per transaction until the reader closes. Afterwards the space is reusable, but in this model the file never shrinks back.</p></div>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>LMDB's own site states that readers don't block writers and writers don't block readers, and that writes are serialized and deadlock-free (<a href="https://www.symas.com/mdb">symas.com/mdb</a>).</li>
+    <li><b>bbolt</b> (Go) is a fork of Bolt, which its README says began as a port of LMDB. The README spells out the same trade-offs you just simulated: copy-on-write, one read-write transaction at a time, many readers, a memory-mapped file, and old pages that can't be reclaimed while an old transaction still uses them. It recommends LSM-style stores (LevelDB) for heavy random writes (<a href="https://github.com/etcd-io/bbolt">github.com/etcd-io/bbolt</a>). bbolt lives in the etcd project; etcd's docs describe its storage as a persistent B+tree (<a href="https://etcd.io/docs/v3.5/learning/data_model/">etcd data model</a>).</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.5's page cache, WAL and checkpoints: LMDB drops all four mechanisms and relies on the OS memory map plus atomic root switching for durability and isolation.</li>
+    <li>Ch.4's sibling links: LMDB is the counter-example, trading slower scans (climb to parent) for an append-only tree.</li>
+    <li>Section 16: the book notes LMDB is the exception to the "two-level memory hierarchy" view, because it's a single-level store.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · ABSTRACTING NODE UPDATES</div><h2>Three ways to hold a node in memory</h2></div><span class="chip">pdf p194</span></div>
+  <p>Before a page changes on disk, its <b>in-memory representation</b> has to change. There are three ways to represent a node in memory:</p>
+  <ol class="plain">
+    <li><b>Use the cached bytes directly.</b> In languages with unmanaged memory (C, C++, Rust with <code>unsafe</code>), the raw binary data in a page can be reinterpreted as a structure through a pointer and a runtime cast. The pointer usually points into memory owned by the page cache or into a memory map.</li>
+    <li><b>Materialize native objects.</b> Decode the page into the language's own objects or structs and run inserts, updates and deletes on those. At flush time, the changes are applied to the page in memory and then to disk. This makes concurrency simpler, because changes to the raw page are managed separately from access to the objects, but it costs more memory: two versions of the same page (raw and native) live in memory at once.</li>
+    <li><b>A wrapper over the buffer.</b> A wrapper object gives access to the buffer backing the node and writes each change into that buffer as soon as it is made. This is most common in managed-memory languages (Java, Go, C#).</li>
+  </ol>
+  <p>Keeping the on-disk page, its cached copy and its in-memory form separate lets them have <b>different life cycles</b>. For example, you can buffer inserts, updates and deletes in memory and reconcile them with the original on-disk version during reads. That is exactly the door the next sections walk through.</p>
+  <div class="fig">
+    <svg viewBox="0 0 660 210" role="img" aria-label="Three in-memory representations of a node" style="width:100%;height:auto">
+      <rect x="10" y="150" width="640" height="46" rx="4" fill="none" stroke-dasharray="4 3" style="stroke:var(--muted)"/>
+      <text x="20" y="168">page cache / mmap: raw page bytes</text>
+      <rect x="40" y="174" width="140" height="16" style="fill:var(--tint2);stroke:var(--rule)"/><rect x="260" y="174" width="140" height="16" style="fill:var(--tint2);stroke:var(--rule)"/><rect x="480" y="174" width="140" height="16" style="fill:var(--tint2);stroke:var(--rule)"/>
+      <text x="40" y="22" style="font-weight:600">1 · raw pointer</text>
+      <rect x="40" y="34" width="140" height="56" rx="3" style="fill:var(--plate);stroke:var(--c1)"/>
+      <text x="50" y="54">struct* node =</text><text x="50" y="72">(Node*) buf</text>
+      <line x1="52" y1="90" x2="52" y2="172" stroke-width="2" style="stroke:var(--c1)"/>
+      <text x="62" y="116" style="fill:var(--muted)">same bytes,</text><text x="62" y="132" style="fill:var(--muted)">no copy</text>
+      <text x="260" y="22" style="font-weight:600">2 · native objects</text>
+      <rect x="260" y="34" width="140" height="56" rx="3" style="fill:var(--plate);stroke:var(--c2)"/>
+      <text x="270" y="54">keys: [..]</text><text x="270" y="72">vals: [..]</text>
+      <line x1="268" y1="90" x2="268" y2="172" stroke-dasharray="4 3" style="stroke:var(--c2)"/><line x1="280" y1="172" x2="280" y2="90" stroke-dasharray="4 3" style="stroke:var(--c2)"/>
+      <text x="290" y="116" style="fill:var(--muted)">decode ↓ · flush ↑</text><text x="290" y="132" style="fill:var(--muted)">two copies in RAM</text>
+      <text x="480" y="22" style="font-weight:600">3 · wrapper</text>
+      <rect x="480" y="34" width="140" height="56" rx="3" style="fill:var(--plate);stroke:var(--c3)"/>
+      <text x="490" y="54">node.setKey(i,k)</text><text x="490" y="72">→ writes buf</text>
+      <line x1="490" y1="90" x2="490" y2="172" stroke-width="2" style="stroke:var(--c3)"/>
+      <text x="500" y="116" style="fill:var(--muted)">object view;</text><text x="500" y="132" style="fill:var(--muted)">bytes change at once</text>
+    </svg>
+  </div>
+  <div class="controls"><button id="abs1" type="button" class="on">1 · raw pointer</button><button id="abs2" type="button">2 · native objects</button><button id="abs3" type="button">3 · wrapper</button></div>
+  <div id="absOut" class="box behind"></div>
+  <div class="box picture"><b>Picture it</b><p>A printed form. (1) Write on the paper itself with a pen. (2) Type the form into a spreadsheet, edit there, and print a new form at the end; easy to edit, but now there are two copies. (3) Hand the paper to a clerk who fills in the boxes for you as you dictate; you never touch the paper, but every change lands on it at once.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.3 (file formats, slotted pages, cells): option 1 and 3 work directly on that binary layout; option 2 decodes it.</li>
+    <li>Section 6: WiredTiger is an instance of option 2 taken further: in-memory pages have a different format from on-disk pages, and they're reconciled at flush.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · LAZY B-TREES</div><h2>Lazy B-Trees: collect changes, write later</h2></div><span class="chip">pdf p195 · footnote 2 p219</span></div>
+  <p>Some algorithms make B-Tree updates cheaper by putting <b>lightweight, concurrency- and update-friendly in-memory structures</b> in front of the tree. Updates go into these buffers first and reach the tree later. The book calls this family <b>lazy B-Trees</b>, and footnote 2 says plainly that this is not a commonly recognized name: Petrov chose "lazy" because what these variants share is buffering updates in an intermediate structure instead of applying them to the tree directly.</p>
+  <div class="box picture"><b>Picture it</b><p>A postman who drives to a house once a day with all its letters, instead of once per letter. If ten letters for the same house arrive in a day, nine trips are saved. If every letter goes to a different house, buffering saves nothing.</p></div>
+  <div class="fig">
+    <h3>How many page writes does buffering save? (simulation)</h3>
+    <canvas id="lazyC" aria-label="Page writes per update vs buffer memory"></canvas>
+    <div class="legend" id="lazyCL"></div>
+    <div class="controls">
+      <label for="lazyP">pages in the tree <input id="lazyP" type="range" min="50" max="2000" step="50" value="500"><output id="lazyPo">500</output></label>
+      <label for="lazyM">buffer holds (updates) <input id="lazyM" type="range" min="1" max="5000" step="1" value="1000"><output id="lazyMo">1000</output></label>
+    </div>
+    <div class="readout" id="lazyR"></div>
+    <p class="note">Simulated: 20,000 updates, each to a page picked at random (uniform, or skewed so 20% of pages get ~80% of updates). Eager = one page write per update. Lazy = updates wait in a buffer; when the buffer is full, the page with the most pending updates is written in one I/O and its updates leave the buffer.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The saving equals the average number of updates that pile up on a page before it's written. That depends on how much memory the buffer has relative to the number of pages, and on how concentrated the updates are. Skewed (hot-page) workloads benefit far more. The price: every read must also look in the buffer (section 6), and buffered updates need their own durability (a log) until they're written.</p></div>
+  <div class="box beyond"><b>Beyond the book: the same idea in databases you'll use</b><ul>
+    <li><b>MySQL InnoDB change buffer</b>: caches changes to secondary-index pages that aren't in the buffer pool and merges them when the page is later read in, or in the background. Default max size 25% of the buffer pool (<a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-change-buffer.html">MySQL docs</a>).</li>
+    <li><b>PostgreSQL GIN "fast update"</b>: new entries go into an unsorted pending list, moved into the main index in bulk on vacuum/autoanalyze or when the list exceeds <code>gin_pending_list_limit</code>. The docs name the cost: searches must also scan the pending list (<a href="https://www.postgresql.org/docs/current/gin.html">PostgreSQL docs</a>).</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.5's page cache already delays writes of dirty pages; lazy B-Trees delay the <em>changes themselves</em>, so many changes fold into one page rewrite.</li>
+    <li>Ch.7: the two-component LSM Tree is the extreme version: the whole in-memory component is a buffer.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · WIREDTIGER</div><h2>WiredTiger: a skiplist of pending updates on every page</h2></div><span class="chip">pdf p196–198 · Fig 6-2, 6-3</span></div>
+  <p>One way to build a lazy B-Tree: <b>materialize a node in memory as soon as it's paged in</b>, and keep its updates in memory until it's time to flush. WiredTiger, now the default storage engine of MongoDB, does something similar. Its <b>row-store B-Tree uses different formats for in-memory and on-disk pages</b>, and an in-memory page must go through <b>reconciliation</b> before it is persisted.</p>
+  <ul class="plain">
+    <li>A <b>clean page</b> is just an index built from the on-disk page image.</li>
+    <li>Updates first go into the page's <b>update buffer</b>. A page with updates is <b>dirty</b>; both clean and dirty pages have an in-memory version that references a base image on disk, and a dirty page also has the buffer (Fig 6-3).</li>
+    <li><b>Reads</b> merge the update buffer with the on-disk contents, so they always return the newest data.</li>
+    <li><b>Flush</b>: buffer contents are reconciled with the page contents and written to disk, <b>overwriting the original page</b>. If the reconciled page is bigger than the maximum page size, it is <b>split into several pages</b>.</li>
+    <li>Update buffers are <b>skiplists</b>: search complexity similar to search trees [PAPADAKIS93], but a better concurrency profile [PUGH90a].</li>
+    <li>Main advantage: page updates and structural changes (splits and merges) are done by a <b>background thread</b>, so readers and writers don't wait for them.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A printed price list on the shop wall with sticky notes stuck beside it. Customers read the list and the notes together. At closing time someone reprints the list with the notes folded in; if it no longer fits on one sheet, it becomes two sheets.</p></div>
+  <div class="fig">
+    <h3>Run it: one WiredTiger-style page</h3>
+    <div class="ds" id="wtView" aria-label="Page image, update buffer and flushed pages"></div>
+    <div class="controls">
+      <label for="wtKey">key <input id="wtKey" type="number" min="1" max="99" value="42"></label>
+      <button id="wtPut" type="button">Upsert</button><button id="wtDel" type="button">Delete</button><button id="wtGet" type="button">Read</button><button id="wtRand" type="button">5 random upserts</button><button id="wtFlush" type="button">Reconcile &amp; flush</button><button id="wtReset" type="button">Reset</button>
+      <label for="wtMax">max entries per page <input id="wtMax" type="range" min="6" max="16" value="10"><output id="wtMaxo">10</output></label>
+    </div>
+    <div class="readout" id="wtR"></div>
+    <p class="note">Simplified: one leaf page, small integer keys. Skiplist tower heights are random (each level with probability ½), drawn as the little stacks.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The disk image is never edited in place while the page is in memory; every change lands in the skiplist. That's why writers don't block on page layout work: inserting into a skiplist touches only a few pointers, and several threads can update a skiplist at once [PUGH90a]. The cost moves to two places: <b>reads</b> must check the buffer first (newest wins), and <b>reconciliation</b> must merge and rewrite the page. Note the order on a read: buffer first, then image; a delete in the buffer hides the image's value.</p></div>
+  <details><summary>How to build it: read and reconcile (TypeScript)</summary>
+<pre class="code">type Upd = { key: number; val: string | null };      // null = delete
+class Page {
+  image: Map&lt;number, string&gt;;                       // decoded on-disk image (read-only)
+  buf = new SkipList&lt;number, Upd&gt;();                 // pending updates, sorted by key
+  get(k: number) {
+    const u = this.buf.find(k);                         // 1) newest change wins
+    if (u) return u.val;                                // may be null (deleted)
+    return this.image.get(k) ?? null;                   // 2) fall back to base image
+  }
+  reconcile(maxEntries: number): Map&lt;number,string&gt;[] {
+    const merged = new Map(this.image);
+    for (const u of this.buf) u.val === null ? merged.delete(u.key) : merged.set(u.key, u.val);
+    const sorted = [...merged].sort((a, b) =&gt; a[0] - b[0]);
+    const pages = [];                                   // too big? split into several pages
+    for (let i = 0; i &lt; sorted.length; i += maxEntries) pages.push(new Map(sorted.slice(i, i + maxEntries)));
+    return pages;                                       // persisted; the book: overwrites the original page
+  }
+}</pre></details>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>MongoDB 3.2 (December 2015) made WiredTiger the default storage engine, replacing MMAPv1 (<a href="https://www.mongodb.com/docs/v4.4/release-notes/3.2/">MongoDB 3.2 release notes</a>). Current docs say MongoDB has WiredTiger write snapshot data to disk as a checkpoint every 60 seconds (<a href="https://www.mongodb.com/docs/manual/core/wiredtiger/">WiredTiger docs</a>).</li>
+    <li>Your <code>Notes/Docker/DockerCommands.md</code> has a "MongoDB in Docker" section: the <code>mongod</code> in that container runs on this engine.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 4 option 2 (native in-memory format, reconciled on flush). Section 12: a Bw-Tree delta chain is the same "base image + pending changes" idea, but stored append-only and without latches.</li>
+    <li>Ch.7: LSM memtables are often skiplists too, for the same concurrency reason.</li>
+    <li>Papers: Papadakis, "Skip lists and probabilistic analysis of algorithms", PhD thesis, Waterloo 1993 [PAPADAKIS93, pdf p511]; Pugh, "Concurrent Maintenance of Skip Lists", UMD tech report 1990 [PUGH90a, pdf p511].</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · LAZY-ADAPTIVE TREE</div><h2>LA-Tree: buffers per subtree that cascade downward</h2></div><span class="chip">pdf p199–200 · Fig 6-4</span></div>
+  <p>Instead of one buffer per node, the <b>Lazy-Adaptive Tree (LA-Tree)</b> [AGRAWAL09] groups nodes into <b>subtrees</b> and attaches one update buffer to each subtree. A buffer tracks every operation aimed at that subtree's top node and its descendants.</p>
+  <ol class="plain">
+    <li>A new record is first added to the <b>root subtree's buffer</b>.</li>
+    <li>When that buffer is full, it is emptied by copying and <b>propagating its changes to the buffers one level down</b>.</li>
+    <li>If those fill up too, the same happens recursively, until changes reach the <b>leaves</b>.</li>
+    <li>At the leaf level, the batched inserts, updates and deletes are <b>applied all at once</b>: tree contents and structure change in a single run. Splits and merges also travel up in batches.</li>
+  </ol>
+  <p>Buffers have <b>hierarchical dependencies</b>: they are <b>cascaded</b>, always flowing from higher to lower. Pages are updated in one pass instead of once per update, so there are fewer disk accesses and fewer structural changes. In Fig 6-4 the gray boxes in the lower buffers are changes that arrived from the root buffer.</p>
+  <p>WiredTiger and the LA-Tree both speed up updates by batching writes, in slightly different ways, and <b>both pay</b> with extra lookups in in-memory buffers and merge/reconciliation with stale data on disk.</p>
+  <div class="box picture"><b>Picture it</b><p>A sorting office. Letters land in the national tray. When it's full, it's emptied into regional trays; full regional trays are emptied into street bags; a postman delivers a whole bag to one street at once. Each house gets one visit for many letters.</p></div>
+  <div class="fig">
+    <h3>Run it: cascaded buffers</h3>
+    <div class="ds" id="laView" aria-label="LA-Tree buffers and leaves"></div>
+    <div class="controls">
+      <button id="laIns1" type="button">Insert 1 key</button><button id="laIns10" type="button">Insert 10 keys</button><button id="laIns200" type="button">Insert 200 keys</button><button id="laReset" type="button">Reset</button>
+      <label for="laRB">root buffer size <input id="laRB" type="range" min="4" max="32" value="12"><output id="laRBo">12</output></label>
+      <label for="laCB">subtree buffer size <input id="laCB" type="range" min="4" max="32" value="8"><output id="laCBo">8</output></label>
+    </div>
+    <div class="readout" id="laR"></div>
+    <p class="note">Simplified model: a root subtree over 4 child subtrees, each child subtree over 4 leaf pages (16 leaves, key range 0–999 split evenly). A leaf page write is counted once per batch that touches it. Plain B-Tree = one leaf write per insert. Splits are not modelled.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each flush moves a whole buffer's worth of updates one level down using one sequential write per target buffer, and at the bottom each leaf is written once for all the updates that reached it. Bigger buffers mean more updates share each leaf write. A lookup, though, must check the root buffer, then its subtree's buffer, then the leaf: up to one extra buffer per level. "Adaptive" in the name refers to the paper tuning buffer sizes to the workload with an online algorithm (from the paper's abstract, not in the book).</p></div>
+  <div class="box beyond"><b>Beyond the book: measured result</b><p>The LA-Tree authors report, on raw NAND flash, <b>2× to 12×</b> gains over the best alternative schemes across workloads and memory limits, and <b>3× to 6×</b> gains in most cases on SSDs (abstract of the UMass tech report version, <a href="https://web.cs.umass.edu/publication/docs/2008/UM-CS-2008-008.pdf">UM-CS-2008-008</a>). The same cascading-buffer idea underlies the buffer tree (Arge, WADS 1995) and B<sup>ε</sup>-trees (Brodal &amp; Fagerberg, SODA 2003), neither of which the book covers.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 6 (one buffer per page) vs here (one buffer per subtree). Section 10: FD-Tree levels also cascade "upper → lower", but as sorted runs instead of buffers attached to tree nodes.</li>
+    <li>Paper: Agrawal, Ganesan, Sitaraman, Diao, Singh, "Lazy-Adaptive Tree: an optimized index structure for flash devices", PVLDB 2(1), 2009 [AGRAWAL09, pdf p489].</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · FD-TREES</div><h2>FD-Tree: random writes only in a tiny head tree</h2></div><span class="chip">pdf p201</span></div>
+  <p>Buffering is everywhere in storage because it replaces <b>many small random writes with one larger write</b>. On HDDs random writes are slow because the head has to move into position. SSDs have no moving parts, but every extra write adds a <b>garbage-collection penalty</b> inside the drive.</p>
+  <p>Keeping a B-Tree up to date needs lots of random writes: leaf writes, plus splits and merges travelling up to parents. So: what if we avoided random writes and in-place node updates altogether?</p>
+  <p>The earlier sections buffered updates per node or per group of nodes. The alternative is to group updates aimed at <em>different</em> nodes together, using <b>append-only storage and merging</b>, the idea that also inspired LSM Trees. A write never has to find its target node: it is simply appended. The <b>Flash Disk Tree (FD-Tree)</b> [LI10] applies this to indexing:</p>
+  <ul class="plain">
+    <li>a small <b>mutable head tree</b> (a small B-Tree buffering updates): the only place where random writes happen;</li>
+    <li>several <b>immutable sorted runs</b> below it;</li>
+    <li>when the head tree fills, its contents go into an immutable run; when a run grows past its threshold, it's merged into the next level, so records move gradually from upper to lower levels.</li>
+  </ul>
+  <div class="fig">
+    <svg viewBox="0 0 660 214" role="img" aria-label="FD-Tree: head tree, sorted runs L1 and L2, with bridges" style="width:100%;height:auto">
+      <text x="10" y="20" style="fill:var(--muted)">mutable · random writes</text>
+      <rect x="270" y="6" width="120" height="22" rx="3" style="fill:var(--tint);stroke:var(--c1)"/><text x="282" y="22">head B-Tree</text>
+      <line x1="300" y1="28" x2="240" y2="48" style="stroke:var(--c1)"/><line x1="360" y1="28" x2="420" y2="48" style="stroke:var(--c1)"/>
+      <rect x="180" y="48" width="120" height="20" rx="3" style="fill:var(--tint);stroke:var(--c1)"/><rect x="360" y="48" width="120" height="20" rx="3" style="fill:var(--tint);stroke:var(--c1)"/>
+      <text x="10" y="96" style="fill:var(--muted)">immutable · written sequentially</text>
+      <rect x="120" y="104" width="420" height="24" rx="3" style="fill:var(--plate);stroke:var(--ink)"/><text x="128" y="121">L1 sorted run (size ≈ k × head)</text>
+      <rect x="20" y="176" width="620" height="24" rx="3" style="fill:var(--plate);stroke:var(--ink)"/><text x="28" y="193">L2 sorted run (size ≈ k² × head)</text>
+      <g stroke-dasharray="3 3" style="stroke:var(--c2)"><line x1="200" y1="128" x2="120" y2="176"/><line x1="330" y1="128" x2="330" y2="176"/><line x1="470" y1="128" x2="560" y2="176"/><line x1="240" y1="68" x2="200" y2="104"/><line x1="420" y1="68" x2="470" y2="104"/></g>
+      <text x="400" y="156" style="fill:var(--c2)">bridges (fences)</text>
+    </svg>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>An inbox tray on your desk (head tree) where you can drop and rearrange papers freely. When it's full you sort it and add it to a filing box in one go. When a filing box gets too big, you merge it with the bigger archive box below. You never open the archive to insert one sheet.</p></div>
+  <div class="fig">
+    <h3>Why sequential beats random: a back-of-envelope calculator (assumptions, not measurements)</h3>
+    <div class="controls">
+      <label for="fdiN">updates <input id="fdiN" type="range" min="100" max="100000" step="100" value="10000"><output id="fdiNo">10000</output></label>
+      <label for="fdiSeek">HDD seek+rotate ms <input id="fdiSeek" type="range" min="2" max="15" step="0.5" value="8"><output id="fdiSeeko">8</output></label>
+      <label for="fdiBW">sequential MB/s <input id="fdiBW" type="range" min="50" max="3000" step="50" value="150"><output id="fdiBWo">150</output></label>
+    </div>
+    <div class="readout" id="fdiR"></div>
+    <p class="note">Assumed: each in-place update rewrites one 4 KB page at a random position (one seek each). Batched: the same updates, 64 bytes each, written as one sorted run. Defaults are typical-looking HDD values; set your own.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A random write pays a fixed positioning cost (HDD) or causes extra internal copying (SSD) no matter how few bytes it carries. Writing a sorted run is one long stream: the fixed cost is paid once. The FD-Tree accepts extra work later (merging runs, rewriting records several times) to make every disk write except the head tree's sequential. Reads get more expensive, because a key can be in any level; the next two sections are how the FD-Tree keeps reads cheap anyway.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.7 (LSM Trees): same "append, then merge" structure; the book's later sections on read, write and space amplification apply here too.</li>
+    <li>Paper: Li, He, Yang, Luo, Yi, "Tree Indexing on Solid State Drives", PVLDB 3(1–2), 2010 [LI10, pdf p508]. Measured results are in section 19 below.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · FRACTIONAL CASCADING</div><h2>Fractional cascading: search many sorted arrays for the price of one</h2></div><span class="chip">pdf p202–203 · Fig 6-5</span></div>
+  <p>To keep pointers between levels, FD-Trees use <b>fractional cascading</b> [CHAZELLE86]. It cuts the cost of finding a key in a stack of sorted arrays: the first array costs a full binary search (log n steps), but each later array is much cheaper because the search starts from the closest match found on the level above.</p>
+  <ul class="plain">
+    <li><b>Bridges</b> are shortcuts between neighbouring arrays. They exist to keep <b>gaps</b> small; a gap is a group of elements with no pointer coming from the level above.</li>
+    <li>A bridge is built by <b>pulling an element up</b> from the lower array into the higher one (if it's not already there) and storing a pointer to where it sits below.</li>
+    <li>Pointing <em>every</em> element to its nearest match below would cost too many pointers to store and maintain. Pointing only elements that happen to exist on both levels could leave huge gaps. The compromise: <b>pull every Nth element</b> of the lower array up.</li>
+    <li>The book's example uses three five-element arrays and pulls <b>every other</b> element from each array into the one above it. The FD-Tree paper calls the bridges <b>fences</b>.</li>
+    <li>To search: binary-search the top array, then follow a bridge down; on the next level you land next to the answer and only scan a short stretch.</li>
+    <li>Chazelle and Guibas wrote it for computational geometry, so their version has bidirectional bridges and an algorithm for restoring the gap-size invariant. The book (and this page) covers only the part FD-Trees use.</li>
+  </ul>
+  <div class="fig">
+    <h3>Run it: build bridges, then search</h3>
+    <div id="fcView" aria-label="Arrays with pulled elements and bridges"></div>
+    <div class="controls">
+      <label for="fcN">pull every <select id="fcN"><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option></select> element</label>
+      <label for="fcKey">search key <input id="fcKey" type="number" min="0" max="99" value="37"></label>
+      <button id="fcSearch" type="button">Search</button><button id="fcNew" type="button">New arrays</button>
+      <label for="fcLen">array length <input id="fcLen" type="range" min="5" max="12" value="7"><output id="fcLeno">7</output></label>
+    </div>
+    <div class="readout" id="fcR"></div>
+    <p class="note">Your own random arrays (not the book's). Shaded cells were pulled up from the array below; each has a bridge (line) to its position there. Highlighted stretch = where the search looks on each level.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Pulled elements split the lower array into stretches of at most N elements. After finding where the key falls in the upper array, the nearest pulled element on each side tells you exactly which stretch of the lower array can hold the answer, so the next level needs at most about N comparisons instead of a fresh log n search. With k arrays of n elements: separate binary searches cost about k·log₂n comparisons; cascading costs log₂(augmented n) + roughly N per extra level. The price is space: each array grows by about 1/N of the array below it (and that array's pulled elements too).</p></div>
+  <details><summary>How to build it: augment bottom-up, search top-down (JavaScript)</summary>
+<pre class="code">// arrays[0] is the top. Build augmented arrays from the bottom up.
+function build(arrays, N) {
+  const aug = []; aug[arrays.length - 1] = arrays.at(-1).map(v =&gt; ({ v, native: true }));
+  for (let i = arrays.length - 2; i &gt;= 0; i--) {
+    const below = aug[i + 1];
+    const pulled = below.filter((_, j) =&gt; j % N === N - 1)            // every Nth
+                        .map(e =&gt; ({ v: e.v, bridge: below.indexOf(e) }));
+    aug[i] = [...arrays[i].map(v =&gt; ({ v, native: true })), ...pulled]
+             .sort((a, b) =&gt; a.v - b.v);
+  }
+  return aug;
+}
+function search(aug, key) {
+  let p = lowerBound(aug[0], key);                 // full binary search once
+  const hits = [p];
+  for (let i = 0; i + 1 &lt; aug.length; i++) {
+    const lo = prevBridge(aug[i], p) + 1;          // bridge left of p  → start
+    const hi = nextBridge(aug[i], p, aug[i + 1].length); // bridge at/after p → end
+    p = lo; while (p &lt; hi &amp;&amp; aug[i + 1][p].v &lt; key) p++;  // ≤ N steps
+    hits.push(p);
+  }
+  return hits;                                     // position of successor on every level
+}</pre></details>
+  <div class="box behind"><b>A note on the book's own example (pdf p202–203)</b><p>The text and Figure 6-5 don't quite agree. The text pulls every other element of each <i>original</i> lower array, so the augmented top array gains 25 and 30 (from the second array) and the second array gains 16 and 26 (from the third). The figure's middle row matches that (16 and 26 shaded), but its top row shows 26 and 30 shaded instead of 25 and 30. 26 exists in the second array only after it has been augmented, so the figure seems to pull from the augmented array; yet a strict every-other pull from that augmented array would give 22, 26 and 30, not just 26 and 30. Neither reading reproduces the figure exactly. The page's simulator pulls every Nth element from the already-augmented array below (the standard construction); the idea is the same either way.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 10: FD-Trees use an adapted version where the first element of each lower-level page is pushed up as a pointer.</li>
+    <li>Ch.7: LSM Trees face the same "search many sorted tables" problem and usually answer it with Bloom filters and per-table indexes instead of bridges.</li>
+    <li>Paper: Chazelle &amp; Guibas, "Fractional Cascading, A Data Structuring Technique", Algorithmica 1, 1986 [CHAZELLE86, pdf p494].</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · LOGARITHMIC RUNS</div><h2>Logarithmic runs: levels that grow by a factor of k</h2></div><span class="chip">pdf p204–205 · Fig 6-6</span></div>
+  <p>An FD-Tree combines fractional cascading with <b>logarithmically sized sorted runs</b>: immutable sorted arrays whose sizes grow by a factor of <b>k</b> from one level to the next, each made by merging the level above into the current one.</p>
+  <ol class="plain">
+    <li>When the head tree fills up the first time, its leaf contents are written out as the first level (L1).</li>
+    <li>When it fills again, its contents are <b>merged with L1</b>, and the merged result <b>replaces the old L1</b>.</li>
+    <li>When a level reaches its size threshold, the next level down is created from it; if that lower level already exists, it is replaced by the merge of the two. This is very close to <b>compaction</b> in LSM Trees.</li>
+  </ol>
+  <p>Fig 6-6 shows a head B-Tree, two runs L1 and L2, and bridges between them. To keep every run reachable, FD-Trees use an <b>adapted fractional cascading</b>: the <b>head element</b> (first key) of each lower-level page is pushed up to the level above as a pointer. A search continues from the closest match found above, so it never starts from scratch on a lower level.</p>
+  <p><b>Deletes.</b> Pages are never updated in place, and records for the same key can exist on several levels. So a delete inserts a <b>tombstone</b> (the paper calls it a <b>filter entry</b>): a marker saying "the record for this key is deleted; discard every record for it on lower levels". When a tombstone reaches the <b>lowest level</b>, it can be dropped, because there's nothing left below for it to hide.</p>
+  <div class="fig">
+    <h3>Run it: an FD-Tree filling up</h3>
+    <div class="ds" id="fdView" aria-label="Head tree and sorted runs"></div>
+    <div class="controls">
+      <button id="fdIns" type="button">Insert 1</button><button id="fdFill" type="button">Fill the head tree</button><button id="fdDel" type="button">Delete a key (tombstone)</button><button id="fdRun" type="button">Insert 200</button><button id="fdReset" type="button">Reset</button>
+      <label for="fdH">head tree holds <input id="fdH" type="range" min="4" max="16" value="6"><output id="fdHo">6</output></label>
+      <label for="fdK">size ratio k <input id="fdK" type="range" min="2" max="8" value="3"><output id="fdKo">3</output></label>
+    </div>
+    <div class="readout" id="fdR"></div>
+  </div>
+  <div class="fig">
+    <h3>The k trade-off, measured on the simulator</h3>
+    <canvas id="fdC" aria-label="Write amplification and number of levels vs size ratio k"></canvas>
+    <div class="legend" id="fdCL"></div>
+    <div class="readout" id="fdCR"></div>
+    <p class="note">Simulated: 20,000 inserts of distinct random keys into an FD-Tree with the head size set above (change it to redraw). Write amplification = records written into runs by all merges ÷ records inserted. Levels ≈ how many runs a lookup may have to visit.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every record is rewritten each time its level is merged with the one above, and again when it is pushed down. Total write amplification is roughly (number of levels) × (rewrites per level). A bigger k means fewer levels (cheaper lookups, about log<sub>k</sub> of the data size), but each level absorbs about k merges from above before it spills, so each record is rewritten more often per level. A small k means little rewriting per level but many levels. So write amplification is U-shaped in k (in this simulation the low point is around k = 4 for head sizes 4–10, drifting toward 5–6 for larger heads), while lookup cost only falls as k grows. This is the same knob LSM Trees expose (Ch.7). The absolute numbers are high here because the head tree is tiny (a real head tree holds thousands of entries, so there are far fewer levels). In the run view, notice that a tombstone only disappears in a merge that produces the lowest level, together with the record it shadows.</p></div>
+  <details><summary>How to build it: insert with cascading merges (JavaScript)</summary>
+<pre class="code">// levels[0] is L1. Entries: {key, tomb}. Newer entries win on equal keys.
+function insert(fd, key, tomb = false) {
+  fd.head.set(key, { key, tomb });                       // random write, but tiny tree
+  if (fd.head.size &lt; fd.H) return;
+  let carry = [...fd.head.values()].sort(byKey); fd.head.clear();
+  for (let i = 0; ; i++) {
+    const isLast = i &gt;= fd.levels.length - 1;
+    const merged = mergeNewerWins(carry, fd.levels[i] || []);
+    const out = isLast ? merged.filter(e =&gt; !e.tomb) : merged; // drop tombstones at bottom
+    fd.written += out.length;                            // sequential write of the new run
+    if (out.length &lt;= fd.H * fd.k ** (i + 1)) { fd.levels[i] = out; return; }
+    fd.levels[i] = []; carry = out;                      // too big: push down a level
+  }
+}</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 9 (bridges), section 8 (why). Ch.7: leveled vs tiered compaction, and tombstones in LSM Trees, which follow the same "drop at the bottom" rule.</li>
+    <li>Paper: [LI10] (pdf p508); the FD-Tree paper also derives the best k for a given SSD and workload from a cost model.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · BW-TREES</div><h2>Bw-Tree: attack all three problems at once</h2></div><span class="chip">pdf p206</span></div>
+  <p>In-place B-Trees have three big problems:</p>
+  <ol class="plain">
+    <li><b>Write amplification</b>: each update to a page may mean rewriting the disk copy of the whole page.</li>
+    <li><b>Space amplification</b>: free space is reserved in pages so updates fit, so for every useful byte you transfer some empty bytes and the rest of the page.</li>
+    <li><b>Concurrency complexity</b>: latches and everything that comes with them.</li>
+  </ol>
+  <p>Buffering (sections 5–7) helps with 1 and 2 but does nothing for 3. Solving all three needs a different approach: <b>batch updates to different nodes with append-only storage</b>, <b>link a node's pieces into a chain</b>, and keep an <b>in-memory structure that installs pointers between nodes with a single compare-and-swap</b>. That makes the tree <b>lock-free</b>. It's called the <b>Buzzword-Tree (Bw-Tree)</b> [LEVANDOSKI14].</p>
+  <div class="fig">
+    <h3>Put numbers on problems 1 and 2 (modelled)</h3>
+    <div class="controls">
+      <label for="bwiRec">record bytes <input id="bwiRec" type="range" min="16" max="1024" step="16" value="64"><output id="bwiReco">64</output></label>
+      <label for="bwiPage">page KB <input id="bwiPage" type="range" min="4" max="32" step="4" value="8"><output id="bwiPageo">8</output></label>
+      <label for="bwiFill">page fill % <input id="bwiFill" type="range" min="40" max="100" step="5" value="70"><output id="bwiFillo">70</output></label>
+      <label for="bwiThr">delta chain limit <input id="bwiThr" type="range" min="2" max="32" value="8"><output id="bwiThro">8</output></label>
+    </div>
+    <div class="readout" id="bwiOut"></div>
+    <p class="note">Assumptions: one small record changes per update; in-place writes the whole page back each time (worst case, no write combining); a delta = record + 32 bytes of header; a consolidation rewrites the page's live bytes once every "limit" updates. Real numbers depend on caching and flush policy.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Instead of reprinting a whole page of a ledger to fix one line, you clip a small correction slip to the front of the page. And instead of locking the ledger while you clip, there's a single index card saying "page 17 starts at slip #942"; you swap that card in one motion, and if someone beat you to it, you clip your slip on top of theirs and try again.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.5's latch crabbing and B<sup>link</sup>-Trees: the Bw-Tree is the latch-free alternative and reuses the B<sup>link</sup> "half-split" trick (section 14).</li>
+    <li>Paper: Levandoski, Lomet, Sengupta, "The Bw-Tree: A B-tree for new hardware platforms", ICDE '13 [LEVANDOSKI14, pdf p507]. The bibliography key says 14 but the entry is dated 2013.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · UPDATE CHAINS</div><h2>Update chains: a node is a base plus a list of changes</h2></div><span class="chip">pdf p207</span></div>
+  <p>A Bw-Tree writes the <b>base node</b> separately from its modifications. The modifications, called <b>delta nodes</b>, form a <b>chain</b>: a linked list from the newest change through older ones, ending at the base node. Each update is stored on its own, with no rewrite of the existing node on disk. A delta can be an <b>insert</b>, an <b>update</b> (which looks the same as an insert), or a <b>delete</b>.</p>
+  <p>Base and delta nodes are unlikely to be page-sized, so it makes sense to store them <b>contiguously</b>. And since neither is ever modified (an update only prepends a node to the list), <b>no extra space has to be reserved</b>.</p>
+  <p>A node becomes a <b>logical</b> thing rather than a physical one: no pre-allocated space, no fixed size, not even one contiguous piece of memory. The downside: a <b>read has to walk all the deltas and apply them</b> to the base to rebuild the node's real state. That resembles the LA-Tree: keep updates apart from the main structure and replay them on read.</p>
+  <div class="fig">
+    <h3>Run it: a delta chain</h3>
+    <div class="ds" id="dcView" aria-label="Delta chain and base node"></div>
+    <div class="controls">
+      <label for="dcKey">key <input id="dcKey" type="number" min="1" max="99" value="30"></label>
+      <button id="dcIns" type="button">Insert / update</button><button id="dcDel" type="button">Delete</button><button id="dcGet" type="button">Read</button><button id="dcCons" type="button">Consolidate</button><button id="dcReset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="dcR"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A read walks from the newest delta toward the base and stops at the <b>first</b> delta that mentions its key, since that's the newest truth; only if no delta mentions it does it search the base. So the read cost for a key grows with the number of deltas newer than its last change, and a miss (key never touched) walks the whole chain. That's why chains must be kept short (section 15).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 6 (WiredTiger's base image + update buffer) and section 7 (LA-Tree replay). Ch.7: an LSM read is the same "newest version wins" walk, across tables instead of deltas.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · TAMING CONCURRENCY WITH COMPARE-AND-SWAP</div><h2>The mapping table: one atomic pointer per node</h2></div><span class="chip">pdf p208–209 · Fig 6-7</span></div>
+  <p>Prepending to a node on disk would be expensive in a normal tree: every new delta would force the <b>parent</b> to be updated to point at it. So Bw-Tree nodes (a chain of deltas plus a base) get <b>logical identifiers</b>, and an <b>in-memory mapping table</b> maps each identifier to the node's current location. Parents point at logical ids, not addresses. This mapping also removes the need for latches: instead of taking exclusive ownership while writing, the Bw-Tree uses <b>compare-and-swap (CAS)</b> on the physical offsets stored in the mapping table.</p>
+  <p>Fig 6-7: each logical node is one base node plus linked deltas. Dotted lines are virtual links between nodes, resolved through the mapping table; solid lines are real data pointers.</p>
+  <p>To update a node:</p>
+  <ol class="plain">
+    <li>Find the target logical <b>leaf</b> by walking from the root. The mapping table gives virtual links to each node's base or its latest delta.</li>
+    <li>Create a new delta that points to the base node or latest delta found in step 1.</li>
+    <li>Point the mapping table entry at the new delta.</li>
+  </ol>
+  <p>Step 3 is a CAS, an atomic operation, so every concurrent read is ordered either <b>before</b> the write (it follows the old pointer and doesn't see the new delta) or <b>after</b> it (it follows the new pointer and sees the update). Nobody blocks: not readers, not the writer. If two threads try to install a delta on the same logical node, <b>only one succeeds</b>; the other must retry.</p>
+  <div class="fig">
+    <h3>Run it: two writers race for the same node</h3>
+    <div class="ds" id="casView" aria-label="Mapping table and delta chain during a CAS race"></div>
+    <div class="controls">
+      <label for="casMode">schedule <select id="casMode"><option value="race">T1 and T2 interleave (conflict)</option><option value="serial">T1 then T2 (no conflict)</option></select></label>
+      <button id="casStep" type="button">Next step ▶</button><button id="casReset" type="button">Reset</button>
+    </div>
+    <div class="log" id="casR"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>CAS(slot, expected, new) writes <i>new</i> only if the slot still holds <i>expected</i>, and does so as one indivisible hardware instruction. A writer's <i>expected</i> is the pointer it saw in step 1, and its new delta already points at that same old head. If someone else installed a delta in between, the slot no longer matches, the CAS fails, and the loser rebuilds its delta on top of the new head. Nobody ever waits holding a lock, so a stalled thread can't block others: that's what lock-free means. The price is wasted work on conflicts (the original paper measured how often installs fail; see section 19, not in the book).</p></div>
+  <details><summary>How to build it: the install loop (TypeScript-style)</summary>
+<pre class="code">// mapping: logical id → pointer to newest delta (or base). One atomic word per node.
+function upsert(pid: PageId, key: Key, val: Val) {
+  for (;;) {
+    const head = mapping.load(pid);                     // step 1: current chain head
+    const delta = { kind: 'insert', key, val, next: head }; // step 2: points at old head
+    if (mapping.compareAndSwap(pid, head, delta)) return;   // step 3: publish atomically
+    // lost the race: someone installed a delta after our load → retry on the new head
+  }
+}
+function read(pid: PageId, key: Key) {
+  for (let n = mapping.load(pid); n; n = n.next) {     // newest → oldest
+    if (n.kind === 'base') return n.lookup(key);
+    if (n.key === key) return n.kind === 'delete' ? null : n.val;
+  }
+}</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.5: latches give mutual exclusion; CAS gives "optimistic, retry if you lost". Section 2: copy-on-write also commits with one atomic pointer swap, but for the whole tree's root; the Bw-Tree does it per node.</li>
+    <li>Ch.7 (LLAMA and Mindful Stacking): the mapping table also hides where on flash a node currently lives, so the storage layer can move it.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · STRUCTURAL MODIFICATION OPERATIONS</div><h2>Splits and merges without locks: SMOs as deltas</h2></div><span class="chip">pdf p210–211</span></div>
+  <p>A Bw-Tree is logically a B-Tree, so nodes still <b>overflow</b> (too large) or <b>underflow</b> (almost empty) and need <b>structure modification operations (SMOs)</b>: splits and merges. They mean the same as in a B-Tree, but they're implemented differently.</p>
+  <p><b>Split.</b> First consolidate the splitting node's logical contents (apply its deltas to its base) and create a new page holding the elements to the right of the split point. Then two steps [WANG18]:</p>
+  <ol class="plain">
+    <li><b>Split</b>: append a special <b>split delta</b> to the splitting node. It tells readers a split is under way, holds the <b>midpoint separator key</b> (records above it in the old node are no longer valid there) and a link to the new logical sibling.</li>
+    <li><b>Parent update</b>: until now it's just like a B<sup>link</sup>-Tree half-split: the new node is reachable through the split delta but not from the parent, so readers go through the old node and follow the sibling link. Adding the new node as a child of the parent lets readers reach it directly, and the split is complete.</li>
+  </ol>
+  <p>The parent update is only a <b>performance optimization</b>: every node and record stays reachable even if it never happens. Because the tree is latch-free, <b>any thread can run into an unfinished SMO</b>, and it is required to <b>help finish it</b> before continuing with its own work. Later threads then use the parent pointer instead of the detour.</p>
+  <p><b>Merge</b> works the same way, in three steps:</p>
+  <ol class="plain">
+    <li><b>Remove sibling</b>: a <b>remove delta</b> is appended to the right sibling, starting the merge and marking it for deletion.</li>
+    <li><b>Merge</b>: a <b>merge delta</b> is created on the left sibling, pointing to the right sibling's contents and making them a logical part of the left node.</li>
+    <li><b>Parent update</b>: the right sibling's contents are now reachable from the left node; removing the right sibling's link from the parent finishes the merge.</li>
+  </ol>
+  <p><b>Concurrent SMOs.</b> To stop concurrent splits and merges from colliding, an <b>abort delta</b> is installed on the parent [WANG18]. It works like a write lock: only one thread has write access at a time, and any thread that tries to append a record on top of it aborts. When the SMO completes, the abort delta is removed.</p>
+  <p><b>Height.</b> The tree grows taller only at a root split: the root is split in two and a new root replaces it, with the old root and its new sibling as children.</p>
+  <div class="fig">
+    <h3>Step through a split or a merge</h3>
+    <div class="ds" id="smoView" aria-label="Bw-Tree split or merge state"></div>
+    <div class="controls">
+      <label for="smoMode">operation <select id="smoMode"><option value="split">split</option><option value="merge">merge</option></select></label>
+      <button id="smoBack" type="button">◀ Back</button><button id="smoStep" type="button">Next step ▶</button><button id="smoReset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="smoR"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each step is one CAS that leaves the tree <b>valid at every moment</b>. After the split delta, a search for a key above the separator that arrives at the old node is redirected to the sibling, so correctness never depends on the parent being up to date. That's why a thread that finds a half-done SMO can safely finish it: the remaining step is a well-defined CAS anyone can perform. Helping is what makes the algorithm lock-free: a thread that stalls in the middle of an SMO can't stall everyone else.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.2: B-Tree node splits and merges (same meaning). Ch.5: B<sup>link</sup>-Trees and the half-split state.</li>
+    <li>Paper: Wang, Pavlo, Lim, Leis, Zhang, Kaminsky, Andersen, "Building a Bw-Tree Takes More Than Just Buzz Words", SIGMOD '18 [WANG18, pdf p515]: the source for the split/merge steps and the abort delta.</li>
+  </ul></div>
+</section>
+
+<!-- 15 -->
+<section class="plate" id="s15">
+  <div class="plate-head"><div><div class="secno">15 · CONSOLIDATION AND GARBAGE COLLECTION</div><h2>Keeping chains short, and freeing memory nobody can see</h2></div><span class="chip">pdf p212–213</span></div>
+  <p>Left alone, delta chains grow without limit, and reads get slower as chains get longer. So when a chain reaches a <b>configurable threshold</b>, the node is <b>rebuilt</b>: the base node's contents are merged with all its deltas into <b>one new base node</b>, written to a new location on disk, and the mapping table is pointed at it. (The book continues this in "LLAMA and Mindful Stacking" in Ch.7, because the log-structured storage underneath handles garbage collection, consolidation and relocation.)</p>
+  <p>After consolidation the old base and deltas are no longer reachable from the mapping table, but their memory <b>can't be freed right away</b>: an operation already running might still be reading them. Readers took no latches and passed no barrier on the way in, so there is no lock whose release tells you they're done.</p>
+  <p>The Bw-Tree uses <b>epoch-based reclamation</b>. Nodes and deltas removed from the mapping table during an epoch are kept until <b>every reader that started in that epoch or earlier has finished</b>. After that they can be garbage-collected safely: any later reader can't have seen them, because they weren't reachable when it started.</p>
+  <div class="fig">
+    <h3>Pick a consolidation threshold (model)</h3>
+    <canvas id="conC" aria-label="Cost per operation vs delta chain threshold"></canvas>
+    <div class="legend" id="conCL"></div>
+    <div class="controls">
+      <label for="conRead">reads % <input id="conRead" type="range" min="5" max="95" step="5" value="50"><output id="conReado">50</output></label>
+      <label for="conS">records per node <input id="conS" type="range" min="16" max="512" step="16" value="64"><output id="conSo">64</output></label>
+    </div>
+    <div class="readout" id="conR"></div>
+    <p class="note">Modelled in "cache-miss units": a read costs 1 (mapping table) + 1 per delta walked (chain length averages (T−1)/2) + 0.3·log₂(records) for the base search. A write costs 1 for its delta plus consolidation spread over T writes: (0.1·records + T)/T. Illustrative only; the papers measured real systems (below).</p>
+  </div>
+  <div class="fig">
+    <h3>Step through epoch-based reclamation</h3>
+    <div class="ds" id="epView" aria-label="Epochs, readers and garbage lists"></div>
+    <div class="controls"><button id="epStep" type="button">Next step ▶</button><button id="epReset" type="button">Reset</button></div>
+    <div class="readout" id="epR"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Consolidation trades a burst of write work (copy the node once) for cheaper reads afterwards; the right threshold depends on the read/write mix, which is what the curve shows. Epochs replace per-reader bookkeeping with one cheap global counter: a thread notes the epoch when it starts, and garbage is tagged with the epoch in which it was unlinked. Freeing garbage from epoch <i>e</i> only needs "is any thread from epoch ≤ <i>e</i> still running?". One slow thread holds back all garbage from its epoch onward, the same effect as LMDB's long reader in section 3.</p></div>
+  <p>The book's verdict: the Bw-Tree improves several important things at once: <b>write amplification, non-blocking access and cache friendliness</b>. A modified version is implemented in <b>Sled</b>, an experimental storage engine, and the CMU Database Group built an in-memory version, <b>OpenBw-Tree</b>, and published a practical implementation guide [WANG18].</p>
+  <div class="box beyond"><b>Beyond the book: what the papers measured</b><ul>
+    <li><b>Chain length.</b> The original Bw-Tree paper swept the consolidation threshold: on the Xbox workload (records around 100 bytes) search got worse once scans went past four deltas; on the synthetic workload with 8-byte keys, chains could grow to about eight deltas without hurting performance (<a href="https://faculty.cc.gatech.edu/~jarulraj/courses/4420-s19/papers/08-oltpindexes1/bwtree-icde2013.pdf">ICDE '13 paper</a>, §VI-B).</li>
+    <li>The OpenBw-Tree paper notes that Microsoft reported 8 as a good length, and that different limits for inner and leaf nodes work best; its own setup used 2 for inner nodes and 24 for leaves. In its threshold sweep the best length was 32–40 for the OpenBw-Tree and 16–24 for its re-implementation of the original design (<a href="https://15721.courses.cs.cmu.edu/spring2019/papers/07-oltpindexes1/mod342-wangA.pdf">SIGMOD '18 paper</a>).</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 3: LMDB reclaims pages once old read transactions finish; this is the same rule. Ch.7: compaction in LSM Trees is the storage-level version of consolidation.</li>
+    <li>[WANG18] (pdf p515) for the implementation details of consolidation and the epoch-based garbage collector.</li>
+  </ul></div>
+</section>
+
+<!-- 16 -->
+<section class="plate" id="s16">
+  <div class="plate-head"><div><div class="secno">16 · CACHE-OBLIVIOUS B-TREES</div><h2>Cache-oblivious: good at every block size without knowing it</h2></div><span class="chip">pdf p214–215</span></div>
+  <p>Block size, node size, cache-line alignment and other settings all affect B-Tree performance. <b>Cache-oblivious structures</b> [DEMAINE02] give <b>asymptotically optimal</b> performance whatever the memory hierarchy looks like, without tuning those settings. The algorithm doesn't need to know the size of cache lines, filesystem blocks or disk pages, and it runs well unchanged on machines with different configurations.</p>
+  <p>So far the book has mostly looked at B-Trees with a <b>two-level memory hierarchy</b> (LMDB from section 3 is the exception): nodes live in disk pages, and the page cache gives fast access to them in memory. The two levels are the <b>page cache</b> (fast, small) and the <b>disk</b> (slower, larger) [AGGARWAL88]. With only two parameters, design is fairly easy: one module per level handles that level's details.</p>
+  <p>Disk is divided into <b>blocks</b>, and data moves between disk and cache a block at a time: even to read one item, the whole block is loaded. Designing around that block size is called <b>cache-aware</b>.</p>
+  <p>Performance-critical software often targets a richer model: CPU caches, and sometimes disk hierarchies (hot/cold storage, HDD/SSD/NVM tiers, moving data between levels). Such work is hard to generalize. Ch.1's "Memory- Versus Disk-Based DBMS" section already noted that disk is several orders of magnitude slower than memory, which is what pushed databases to optimize for that gap.</p>
+  <p>Cache-oblivious algorithms let you <b>reason with the simple two-level model</b> and still get the benefits of a multilevel hierarchy. There are no platform-specific parameters, yet the number of transfers between the two levels is guaranteed to be <b>within a constant factor</b> of optimal. If a structure is optimal for <em>any</em> two levels of the hierarchy, it is optimal for <em>every</em> pair of adjacent levels. It achieves this by working at the highest (fastest) cache level as much as possible.</p>
+  <div class="box picture"><b>Picture it</b><p>Packing a suitcase so that whatever size of bag you're handed (shoebox, carry-on, trunk), the things you'll need together are already next to each other. A cache-aware packer packs perfectly for one bag size and badly for the others.</p></div>
+  <div class="fig">
+    <h3>A B-Tree tuned for one block size, run on another (modelled)</h3>
+    <canvas id="coC" aria-label="Block transfers per lookup vs actual block size"></canvas>
+    <div class="legend" id="coCL"></div>
+    <div class="controls">
+      <label for="coN">keys 10^ <input id="coN" type="range" min="4" max="10" value="8"><output id="coNo">8</output></label>
+      <label for="coKey">bytes per key+pointer <input id="coKey" type="range" min="8" max="64" step="8" value="16"><output id="coKeyo">16</output></label>
+    </div>
+    <div class="readout" id="coR"></div>
+    <p class="note">Model: node size S bytes gives fan-out S/key; height = ⌈log N / log fan-out⌉. If a node is bigger than the block, binary search inside it touches about log₂(S/B)+1 blocks; if smaller, one block per node. "Ideal" = ⌈log N / log(B/key)⌉, the best any layout can do at block size B. The vEB curve is computed on a real layout in section 17.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A tree tuned for 4 KB pages is optimal when the block really is 4 KB, but at the 64-byte cache-line level each 4 KB node costs several cache misses for its internal binary search. A tree tuned for 64-byte nodes is cache-friendly but becomes very tall, and at the 4 KB disk level each tiny node wastes a whole page read. No single setting is right for every level at once. A cache-oblivious layout stays within a constant factor of the ideal curve at every block size.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.1 (memory- vs disk-based DBMS), Ch.2 (why B-Trees use high fan-out: to match the block size).</li>
+    <li>Papers: Demaine, "Cache-Oblivious Algorithms and Data Structures", EEF Summer School lecture notes, 2002 [DEMAINE02, pdf p496]; Aggarwal &amp; Vitter, "The input/output complexity of sorting and related problems", CACM 31(9), 1988 [AGGARWAL88, pdf p489]: the two-level external-memory model.</li>
+  </ul></div>
+</section>
+
+<!-- 17 -->
+<section class="plate" id="s17">
+  <div class="plate-head"><div><div class="secno">17 · VAN EMDE BOAS LAYOUT</div><h2>van Emde Boas layout + packed array</h2></div><span class="chip">pdf p216–217 · Fig 6-8, 6-9</span></div>
+  <p>A cache-oblivious B-Tree is a <b>static B-Tree</b> plus a <b>packed array</b> [BENDER05].</p>
+  <p>The static tree uses the <b>van Emde Boas (vEB) layout</b>: cut the tree at the middle level of its edges, then cut each resulting subtree the same way, recursively, giving subtrees of about √N size (the book's text writes this as "sqr(N)"). The key property: <b>every recursive subtree is stored in one contiguous block of memory</b>. In Fig 6-8, nodes that belong together logically sit next to each other physically; the top shows the logical tree, the bottom shows the order in memory and on disk.</p>
+  <div class="fig">
+    <h3>Run it: lay out a tree and count block transfers</h3>
+    <div id="vebSvg" aria-label="Tree with nodes numbered by memory position and coloured by block"></div>
+    <div class="controls">
+      <label for="vebLay">layout <select id="vebLay"><option value="vebBook">vEB (rounding as in Fig 6-8)</option><option value="vebEven">vEB (top gets ⌊h/2⌋ levels)</option><option value="bfs">breadth-first (level by level)</option><option value="dfs">depth-first (pre-order)</option></select></label>
+      <label for="vebH">tree height <input id="vebH" type="range" min="2" max="5" value="5"><output id="vebHo">5</output></label>
+      <label for="vebB">block holds (nodes) <input id="vebB" type="range" min="1" max="16" value="3"><output id="vebBo">3</output></label>
+    </div>
+    <div class="readout" id="vebR"></div>
+    <canvas id="vebC" aria-label="Average blocks touched per root-to-leaf search vs block size, by layout"></canvas>
+    <div class="legend" id="vebCL"></div>
+    <p class="note">Computed exactly on a complete binary tree of height 16 (65,535 nodes): the average number of distinct blocks touched on a root-to-leaf path, for block sizes 1–4096 nodes. Blocks are aligned to multiples of the block size in memory.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A search walks one root-to-leaf path. With breadth-first layout, the top few levels share blocks but every deep node is far from its parent, so deep levels cost one block each. With depth-first layout, going right jumps over a whole subtree. In the vEB layout, whatever the block size B, there's a level of the recursion where subtrees are between about √B and B nodes; each such subtree fits in at most two blocks, and a path crosses only about log N / log √B of them. That's O(log<sub>B</sub> N) transfers <b>for every B at once</b>, without B appearing anywhere in the code. On the chart, vEB is the lowest or close to it at every block size; breadth-first is worst throughout; depth-first does well on tiny blocks but falls behind as blocks grow. With height 5 and the first option, the numbering reproduces Fig 6-8 (1 | 2 3 4 | 5 6 7 | …); different rounding at odd heights is a convention choice, not a different algorithm.</p></div>
+  <details><summary>How to build it: vEB order of a complete binary tree (JavaScript)</summary>
+<pre class="code">// Nodes use heap numbering: root 1, children 2i and 2i+1. Returns memory order.
+const hyper = (x) =&gt; 2 ** Math.ceil(Math.log2(x));          // round up to a power of 2
+function vebOrder(root, h, out = []) {
+  if (h === 1) { out.push(root); return out; }
+  const bottomH = hyper(Math.ceil(h / 2));                   // rule that matches Fig 6-8
+  const topH = h - bottomH;
+  vebOrder(root, topH, out);                                  // top subtree first
+  const first = root * 2 ** topH;                              // leftmost bottom-subtree root
+  for (let r = first; r &lt; first + 2 ** topH; r++) vebOrder(r, bottomH, out);
+  return out;                                                 // each subtree is contiguous
+}</pre></details>
+  <h3>The packed array: leave gaps so inserts don't shift everything</h3>
+  <p>To make the structure dynamic (inserts, updates, deletes), cache-oblivious trees store elements in a <b>packed array</b>: contiguous memory with <b>gaps reserved for future inserts</b>. Gaps are spread according to a <b>density threshold</b> (Fig 6-9). An insert needs fewer relocations: items move only to open a gap if there isn't one already where the new element goes. When the array becomes too dense or too sparse, it's <b>rebuilt</b> larger or smaller. The static tree indexes this bottom-level array and has to be updated whenever elements move, so its pointers stay correct.</p>
+  <div class="fig">
+    <div class="ds" id="paView" aria-label="Packed array with gaps"></div>
+    <div class="controls">
+      <button id="paIns" type="button">Insert 1</button><button id="paIns10" type="button">Insert 10</button><button id="paReset" type="button">Reset</button>
+      <label for="paDen">max density % <input id="paDen" type="range" min="50" max="95" step="5" value="75"><output id="paDeno">75</output></label>
+    </div>
+    <div class="readout" id="paR"></div>
+    <p class="note">Simplified packed array (not the book's): an insert shifts elements toward the nearest gap; when the array passes the density limit it's rebuilt twice as large with even gaps. Real packed-memory arrays rebalance windows of several sizes with per-level density thresholds. "Dense array" = same keys in a gap-free sorted array, where every insert shifts all larger elements.</p>
+  </div>
+  <p><b>Why you won't find one in production.</b> The author knows of no non-academic cache-oblivious B-Tree implementation (as of writing). Possible reasons: even with caching abstracted away, data still moves in blocks, and paging and eviction still hurt; and in terms of block transfers, cache-oblivious B-Trees have the <b>same complexity</b> as cache-aware ones. That may change as faster <b>non-volatile byte-addressable storage</b> becomes common. Still, the ideas are useful for building efficient B-Trees, and they let on-disk structures be built much like in-memory ones.</p>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.4's free space and vacuum: B-Tree pages reserve space for the same reason the packed array keeps gaps.</li>
+    <li>Paper: Bender, Demaine, Farach-Colton, "Cache-Oblivious B-Trees", SIAM Journal on Computing 35(2), 2005 [BENDER05, pdf p492].</li>
+  </ul></div>
+</section>
+
+<!-- 18 -->
+<section class="plate" id="s18">
+  <div class="plate-head"><div><div class="secno">18 · SUMMARY &amp; FURTHER READING</div><h2>What each variant buys you</h2></div><span class="chip">pdf p218–219</span></div>
+  <p>The original B-Tree design has weaknesses that mattered little on spinning disks but make it less efficient on SSDs: <b>high write amplification</b> (from rewriting pages) and <b>high space overhead</b> (from space reserved in nodes for future writes).</p>
+  <div class="tablewrap"><table>
+    <tr><th>Problem</th><th>Technique</th><th>Variants (book's summary)</th></tr>
+    <tr><td>Write amplification</td><td>Buffering: in-memory buffers on single nodes or groups of nodes absorb repeated updates to a page, so fewer I/Os are needed</td><td>Lazy B-Trees: WiredTiger, LA-Tree</td></tr>
+    <tr><td>Space amplification</td><td>Immutability: records live in immutable sorted runs; the mutable B-Tree is kept small</td><td>FD-Tree</td></tr>
+    <tr><td>Space amplification + write amplification + latches</td><td>Immutability too: nodes and their updates stored separately in a log-structured store; consolidating a node is relatively rare; virtual pointers between logical nodes live in memory, so pages need no latches</td><td>Bw-Tree</td></tr>
+  </table></div>
+  <h3>Further reading the book lists (pdf p218–219)</h3>
+  <ul class="plain">
+    <li><b>Copy-on-write B-Trees:</b> Driscoll, Sarnak, Sleator, Tarjan. "Making data structures persistent." STOC '86, 109–121.</li>
+    <li><b>Lazy-Adaptive Trees:</b> Agrawal, Ganesan, Sitaraman, Diao, Singh. "Lazy-Adaptive Tree: an optimized index structure for flash devices." PVLDB 2(1), 2009, 361–372.</li>
+    <li><b>FD-Trees:</b> Li, He, Yang, Luo, Yi. "Tree Indexing on Solid State Drives." PVLDB 3(1–2), 2010, 1195–1206.</li>
+    <li><b>Bw-Trees:</b> Wang, Pavlo, Lim, Leis, Zhang, Kaminsky, Andersen. "Building a Bw-Tree Takes More Than Just Buzz Words." SIGMOD '18, 473–488. · Levandoski, Lomet, Sengupta. "The Bw-Tree: A B-tree for new hardware platforms." ICDE '13, 302–313.</li>
+    <li><b>Cache-oblivious B-Trees:</b> Bender, Demaine, Farach-Colton. "Cache-Oblivious B-Trees." SIAM J. Computing 35(2), 2005, 341–358.</li>
+  </ul>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.7 opens by contrasting mutable (in-place) and immutable (append-only) structures and names copy-on-write B-Trees, FD-Trees and Bw-Trees as the immutable designs already seen.</li>
+  </ul></div>
+</section>
+
+<!-- 19 -->
+<section class="plate" id="s19">
+  <div class="plate-head"><div><div class="secno">19 · CHOOSING BETWEEN THEM</div><h2>Before → after, with measured numbers</h2></div><span class="chip">my synthesis · beyond the book</span></div>
+  <p>This plate is my comparison, not the book's. The "measured" column quotes the papers' own results (each read during the making of this page); everything else is reasoning from the mechanisms above.</p>
+  <div class="tablewrap"><table>
+    <tr><th>Variant</th><th>Problem with the previous design</th><th>What changed</th><th>New cost</th><th>Measured (source)</th></tr>
+    <tr><td>Copy-on-write (LMDB, bbolt)</td><td>In-place pages need latches for readers, and WAL + checkpoints for crash safety</td><td>Copy root-to-leaf path, flip root atomically</td><td>Path copy per write (height × page); one writer at a time; long readers grow the file; scans climb to parent</td><td>No numbers in the book; see the calculators in sections 2–3</td></tr>
+    <tr><td>Lazy: WiredTiger, LA-Tree</td><td>Each update rewrites a page (write amplification)</td><td>Buffer updates per page / per subtree; apply in batches</td><td>Reads also search buffers; reconciliation work; buffers need memory and logging</td><td>LA-Tree: 2–12× over the best alternative on raw NAND, 3–6× on SSDs in most cases (Agrawal et al.)</td></tr>
+    <tr><td>FD-Tree</td><td>B-Tree maintenance = random writes, slow on HDD, GC-heavy on SSD</td><td>Small head B-Tree + logarithmic sorted runs + fractional cascading</td><td>Records rewritten by merges; search crosses several levels; tombstones</td><td>Mixed workloads: 5.7–27.9× faster than B+-tree, 1.4–1.6× than LSM-tree, 3.7–5.5× than BFTL on an Mtron SSD; 1.7–3.6×, 1.4–1.8×, 1.9–3.4× on an Intel SSD. Inserts at 8 GB on Mtron: ~280× vs B+-tree, ~35× vs BFTL; 10–50% slower than LSM-tree (Li et al.)</td></tr>
+    <tr><td>Bw-Tree</td><td>Latches block threads and bounce cache lines; pages rewritten for small changes</td><td>Delta chains + mapping table + CAS; SMOs as deltas; epoch GC</td><td>Chain walks on read; CAS retries; indirection on every hop; tricky to implement</td><td>Original paper, in memory: 10.4M vs 555K ops/s against BerkeleyDB on Xbox LIVE (18.7×), 8.6× on dedup, 5.8× synthetic; 3.7–4.4× over a latch-free skiplist (Levandoski et al.). But OpenBw-Tree found lock-based indexes 1.5–4.5× faster than even its optimized Bw-Tree (Wang et al.)</td></tr>
+    <tr><td>Cache-oblivious</td><td>Node size tuned for one level of the hierarchy only</td><td>vEB layout + packed array</td><td>Static tree must be fixed up on relocations; same block-transfer complexity as a well-tuned B-Tree</td><td>No production implementations known to the author; see section 17's computed block counts</td></tr>
+  </table></div>
+  <h3>Rules of thumb (my reading)</h3>
+  <ul class="plain">
+    <li><b>Read-heavy, single machine, want simplicity and snapshots:</b> copy-on-write (LMDB, bbolt). Avoid long-running read transactions under heavy writes.</li>
+    <li><b>General purpose, updates hit hot pages:</b> a lazy/buffered B-Tree (WiredTiger; or an in-place engine with a change buffer).</li>
+    <li><b>Write-heavy, random keys, flash:</b> append-and-merge designs: FD-Tree in research, LSM Trees in practice (Ch.7).</li>
+    <li><b>Many cores, in-memory index, high contention:</b> latch-free ideas (Bw-Tree) are worth knowing, but the OpenBw-Tree result says measure against a good lock-based B+Tree (optimistic lock coupling) first.</li>
+  </ul>
+  <div class="box beyond"><b>Beyond the book: measured-number details and links</b><ul>
+    <li>FD-Tree numbers: Li et al., PVLDB 2010, introduction and §6 (<a href="https://home.cse.ust.hk/~yike/fdtree_pvldb.pdf">PDF</a>). The B+-tree baseline is a standard disk B+-tree; BFTL is a flash-oriented B-Tree layer; the overall figures are mixed search/insert workloads at an 8 GB index.</li>
+    <li>LA-Tree numbers: abstract of the UMass tech report UM-CS-2008-008 (<a href="https://web.cs.umass.edu/publication/docs/2008/UM-CS-2008-008.pdf">PDF</a>).</li>
+    <li>Bw-Tree numbers: Levandoski et al., ICDE '13, §VI (<a href="https://faculty.cc.gatech.edu/~jarulraj/courses/4420-s19/papers/08-oltpindexes1/bwtree-icde2013.pdf">PDF</a>). Both systems ran fully in memory with 8 KB pages; the Bw-Tree ran at about 99% CPU utilization vs about 60% for BerkeleyDB, which uses page-level latches. Failed CAS installs (Table I): record updates failed at most 0.0171% of the time, while splits and consolidations failed up to 8.88% and 7.35% on the synthetic workload, which the authors give as the reason that workload's speedup is the smallest.</li>
+    <li>OpenBw-Tree numbers: Wang et al., SIGMOD '18 (<a href="https://15721.courses.cs.cmu.edu/spring2019/papers/07-oltpindexes1/mod342-wangA.pdf">PDF</a>): optimized variant 1.1–2.5× faster than the original design on insert-heavy, highly concurrent workloads (1.1–1.4× on read-heavy ones); still slower than a B+Tree with optimistic lock coupling, Masstree (often ~2×) and ART (over 4× on point lookups). The paper's abstract notes the Bw-Tree was built for SQL Server's Hekaton engine.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. In a copy-on-write B-Tree of height 4, how many pages does a single-record update copy, and what is the commit point?</summary><p>Four: one page per level on the root-to-leaf path (assuming no split). The commit point is the atomic switch of the pointer to the topmost (root) page; before it nobody sees the new pages, after it the old path is garbage once its readers finish. (Section 2.)</p></details>
+  <details><summary>2. Why can't LMDB use sibling pointers between leaves, and what does it do instead during a range scan?</summary><p>A sibling pointer would make each leaf copy force a copy of its neighbour (whose pointer changes), and that neighbour's neighbour, and so on, defeating path copying in an append-only design (the book gives only "because of the append-only design"; the neighbour-copy detail is this page's explanation). LMDB climbs back to the parent to find the next leaf. (Section 3.)</p></details>
+  <details><summary>3. Why does a long-running read transaction make an LMDB (or bbolt) file grow?</summary><p>Pages freed by writes after that reader started might still be on its snapshot, so they can't be reused until it finishes; every new write must allocate fresh pages at the end of the file. (Section 3 simulation; bbolt's README says the same.)</p></details>
+  <details><summary>4. What's the trade-off of materializing nodes as native language objects instead of using raw page bytes?</summary><p>Concurrency is simpler, because changes to the raw page are managed separately from access to the objects; but memory overhead is higher, since both the raw and the native version of the page are held in memory. (Section 4.)</p></details>
+  <details><summary>5. A WiredTiger read for key 42 finds a delete entry for 42 in the page's update buffer, while the on-disk image still has 42 → "x". What does the read return, and why is the buffer a skiplist?</summary><p>Not found: the buffer holds newer changes, so it is checked first and wins. Skiplists give search-tree-like complexity [PAPADAKIS93] with a better concurrency profile [PUGH90a]. (Section 6.)</p></details>
+  <details><summary>6. LA-Tree vs WiredTiger: where is the buffer attached, and what do both pay for batching?</summary><p>WiredTiger: one update buffer per page. LA-Tree: one buffer per subtree, cascading from the root buffer down to leaves, applied in batches. Both pay extra lookups in in-memory buffers on reads and merge/reconciliation with stale on-disk data. (Sections 6–7.)</p></details>
+  <details><summary>7. In fractional cascading, why pull every Nth element instead of linking every element or only the shared ones?</summary><p>Linking every element costs too many pointers to store and maintain; linking only elements present on both levels can leave large gaps (stretches with no bridge), so the next-level search isn't bounded. Pulling every Nth bounds every gap to about N elements. (Section 9.)</p></details>
+  <details><summary>8. In an FD-Tree, when can a tombstone (filter entry) be discarded, and what happens if it's dropped too early?</summary><p>Only when it reaches the lowest level, because then nothing below can still hold an older record for that key. Dropped early, an older record on a lower level would "come back to life". (Section 10.)</p></details>
+  <details><summary>9. What happens to an FD-Tree's lookup cost and write amplification as the size ratio k grows? Why?</summary><p>Lookups get cheaper: fewer levels (about log<sub>k</sub> of the size). Write amplification is U-shaped: each level is merged into about k times before it spills, so rewrites per level grow with k, but the number of levels shrinks; very small and very large k both rewrite a lot. (Section 10 chart.)</p></details>
+  <details><summary>10. Why does the Bw-Tree need a mapping table at all? What would happen without it?</summary><p>Every prepended delta changes the address of a node's head. Without indirection, parents would have to be rewritten to point at the newest delta on every update (and their parents, up to the root). With logical ids, parents never change, and the single per-node pointer can be updated with one CAS. (Section 13.)</p></details>
+  <details><summary>11. Two threads install deltas on the same Bw-Tree node at the same time. What exactly happens to the loser?</summary><p>Its CAS fails because the mapping-table slot no longer holds the head it read. It reloads the new head, re-points its delta at it, and retries. No one blocks; the cost is redone work. (Section 13.)</p></details>
+  <details><summary>12. During a Bw-Tree split, the parent update hasn't happened yet. Can a reader still find a key that moved to the new sibling? What must a thread do when it meets this state?</summary><p>Yes: the split delta on the old node holds the separator and a link to the sibling, so the reader is redirected (like a B<sup>link</sup> half-split). Any thread that encounters an incomplete SMO must help finish it (install the parent entry) before going on. (Section 14.)</p></details>
+  <details><summary>13. Epoch-based reclamation: a node is unlinked by consolidation in epoch 7. Which readers must finish before it's freed?</summary><p>Every reader that started in epoch 7 or earlier. Readers that started in epoch 8 or later couldn't reach it, because it was already unlinked when they began. (Section 15.)</p></details>
+  <details><summary>14. If cache-oblivious B-Trees are optimal for every block size, why does the author know of no production implementation?</summary><p>Data still moves in blocks, and paging and eviction still hurt in practice; and in block-transfer terms the complexity equals that of a well-tuned cache-aware B-Tree, so the gain is limited. Byte-addressable non-volatile memory may change that. (Section 17.)</p></details>
+</section>
+
+<footer>Built from Alex Petrov, <i>Database Internals</i> (2019), Chapter 6 "B-Tree Variants" (PDF pages 190–219, including the summary, further reading and footnotes on p218–219; bibliography entries from pdf p489–516), summarised in my own words with my own diagrams and examples. Every simulation runs on random keys and stated assumptions; results labelled "modelled" or "simulated" are not measurements. Numbers labelled "Beyond the book" come from the linked papers and official documentation.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // =====================================================================
+  // ---------- chapter 6 helpers ----------
+  // =====================================================================
+  let SEED = 1;
+  const cell = (t, cls) => `<span class="cell${cls ? ' ' + cls : ''}">${t}</span>`;
+  const byKey = (a, b) => a.key - b.key;
+  const num = (v, d) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(d == null ? 1 : d) : v.toFixed(d == null ? 2 : d));
+  function keyOf(id, def) { let v = Math.round(+$(id).value); if (!isFinite(v) || v < 1) v = def; return Math.min(99, v); }
+  function bytes(b) { return b >= 1073741824 ? (b / 1073741824).toFixed(1) + ' GB' : b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? (b / 1024).toFixed(1) + ' KB' : b.toFixed(0) + ' B'; }
+  function dur(ms) { return ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : ms >= 1000 ? (ms / 1000).toFixed(2) + ' s' : ms.toFixed(1) + ' ms'; }
+
+  // x-y chart with axes (for parameter sweeps)
+  // sp: {xs, series:[{y,col,label,dash,w}], logx, xlab, ylab, ymin, ymax, xfmt, yfmt, marks:[{x,y,col}], vlines:[{x,label}]}
+  function xyChart(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const padL = 50, padR = 14, padT = 16, padB = 40;
+    const xs = sp.xs; const tx = sp.logx ? (v) => Math.log10(v) : (v) => v;
+    const xa = tx(xs[0]), xb = tx(xs[xs.length - 1]);
+    let lo = Infinity, hi = -Infinity;
+    sp.series.forEach((s) => s.y.forEach((v) => { if (v == null || !isFinite(v)) return; if (v < lo) lo = v; if (v > hi) hi = v; }));
+    if (sp.ymin != null) lo = sp.ymin; if (sp.ymax != null) hi = sp.ymax;
+    if (!isFinite(lo)) { lo = 0; hi = 1; } if (hi <= lo) hi = lo + 1;
+    if (sp.ymax == null) hi += (hi - lo) * 0.08;
+    const X = (v) => padL + (tx(v) - xa) / ((xb - xa) || 1) * (W - padL - padR);
+    const Y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+    g.font = '11px ' + css('mono'); g.lineWidth = 1;
+    const yf = sp.yfmt || ((v) => (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(0) : +v.toFixed(2) + ''));
+    niceTicks(lo, hi, 4).forEach((t) => { const y = Y(t); if (y < padT - 1 || y > H - padB + 1) return; g.strokeStyle = colorOf('rule', 0.9); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillStyle = colorOf('muted'); const s = yf(t); g.fillText(s, padL - 6 - g.measureText(s).width, y + 4); });
+    const xt = sp.xticks || (sp.logx ? xs : niceTicks(xs[0], xs[xs.length - 1], 6));
+    const xf = sp.xfmt || ((v) => '' + v);
+    let lastX = -1e9;
+    xt.forEach((t) => { const x = X(t); if (x < padL - 1 || x > W - padR + 1) return; const s = xf(t); const tw = g.measureText(s).width; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(x, H - padB); g.lineTo(x, H - padB + 4); g.stroke(); if (x - tw / 2 > lastX + 4) { g.fillStyle = colorOf('muted'); g.fillText(s, x - tw / 2, H - padB + 16); lastX = x + tw / 2; } });
+    g.fillStyle = colorOf('muted');
+    if (sp.xlab) g.fillText(sp.xlab, W - padR - g.measureText(sp.xlab).width, H - 6);
+    if (sp.ylab) g.fillText(sp.ylab, padL + 6, padT - 4);
+    g.strokeStyle = colorOf('muted', 0.8); g.beginPath(); g.moveTo(padL, padT); g.lineTo(padL, H - padB); g.lineTo(W - padR, H - padB); g.stroke();
+    (sp.vlines || []).forEach((v) => { const x = X(v.x); g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(x, padT); g.lineTo(x, H - padB); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); const tw = g.measureText(v.label).width; g.fillText(v.label, x + 4 + tw > W - padR ? x - tw - 4 : x + 4, padT + 12); } });
+    sp.series.forEach((s) => {
+      g.strokeStyle = colorOf(s.col); g.lineWidth = s.w || 2; g.setLineDash(s.dash || []); g.beginPath(); let pen = false;
+      xs.forEach((x, i) => { const v = s.y[i]; if (v == null || !isFinite(v)) { pen = false; return; } const px = X(x), py = Y(Math.min(Math.max(v, lo), hi)); if (!pen) { g.moveTo(px, py); pen = true; } else g.lineTo(px, py); });
+      g.stroke(); g.setLineDash([]);
+      if (s.dots) xs.forEach((x, i) => { const v = s.y[i]; if (v == null || !isFinite(v)) return; g.fillStyle = colorOf(s.col); g.beginPath(); g.arc(X(x), Y(Math.min(Math.max(v, lo), hi)), 2.5, 0, 7); g.fill(); });
+    });
+    (sp.marks || []).forEach((m) => { g.fillStyle = colorOf(m.col || 'ink'); g.strokeStyle = colorOf('plate'); g.lineWidth = 2; g.beginPath(); g.arc(X(m.x), Y(Math.min(Math.max(m.y, lo), hi)), m.r || 5, 0, 7); g.fill(); g.stroke(); });
+    const L = $(id + 'L'); if (L) L.innerHTML = sp.series.filter((s) => s.label).map((s) => `<span style="--sw:${colorOf(s.col)}">${s.label}</span>`).join('') + (sp.legendExtra || '');
+  }
+
+  // =====================================================================
+  // ---------- 02 copy-on-write ----------
+  // =====================================================================
+  const cow = {};
+  function cowInit() {
+    cow.pages = new Map(); cow.n = 0; cow.readers = []; cow.rc = 0; cow.pend = null; cow.reclaimed = 0; cow.copied = 0; cow.writes = 0; cow.msg = 'Pick a leaf, then press <b>Next step</b> to start a write.';
+    const mk = (kind, kids, label) => { const id = 'p' + (cow.n++); cow.pages.set(id, { id, kind, kids, label, ver: 1 }); return id; };
+    const leaves = []; for (let i = 0; i < 9; i++) leaves.push(mk('leaf', null, 'L' + i));
+    const ints = []; for (let j = 0; j < 3; j++) ints.push(mk('int', leaves.slice(j * 3, j * 3 + 3), 'I' + j));
+    cow.root = mk('root', ints, 'R');
+  }
+  function cowReach(id, set) { if (!id || set.has(id)) return set; set.add(id); const p = cow.pages.get(id); if (p && p.kids) p.kids.forEach((k) => cowReach(k, set)); return set; }
+  function cowCopy(id, kids) { const o = cow.pages.get(id); const nid = 'p' + (cow.n++); cow.pages.set(nid, { id: nid, kind: o.kind, kids: kids || o.kids, label: o.label, ver: o.ver + 1 }); cow.copied++; return nid; }
+  function cowGC() {
+    const keep = cowReach(cow.root, new Set()); cow.readers.forEach((r) => cowReach(r.root, keep));
+    if (cow.pend) Object.values(cow.pend).forEach((v) => { if (typeof v === 'string') keep.add(v); });
+    let freed = 0; for (const id of [...cow.pages.keys()]) if (!keep.has(id)) { cow.pages.delete(id); freed++; }
+    cow.reclaimed += freed; return freed;
+  }
+  function cowStep() {
+    const i = +$('cowLeaf').value || 0;
+    if (!cow.pend) {
+      const rootP = cow.pages.get(cow.root); const intId = rootP.kids[Math.floor(i / 3)]; const leafId = cow.pages.get(intId).kids[i % 3];
+      cow.pend = { st: 1, i, oldInt: intId, oldLeaf: leafId, newLeaf: cowCopy(leafId) };
+      cow.msg = `Step 1/4 · copy leaf <b>L${i}</b> and apply the change to the copy (v${cow.pages.get(leafId).ver} → v${cow.pages.get(cow.pend.newLeaf).ver}). Nobody can reach it yet.`;
+    } else if (cow.pend.st === 1) {
+      const ip = cow.pages.get(cow.pend.oldInt); const kids = ip.kids.map((k) => (k === cow.pend.oldLeaf ? cow.pend.newLeaf : k));
+      cow.pend.newInt = cowCopy(cow.pend.oldInt, kids); cow.pend.st = 2;
+      cow.msg = `Step 2/4 · copy parent <b>${ip.label}</b>; the copy points at the new L${cow.pend.i} and <i>shares</i> its two other leaves.`;
+    } else if (cow.pend.st === 2) {
+      const rp = cow.pages.get(cow.root); const kids = rp.kids.map((k) => (k === cow.pend.oldInt ? cow.pend.newInt : k));
+      cow.pend.newRoot = cowCopy(cow.root, kids); cow.pend.st = 3;
+      cow.msg = 'Step 3/4 · copy the root; it points at the new internal page and shares the other two. Two complete trees now exist side by side (Fig 6-1).';
+    } else {
+      cow.root = cow.pend.newRoot; cow.pend = null; cow.writes++;
+      const f = cowGC();
+      const held = cow.pages.size - cowReach(cow.root, new Set()).size;
+      cow.msg = `Step 4/4 · <b>atomic switch of the root pointer</b> = commit. ${f ? f + ' old pages freed at once (no reader holds them).' : ''} ${held ? held + ' old pages kept alive for readers on older roots.' : ''}`;
+    }
+    drawCow();
+  }
+  function drawCow() {
+    const cur = cowReach(cow.root, new Set());
+    const rd = cow.readers.map((r) => ({ r, s: cowReach(r.root, new Set()) }));
+    const rows = { root: [], int: [], leaf: [] };
+    [...cow.pages.values()].sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : a.ver - b.ver)).forEach((p) => {
+      const inCur = cur.has(p.id); const holders = rd.filter((x) => x.s.has(p.id)).map((x) => x.r.name);
+      let cls = '', tag = '';
+      if (!inCur && !holders.length) { cls = 'new'; tag = 'new, unreachable'; }
+      else if (!inCur) { cls = 'old'; tag = 'old · ' + holders.join(','); }
+      else if (holders.length && cow.readers.length) tag = 'shared';
+      if (p.id === cow.root) { cls += ' hot'; tag = 'current root'; }
+      const kids = p.kids ? ' <small>→ ' + p.kids.map((k) => { const c = cow.pages.get(k); return c.label + '·v' + c.ver; }).join(' ') + '</small>' : '';
+      rows[p.kind].push(`<span class="pg ${cls}"><b>${p.label}</b><small>v${p.ver}</small>${kids}${tag ? ' <small>(' + tag + ')</small>' : ''}</span>`);
+    });
+    $('cowTree').innerHTML = ['root', 'int', 'leaf'].map((k) => `<div class="lvl"><span class="lab">${k === 'int' ? 'internal' : k}</span>${rows[k].join('')}</div>`).join('');
+    $('cowR').innerHTML = `<span>${cow.msg}</span><span>writes committed <b>${cow.writes}</b></span><span>pages copied <b>${cow.copied}</b></span><span>live pages <b>${cow.pages.size}</b> (tree alone: 13)</span><span>reclaimed <b>${cow.reclaimed}</b></span><span>readers <b>${cow.readers.length ? cow.readers.map((r) => r.name + '@' + cow.pages.get(r.root).label + 'v' + cow.pages.get(r.root).ver).join(', ') : 'none'}</b></span>`;
+  }
+  $('cowStep').addEventListener('click', cowStep);
+  $('cowRead').addEventListener('click', () => { cow.readers.push({ name: 'Reader' + (++cow.rc), root: cow.root }); cow.msg = `Reader${cow.rc} pinned the current root: it will see this exact snapshot however many writes commit.`; drawCow(); });
+  $('cowDone').addEventListener('click', () => { const r = cow.readers.shift(); const f = cowGC(); cow.msg = r ? `${r.name} finished; ${f} pages only it could see were reclaimed.` : 'No reader to finish.'; drawCow(); });
+  $('cowReset').addEventListener('click', () => { cowInit(); drawCow(); });
+  const dCowCalc = reg(() => {
+    const n = val('cowN'), f = val('cowF'), P = val('cowP');
+    const h = Math.max(1, Math.ceil(n * Math.LN10 / Math.log(f)));
+    const N = Math.pow(10, n); const leafPages = N / f; const size = leafPages * P * 1024;
+    $('cowCalc').innerHTML = `<span>tree height <b>${h}</b> levels</span><span>copy-on-write writes <b>${h} pages = ${h * P} KB</b> per update</span><span>in-place writes back <b>1 page = ${P} KB</b></span><span>extra writing <b>${h}×</b></span><span>leaf level ≈ <b>${bytes(size)}</b></span>`;
+  });
+  ['cowN', 'cowF', 'cowP'].forEach((id) => bindRange(id, dCowCalc));
+
+  // =====================================================================
+  // ---------- 03 LMDB ----------
+  // =====================================================================
+  const lm = {};
+  function lmInit() { lm.txn = 2; lm.metas = [{ txn: 2, root: 'p14' }, { txn: 1, root: 'p9' }]; lm.page = 14; lm.reader = null; lm.msg = 'Readers always start from the meta slot with the higher transaction id.'; }
+  function drawLm() {
+    const latest = lm.metas[0].txn > lm.metas[1].txn ? 0 : 1;
+    $('lmdbMeta').innerHTML = `<div class="lvl"><span class="lab">meta pages</span>${lm.metas.map((m, i) => `<span class="pg ${i === latest ? 'hot' : 'old'}"><b>meta${i}</b><small>txn ${m.txn} · root ${m.root}${i === latest ? ' · latest' : ' · next commit goes here'}</small></span>`).join('')}</div>` +
+      `<div class="lvl"><span class="lab">readers</span>${lm.reader ? `<span class="pg"><b>long reader</b><small>snapshot txn ${lm.reader.txn} · root ${lm.reader.root}</small></span>` : '<small>none</small>'}</div>`;
+    const blocked = lm.reader ? lm.txn - lm.reader.txn : 0;
+    $('lmdbR').innerHTML = `<span>${lm.msg}</span>${lm.reader ? `<span>commits since reader opened <b>${blocked}</b> → pages freed by them can't be reused yet</span>` : ''}`;
+  }
+  $('lmdbCommit').addEventListener('click', () => { lm.txn++; lm.page += val('lmdbH'); const slot = lm.txn % 2; lm.metas[slot] = { txn: lm.txn, root: 'p' + lm.page }; lm.msg = `txn ${lm.txn} copied its path and wrote its root p${lm.page} into <b>meta${slot}</b>, overwriting the older of the two roots.`; drawLm(); });
+  $('lmdbReader').addEventListener('click', () => { const m = lm.metas[0].txn > lm.metas[1].txn ? lm.metas[0] : lm.metas[1]; lm.reader = { txn: m.txn, root: m.root }; lm.msg = `A read txn opened on snapshot ${m.txn}. It takes no lock; writers carry on.`; drawLm(); });
+  $('lmdbEnd').addEventListener('click', () => { lm.msg = lm.reader ? 'Reader closed: everything freed since its snapshot is reusable again.' : 'No reader open.'; lm.reader = null; drawLm(); });
+  function lmdbSim(h, D, withReader) {
+    const T = 400, start = 50; let file = 200; const q = []; const out = [];
+    for (let t = 1; t <= T; t++) {
+      const active = withReader && D > 0 && t >= start && t < start + D;
+      const limit = active ? start - 1 : t - 1;
+      let need = h;
+      while (need > 0 && q.length && q[0].f <= limit) { const take = Math.min(need, q[0].n); q[0].n -= take; need -= take; if (!q[0].n) q.shift(); }
+      file += need; q.push({ f: t, n: h }); out.push(file);
+    }
+    return out;
+  }
+  const dLmdb = reg(() => {
+    const h = val('lmdbH'), D = val('lmdbD');
+    const a = lmdbSim(h, D, false), b = lmdbSim(h, D, true); const xs = a.map((_, i) => i + 1);
+    xyChart('lmdbC', { xs, series: [{ y: a, col: 'c2', label: 'no long reader' }, { y: b, col: 'c1', label: `reader open txn 50–${50 + D}` }], xlab: 'write transaction #', ylab: 'file size (pages)', ymin: 0, vlines: D ? [{ x: 50, label: 'reader opens' }, { x: Math.min(400, 50 + D), label: 'closes' }] : [] });
+    $('lmdbCR').innerHTML = `<span>final file: <b>${a[a.length - 1]}</b> pages without, <b>${b[b.length - 1]}</b> with the long reader</span><span>growth while it was open ≈ <b>${h}</b> pages × <b>${D}</b> txns</span>`;
+  });
+  bindRange('lmdbH', dLmdb); bindRange('lmdbD', dLmdb);
+
+  // =====================================================================
+  // ---------- 04 abstracting node updates ----------
+  // =====================================================================
+  const ABS = [
+    { t: 'Raw pointer into the page (unmanaged languages)', code: `// C: the node IS the cached page bytes. No copy, no decode.
+typedef struct { uint16_t count; uint16_t flags; uint32_t right_sibling; uint16_t offsets[]; } NodeHdr;
+NodeHdr *node = (NodeHdr *)frame->data;      // frame owned by the page cache (or an mmap)
+uint16_t off  = node->offsets[i];            // read a cell in place
+node->count++;                               // a write changes the cached page directly`,
+      pro: 'Zero copies and zero extra memory; works directly on page-cache memory or a memory map (LMDB reads this way).', con: 'Every concurrent reader sees bytes being changed, so access needs latches or copy-on-write; casts are unsafe if the layout is wrong.' },
+    { t: 'Materialize native objects (decode on load, encode on flush)', code: `// Go: decode the page into ordinary objects, edit those, write back later.
+type Node struct { Keys []int64; Vals [][]byte; Right PageID }
+n := decode(page)          // second copy of the data, in the language's own form
+n.Insert(k, v)             // plain slices: easy to reason about, easy to share
+...
+page = encode(n)           // at flush: apply changes to the page in memory, then disk`,
+      pro: 'Simplest to program and to make concurrent: raw pages and objects are managed separately, so the in-memory node can live its own life (buffer updates, reconcile later).', con: 'Two versions of each page in memory (raw + native): higher memory overhead, plus decode/encode CPU.' },
+    { t: 'Wrapper object over the backing buffer (managed languages)', code: `// Java: an object view whose setters write straight into the page buffer.
+final class NodeView {
+  private final ByteBuffer buf;                       // the page's backing buffer
+  int count()               { return buf.getShort(0); }
+  long key(int i)           { return buf.getLong(offset(i)); }
+  void setKey(int i, long k){ buf.putLong(offset(i), k); }   // change lands immediately
+}`,
+      pro: 'Object-style API without a second copy of the data; common in Java/Go/C# engines.', con: 'Changes are materialized in the buffer as soon as they are made, so you still need latching around the buffer; small getter/setter overhead.' }
+  ];
+  let absSel = 0;
+  function drawAbs() {
+    const a = ABS[absSel];
+    $('absOut').innerHTML = `<b>${absSel + 1} · ${a.t}</b><pre class="code">${a.code.replace(/</g, '&lt;')}</pre><p><b>Good:</b> ${a.pro}</p><p><b>Cost:</b> ${a.con}</p>`;
+    ['abs1', 'abs2', 'abs3'].forEach((id, i) => $(id).classList.toggle('on', i === absSel));
+  }
+  $('abs1').addEventListener('click', () => { absSel = 0; drawAbs(); });
+  $('abs2').addEventListener('click', () => { absSel = 1; drawAbs(); });
+  $('abs3').addEventListener('click', () => { absSel = 2; drawAbs(); });
+
+  // =====================================================================
+  // ---------- 05 lazy buffering simulation ----------
+  // =====================================================================
+  function lazySim(P, M, skew, seed) {
+    const r = rng(seed); const U = 20000; const cnt = new Int32Array(P); const bucket = [new Set()]; let maxC = 0, buffered = 0, writes = 0;
+    const hot = Math.max(1, Math.round(P * 0.2));
+    for (let u = 0; u < U; u++) {
+      const p = skew ? (r() < 0.8 ? Math.floor(r() * hot) : hot + Math.floor(r() * (P - hot))) : Math.floor(r() * P);
+      const c = cnt[p]; if (c) bucket[c].delete(p); cnt[p] = c + 1; if (!bucket[c + 1]) bucket[c + 1] = new Set(); bucket[c + 1].add(p); if (c + 1 > maxC) maxC = c + 1; buffered++;
+      if (buffered >= M) {
+        const it = bucket[maxC].values().next(); const q = it.value; bucket[maxC].delete(q); buffered -= cnt[q]; cnt[q] = 0; writes++;
+        while (maxC > 0 && (!bucket[maxC] || !bucket[maxC].size)) maxC--;
+      }
+    }
+    for (let p = 0; p < P; p++) if (cnt[p]) writes++;
+    return writes / U;
+  }
+  const lazyCache = {};
+  const LAZY_X = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+  const dLazy = reg(() => {
+    const P = val('lazyP'), M = val('lazyM'); const key = P + ':' + SEED;
+    if (!lazyCache[key]) lazyCache[key] = { u: LAZY_X.map((m) => lazySim(P, m, false, SEED + 11)), s: LAZY_X.map((m) => lazySim(P, m, true, SEED + 11)) };
+    const c = lazyCache[key]; const mu = lazySim(P, M, false, SEED + 11), ms = lazySim(P, M, true, SEED + 11);
+    xyChart('lazyC', { xs: LAZY_X, logx: true, series: [{ y: LAZY_X.map(() => 1), col: 'muted', dash: [5, 4], label: 'eager: 1 write per update' }, { y: c.u, col: 'c2', label: 'lazy, uniform updates', dots: true }, { y: c.s, col: 'c1', label: 'lazy, skewed 80/20', dots: true }], marks: [{ x: Math.max(1, M), y: mu, col: 'c2' }, { x: Math.max(1, M), y: ms, col: 'c1' }], ymin: 0, ymax: 1.05, xlab: 'buffer size (updates held)', ylab: 'page writes per update' });
+    $('lazyR').innerHTML = `<span>buffer ${M} updates over ${P} pages</span><span>uniform: <b>${mu.toFixed(3)}</b> writes/update (<b>${(1 / mu).toFixed(1)}×</b> fewer)</span><span>skewed: <b>${ms.toFixed(3)}</b> (<b>${(1 / ms).toFixed(1)}×</b> fewer)</span>`;
+  });
+  bindRange('lazyP', dLazy); bindRange('lazyM', dLazy);
+
+  // =====================================================================
+  // ---------- 06 WiredTiger page ----------
+  // =====================================================================
+  const wt = {};
+  function wtInit() {
+    const r = rng(SEED + 21); wt.r = r; wt.image = new Map(); wt.buf = new Map(); wt.ver = 0; wt.flushes = 0; wt.splits = 0; wt.lastPages = null; wt.hit = null;
+    while (wt.image.size < 7) wt.image.set(1 + Math.floor(r() * 99), 'v0');
+    [12, 58, 77].forEach((k) => wtPut(k, false)); wtPut([...wt.image.keys()][0], true); wt.hit = null;
+    wt.msg = 'Dirty page: three upserts and one delete are waiting in the skiplist; the disk image is untouched.';
+  }
+  const tower = () => { let h = 1; while (wt.r() < 0.5 && h < 4) h++; return h; };
+  function wtPut(k, del) { const e = wt.buf.get(k); wt.buf.set(k, { val: del ? null : 'v' + (++wt.ver), h: e ? e.h : tower() }); wt.hit = k; wt.msg = del ? `Delete of ${k} recorded in the update buffer (the image still holds the old value until the next flush).` : `Upsert ${k} → v${wt.ver} went into the skiplist; the disk image is untouched.`; }
+  function wtMerged() { const m = new Map(wt.image); for (const [k, u] of wt.buf) { if (u.val === null) m.delete(k); else m.set(k, u.val); } return [...m.keys()].sort((a, b) => a - b).map((k) => [k, m.get(k)]); }
+  function drawWt() {
+    const bk = [...wt.buf.keys()].sort((a, b) => a - b);
+    const towers = bk.map((k) => { const u = wt.buf.get(k); return `<span class="tw">${'<i></i>'.repeat(u.h)}${cell(k + (u.val === null ? ' ✕' : ''), (u.val === null ? 'tomb ' : 'buf ') + (k === wt.hit ? 'hit' : ''))}</span>`; }).join('');
+    const img = [...wt.image.keys()].sort((a, b) => a - b).map((k) => cell(k, k === wt.hit ? 'hit' : '')).join('');
+    const merged = wtMerged().map(([k]) => cell(k, (wt.buf.has(k) ? 'buf ' : '') + (k === wt.hit ? 'hit' : ''))).join('');
+    const lp = wt.lastPages ? wt.lastPages.map((p, i) => `<span class="pg"><small>page ${i + 1}</small>${p.map((k) => cell(k)).join('')}</span>`).join('') : '<small>not flushed yet</small>';
+    $('wtView').innerHTML = `<div class="lvl bot"><span class="lab">update buffer (skiplist)</span>${towers || '<small>empty: page is clean</small>'}</div>` +
+      `<div class="lvl"><span class="lab">on-disk page image</span><span class="pg">${img}</span></div>` +
+      `<div class="lvl"><span class="lab">what a read sees (merged)</span><span class="pg">${merged}</span></div>` +
+      `<div class="lvl"><span class="lab">last flush wrote</span>${lp}</div>`;
+    $('wtR').innerHTML = `<span>${wt.msg}</span><span>page is <b>${wt.buf.size ? 'dirty' : 'clean'}</b></span><span>buffered <b>${wt.buf.size}</b></span><span>flushes <b>${wt.flushes}</b> · splits <b>${wt.splits}</b></span>`;
+  }
+  $('wtPut').addEventListener('click', () => { wtPut(keyOf('wtKey', 42), false); drawWt(); });
+  $('wtDel').addEventListener('click', () => { wtPut(keyOf('wtKey', 42), true); drawWt(); });
+  $('wtRand').addEventListener('click', () => { for (let i = 0; i < 5; i++) wtPut(1 + Math.floor(wt.r() * 99), false); wt.msg = '5 random upserts landed in the skiplist.'; drawWt(); });
+  $('wtGet').addEventListener('click', () => {
+    const k = keyOf('wtKey', 42); wt.hit = k; const u = wt.buf.get(k);
+    if (u) wt.msg = u.val === null ? `Read ${k}: found a <b>delete</b> in the update buffer → not found (the image's old value is hidden).` : `Read ${k}: found <b>${u.val}</b> in the update buffer (newest wins; image not consulted).`;
+    else wt.msg = wt.image.has(k) ? `Read ${k}: not in the buffer → read <b>${wt.image.get(k)}</b> from the page image.` : `Read ${k}: in neither buffer nor image → not found.`;
+    drawWt();
+  });
+  $('wtFlush').addEventListener('click', () => {
+    const merged = wtMerged(); const max = val('wtMax'); const pages = [];
+    for (let i = 0; i < merged.length; i += max) pages.push(merged.slice(i, i + max).map((e) => e[0]));
+    if (!pages.length) pages.push([]);
+    wt.image = new Map(merged); wt.buf = new Map(); wt.lastPages = pages; wt.flushes++; if (pages.length > 1) wt.splits++; wt.hit = null;
+    wt.msg = `Reconciled ${merged.length} entries and wrote them as <b>${pages.length}</b> page${pages.length > 1 ? 's (too big for one: split)' : ''}. Buffer emptied; page is clean again.`;
+    drawWt();
+  });
+  $('wtReset').addEventListener('click', () => { wtInit(); drawWt(); });
+  bindRange('wtMax', () => {});
+
+  // =====================================================================
+  // ---------- 07 LA-Tree ----------
+  // =====================================================================
+  const la = {};
+  function laInit() { la.r = rng(SEED + 31); la.root = []; la.sub = [[], [], [], []]; la.arr = [new Set(), new Set(), new Set(), new Set()]; la.leaf = new Array(16).fill(0); la.leafHit = new Set(); la.ins = 0; la.leafW = 0; la.rootF = 0; la.subF = 0; la.bufW = 0; la.msg = ''; for (let i = 0; i < 40; i++) laInsert(Math.floor(la.r() * 1000)); la.msg = '40 keys inserted so far. New keys land in the root buffer first.'; }
+  function laInsert(k) {
+    la.root.push(k); la.ins++;
+    if (la.root.length >= val('laRB')) {
+      la.rootF++; la.arr.forEach((s) => s.clear()); la.leafHit.clear(); const got = new Set();
+      la.root.forEach((x) => { const j = Math.min(3, Math.floor(x / 250)); la.sub[j].push(x); la.arr[j].add(x); got.add(j); });
+      la.bufW += got.size; la.root = [];
+      let msg = `Root buffer full → its ${val('laRB')} updates were copied down into ${got.size} subtree buffer${got.size > 1 ? 's' : ''}.`;
+      la.sub.forEach((b, j) => {
+        if (b.length >= val('laCB')) {
+          la.subF++; const leaves = new Set(); b.forEach((x) => { const li = Math.min(15, Math.floor(x / 62.5)); la.leaf[li]++; leaves.add(li); });
+          leaves.forEach((li) => la.leafHit.add(li)); la.leafW += leaves.size;
+          msg += ` Subtree ${j} buffer full → ${b.length} updates applied to its leaves in one batch (${leaves.size} page writes).`;
+          la.sub[j] = []; la.arr[j].clear();
+        }
+      });
+      la.msg = msg;
+    } else la.msg = `Key ${k} added to the root buffer.`;
+  }
+  function drawLa() {
+    const RB = val('laRB'), CB = val('laCB');
+    const bar = (n, cap) => `<span class="bar"><i style="width:${Math.min(100, n / cap * 100)}%"></i></span>`;
+    const rootRow = `<div class="lvl"><span class="lab">root buffer ${la.root.length}/${RB}</span>${bar(la.root.length, RB)}<span class="pg">${la.root.map((k) => cell(k, 'buf')).join('') || '<small>empty</small>'}</span></div>`;
+    const subRow = `<div class="lvl"><span class="lab">subtree buffers</span>${la.sub.map((b, j) => `<span class="pg"><small>S${j} ${b.length}/${CB}</small>${b.map((k) => cell(k, la.arr[j].has(k) ? 'pull' : 'buf')).join('')}</span>`).join('')}</div>`;
+    const leafRow = `<div class="lvl"><span class="lab">leaf pages (keys)</span>${la.leaf.map((c, i) => `<span class="pg${la.leafHit.has(i) ? ' new' : ''}"><small>${i}</small>${c}</span>`).join('')}</div>`;
+    $('laView').innerHTML = rootRow + subRow + leafRow;
+    const pend = la.root.length + la.sub.reduce((s, b) => s + b.length, 0);
+    $('laR').innerHTML = `<span>${la.msg}</span><span>inserted <b>${la.ins}</b></span><span>leaf page writes: LA-Tree <b>${la.leafW}</b> vs plain B-Tree <b>${la.ins}</b>${la.leafW ? ` → <b>${(la.ins / Math.max(1, la.leafW)).toFixed(1)}×</b> fewer` : ''}</span><span>buffer flushes: root <b>${la.rootF}</b>, subtree <b>${la.subF}</b> (+${la.bufW} sequential buffer writes)</span><span>still buffered <b>${pend}</b> (reads must check these)</span>`;
+  }
+  const laAdd = (n) => { for (let i = 0; i < n; i++) laInsert(Math.floor(la.r() * 1000)); drawLa(); };
+  $('laIns1').addEventListener('click', () => laAdd(1));
+  $('laIns10').addEventListener('click', () => laAdd(10));
+  $('laIns200').addEventListener('click', () => laAdd(200));
+  $('laReset').addEventListener('click', () => { laInit(); drawLa(); });
+  bindRange('laRB', () => { laInit(); drawLa(); }); bindRange('laCB', () => { laInit(); drawLa(); });
+
+  // =====================================================================
+  // ---------- 08 FD-Tree intro calculator ----------
+  // =====================================================================
+  const dFdi = reg(() => {
+    const N = val('fdiN'), seek = val('fdiSeek'), bw = val('fdiBW') * 1048576 / 1000; // bytes per ms
+    const inplace = N * (seek + 4096 / bw), batched = seek + N * 64 / bw;
+    $('fdiR').innerHTML = `<span>in place: ${N} random page writes ≈ <b>${dur(inplace)}</b></span><span>batched: one sequential run of ${bytes(N * 64)} ≈ <b>${dur(batched)}</b></span><span>ratio ≈ <b>${Math.round(inplace / batched).toLocaleString('en-US')}×</b></span>`;
+  });
+  ['fdiN', 'fdiSeek', 'fdiBW'].forEach((id) => bindRange(id, dFdi));
+
+  // =====================================================================
+  // ---------- 09 fractional cascading ----------
+  // =====================================================================
+  const fc = {};
+  function fcNewArrays() {
+    const r = rng(SEED + 41 + (fc.gen = (fc.gen || 0) + 1)); const L = val('fcLen'); fc.arrays = [];
+    for (let a = 0; a < 3; a++) { const s = new Set(); while (s.size < L) s.add(1 + Math.floor(r() * 98)); fc.arrays.push([...s].sort((x, y) => x - y)); }
+    fc.res = null;
+  }
+  function fcBuild() {
+    const N = +$('fcN').value || 2; const A = fc.arrays; const aug = [];
+    aug[A.length - 1] = A[A.length - 1].map((v) => ({ v, native: true, bridge: -1 }));
+    for (let i = A.length - 2; i >= 0; i--) {
+      const below = aug[i + 1]; const row = A[i].map((v) => ({ v, native: true, bridge: -1 }));
+      below.forEach((e, j) => { if (j % N !== N - 1) return; const same = row.find((x) => x.v === e.v); if (same) same.bridge = j; else row.push({ v: e.v, native: false, bridge: j }); });
+      aug[i] = row.sort((a, b) => a.v - b.v);
+    }
+    fc.aug = aug;
+  }
+  function fcSearch(key) {
+    const aug = fc.aug; let cmp = 0; let lo = 0, hi = aug[0].length;
+    while (lo < hi) { const m = (lo + hi) >> 1; cmp++; if (aug[0][m].v < key) lo = m + 1; else hi = m; }
+    let p = lo; const pos = [p], ranges = [[0, aug[0].length]];
+    for (let i = 0; i + 1 < aug.length; i++) {
+      let a = 0; for (let j = p - 1; j >= 0; j--) if (aug[i][j].bridge >= 0) { a = aug[i][j].bridge + 1; break; }
+      let b = aug[i + 1].length; for (let j = p; j < aug[i].length; j++) if (aug[i][j].bridge >= 0) { b = aug[i][j].bridge; break; }
+      p = a; while (p < b) { cmp++; if (aug[i + 1][p].v < key) p++; else break; }
+      pos.push(p); ranges.push([a, b]);
+    }
+    const succ = pos.map((q, i) => { for (let j = q; j < aug[i].length; j++) if (aug[i][j].native) return aug[i][j].v; return null; });
+    const sep = fc.arrays.reduce((s, arr) => s + Math.ceil(Math.log2(arr.length + 1)), 0);
+    fc.res = { key, pos, ranges, succ, cmp, sep };
+  }
+  function drawFc() {
+    const aug = fc.aug, cw = 40, ch = 26, gapY = 54, left = 34; const maxLen = Math.max(...aug.map((a) => a.length));
+    const W = left + maxLen * cw + 10, H = aug.length * (ch + gapY) - gapY + 12;
+    let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W * 1.25}px;height:auto" role="img" aria-label="Fractional cascading arrays">`;
+    aug.forEach((row, i) => {
+      const y = 6 + i * (ch + gapY);
+      s += `<text x="2" y="${y + 18}" style="fill:var(--muted)">A${i + 1}</text>`;
+      if (fc.res && i > 0) { const [a, b] = fc.res.ranges[i]; const e = Math.min(b, row.length - 1); if (e >= a) s += `<rect x="${left + a * cw - 3}" y="${y - 4}" width="${(e - a + 1) * cw + 2}" height="${ch + 8}" rx="4" style="fill:none;stroke:var(--c2);stroke-width:2;stroke-dasharray:4 3"/>`; }
+      row.forEach((e, j) => {
+        const x = left + j * cw; const found = fc.res && fc.res.pos[i] === j;
+        s += `<rect x="${x}" y="${y}" width="${cw - 4}" height="${ch}" rx="3" style="fill:var(${found ? '--tint' : e.native ? '--plate' : '--tint3'});stroke:var(${found ? '--c1' : '--rule'});stroke-width:${found ? 2.5 : 1}"/>`;
+        s += `<text x="${x + (cw - 4) / 2}" y="${y + 17}" text-anchor="middle" style="font-weight:${e.native ? 400 : 600}">${e.v}</text>`;
+        if (e.bridge >= 0 && i + 1 < aug.length) { const tx = left + e.bridge * cw + (cw - 4) / 2, ty = y + ch + gapY; s += `<line x1="${x + (cw - 4) / 2}" y1="${y + ch}" x2="${tx}" y2="${ty - 2}" style="stroke:var(--c2);stroke-width:1.3"/><circle cx="${tx}" cy="${ty - 2}" r="2.5" style="fill:var(--c2)"/>`; }
+      });
+    });
+    s += '</svg>';
+    $('fcView').innerHTML = s;
+    const extra = aug.reduce((t, a, i) => t + a.length - fc.arrays[i].length, 0);
+    let txt = `<span>original sizes ${fc.arrays.map((a) => a.length).join(' + ')} · augmented ${aug.map((a) => a.length).join(' + ')} (<b>${extra}</b> pulled-up copies)</span>`;
+    if (fc.res) txt += `<span>key <b>${fc.res.key}</b>: successor in A1, A2, A3 = <b>${fc.res.succ.map((v) => (v == null ? 'none' : v)).join(', ')}</b></span><span>comparisons with cascading <b>${fc.res.cmp}</b> vs three separate binary searches ≈ <b>${fc.res.sep}</b></span>`;
+    $('fcR').innerHTML = txt;
+  }
+  const fcAll = () => { fcBuild(); fcSearch(Math.max(0, Math.min(99, Math.round(+$('fcKey').value) || 0))); drawFc(); };
+  $('fcSearch').addEventListener('click', fcAll);
+  $('fcN').addEventListener('change', fcAll);
+  $('fcNew').addEventListener('click', () => { fcNewArrays(); fcAll(); });
+  bindRange('fcLen', () => { fcNewArrays(); fcAll(); });
+
+  // =====================================================================
+  // ---------- 10 FD-Tree logarithmic runs ----------
+  // =====================================================================
+  function mergeNewerWins(newer, older) {
+    const out = []; let i = 0, j = 0;
+    while (i < newer.length || j < older.length) {
+      if (j >= older.length || (i < newer.length && newer[i].key < older[j].key)) out.push(newer[i++]);
+      else if (i >= newer.length || older[j].key < newer[i].key) out.push(older[j++]);
+      else { out.push(newer[i++]); j++; }
+    }
+    return out;
+  }
+  function fdNew(H, k) { return { H, k, head: new Map(), levels: [], ins: 0, written: 0, live: new Set(), fresh: new Set(), msg: '' }; }
+  function fdInsert(fd, key, tomb) {
+    fd.head.set(key, { key, tomb: !!tomb }); fd.ins++;
+    if (tomb) fd.live.delete(key); else fd.live.add(key);
+    if (fd.head.size < fd.H) return '';
+    let carry = [...fd.head.values()].sort(byKey); fd.head.clear(); fd.fresh = new Set();
+    let msg = `Head tree full → ${carry.length} records sorted and merged into L1`;
+    for (let i = 0; ; i++) {
+      const isLast = i >= fd.levels.length - 1;
+      const merged = mergeNewerWins(carry, fd.levels[i] || []);
+      const out = isLast ? merged.filter((e) => !e.tomb) : merged;
+      if (isLast && out.length < merged.length) msg += ` (${merged.length - out.length} tombstone${merged.length - out.length > 1 ? 's' : ''} dropped at the bottom level, with what they shadowed)`;
+      fd.written += out.length; const cap = fd.H * Math.pow(fd.k, i + 1);
+      if (out.length <= cap) { fd.levels[i] = out; fd.fresh.add(i); return msg + `; L${i + 1} now ${out.length}/${cap}.`; }
+      fd.levels[i] = []; carry = out; msg += `; L${i + 1} over its limit ${cap} → merged into L${i + 2}`;
+    }
+  }
+  let fdS, fdR;
+  function fdInit() { fdS = fdNew(val('fdH'), val('fdK')); fdR = rng(SEED + 51); for (let i = 0; i < 40; i++) fdInsert(fdS, fdKey()); fdS.msg = '40 records inserted so far. New inserts go into the small mutable head tree.'; }
+  const fdKey = () => 1 + Math.floor(fdR() * 999);
+  function drawFd() {
+    const show = (arr, isFresh) => { const lim = 40; const c = arr.slice(0, lim).map((e) => cell(e.key, (e.tomb ? 'tomb' : '') + (isFresh ? ' moved' : ''))).join(''); return c + (arr.length > lim ? `<small> … +${arr.length - lim}</small>` : ''); };
+    const head = [...fdS.head.values()].sort(byKey);
+    let h = `<div class="lvl"><span class="lab">head tree ${head.length}/${fdS.H}</span><span class="pg" style="border-color:var(--c1)">${show(head) || '<small>empty</small>'}</span></div>`;
+    fdS.levels.forEach((lv, i) => { h += `<div class="lvl"><span class="lab">L${i + 1} ${lv.length}/${fdS.H * Math.pow(fdS.k, i + 1)}</span><span class="pg">${lv.length ? show(lv, fdS.fresh.has(i)) : '<small>empty</small>'}</span></div>`; });
+    $('fdView').innerHTML = h;
+    const tombs = fdS.levels.reduce((s, l) => s + l.filter((e) => e.tomb).length, 0) + head.filter((e) => e.tomb).length;
+    $('fdR').innerHTML = `<span>${fdS.msg}</span><span>operations <b>${fdS.ins}</b></span><span>records written by merges <b>${fdS.written}</b> → write amplification <b>${fdS.ins ? (fdS.written / fdS.ins).toFixed(2) : '0'}</b></span><span>levels <b>${fdS.levels.length}</b></span><span>tombstones present <b>${tombs}</b></span>`;
+  }
+  const fdDo = (f) => { f(); drawFd(); };
+  $('fdIns').addEventListener('click', () => fdDo(() => { const k = fdKey(); const m = fdInsert(fdS, k); fdS.msg = m || `Inserted ${k} into the head tree (the only random write).`; }));
+  $('fdFill').addEventListener('click', () => fdDo(() => { let m = ''; while (!m) m = fdInsert(fdS, fdKey()); fdS.msg = m; }));
+  $('fdDel').addEventListener('click', () => fdDo(() => { const keys = [...fdS.live]; if (!keys.length) { fdS.msg = 'Nothing to delete yet.'; return; } const k = keys[Math.floor(fdR() * keys.length)]; const m = fdInsert(fdS, k, true); fdS.msg = `Tombstone for ${k} inserted (red). Older copies of ${k} on lower levels are now shadowed. ` + m; }));
+  $('fdRun').addEventListener('click', () => fdDo(() => { let m = ''; for (let i = 0; i < 200; i++) { const x = fdInsert(fdS, fdKey()); if (x) m = x; } fdS.msg = '200 inserts done. Last merge: ' + (m || 'none'); }));
+  $('fdReset').addEventListener('click', () => { fdInit(); drawFd(); });
+  const FD_K = [2, 3, 4, 5, 6, 8, 10];
+  const fdCache = {};
+  const dFdChart = reg(() => {
+    const H = val('fdH'); const key = H + ':' + SEED;
+    if (!fdCache[key]) {
+      fdCache[key] = FD_K.map((k) => { const f = fdNew(H, k); const r = rng(SEED + 61); for (let i = 0; i < 20000; i++) fdInsert(f, r()); return { wa: f.written / f.ins, lv: f.levels.filter((l) => l.length).length, lvAll: f.levels.length }; });
+    }
+    const c = fdCache[key]; const kk = val('fdK'); const near = c[FD_K.reduce((b, k, i) => (Math.abs(k - kk) < Math.abs(FD_K[b] - kk) ? i : b), 0)];
+    xyChart('fdC', { xs: FD_K, series: [{ y: c.map((x) => x.wa), col: 'c1', label: 'write amplification', dots: true }, { y: c.map((x) => x.lvAll), col: 'c2', label: 'levels (runs a lookup may visit)', dots: true }], ymin: 0, xlab: 'size ratio k', ylab: 'count', xticks: FD_K });
+    $('fdCR').innerHTML = `<span>head = ${H}, 20,000 inserts</span>${c.map((x, i) => `<span>k=${FD_K[i]}: WA <b>${x.wa.toFixed(1)}</b>, levels <b>${x.lvAll}</b></span>`).join('')}<span>your k=${kk} ≈ WA <b>${near.wa.toFixed(1)}</b></span>`;
+  });
+  bindRange('fdH', () => { fdInit(); drawFd(); dFdChart(); }); bindRange('fdK', () => { fdInit(); drawFd(); dFdChart(); });
+
+  // =====================================================================
+  // ---------- 11 Bw-Tree problems calculator ----------
+  // =====================================================================
+  const dBwi = reg(() => {
+    const r = val('bwiRec'), P = val('bwiPage') * 1024, f = val('bwiFill') / 100, T = val('bwiThr');
+    const waIn = P / r; const spaceExtra = (1 - f) / f; const waDelta = (r + 32 + P * f / T) / r;
+    $('bwiOut').innerHTML = `<span>in-place: write <b>${bytes(P)}</b> to change ${r} B → write amplification <b>${num(waIn)}×</b></span><span>space: each useful byte read drags <b>${spaceExtra.toFixed(2)}</b> empty bytes (fill ${Math.round(f * 100)}%)</span><span>delta chain: ${r + 32} B delta + consolidation share ${bytes(P * f / T)} → <b>${num(waDelta)}×</b></span><span>improvement <b>${num(waIn / waDelta)}×</b> fewer bytes written</span>`;
+  });
+  ['bwiRec', 'bwiPage', 'bwiFill', 'bwiThr'].forEach((id) => bindRange(id, dBwi));
+
+  // =====================================================================
+  // ---------- 12 delta chain ----------
+  // =====================================================================
+  const dc = {};
+  function dcInit() { dc.base = new Map([[10, 'a'], [20, 'b'], [40, 'c'], [55, 'd'], [70, 'e'], [85, 'f']]); dc.chain = [{ kind: 'ins', key: 62, val: 'v2' }, { kind: 'del', key: 20 }, { kind: 'ins', key: 40, val: 'v1' }]; dc.ver = 2; dc.visit = -1; dc.hitBase = false; dc.msg = 'Logical node P7: three deltas (newest first) in front of the base node. Try reading 20, 40 and 85.'; }
+  function drawDc() {
+    const ch = dc.chain.map((d, i) => `<span class="pg${i < dc.visit ? ' hot' : ''}${i === dc.visit - 1 && !dc.hitBase ? ' new' : ''}"><small>Δ${dc.chain.length - i}</small>${d.kind === 'del' ? cell('del ' + d.key, 'tomb') : cell(d.key + '=' + d.val, 'buf')}</span><span class="arr">→</span>`).join('');
+    const base = [...dc.base.keys()].sort((a, b) => a - b).map((k) => cell(k + '=' + dc.base.get(k))).join('');
+    $('dcView').innerHTML = `<div class="lvl"><span class="lab">mapping table</span><span class="pg"><b>P7</b><small>→ ${dc.chain.length ? 'Δ' + dc.chain.length : 'base'}</small></span></div><div class="lvl"><span class="lab">chain (newest first)</span>${ch}<span class="pg${dc.hitBase ? ' hot' : ''}"><small>base</small>${base}</span></div>`;
+    $('dcR').innerHTML = `<span>${dc.msg}</span><span>chain length <b>${dc.chain.length}</b></span><span>bytes rewritten so far <b>0</b> (deltas are only prepended)</span>`;
+  }
+  $('dcIns').addEventListener('click', () => { const k = keyOf('dcKey', 30); dc.chain.unshift({ kind: 'ins', key: k, val: 'v' + (++dc.ver) }); dc.visit = -1; dc.hitBase = false; dc.msg = `Prepended an insert/update delta for ${k}; base untouched.`; drawDc(); });
+  $('dcDel').addEventListener('click', () => { const k = keyOf('dcKey', 30); dc.chain.unshift({ kind: 'del', key: k }); dc.visit = -1; dc.hitBase = false; dc.msg = `Prepended a delete delta for ${k}.`; drawDc(); });
+  $('dcGet').addEventListener('click', () => {
+    const k = keyOf('dcKey', 30); let i = 0;
+    for (; i < dc.chain.length; i++) if (dc.chain[i].key === k) break;
+    if (i < dc.chain.length) { dc.visit = i + 1; dc.hitBase = false; const d = dc.chain[i]; dc.msg = `Read ${k}: walked ${i + 1} delta${i ? 's' : ''}; newest mention is ${d.kind === 'del' ? 'a <b>delete</b> → not found' : 'value <b>' + d.val + '</b>'}. Base not searched.`; }
+    else { dc.visit = dc.chain.length; dc.hitBase = true; dc.msg = `Read ${k}: walked all ${dc.chain.length} deltas without a match, then searched the base → ${dc.base.has(k) ? '<b>' + dc.base.get(k) + '</b>' : 'not found'}.`; }
+    drawDc();
+  });
+  $('dcCons').addEventListener('click', () => { const n = dc.chain.length; for (let i = n - 1; i >= 0; i--) { const d = dc.chain[i]; if (d.kind === 'del') dc.base.delete(d.key); else dc.base.set(d.key, d.val); } dc.chain = []; dc.visit = -1; dc.hitBase = false; dc.msg = `Consolidated ${n} deltas into a new base node (written to a new location; the mapping table now points at it).`; drawDc(); });
+  $('dcReset').addEventListener('click', () => { dcInit(); drawDc(); });
+
+  // =====================================================================
+  // ---------- 13 CAS race ----------
+  // =====================================================================
+  const CAS = {
+    race: [
+      { slot: 'Base', chain: ['Base'], t1: '', t2: '', log: 'Start: mapping table slot for page P points at its base node.' },
+      { slot: 'Base', chain: ['Base'], t1: 'saw Base', t2: '', log: '<b>T1</b> step 1: walks to P, loads slot → Base.' },
+      { slot: 'Base', chain: ['Base'], t1: 'saw Base', t2: 'saw Base', log: '<b>T2</b> step 1: loads the same slot → Base.' },
+      { slot: 'Base', chain: ['Base'], t1: 'Δ1(ins 10) → Base', t2: 'saw Base', log: '<b>T1</b> step 2: builds Δ1 (insert 10) pointing at Base. Private, invisible.' },
+      { slot: 'Base', chain: ['Base'], t1: 'Δ1(ins 10) → Base', t2: 'Δ2(ins 20) → Base', log: '<b>T2</b> step 2: builds Δ2 (insert 20) pointing at Base.' },
+      { slot: 'Base', chain: ['Base'], t1: 'Δ1(ins 10) → Base', t2: 'Δ2(ins 20) → Base', log: '<b>Reader R1</b> loads slot → Base: ordered <i>before</i> both writes, sees neither.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'Δ2(ins 20) → Base', log: '<b>T1</b> step 3: CAS(slot, Base → Δ1) <span class="good">succeeds</span>.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'Δ2(ins 20) → Base', log: '<b>Reader R2</b> loads slot → Δ1: ordered <i>after</i> T1, sees insert 10.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'CAS failed ✗', log: '<b>T2</b> step 3: CAS(slot, Base → Δ2) <span class="bad">fails</span>: slot holds Δ1, not Base. Δ2 is thrown away.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'Δ2′(ins 20) → Δ1', log: '<b>T2</b> retries: reloads slot → Δ1, builds Δ2′ pointing at Δ1.' },
+      { slot: 'Δ2′', chain: ['Δ2′', 'Δ1', 'Base'], t1: 'done ✓', t2: 'done ✓', log: '<b>T2</b>: CAS(slot, Δ1 → Δ2′) <span class="good">succeeds</span>. Both inserts applied; nobody ever waited on a lock.' }
+    ],
+    serial: [
+      { slot: 'Base', chain: ['Base'], t1: '', t2: '', log: 'Start: slot for P points at its base node.' },
+      { slot: 'Base', chain: ['Base'], t1: 'saw Base', t2: '', log: '<b>T1</b>: loads slot → Base.' },
+      { slot: 'Base', chain: ['Base'], t1: 'Δ1(ins 10) → Base', t2: '', log: '<b>T1</b>: builds Δ1 pointing at Base.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: '', log: '<b>T1</b>: CAS(Base → Δ1) <span class="good">succeeds</span>.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'saw Δ1', log: '<b>T2</b>: loads slot → Δ1.' },
+      { slot: 'Δ1', chain: ['Δ1', 'Base'], t1: 'done ✓', t2: 'Δ2(ins 20) → Δ1', log: '<b>T2</b>: builds Δ2 pointing at Δ1.' },
+      { slot: 'Δ2', chain: ['Δ2', 'Δ1', 'Base'], t1: 'done ✓', t2: 'done ✓', log: '<b>T2</b>: CAS(Δ1 → Δ2) <span class="good">succeeds</span>. No conflict, no retry.' }
+    ]
+  };
+  let casI = 0;
+  function drawCas() {
+    const seq = CAS[$('casMode').value] || CAS.race; if (casI >= seq.length) casI = seq.length - 1; const s = seq[casI];
+    $('casView').innerHTML = `<div class="lvl"><span class="lab">mapping table</span><span class="pg hot"><b>P</b><small>→ ${s.slot}</small></span></div>` +
+      `<div class="lvl"><span class="lab">installed chain</span>${s.chain.map((n) => `<span class="pg${n === 'Base' ? '' : ' new'}">${n}</span>`).join('<span class="arr">→</span>')}</div>` +
+      `<div class="lvl"><span class="lab">thread T1</span><span class="pg"><small>${s.t1 || 'idle'}</small></span></div><div class="lvl"><span class="lab">thread T2</span><span class="pg"><small>${s.t2 || 'idle'}</small></span></div>`;
+    $('casR').innerHTML = seq.slice(0, casI + 1).map((x, i) => `<div>${i}. ${x.log}</div>`).join('') + (casI < seq.length - 1 ? '<div>… press Next step</div>' : '<div><b>End.</b></div>');
+  }
+  $('casStep').addEventListener('click', () => { casI++; drawCas(); });
+  $('casReset').addEventListener('click', () => { casI = 0; drawCas(); });
+  $('casMode').addEventListener('change', () => { casI = 0; drawCas(); });
+
+  // =====================================================================
+  // ---------- 14 SMOs ----------
+  // =====================================================================
+  const pgB = (name, body, cls) => `<span class="pg ${cls || ''}"><b>${name}</b> ${body}</span>`;
+  const SMO = {
+    split: [
+      { P: pgB('P', '<small>…→A · 100→C</small>'), A: pgB('A', cell('Δ ins 80', 'buf') + cell('Δ ins 70', 'buf') + cell('Δ ins 60', 'buf') + cell('Δ ins 50', 'buf') + '<small>base</small>' + [10, 20, 30, 40].map((k) => cell(k)).join('')), B: '', txt: 'Before: logical node A has overflowed (base + 4 inserts = 8 records). A lookup for 70 goes P → A and finds it in a delta.' },
+      { P: pgB('P', '<small>…→A · 100→C</small>'), A: pgB('A', cell('Δ ins 80', 'buf') + cell('Δ ins 70', 'buf') + cell('Δ ins 60', 'buf') + cell('Δ ins 50', 'buf') + '<small>base</small>' + [10, 20, 30, 40].map((k) => cell(k)).join('')), B: pgB('B', [50, 60, 70, 80].map((k) => cell(k)).join(''), 'new'), txt: 'Prepare: consolidate A\'s contents (apply deltas to base) and create a new page B with everything right of the split point (keys > 40). B gets a mapping-table entry, but nothing points to it yet, so nobody can see it.' },
+      { P: pgB('P', '<small>…→A · 100→C</small>'), A: pgB('A', cell('split Δ: >40 → B', 'pull') + cell('Δ ins 80', 'buf') + '<small>…</small>' + '<small>base</small>' + [10, 20, 30, 40].map((k) => cell(k)).join('')), B: pgB('B', [50, 60, 70, 80].map((k) => cell(k)).join('')), txt: 'Step 1 · Split: CAS a split delta onto A. It holds separator 40 (records above it in A are no longer valid there) and a link to sibling B. Lookup 70: P → A → split delta says "> 40, go to B" → B. Lookup 20: P → A → stays in A. This is the B<sup>link</sup> half-split state.' },
+      { P: pgB('P', cell('index Δ: 40 → B', 'pull') + '<small>…→A · 100→C</small>', 'hot'), A: pgB('A', cell('split Δ: >40 → B', 'pull') + '<small>…</small><small>base</small>' + [10, 20, 30, 40].map((k) => cell(k)).join('')), B: pgB('B', [50, 60, 70, 80].map((k) => cell(k)).join('')), txt: 'Step 2 · Parent update: CAS an index-entry delta onto P so B is a direct child. Lookup 70 now goes P → B with no detour. Any thread that had found the split half-done would have installed this itself before doing its own work. The split is complete; a later consolidation of A drops the split delta.' }
+    ],
+    merge: [
+      { P: pgB('P', '<small>…→A · 25→B · 60→C</small>'), A: pgB('A', [10, 20].map((k) => cell(k)).join('')), B: pgB('B', cell(30)), txt: 'Before: B has underflowed (one record). We merge B into its left sibling A. Lookup 30: P → B.' },
+      { P: pgB('P', '<small>…→A · 25→B · 60→C</small>'), A: pgB('A', [10, 20].map((k) => cell(k)).join('')), B: pgB('B', cell('remove Δ', 'tomb') + cell(30), 'old'), txt: 'Step 1 · Remove sibling: CAS a remove delta onto B. It marks the start of the merge SMO and marks B for deletion; a thread that reaches B sees it and must help finish the merge first.' },
+      { P: pgB('P', '<small>…→A · 25→B · 60→C</small>'), A: pgB('A', cell('merge Δ → B\'s contents', 'pull') + [10, 20].map((k) => cell(k)).join('')), B: pgB('B', cell('remove Δ', 'tomb') + cell(30), 'old'), txt: 'Step 2 · Merge: CAS a merge delta onto A that points at B\'s contents, making them logically part of A. Lookup 30 arriving at A finds it through the merge delta.' },
+      { P: pgB('P', cell('delete index 25→B', 'pull') + '<small>…→A · 60→C</small>', 'hot'), A: pgB('A', cell('merge Δ → B\'s contents', 'pull') + [10, 20].map((k) => cell(k)).join('')), B: '', txt: 'Step 3 · Parent update: remove the link to B from P. Lookup 30: P → A → merge delta. B\'s old nodes are now unreachable and are freed later by epoch-based reclamation (section 15).' }
+    ]
+  };
+  let smoI = 0;
+  function drawSmo() {
+    const seq = SMO[$('smoMode').value] || SMO.split; smoI = Math.max(0, Math.min(smoI, seq.length - 1)); const s = seq[smoI];
+    $('smoView').innerHTML = `<div class="lvl"><span class="lab">parent</span>${s.P}</div><div class="lvl"><span class="lab">children</span>${s.A}${s.B ? '<span class="arr">→ sibling →</span>' + s.B : ''}</div>`;
+    $('smoR').innerHTML = `<span>step ${smoI}/${seq.length - 1}</span><span>${s.txt}</span>`;
+  }
+  $('smoStep').addEventListener('click', () => { smoI++; drawSmo(); });
+  $('smoBack').addEventListener('click', () => { smoI--; drawSmo(); });
+  $('smoReset').addEventListener('click', () => { smoI = 0; drawSmo(); });
+  $('smoMode').addEventListener('change', () => { smoI = 0; drawSmo(); });
+
+  // =====================================================================
+  // ---------- 15 consolidation model + epochs ----------
+  // =====================================================================
+  const CON_T = []; for (let t = 1; t <= 32; t++) CON_T.push(t);
+  const dCon = reg(() => {
+    const r = val('conRead') / 100, S = val('conS');
+    const rd = CON_T.map((T) => 1 + (T - 1) / 2 + 0.3 * Math.log2(S));
+    const wr = CON_T.map((T) => 1 + (0.1 * S + T) / T);
+    const tot = CON_T.map((T, i) => r * rd[i] + (1 - r) * wr[i]);
+    let bi = 0; tot.forEach((v, i) => { if (v < tot[bi]) bi = i; });
+    xyChart('conC', { xs: CON_T, series: [{ y: tot, col: 'c1', label: 'cost per operation (mix)', w: 2.6 }, { y: rd, col: 'c2', label: 'read cost', dash: [5, 4] }, { y: wr, col: 'c3', label: 'write cost', dash: [5, 4] }], marks: [{ x: CON_T[bi], y: tot[bi], col: 'c1' }], ymin: 0, xlab: 'delta chain threshold T', ylab: 'cost units', xticks: [1, 4, 8, 12, 16, 20, 24, 28, 32] });
+    $('conR').innerHTML = `<span>best threshold in this model <b>T = ${CON_T[bi]}</b></span><span>cost there <b>${tot[bi].toFixed(2)}</b> vs T=1 <b>${tot[0].toFixed(2)}</b> vs T=32 <b>${tot[31].toFixed(2)}</b></span><span>more reads → shorter chains; bigger nodes → consolidate less often</span>`;
+  });
+  bindRange('conRead', dCon); bindRange('conS', dCon);
+  const EP = [
+    { e: 1, rd: [], g: [], txt: 'Global epoch = 1. No readers, no garbage.' },
+    { e: 1, rd: ['A@1'], g: [], txt: 'Reader A starts and notes epoch 1 (one counter read, no latch).' },
+    { e: 1, rd: ['A@1'], g: [['epoch 1', 'P7 old base + 3 deltas', 'waiting']], txt: 'A writer consolidates P7: the new base is installed by CAS; the old base and deltas are unlinked and put on epoch 1\'s garbage list. A might still be walking them.' },
+    { e: 2, rd: ['A@1', 'B@2'], g: [['epoch 1', 'P7 old base + 3 deltas', 'waiting']], txt: 'Global epoch advances to 2. Reader B starts in epoch 2: it cannot have seen P7\'s old chain, which was already unlinked.' },
+    { e: 2, rd: ['A@1', 'B@2'], g: [['epoch 1', 'P7 old base + 3 deltas', 'waiting'], ['epoch 2', 'P9 old base + 5 deltas', 'waiting']], txt: 'Another consolidation (P9) during epoch 2 adds garbage to epoch 2\'s list.' },
+    { e: 2, rd: ['B@2'], g: [['epoch 1', 'P7 old base + 3 deltas', 'freed'], ['epoch 2', 'P9 old base + 5 deltas', 'waiting']], txt: 'Reader A finishes. No reader from epoch ≤ 1 remains → epoch 1\'s garbage is freed. Epoch 2\'s garbage must wait for B.' },
+    { e: 3, rd: [], g: [['epoch 1', 'P7 old base + 3 deltas', 'freed'], ['epoch 2', 'P9 old base + 5 deltas', 'freed']], txt: 'Epoch advances to 3 and B finishes → epoch 2\'s garbage is freed. If B had been a slow scan, all garbage from epoch 2 onward would have piled up behind it.' }
+  ];
+  let epI = 0;
+  function drawEp() {
+    const s = EP[Math.min(epI, EP.length - 1)];
+    $('epView').innerHTML = `<div class="lvl"><span class="lab">global epoch</span><span class="pg hot"><b>${s.e}</b></span></div><div class="lvl"><span class="lab">active readers</span>${s.rd.length ? s.rd.map((x) => `<span class="pg">${x}</span>`).join('') : '<small>none</small>'}</div><div class="lvl"><span class="lab">garbage lists</span>${s.g.length ? s.g.map((x) => `<span class="pg ${x[2] === 'freed' ? 'old' : 'new'}"><b>${x[0]}</b><small>${x[1]} · ${x[2]}</small></span>`).join('') : '<small>empty</small>'}</div>`;
+    $('epR').innerHTML = `<span>step ${Math.min(epI, EP.length - 1)}/${EP.length - 1}</span><span>${s.txt}</span>`;
+  }
+  $('epStep').addEventListener('click', () => { epI = Math.min(epI + 1, EP.length - 1); drawEp(); });
+  $('epReset').addEventListener('click', () => { epI = 0; drawEp(); });
+
+  // =====================================================================
+  // ---------- 16 cache-oblivious calculator ----------
+  // =====================================================================
+  const CO_B = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536];
+  function coTransfers(N, key, S, B) { const f = Math.max(2, S / key); const h = Math.ceil(Math.log(N) / Math.log(f)); const per = S > B ? Math.ceil(Math.log2(S / B)) + 1 : 1; return h * per; }
+  const dCo = reg(() => {
+    const N = Math.pow(10, val('coN')), key = val('coKey');
+    const ideal = CO_B.map((B) => Math.ceil(Math.log(N) / Math.log(Math.max(2, B / key))));
+    const t64 = CO_B.map((B) => coTransfers(N, key, 64, B)), t4k = CO_B.map((B) => coTransfers(N, key, 4096, B)), t64k = CO_B.map((B) => coTransfers(N, key, 65536, B));
+    xyChart('coC', { xs: CO_B, logx: true, series: [{ y: t64, col: 'c3', label: 'nodes tuned to 64 B' }, { y: t4k, col: 'c1', label: 'nodes tuned to 4 KB' }, { y: t64k, col: 'c2', label: 'nodes tuned to 64 KB' }, { y: ideal, col: 'buy', dash: [5, 4], label: 'ideal for that block size' }], ymin: 0, xlab: 'actual block size (bytes)', ylab: 'block transfers per lookup', xfmt: (v) => (v >= 1024 ? v / 1024 + 'K' : '' + v) });
+    const at = (B) => CO_B.indexOf(B);
+    $('coR').innerHTML = `<span>at 64 B cache lines: tuned-64B <b>${t64[at(64)]}</b>, tuned-4KB <b>${t4k[at(64)]}</b>, ideal <b>${ideal[at(64)]}</b></span><span>at 4 KB pages: tuned-64B <b>${t64[at(4096)]}</b>, tuned-4KB <b>${t4k[at(4096)]}</b>, ideal <b>${ideal[at(4096)]}</b></span>`;
+  });
+  bindRange('coN', dCo); bindRange('coKey', dCo);
+
+  // =====================================================================
+  // ---------- 17 van Emde Boas layout + packed array ----------
+  // =====================================================================
+  const hyper = (x) => Math.pow(2, Math.ceil(Math.log2(x)));
+  function vebOrder(root, h, rule, out) {
+    if (h === 1) { out.push(root); return out; }
+    const bottomH = rule === 'vebEven' ? h - Math.floor(h / 2) : hyper(Math.ceil(h / 2)); const topH = h - bottomH;
+    vebOrder(root, topH, rule, out);
+    const first = root * Math.pow(2, topH); for (let r = first; r < first + Math.pow(2, topH); r++) vebOrder(r, bottomH, rule, out);
+    return out;
+  }
+  function layoutOrder(kind, h) {
+    const n = Math.pow(2, h) - 1;
+    if (kind === 'bfs') { const o = []; for (let i = 1; i <= n; i++) o.push(i); return o; }
+    if (kind === 'dfs') { const o = []; const st = [1]; while (st.length) { const v = st.pop(); o.push(v); if (2 * v + 1 <= n) st.push(2 * v + 1); if (2 * v <= n) st.push(2 * v); } return o; }
+    return vebOrder(1, h, kind, []);
+  }
+  function avgBlocks(kind, h, B) {
+    const ord = layoutOrder(kind, h); const pos = new Int32Array(ord.length + 2); ord.forEach((v, i) => { pos[v] = i; });
+    const n = ord.length; const cnt = new Map(); let distinct = 0, sum = 0, leaves = 0;
+    (function walk(v) {
+      const b = Math.floor(pos[v] / B); const c = cnt.get(b) || 0; if (!c) distinct++; cnt.set(b, c + 1);
+      if (2 * v > n) { sum += distinct; leaves++; } else { walk(2 * v); walk(2 * v + 1); }
+      cnt.set(b, c); if (!c) distinct--;
+    })(1);
+    return sum / leaves;
+  }
+  const VEB_B = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+  const LAYS = [['vebBook', 'vEB', 'c1'], ['bfs', 'breadth-first', 'c2'], ['dfs', 'depth-first', 'c3']];
+  let vebCurve = null;
+  const BLK = ['--tint', '--tint2', '--tint3'];
+  const dVeb = reg(() => {
+    const kind = $('vebLay').value || 'vebBook', h = val('vebH'), B = val('vebB');
+    const ord = layoutOrder(kind, h); const pos = {}; ord.forEach((v, i) => { pos[v] = i; });
+    const W = 640, top = 18, dy = 46; const n = ord.length; const leavesN = Math.pow(2, h - 1);
+    const xy = (v) => { const d = Math.floor(Math.log2(v)); const idx = v - Math.pow(2, d); return [(idx + 0.5) / Math.pow(2, d) * W, top + d * dy]; };
+    const memY = top + (h - 1) * dy + 40; const cw = Math.min(40, (W - 10) / n);
+    let s = `<svg viewBox="0 0 ${W} ${memY + 42}" style="width:100%;height:auto" role="img" aria-label="Tree laid out in memory">`;
+    for (let v = 2; v <= n; v++) { const [x1, y1] = xy(Math.floor(v / 2)), [x2, y2] = xy(v); s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--rule)"/>`; }
+    const r = h >= 5 ? Math.min(11, W / leavesN / 2 - 1) : 12;
+    for (let v = 1; v <= n; v++) { const [x, y] = xy(v); const b = Math.floor(pos[v] / B); s += `<circle cx="${x}" cy="${y}" r="${r}" style="fill:var(${BLK[b % 3]});stroke:var(${b % 2 ? '--c2' : '--c1'});stroke-width:1.5"/><text x="${x}" y="${y + 4}" text-anchor="middle" style="font-size:${r < 11 ? 9 : 10}px">${pos[v] + 1}</text>`; }
+    s += `<text x="0" y="${memY - 8}" style="fill:var(--muted)">memory order (boxes = blocks of ${B} node${B > 1 ? 's' : ''})</text>`;
+    ord.forEach((v, i) => { const b = Math.floor(i / B); s += `<rect x="${5 + i * cw}" y="${memY}" width="${cw - 1}" height="20" style="fill:var(${BLK[b % 3]});stroke:var(${b % 2 ? '--c2' : '--c1'})"/>` + (cw >= 17 ? `<text x="${5 + i * cw + cw / 2 - 0.5}" y="${memY + 14}" text-anchor="middle" style="font-size:9px">${i + 1}</text>` : ''); });
+    s += '</svg>';
+    $('vebSvg').innerHTML = s;
+    const here = avgBlocks(kind, h, B); if (!vebCurve) vebCurve = LAYS.map(([k]) => VEB_B.map((b) => avgBlocks(k, 16, b))); const i64 = VEB_B.indexOf(64);
+    $('vebR').innerHTML = `<span>${n} nodes, path length ${h}</span><span>average blocks touched per root-to-leaf search: <b>${here.toFixed(2)}</b></span><span>numbers in circles = position in memory${kind === 'vebBook' && h === 5 ? ' (matches the order in Fig 6-8)' : ''}</span><span>height-16 tree, blocks of 64 nodes: vEB <b>${vebCurve[0][i64].toFixed(2)}</b> · breadth-first <b>${vebCurve[1][i64].toFixed(2)}</b> · depth-first <b>${vebCurve[2][i64].toFixed(2)}</b> blocks per search</span>`;
+    xyChart('vebC', { xs: VEB_B, logx: true, series: LAYS.map(([, lab, col], i) => ({ y: vebCurve[i], col, label: lab, dots: true })), ymin: 0, xlab: 'block size (nodes)', ylab: 'avg blocks per search (height 16)' });
+  });
+  bindRange('vebH', dVeb); bindRange('vebB', dVeb); $('vebLay').addEventListener('change', dVeb);
+
+  const pa = {};
+  function paInit() { pa.r = rng(SEED + 71); pa.cap = 16; pa.s = new Array(16).fill(null); [120, 260, 410, 560, 700, 880].forEach((k, i) => { pa.s[1 + i * 2 + (i > 2 ? 1 : 0)] = k; }); pa.dense = pa.s.filter((x) => x != null); pa.moves = 0; pa.dmoves = 0; pa.ins = 0; pa.rebuilds = 0; pa.hit = -1; pa.moved = new Set(); pa.msg = 'Six keys spread out with gaps between them.'; }
+  function paInsert(k) {
+    pa.ins++; pa.moved = new Set(); const s = pa.s;
+    pa.dmoves += pa.dense.filter((x) => x > k).length; pa.dense.push(k); pa.dense.sort((a, b) => a - b);
+    let q = -1; for (let i = 0; i < s.length; i++) if (s[i] != null && s[i] < k) q = i;
+    let p = s.length; for (let i = q + 1; i < s.length; i++) if (s[i] != null) { p = i; break; }
+    let slot = -1; for (let i = q + 1; i < p; i++) if (s[i] == null) { slot = i; break; }
+    let moved = 0;
+    if (slot >= 0) { s[slot] = k; pa.hit = slot; pa.msg = `${k}: a gap was already waiting between its neighbours → 0 moves.`; }
+    else {
+      let rr = -1; for (let i = p; i < s.length; i++) if (s[i] == null) { rr = i; break; }
+      let ll = -1; for (let i = q; i >= 0; i--) if (s[i] == null) { ll = i; break; }
+      if (rr >= 0 && (ll < 0 || rr - p <= q - ll)) { for (let i = rr; i > p; i--) { s[i] = s[i - 1]; pa.moved.add(i); moved++; } s[p] = k; pa.hit = p; }
+      else { for (let i = ll; i < q; i++) { s[i] = s[i + 1]; pa.moved.add(i); moved++; } s[q] = k; pa.hit = q; }
+      pa.msg = `${k}: no gap between its neighbours → shifted ${moved} element${moved === 1 ? '' : 's'} to the nearest gap.`;
+    }
+    pa.moves += moved;
+    const n = s.filter((x) => x != null).length;
+    if (n / pa.cap > val('paDen') / 100) {
+      const items = s.filter((x) => x != null); pa.cap *= 2; pa.s = new Array(pa.cap).fill(null); const step = pa.cap / items.length;
+      items.forEach((x, i) => { pa.s[Math.floor(i * step + step / 2)] = x; }); pa.moves += items.length; pa.rebuilds++; pa.hit = -1; pa.moved = new Set();
+      pa.msg += ` Density passed ${val('paDen')}% → rebuilt into ${pa.cap} slots with even gaps (${items.length} relocations).`;
+    }
+  }
+  function drawPa() {
+    $('paView').innerHTML = `<div class="lvl">${pa.s.map((x, i) => (x == null ? cell('·', 'gap') : cell(x, i === pa.hit ? 'hit' : pa.moved.has(i) ? 'moved' : ''))).join('')}</div>`;
+    const n = pa.s.filter((x) => x != null).length;
+    $('paR').innerHTML = `<span>${pa.msg}</span><span>${n} keys in ${pa.cap} slots (density <b>${Math.round(n / pa.cap * 100)}%</b>)</span><span>relocations: packed <b>${pa.moves}</b> vs dense array <b>${pa.dmoves}</b> over ${pa.ins} inserts</span><span>rebuilds <b>${pa.rebuilds}</b></span>`;
+  }
+  const paAdd = (m) => { for (let i = 0; i < m; i++) { let k; do { k = 1 + Math.floor(pa.r() * 999); } while (pa.dense.includes(k)); paInsert(k); } drawPa(); };
+  $('paIns').addEventListener('click', () => paAdd(1));
+  $('paIns10').addEventListener('click', () => paAdd(10));
+  $('paReset').addEventListener('click', () => { paInit(); drawPa(); });
+  bindRange('paDen', () => {});
+
+  // =====================================================================
+  // ---------- global ----------
+  // =====================================================================
+  function resetAll() {
+    $('seedOut').textContent = SEED;
+    cowInit(); drawCow(); lmInit(); drawLm(); drawAbs(); wtInit(); drawWt(); laInit(); drawLa();
+    fc.gen = 0; fcNewArrays(); fcAll(); fdInit(); drawFd(); dcInit(); drawDc(); casI = 0; drawCas(); smoI = 0; drawSmo(); epI = 0; drawEp(); paInit(); drawPa();
+  }
+  $('reroll').addEventListener('click', () => { SEED = SEED * 7 % 997 + 3; resetAll(); redrawAll(); });
+  resetAll(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

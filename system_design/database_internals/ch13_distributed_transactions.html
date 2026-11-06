@@ -1,0 +1,1790 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.13 Distributed Transactions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* ---- chapter 13 additions ---- */
+.plate > * { min-width: 0; }
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.beyond { background: var(--paper); border: 1px dashed var(--c3); }
+.beyond > b { color: var(--c3); }
+.example { background: var(--paper); border: 1px solid var(--rule); }
+.papers li { font-size: 15px; }
+.svgbox { min-width: 0; }
+.svgbox svg { width: 100%; height: auto; display: block; }
+.seq { min-width: 0; overflow-x: auto; }
+.seq svg { width: 100%; min-width: 520px; height: auto; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; }
+.steptext { font-size: 16px; min-height: 3.2em; max-width: 68ch; }
+.stepbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.stepbar .count { color: var(--muted); }
+code { font-family: var(--mono); font-size: .9em; }
+pre.code { font-family: var(--mono); font-size: 13px; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; white-space: pre; }
+table.st td, table.st th { font-family: var(--mono); font-size: 13px; padding: 5px 8px; }
+table.st td.ok, span.ok { color: var(--buy); font-weight: 600; }
+table.st td.bad, span.bad { color: var(--sell); font-weight: 600; }
+table.st td.wait, span.wait { color: var(--c1); font-weight: 600; }
+table.st td.dim { color: var(--muted); }
+table.st tr.hot td { background: var(--tint); }
+table.st td.new { outline: 2px solid var(--c1); outline-offset: -2px; }
+.parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.part { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; background: var(--paper); font-family: var(--mono); font-size: 13px; display: grid; gap: 4px; }
+.part b { font-family: var(--display); font-size: 14px; }
+.part.active { border-color: var(--c1); background: var(--tint); }
+.part.passive { opacity: .8; }
+.part .msg { color: var(--c2); }
+.verdict { font-family: var(--mono); font-size: 14px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); }
+.verdict.good { border-color: var(--buy); color: var(--buy); }
+.verdict.bad { border-color: var(--sell); color: var(--sell); }
+.verdict.warn { border-color: var(--c1); color: var(--c1); }
+.foot { font-size: 14px; color: var(--muted); max-width: 68ch; }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch12_anti_entropy_and_dissemination.html">← Ch.12</a><a href="ch14_consensus.html">Ch.14 →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals (2019) · Chapter 13 · pdf p403–434</div>
+  <h1>Distributed transactions, <em>step by step</em></h1>
+  <p class="lede">How several machines agree to make a group of changes all-or-nothing: two-phase commit and where it gets stuck, three-phase commit and why it splits in two under a network partition, Calvin's "agree on the order first", Spanner's 2PC over Paxos groups with TrueTime, partitioning and consistent hashing, Percolator's snapshot isolation on Bigtable, and coordination avoidance with RAMP. Every protocol here has a step-through you can break on purpose (crash a node, cut the network) and watch what each node knows. Workloads, key sets and timings are <b>simulated</b>, and the cost numbers they produce are <b>modelled</b>, not measured on a real database. Anything that comes from outside the book sits in a dashed "Beyond the book" box or is marked "(not in the book)".</p>
+  <div class="topbar">
+    <button id="reroll" type="button">Roll a new workload</button>
+    <span class="readout">workload seed <b id="seedOut">1</b> · feeds the key sets, arrival times and replica orders below</span>
+  </div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Chapter 5 made one node's transactions safe. Chapters 8–12 spread data over many nodes. This chapter joins the two: a transaction that touches data on several nodes must still commit everywhere or nowhere. Petrov moves from the simplest protocol to the cleverer ones, and each step fixes a weakness of the one before it.</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Problem</span><span class="node">multi-partition transaction</span><span class="arr">needs</span><span class="node key">atomic commitment: everyone commits or no one does</span></div>
+    <div class="row"><span class="tag">Classic</span><span class="node">2PC: propose → commit/abort</span><span class="arr">blocks if coordinator dies</span><span class="node">3PC: propose → prepare → commit, + timeouts</span><span class="arr">splits under partition</span><span class="node key">consensus (Ch.14)</span></div>
+    <div class="row"><span class="tag">Modern</span><span class="node">Calvin: agree on order, then run deterministically</span><span class="node">Spanner: 2PC over Paxos groups + TrueTime</span></div>
+    <div class="row"><span class="tag">Placement</span><span class="node">range sharding</span><span class="arr">→</span><span class="node">hash mod N (moves most keys on resize)</span><span class="arr">→</span><span class="node key">consistent hashing (moves ≈ K/n)</span></div>
+    <div class="row"><span class="tag">Weaker but cheaper</span><span class="node">snapshot isolation → Percolator (client-driven 2PC on Bigtable)</span><span class="arr">→</span><span class="node key">coordination avoidance: I-confluence, RAMP</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Atomic across machines</a>
+    <a href="#s2"><span>02</span>Making operations appear atomic</a>
+    <a href="#s3"><span>03</span>Two-phase commit</a>
+    <a href="#s4"><span>04</span>Cohort failures in 2PC</a>
+    <a href="#s5"><span>05</span>Coordinator failures in 2PC</a>
+    <a href="#s6"><span>06</span>Three-phase commit</a>
+    <a href="#s7"><span>07</span>Coordinator failures in 3PC</a>
+    <a href="#s8"><span>08</span>Calvin</a>
+    <a href="#s9"><span>09</span>Spanner</a>
+    <a href="#s10"><span>10</span>Database partitioning</a>
+    <a href="#s11"><span>11</span>Consistent hashing</a>
+    <a href="#s12"><span>12</span>Snapshot isolation + Percolator</a>
+    <a href="#s13"><span>13</span>Coordination avoidance + RAMP</a>
+    <a href="#s14"><span>14</span>Summary + further reading</a>
+    <a href="#quiz"><span>??</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Atomic, even when the steps run on different machines</h2></div><span class="chip">pdf p403–404</span></div>
+  <p>To keep a distributed system in order we need some consistency guarantee. Chapter 11's consistency models talk about <b>one object and one operation</b> at a time. Databases usually need more: several operations that happen <b>atomically</b>, as one unit.</p>
+  <p>Petrov describes an atomic transaction as a <b>state transition</b>: the database is in state A before the transaction and in state B after it. A transaction carries no fixed state of its own; it applies operations to records starting at some moment. That gives the system freedom: transactions can be <b>reordered</b> and even <b>retried</b>.</p>
+  <p>The core job of transaction processing is to decide which <b>histories</b> are allowed, that is, to model which interleavings of transactions are acceptable. A history here is a <b>dependency graph</b>: which transactions ran before the current one. A history is <b>serializable</b> if it is equivalent to (has the same dependency graph as) some history that runs the transactions one after another. Chapter 5's "Serializability" section has the details; this chapter is the distributed counterpart of Chapter 5.</p>
+  <p>On a single partition, the pessimistic (lock-based or tracking) and optimistic (try, then validate) schemes from Chapter 5 are enough. Neither solves the <b>multipartition</b> case, which needs coordination between servers, a distributed commit and a distributed rollback.</p>
+  <p>Petrov's example is a money transfer: you want the credit to one account and the debit from the other to happen together. Look closer and even one debit isn't a single step: read the old balance, subtract, save. Each of those is several steps again (receive the request, parse it, find the data on disk, write, acknowledge). A simple write is hundreds of small steps. So the system must first <b>execute</b> the transaction and only then make its results <b>visible</b>.</p>
+  <ul class="plain">
+    <li><b>Transaction</b>: a set of operations forming one atomic unit of execution.</li>
+    <li><b>Atomicity</b>: all of its results become visible, or none do, even if it changed many rows or many tables.</li>
+    <li><b>Recoverable</b>: if it can't finish, is aborted or times out, its effects are rolled back completely, as if it had never been tried. A partially executed, non-recoverable transaction can leave the database inconsistent.</li>
+    <li><b>Across nodes</b>: nodes fail and recover independently, and the network can partition, yet their states must stay consistent. So atomicity covers remote operations too: changes reach <b>all</b> involved nodes durably, or <b>none</b> [LAMPSON79].</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Two bank branches in different cities. Moving ₹300 from Asha's account in Pune to Ravi's account in Delhi means Pune subtracts and Delhi adds. If Pune's clerk subtracts and then Delhi's line goes dead, ₹300 has vanished from the world. A distributed transaction protocol is the phone procedure both clerks follow so that this can't happen: nobody writes the change in ink until both have said "I can do it", and both then do it.</p></div>
+  <div class="fig">
+    <h3>Try it: one transfer, two partitions, one crash</h3>
+    <div class="controls">
+      <label for="sel1m">Protocol <select id="sel1m"><option value="none">none: each node applies on its own</option><option value="atomic">atomic commitment (2PC-style)</option></select></label>
+      <label for="sel1c">Crash <select id="sel1c"><option value="none">no crash</option><option value="mid">Delhi node crashes before applying</option><option value="late">Delhi node crashes after it voted yes</option></select></label>
+    </div>
+    <div class="parts" id="st1"></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Without a protocol, each node commits its own half the moment it finishes, so a crash in between leaves the system in a state that no serial history could produce (money destroyed). With atomic commitment, a node first makes its half <b>durable but invisible</b>, says so, and only flips it to visible when it learns that every other node did the same. A crash then leads to "both" or "neither": either the transaction aborts everywhere, or the crashed node finishes its half from its log when it comes back. The invariant (total money) never shows a broken value to readers.</p></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[LAMPSON79]</b> Lampson, Butler W., and Howard E. (Sturgis), "Crash Recovery in a Distributed Data Storage System", 1979 (Microsoft Research archive). One of the first precise treatments of making updates on several machines atomic in the face of crashes; it introduced stable storage and a two-phase-style commit. Worth reading for the clean failure model.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_transaction_processing_and_recovery.html">Ch.5</a> (pdf p141–189): serializability, 2PL, OCC, MVCC, snapshot isolation, write skew. This chapter reuses all of them across machines.</li>
+    <li><a href="ch11_replication_and_consistency.html">Ch.11</a> (pdf p340–380): single-object consistency models (linearizability etc.), which this chapter extends to multi-object transactions.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · MAKING OPERATIONS APPEAR ATOMIC</div><h2>Atomic commitment: a unanimous yes, or nothing</h2></div><span class="chip">pdf p405–406, p434 fn 1</span></div>
+  <p>To make several operations (some remote) look atomic we need a class of algorithms called <b>atomic commitment</b>. The rules:</p>
+  <ul class="plain">
+    <li><b>No disagreement.</b> The transaction commits only if <b>every</b> participant votes for it; one "no" is enough to abort.</li>
+    <li><b>Failed processes must reach the same conclusion</b> as the rest of the cohort when they come back.</li>
+    <li><b>No Byzantine tolerance.</b> If a process lies about its state or decides arbitrarily, unanimity means nothing, so atomic commitment does not work with Byzantine failures [HADZILACOS05].</li>
+    <li><b>Participants only vote.</b> They can't choose, influence or change the proposed transaction or propose another; they can only say whether they are willing to execute it [ROBINSON08].</li>
+  </ul>
+  <p>Atomic commitment says nothing strict about what <i>prepare</i>, <i>commit</i> and <i>rollback</i> mean inside each node. Implementers decide:</p>
+  <ul class="plain">
+    <li>when data counts as <b>ready to commit</b>, i.e. a pointer swap away from becoming public;</li>
+    <li>how to do the <b>commit</b> itself so results become visible as fast as possible;</li>
+    <li>how to <b>roll back</b> if the algorithm decides not to commit.</li>
+  </ul>
+  <p>(Chapter 5 covered the node-local versions of these.) Users include <b>MySQL</b> (distributed transactions) and <b>Kafka</b> (producer and consumer interaction [MEHTA17]).</p>
+  <p>In a database the <b>transaction manager</b> runs distributed transactions: it schedules, coordinates, executes and tracks them. In a distributed setting it makes sure each node's local visibility matches what the distributed atomic operation prescribes: the transaction commits in all partitions and on all replicas.</p>
+  <p>The chapter covers two algorithms: <b>two-phase commit</b>, which solves the commitment problem but can't survive a failed coordinator, and <b>three-phase commit</b> [SKEEN83], which solves <b>non-blocking</b> atomic commitment and lets participants proceed even if the coordinator fails [BABAOGLU93]. Footnote 1 adds the fine print: the non-blocking guarantee assumes a highly reliable network, meaning one without partitions [ALHOUMAILY10].</p>
+  <div class="box picture"><b>Picture it</b><p>A jury that may only answer "guilty as charged" or "not". Jurors can't rewrite the charge, and one dissent means no verdict. That works only if every juror is honest: a juror who says "yes" in the room and "no" outside breaks the whole idea, which is why atomic commitment can't tolerate liars.</p></div>
+  <div class="fig">
+    <h3>Try it: set each cohort's vote</h3>
+    <div class="controls">
+      <label for="v2a">Cohort 1 <select id="v2a"><option value="yes">votes yes</option><option value="no">votes no</option><option value="down">is down</option><option value="liar">lies (Byzantine)</option></select></label>
+      <label for="v2b">Cohort 2 <select id="v2b"><option value="yes">votes yes</option><option value="no">votes no</option><option value="down">is down</option><option value="liar">lies (Byzantine)</option></select></label>
+      <label for="v2c">Cohort 3 <select id="v2c"><option value="yes">votes yes</option><option value="no">votes no</option><option value="down">is down</option><option value="liar">lies (Byzantine)</option></select></label>
+      <label for="v2d">Cohort 4 <select id="v2d"><option value="yes">votes yes</option><option value="no">votes no</option><option value="down">is down</option><option value="liar">lies (Byzantine)</option></select></label>
+    </div>
+    <div class="parts" id="st2"></div>
+    <div class="verdict" id="r2"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The decision function is a plain AND over the votes, and a missing vote counts as "no" after a timeout. That makes the outcome easy to reason about but gives every participant a veto, including a crashed one. A liar breaks it from the inside: it votes yes, the coordinator commits, and the liar then does something else, so the "everyone did the same thing" promise is false and nobody can tell. Contrast with <b>consensus</b> (Chapter 14), where participants agree on a <i>value</i> and only a majority has to be alive.</p></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Atomic commitment (2PC, 3PC)</th><th>Consensus (Paxos, Raft; Ch.14)</th></tr></thead>
+    <tbody>
+      <tr><td>What is decided</td><td>commit or abort a <b>given</b> proposal</td><td>which value is chosen (participants may propose)</td></tr>
+      <tr><td>Who must agree</td><td>everyone (unanimous)</td><td>a majority (quorum)</td></tr>
+      <tr><td>One node down</td><td>abort (before vote) or wait (after vote)</td><td>keeps going while a majority is up</td></tr>
+      <tr><td>Liars</td><td>not tolerated</td><td>not tolerated by Paxos/Raft either (needs BFT protocols) <i>(not in the book)</i></td></tr>
+    </tbody>
+  </table></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[HADZILACOS05]</b> Hadzilacos, Vassos, "On the relationship between the atomic commitment and consensus problems", in <i>Fault-Tolerant Distributed Computing</i>, 201–208, 2005. Shows how the two problems differ (veto power vs majority) and how one reduces to the other. Read it to stop confusing 2PC with consensus.</li>
+    <li><b>[ROBINSON08]</b> Robinson, Henry, "Consensus Protocols: Two-Phase Commit", The Paper Trail (blog), 2008. A short, very clear walk through 2PC and its failure cases.</li>
+    <li><b>[MEHTA17]</b> Mehta, Apurva and Jason Gustafson, "Transactions in Apache Kafka", Confluent blog, 2017. How Kafka's transaction coordinator commits writes to many partitions atomically.</li>
+    <li><b>[SKEEN83]</b> Skeen, Dale and M. Stonebraker, "A Formal Model of Crash Recovery in a Distributed System", <i>IEEE Transactions on Software Engineering</i> 9(3): 219–228, 1983. The origin of three-phase commit and of the "blocking" analysis.</li>
+    <li><b>[BABAOGLU93]</b> Babaoglu, Ozalp and Sam Toueg, "Understanding Non-Blocking Atomic Commitment", technical report, University of Bologna, 1993. Defines non-blocking atomic commitment precisely and what it costs.</li>
+    <li><b>[ALHOUMAILY10]</b> Al-Houmaily, Yousef J., "Atomic commit protocols, their integration, and their optimisations in distributed database systems", <i>Int. J. of Intelligent Information and Database Systems</i> 4(4): 373–412, 2010. A survey of 2PC variants (presumed abort/commit, etc.) and 3PC's assumptions.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: failure models (crash-stop, crash-recovery, Byzantine). Atomic commitment assumes non-Byzantine processes.</li>
+    <li><a href="ch14_consensus.html">Ch.14 Consensus</a>: the majority-based alternative the summary (section 14) points to.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · TWO-PHASE COMMIT</div><h2>2PC: collect votes, then flip the switch</h2></div><span class="chip">pdf p407–409 · Fig 13-1</span></div>
+  <p>2PC is the most direct protocol for multipartition atomic updates and is usually discussed for database transactions. Phase one distributes the value to decide on and collects votes. Phase two just flips the switch: it makes the result of phase one visible.</p>
+  <ul class="plain">
+    <li><b>Coordinator (leader)</b>: holds the state, collects votes, and is the reference point for the round.</li>
+    <li><b>Cohorts</b>: all other nodes. Usually partitions working on <b>disjoint</b> datasets that the transaction touches.</li>
+    <li>The coordinator and <b>every</b> cohort keep a <b>local operation log</b> of each step.</li>
+    <li>What is voted on is usually the <b>identifier</b> of the distributed transaction, but 2PC works in other settings too.</li>
+    <li>Who coordinates is not fixed by the protocol: the node that received the request, a randomly picked node, one chosen by leader election, a manually assigned one, or one fixed for the system's lifetime. The role can move to another participant for reliability or performance.</li>
+  </ul>
+  <p><b>Prepare.</b> The coordinator sends a <code>Propose</code> message about the new transaction. Each cohort decides whether it can commit its own part. Yes → a positive vote; otherwise it asks the coordinator to abort. All cohort decisions are persisted in the coordinator's log, and each cohort keeps a copy of its own decision locally. A cohort may refuse, for example, if a conflicting transaction already committed a different value.</p>
+  <p><b>Commit/abort.</b> If even one cohort voted to abort, the coordinator sends <code>Abort</code> to all. Only if <b>all</b> voted yes does it send <code>Commit</code>. One rejection aborts the whole round.</p>
+  <p>At every step, coordinator and cohorts write the result to <b>durable storage</b>, so they can rebuild state after a local failure and forward or replay results for other participants. In databases, one 2PC round usually handles one transaction. During prepare, the transaction's contents (operations, identifiers, metadata) go from the coordinator to the cohorts, which execute it locally and leave it <b>partially committed</b> (also called <b>precommitted</b>), ready to be finalized. So by the time the transaction commits, its contents are already durable on every node [BERNSTEIN09].</p>
+  <div class="box picture"><b>Picture it</b><p>A wedding officiant (coordinator) asks each partner "do you?" (Propose). Each answers, and once one says "I do" they can't take it back (the promise). Only after hearing two "I do"s does the officiant pronounce them married (Commit). If either says no, there's no wedding (Abort) and nobody is half-married.</p></div>
+  <div class="fig">
+    <h3>Step through 2PC (Figure 13-1, rebuilt)</h3>
+    <div class="controls">
+      <label for="n3">Cohorts <input id="n3" type="range" min="2" max="5" value="3"><output id="n3o">3</output></label>
+      <label for="sel3">Votes <select id="sel3"><option value="yes">everyone votes yes</option><option value="no">cohort 2 votes no</option></select></label>
+    </div>
+    <div class="stepbar"><button id="b3prev" type="button">◀ back</button><button id="b3next" type="button">next ▶</button><button id="b3reset" type="button">reset</button><span class="count" id="c3n"></span></div>
+    <p class="steptext" id="txt3"></p>
+    <div class="seq" id="d3"></div>
+    <div class="tablewrap" id="tbl3"></div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The trick is the <b>prepared</b> state. Before voting yes, a cohort does all the work that could fail (take locks, check constraints, write the changes and a "prepared" record to its log and force it to disk). After that, committing can't fail: it's a pointer swap plus a log record. So the coordinator's decision really is the only thing left, and a "yes" is a promise the cohort can keep even across a crash, because the promise is on disk. The coordinator's decision record is the <b>commit point</b> of the whole distributed transaction: once it's durable, the outcome is fixed.</p></div>
+  <div class="box example"><b>Worked example: counting a 2PC round</b>
+    <p>Three cohorts, all vote yes. Messages: 3 <code>Propose</code> + 3 votes + 3 <code>Commit</code> + 3 acks = <b>12</b>, i.e. 4N. Network round trips on the critical path: <b>2</b> (propose/vote, commit/ack). Forced log writes in the simplest (presumed-nothing) form <i>(counting convention not in the book)</i>: each cohort forces "prepared" and "committed" (2 × 3 = 6) and the coordinator forces its decision (1) = <b>7</b>, i.e. 2N + 1. The client can be told "committed" as soon as the coordinator's decision is durable, which is after one round trip plus two fsyncs (the cohort's prepare and the coordinator's decision) on the critical path.</p></div>
+  <h3>How to build it (core logic, TypeScript-style)</h3>
+<pre class="code">// coordinator: one round per transaction id
+async function twoPhaseCommit(txId: string, cohorts: Cohort[], log: Log) {
+  log.force({ txId, type: 'begin', cohorts: cohorts.map(c =&gt; c.id) });
+  const votes = await Promise.all(cohorts.map(c =&gt;
+    c.propose(txId).catch(() =&gt; 'no')));          // timeout or crash counts as "no"
+  const decision = votes.every(v =&gt; v === 'yes') ? 'commit' : 'abort';
+  log.force({ txId, type: decision });            // &lt;- commit point
+  await Promise.all(cohorts.map(c =&gt; retryForever(() =&gt; c.decide(txId, decision))));
+  log.append({ txId, type: 'end' });              // lets the coordinator forget txId
+  return decision;
+}
+
+// cohort
+function onPropose(txId: string): 'yes' | 'no' {
+  if (!executeLocally(txId)) { log.force({ txId, type: 'abort' }); return 'no'; }
+  log.force({ txId, type: 'prepared' });         // the promise, now durable
+  return 'yes';                                   // from here on: may not abort alone
+}
+function onDecide(txId: string, d: 'commit' | 'abort') {
+  log.force({ txId, type: d });
+  d === 'commit' ? makeVisible(txId) : rollback(txId);
+  releaseLocks(txId);
+}</pre>
+  <div class="box beyond"><b>Beyond the book: 2PC in real systems</b><ul>
+    <li><b>PostgreSQL</b> exposes the cohort side as SQL: <code>PREPARE TRANSACTION 'id'</code>, then <code>COMMIT PREPARED 'id'</code> or <code>ROLLBACK PREPARED 'id'</code>. It's off by default (<code>max_prepared_transactions = 0</code>), and a prepared transaction keeps its locks until someone resolves it, which is exactly the blocking problem of section 5. (postgresql.org/docs, "PREPARE TRANSACTION")</li>
+    <li><b>MySQL/InnoDB</b> supports XA: <code>XA START</code>, <code>XA END</code>, <code>XA PREPARE</code>, <code>XA COMMIT</code>. MySQL also runs an internal 2PC between the binary log and InnoDB so both agree after a crash. (dev.mysql.com, "XA Transactions")</li>
+    <li><b>Kafka</b> transactions: a transaction coordinator logs the transaction's state in an internal topic, then writes commit or abort markers into every partition the producer wrote to; consumers in read-committed mode skip aborted data. That's 2PC with the coordinator's log as the decision record [MEHTA17].</li>
+    <li><b>Sagas</b> (Garcia-Molina &amp; Salem, SIGMOD 1987) are the common microservice alternative: no prepare phase, each step commits locally and a failure runs compensating steps. You give up isolation (others see intermediate states) to avoid holding locks across services.</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[BERNSTEIN09]</b> Bernstein, Philip A. and Eric Newcomer, <i>Principles of Transaction Processing</i>, Morgan Kaufmann, 2009. Chapter on two-phase commit covers the prepared state, logging rules and the presumed-abort/commit optimisations. The practical reference for anyone implementing 2PC.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_transaction_processing_and_recovery.html">Ch.5</a>: the WAL and "force the log before you promise" are exactly the local tools 2PC's prepared state is built from.</li>
+    <li>My syllabus (<code>Notes/syllabus.html</code>, section 2C) lists sagas and CAP/PACELC under "Master"; 2PC vs sagas is the trade-off behind that line.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · COHORT FAILURES IN 2PC</div><h2>A cohort fails: abort if it hadn't voted, wait if it had</h2></div><span class="chip">pdf p410–411 · Fig 13-2</span></div>
+  <p><b>Fails during propose</b> (Figure 13-2). The coordinator needs every vote positive, so if one cohort is unavailable it <b>aborts</b> the transaction. That hurts <b>availability</b>: one failed node can stop transactions from happening. Some systems, Spanner for example (section 9), run 2PC over <b>Paxos groups</b> instead of single nodes to make the protocol more available.</p>
+  <p>The central idea of 2PC is the cohort's <b>promise</b>: once it answers yes, it won't go back on that, so only the coordinator can abort.</p>
+  <p><b>Fails after voting yes.</b> When it recovers, the cohort must learn the actual outcome before serving values correctly, because the coordinator may have aborted due to other cohorts' votes. It catches up with the coordinator's final decision, usually because the coordinator persists a decision log and replicates decision values to failed participants. Until then the cohort can't serve requests: it's in an inconsistent state.</p>
+  <p><b>Lost messages.</b> There are several places where a process waits for others (the coordinator collecting votes, a cohort waiting for commit/abort). A link failure can lose a message and the wait would last forever. If the coordinator gets no reply during propose, it can <b>time out and abort</b>.</p>
+  <div class="box picture"><b>Picture it</b><p>A group dinner booking needs all five friends to confirm. If one doesn't answer the group chat before the deadline, the booking is cancelled (abort before the vote). If a friend said "I'm in" and then their phone died, when it comes back they can't just assume the dinner is on: they must check the group chat to see whether someone else cancelled.</p></div>
+  <div class="fig">
+    <h3>Step through a cohort failure</h3>
+    <div class="controls"><label for="sel4">Scenario <select id="sel4"><option value="before">cohort 3 crashes before voting (Fig 13-2)</option><option value="after">cohort 3 crashes after voting yes</option></select></label></div>
+    <div class="stepbar"><button id="b4prev" type="button">◀ back</button><button id="b4next" type="button">next ▶</button><button id="b4reset" type="button">reset</button><span class="count" id="c4n"></span></div>
+    <p class="steptext" id="txt4"></p>
+    <div class="seq" id="d4"></div>
+    <div class="tablewrap" id="tbl4"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The two cases differ by one durable record. With no "prepared" record in its log, a recovering cohort knows it never promised anything, so it can roll its part back on its own (the coordinator must have aborted, since a vote was missing). With a "prepared" record, it promised, and only the coordinator's decision tells it which way to go; it must keep the transaction's locks and refuse to serve those rows until it asks.</p></div>
+  <div class="fig">
+    <h3>Measured numbers (modelled): how likely is "everyone is up"?</h3>
+    <p>2PC needs all N cohorts. If each is a single node that is up with probability <i>p</i> (independently), a transaction touching N shards can commit with probability p<sup>N</sup>. Make each cohort a Paxos group of <i>r</i> replicas that needs only a majority, and a cohort is up with probability P(majority of r up). Independence and the uptime values are assumptions, not data.</p>
+    <div class="controls">
+      <label for="p4">Node uptime <input id="p4" type="range" min="9000" max="9999" value="9900"><output id="p4o">9900</output></label>
+      <label for="g4">Replicas per group <select id="g4"><option value="3">3 (tolerates 1 down)</option><option value="5">5 (tolerates 2 down)</option></select></label>
+    </div>
+    <canvas id="c4" class="short" aria-label="Probability that all cohorts are available versus number of shards"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="readout" id="r4"></div>
+  </div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch09_failure_detection.html">Ch.9 Failure Detection</a>: the coordinator's timeout is a failure detector, with the same trade-off between fast detection and false suspicion.</li>
+    <li>Section 9 (Spanner) uses the Paxos-group trick that the chart above models.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · COORDINATOR FAILURES IN 2PC</div><h2>The coordinator fails: sometimes peers know, sometimes nobody does</h2></div><span class="chip">pdf p412–413, p434 fn 2 · Fig 13-3, 13-4</span></div>
+  <p><b>Decision made, not delivered</b> (Figure 13-3). If a cohort gets no commit or abort in phase two, it should find out what the coordinator decided. The coordinator may have decided but failed to tell this replica. The decision can then be copied from <b>peers' transaction logs</b> or from a <b>backup coordinator</b>. Copying a commit decision is safe because decisions are unanimous: commit on one cohort means every cohort must commit.</p>
+  <p><b>Decision never sent</b> (Figure 13-4). In phase one the coordinator collects votes, which are also promises to wait for its explicit commit or abort. If it fails after collecting votes but before broadcasting the result, the cohorts are <b>uncertain</b>: they don't know what it decided, or whether any participant (perhaps one that is also unreachable) was told [BERNSTEIN87]. The cluster is undecided, and with a permanent coordinator failure the cohorts can never learn the outcome. That is why 2PC is called a <b>blocking</b> atomic commitment algorithm. If the coordinator never recovers, its replacement must <b>collect the votes again</b> for that transaction and then decide.</p>
+  <p>Many databases use 2PC: MySQL, PostgreSQL, MongoDB and others. (Footnote 2: MongoDB's documentation says that as of v3.6 its 2PC gives only transaction-like semantics.) It's popular because it is <b>simple</b> (easy to reason about, implement and debug) and <b>cheap</b> (few messages and round trips). Good recovery mechanisms and <b>backup coordinators</b> reduce the chance of the failures above.</p>
+  <div class="box picture"><b>Picture it</b><p>A referee collects sealed votes, walks out of the room, and collapses in the corridor. If he had already told one player the result, the others can ask that player. If he told no one, the players sit there holding their promises: none of them may leave (release locks), and none may guess, because the referee might have written "commit" in his notebook and might have shouted it to someone in the corridor before collapsing.</p></div>
+  <div class="fig">
+    <h3>Step through a coordinator failure</h3>
+    <div class="controls"><label for="sel5">Scenario <select id="sel5"><option value="partial">crashes after telling cohort 1 only (Fig 13-3)</option><option value="before">crashes before telling anyone (Fig 13-4)</option></select></label></div>
+    <div class="stepbar"><button id="b5prev" type="button">◀ back</button><button id="b5next" type="button">next ▶</button><button id="b5reset" type="button">reset</button><span class="count" id="c5n"></span></div>
+    <p class="steptext" id="txt5"></p>
+    <div class="seq" id="d5"></div>
+    <div class="tablewrap" id="tbl5"></div>
+  </div>
+  <div class="fig">
+    <h3>Try it: can an in-doubt cohort decide by asking its peers?</h3>
+    <p>You are a cohort that voted yes and then heard nothing. You can reach your three peers. Set what each one tells you. <i>(The full decision rule, often called the cooperative termination protocol, is standard textbook material, e.g. [BERNSTEIN87], not spelled out in this chapter.)</i></p>
+    <div class="controls">
+      <label for="t5a">Peer A <select id="t5a"><option value="prepared">prepared, don't know</option><option value="committed">committed</option><option value="aborted">aborted</option><option value="novote">never voted yes</option><option value="down">unreachable</option></select></label>
+      <label for="t5b">Peer B <select id="t5b"><option value="prepared">prepared, don't know</option><option value="committed">committed</option><option value="aborted">aborted</option><option value="novote">never voted yes</option><option value="down">unreachable</option></select></label>
+      <label for="t5c">Peer C <select id="t5c"><option value="prepared">prepared, don't know</option><option value="committed">committed</option><option value="aborted">aborted</option><option value="novote">never voted yes</option><option value="down">unreachable</option></select></label>
+    </div>
+    <div class="verdict" id="r5"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>An in-doubt cohort can safely decide only if some reachable peer holds proof: "committed" proves the coordinator decided commit; "aborted" or "never voted yes" proves the decision can't have been commit. If every reachable peer is itself prepared-and-in-doubt, the only node that might know is the dead coordinator (or an unreachable peer it told), so any guess could contradict a decision already acted on. The cohort must keep its locks and wait. That is the blocking window, and its length is the coordinator's recovery time.</p></div>
+  <div class="fig">
+    <h3>Measured numbers (modelled): what a blocked coordinator costs</h3>
+    <p>While cohorts are in doubt they hold the transaction's locks. Every other transaction that needs those rows waits too.</p>
+    <div class="controls">
+      <label for="h5">Coordinator down (s) <input id="h5" type="range" min="1" max="600" value="30"><output id="h5o">30</output></label>
+      <label for="q5">Txns/s hitting those rows <input id="q5" type="range" min="1" max="500" value="50"><output id="q5o">50</output></label>
+    </div>
+    <div class="readout" id="r5b"></div>
+  </div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[BERNSTEIN87]</b> Bernstein, Philip A., Vassos Hadzilacos and Nathan Goodman, <i>Concurrency Control and Recovery in Database Systems</i>, Addison-Wesley, 1987. Chapter 7 analyses 2PC's uncertainty period and proves that any atomic commitment protocol can block under some failures. Free online from Microsoft Research; the classic text.</li>
+  </ul></details>
+  <div class="box beyond"><b>Beyond the book: the standard fixes</b><ul>
+    <li><b>Replicate the coordinator's log.</b> If the decision record is written through consensus (a Paxos/Raft group), a new coordinator can read it: no blocking as long as a majority survives. Gray &amp; Lamport's <i>Paxos Commit</i> [GRAY04] does this and notes that with no fault tolerance (F = 0) it reduces to classic 2PC. Spanner (section 9) and CockroachDB work this way.</li>
+    <li><b>Presumed abort.</b> If the coordinator keeps no record of a transaction, the answer to "what happened?" is "abort". This saves log writes and messages for read-only and aborted transactions; [ALHOUMAILY10] surveys it and its sibling, presumed commit.</li>
+    <li><b>Operations.</b> In PostgreSQL, a forgotten prepared transaction shows up in <code>pg_prepared_xacts</code>, holding locks and blocking VACUUM from cleaning old rows until someone commits or rolls it back by hand.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch10_leader_election.html">Ch.10 Leader Election</a>: electing a backup coordinator is a leader-election problem.</li>
+    <li>Section 7: 3PC is the textbook attempt to remove this blocking window.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · THREE-PHASE COMMIT</div><h2>3PC: add a "get ready" round and timeouts on both sides</h2></div><span class="chip">pdf p414–415 · Fig 13-5</span></div>
+  <p>To make atomic commitment robust against coordinator failure and avoid undecided states, <b>three-phase commit (3PC)</b> adds one extra step plus <b>timeouts on both sides</b>, so cohorts can go on to commit or abort if the coordinator fails, depending on how far the protocol got. 3PC assumes a <b>synchronous</b> model and that <b>communication failures can't happen</b> [BABAOGLU93].</p>
+  <p>The new <b>prepare</b> step sits before commit/abort. It tells cohorts the vote result the coordinator gathered during propose, so the protocol can continue even if the coordinator dies. Everything else (including needing a coordinator for the round) is like 2PC. The cohort-side timeout forces a decision, and <b>which</b> decision depends on the step the cohort is in.</p>
+  <ul class="plain">
+    <li><b>Propose</b>: the coordinator sends the proposed value and collects votes. If the coordinator crashes here and the operation times out, or a cohort votes no, the transaction <b>aborts</b>.</li>
+    <li><b>Prepare</b>: the coordinator announces the vote result. If all voted to commit, it sends <code>Prepare</code> ("get ready to commit"); otherwise <code>Abort</code>, and the round ends. If it can't deliver every Prepare or doesn't get every acknowledgment, cohorts may <b>abort after a timeout</b>, since the protocol never reached the prepared state everywhere.</li>
+    <li>Once <b>all</b> cohorts are prepared and the coordinator has all their acks, the transaction <b>will commit even if either side fails</b>: everyone now has the same view of the state.</li>
+    <li><b>Commit</b>: the coordinator tells everyone the result of the prepare phase, which resets their timeout counters and finishes the transaction.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A rocket launch. "Go / no-go poll" is propose. "All stations, we are go: arm the systems" is prepare. "Launch" is commit. If mission control goes silent during the poll, everyone stands down. If it goes silent after every station has confirmed "armed", every station knows every other station is armed too, so the countdown finishes on its own.</p></div>
+  <div class="fig">
+    <h3>Step through 3PC (Figure 13-5, rebuilt)</h3>
+    <div class="controls"><label for="sel6">Scenario <select id="sel6"><option value="happy">no failure</option><option value="crashPropose">coordinator crashes during propose</option><option value="crashPrepared">coordinator crashes after all prepare acks</option></select></label></div>
+    <div class="stepbar"><button id="b6prev" type="button">◀ back</button><button id="b6next" type="button">next ▶</button><button id="b6reset" type="button">reset</button><span class="count" id="c6n"></span></div>
+    <p class="steptext" id="txt6"></p>
+    <div class="seq" id="d6"></div>
+    <div class="tablewrap" id="tbl6"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>2PC blocks because a cohort in the prepared state can't tell "nobody committed yet" from "someone already committed". 3PC adds a state between them so that two facts hold: (1) no cohort commits until <b>every</b> cohort is prepared, and (2) no cohort is ever "voted yes" while another has already committed. Then a cohort's own state is enough to pick a safe timeout action: still in "voted" → nobody can have committed → abort; in "prepared" → everyone voted yes → commit. The price is one more round trip, and the proof leans on timeouts meaning "the other side is dead", which is only true in a synchronous network.</p></div>
+<pre class="code">// 3PC cohort timeout rule (the book's description)
+function onTimeout(tx: Tx) {
+  switch (tx.state) {
+    case 'voted':    return abort(tx);   // never reached prepared: nobody can have committed
+    case 'prepared': return commit(tx);  // everyone voted yes and knows it
+    default:         return;             // already committed or aborted
+  }
+}</pre>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: synchronous vs asynchronous system models and the FLP result explain why "timeout = dead" is an assumption, not a fact.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · COORDINATOR FAILURES IN 3PC</div><h2>Non-blocking, until the network splits</h2></div><span class="chip">pdf p416 · Fig 13-6</span></div>
+  <p>Every state change is coordinated: cohorts can't move to the next phase until everyone has finished the previous one, and the coordinator has to wait for the replicas. Cohorts that hear nothing before the timeout can abort, as long as they hadn't moved past the prepare phase.</p>
+  <p>2PC can't recover from coordinator failure, and cohorts may be stuck in a non-deterministic state until it returns. 3PC avoids that block and lets cohorts reach a <b>deterministic</b> decision.</p>
+  <p>Its worst case is a <b>network partition</b> (Figure 13-6). Some nodes reach the prepared state and will commit after the timeout. Others can't reach the coordinator and will abort after the timeout. The result is <b>split brain</b>: some commit, some abort, each following the protocol, leaving the participants inconsistent and contradicting each other.</p>
+  <p>So 3PC solves 2PC's blocking only partly, sends more messages, can produce contradictions and handles partitions badly. Petrov suggests this is probably the main reason it is rarely used in practice.</p>
+  <div class="box picture"><b>Picture it</b><p>Mission control sends "arm" and the radio link to two of the four stations is cut mid-sentence. The two that heard "arm" count down and launch on timeout. The two that didn't hear it stand down on timeout. Each did exactly what the manual says, and the rocket leaves with half its boosters.</p></div>
+  <div class="fig">
+    <h3>Try it: which cohorts got Prepare before the partition?</h3>
+    <div class="controls">
+      <label for="k7a"><input id="k7a" type="checkbox" checked> cohort 1</label>
+      <label for="k7b"><input id="k7b" type="checkbox"> cohort 2</label>
+      <label for="k7c"><input id="k7c" type="checkbox"> cohort 3</label>
+      <label for="k7d"><input id="k7d" type="checkbox"> cohort 4</label>
+    </div>
+    <div class="seq" id="d7"></div>
+    <div class="verdict" id="r7"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The timeout rule turns "I heard nothing" into "the others must be in my state". In a partition that's false: a cohort that heard Prepare assumes everyone is prepared, and a cohort that didn't assumes nobody is. The full protocol in [SKEEN83] adds a termination step where surviving cohorts compare states, but cohorts on opposite sides of a partition can't compare. No timeout-based rule can tell a slow node from a dead one in an asynchronous network, which is why real systems moved to majority-based consensus (Chapter 14): a minority side simply can't decide anything.</p></div>
+  <div class="fig">
+    <h3>Measured numbers (modelled): cost of 2PC vs 3PC</h3>
+    <p>Counting from Figures 13-1 and 13-5: each phase is one broadcast and one reply per cohort. Latency = phases × round trip + forced log writes on the critical path. One-way latency and fsync time are your inputs; the forced-write counts follow the simplest logging scheme <i>(not in the book)</i>.</p>
+    <div class="controls">
+      <label for="n7">Cohorts <input id="n7" type="range" min="2" max="20" value="4"><output id="n7o">4</output></label>
+      <label for="l7">One-way latency (ms) <input id="l7" type="range" min="1" max="80" value="5"><output id="l7o">5</output></label>
+      <label for="f7">fsync (ms) <input id="f7" type="range" min="0" max="10" value="1"><output id="f7o">1</output></label>
+    </div>
+    <div class="tablewrap" id="tb7"></div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>2PC</th><th>3PC</th></tr></thead>
+    <tbody>
+      <tr><td>Phases</td><td>propose, commit/abort</td><td>propose, prepare, commit/abort</td></tr>
+      <tr><td>Coordinator dies after votes</td><td>cohorts block until it (or a replacement that re-collects votes) returns</td><td>cohorts decide by timeout (abort if not prepared, commit if prepared)</td></tr>
+      <tr><td>Network partition</td><td>blocks, stays consistent</td><td>may split brain: inconsistent</td></tr>
+      <tr><td>Model assumed</td><td>asynchronous is fine (safety never depends on timing)</td><td>synchronous, no communication failures</td></tr>
+      <tr><td>Messages / round trips</td><td>4N / 2</td><td>6N / 3</td></tr>
+      <tr><td>Used in practice</td><td>widely (MySQL, PostgreSQL, MongoDB, Kafka, Spanner over Paxos)</td><td>rarely</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch11_replication_and_consistency.html">Ch.11</a>: CAP. 3PC picks availability (decide on timeout) and loses consistency under partition; 2PC picks consistency and loses availability.</li>
+    <li><a href="ch14_consensus.html">Ch.14</a>: Paxos and Raft decide with a majority, so the minority side of a partition waits instead of contradicting the majority.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · DISTRIBUTED TRANSACTIONS WITH CALVIN</div><h2>Calvin: agree on the order first, then everyone runs the same script</h2></div><span class="chip">pdf p417–419 · Fig 13-7</span></div>
+  <p>Another way to cut contention and shorten how long transactions hold locks: let replicas <b>agree on the execution order and the transaction boundaries before taking any locks</b>. If that works, a node failure no longer aborts transactions, because the other participants run the same transaction in parallel and the failed node can recover state from them.</p>
+  <p>Traditional systems use two-phase locking or optimistic concurrency control, which have <b>no deterministic order</b>, so nodes must coordinate to keep order. A <b>deterministic</b> order removes coordination from the execution phase: every replica gets the same inputs, so every replica produces the same outputs. This approach is known as <b>Calvin</b> [THOMSON12]; <b>FaunaDB</b> is a prominent implementation.</p>
+  <ul class="plain">
+    <li><b>Sequencer</b>: the entry point for all transactions. It fixes the order and builds a global <b>transaction input sequence</b>. Time is cut into <b>epochs</b>: the sequencer groups transactions into short windows (the paper uses <b>10 ms</b> batches), and each batch is also the unit of replication, so transactions aren't shipped one by one.</li>
+    <li>Once a batch is replicated, the sequencer passes it to the <b>scheduler</b>, which runs parts of transactions in parallel while keeping the serial order the sequencer chose. Applying a transaction to a given state can only produce that transaction's changes, and the order is fixed, so replicas don't need to talk to the sequencer again.</li>
+    <li>Each transaction has a <b>read set</b> (the records it depends on) and a <b>write set</b> (its effects). Calvin does not natively support transactions that need extra reads to <i>discover</i> their read and write sets.</li>
+  </ul>
+  <p>A <b>worker thread</b>, managed by the scheduler, runs four steps:</p>
+  <ol class="plain">
+    <li>Analyse the read and write sets: find which read-set records are local, and list the <b>active participants</b> (the nodes holding write-set records, which will modify data).</li>
+    <li>Read the local part of the read set and <b>forward</b> those records to the active participants.</li>
+    <li>If this node is an active participant, <b>receive</b> the records the other nodes forwarded in step 2.</li>
+    <li>Execute the batch and persist results locally. No results are forwarded: the other nodes got the same inputs and compute and persist the same results themselves.</li>
+  </ol>
+  <p>A typical deployment colocates sequencer, scheduler, workers and storage on each partition (Figure 13-7). To agree on exactly which transactions go into an epoch, sequencers use <b>Paxos</b> or <b>asynchronous replication</b> with a dedicated leader replica. A leader lowers latency but makes recovery more expensive, since nodes must reproduce the failed leader's state before continuing.</p>
+  <div class="box picture"><b>Picture it</b><p>An orchestra spread over three cities, playing together over video. Instead of conductors phoning each other before every bar ("are you ready? may I play?"), they all agree on the score in advance and press play at the same moment. Each city produces the same music without talking. If one city's player faints, the music in the other cities is unaffected, and the player can catch up from the score.</p></div>
+  <div class="svgbox"><svg viewBox="0 0 760 300" role="img" aria-label="Calvin layers on three partitions: sequencer, scheduler, workers, storage">
+    <defs><marker id="ar8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+    <g>
+      <rect x="20" y="10" width="220" height="280" rx="6" style="fill:none;stroke:var(--rule);stroke-dasharray:4 3"/>
+      <rect x="270" y="10" width="220" height="280" rx="6" style="fill:none;stroke:var(--rule);stroke-dasharray:4 3"/>
+      <rect x="520" y="10" width="220" height="280" rx="6" style="fill:none;stroke:var(--rule);stroke-dasharray:4 3"/>
+      <text x="130" y="28" text-anchor="middle" style="fill:var(--muted)">partition 1</text>
+      <text x="380" y="28" text-anchor="middle" style="fill:var(--muted)">partition 2</text>
+      <text x="630" y="28" text-anchor="middle" style="fill:var(--muted)">partition 3</text>
+      <rect x="50" y="40" width="160" height="36" rx="4" style="fill:var(--tint);stroke:var(--c1)"/><text x="130" y="63" text-anchor="middle">Sequencer</text>
+      <rect x="300" y="40" width="160" height="36" rx="4" style="fill:var(--tint);stroke:var(--c1)"/><text x="380" y="63" text-anchor="middle">Sequencer</text>
+      <rect x="550" y="40" width="160" height="36" rx="4" style="fill:var(--tint);stroke:var(--c1)"/><text x="630" y="63" text-anchor="middle">Sequencer</text>
+      <rect x="50" y="118" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--c2)"/><text x="130" y="141" text-anchor="middle">Scheduler</text>
+      <rect x="300" y="118" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--c2)"/><text x="380" y="141" text-anchor="middle">Scheduler</text>
+      <rect x="550" y="118" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--c2)"/><text x="630" y="141" text-anchor="middle">Scheduler</text>
+      <rect x="50" y="180" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--ink)"/><text x="130" y="203" text-anchor="middle">Workers</text>
+      <rect x="300" y="180" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--ink)"/><text x="380" y="203" text-anchor="middle">Workers</text>
+      <rect x="550" y="180" width="160" height="36" rx="4" style="fill:var(--paper);stroke:var(--ink)"/><text x="630" y="203" text-anchor="middle">Workers</text>
+      <rect x="50" y="240" width="160" height="36" rx="4" style="fill:var(--grid);stroke:var(--ink)"/><text x="130" y="263" text-anchor="middle">Storage</text>
+      <rect x="300" y="240" width="160" height="36" rx="4" style="fill:var(--grid);stroke:var(--ink)"/><text x="380" y="263" text-anchor="middle">Storage</text>
+      <rect x="550" y="240" width="160" height="36" rx="4" style="fill:var(--grid);stroke:var(--ink)"/><text x="630" y="263" text-anchor="middle">Storage</text>
+      <line x1="130" y1="76" x2="130" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="130" y1="76" x2="370" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="130" y1="76" x2="610" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="380" y1="76" x2="150" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="380" y1="76" x2="380" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="380" y1="76" x2="620" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="630" y1="76" x2="160" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="630" y1="76" x2="390" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="630" y1="76" x2="630" y2="116" style="stroke:var(--muted)" marker-end="url(#ar8)"/>
+      <line x1="130" y1="154" x2="130" y2="178" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="380" y1="154" x2="380" y2="178" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="630" y1="154" x2="630" y2="178" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="210" y1="198" x2="298" y2="198" style="stroke:var(--c2);stroke-dasharray:4 3" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="460" y1="198" x2="548" y2="198" style="stroke:var(--c2);stroke-dasharray:4 3" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="130" y1="216" x2="130" y2="238" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="380" y1="216" x2="380" y2="238" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <line x1="630" y1="216" x2="630" y2="238" style="stroke:var(--muted)" marker-start="url(#ar8)" marker-end="url(#ar8)"/>
+      <text x="255" y="102" text-anchor="middle" style="fill:var(--muted);font-size:10px">every sequencer feeds every scheduler</text>
+      <text x="255" y="232" text-anchor="middle" style="fill:var(--c2);font-size:10px">read-set records forwarded</text>
+    </svg></div>
+  <div class="fig">
+    <h3>Try it: epochs trade a little latency for far fewer replication messages</h3>
+    <div class="controls"><label for="e8">Epoch (ms) <input id="e8" type="range" min="2" max="50" value="10"><output id="e8o">10</output></label></div>
+    <canvas id="c8" class="short" aria-label="Simulated transaction arrivals grouped into epochs"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="fig">
+    <h3>Try it: same order in, same state out</h3>
+    <p>Two replicas start with <code>x = 10</code> and receive the same three transactions: T1 <code>x = x × 2</code>, T2 <code>x = x + 5</code>, T3 <code>x = x − 3</code>. The network delivers them in a different order at each replica (simulated).</p>
+    <div class="controls">
+      <label for="sel8">Replicas apply <select id="sel8"><option value="calvin">in the sequencer's order (Calvin)</option><option value="local">in their own arrival order</option></select></label>
+      <button id="b8shuf" type="button">re-deliver in a new order</button>
+    </div>
+    <div class="parts" id="d8"></div>
+    <div class="verdict" id="r8b"></div>
+  </div>
+  <div class="fig">
+    <h3>Step through one worker's four steps</h3>
+    <p>Transaction T: <code>z = x + y; y = y − 1</code>. Read set {x, y}; write set {y, z}. x lives on P1, y on P2, z on P3.</p>
+    <div class="stepbar"><button id="w8prev" type="button">◀ back</button><button id="w8next" type="button">next ▶</button><button id="w8reset" type="button">reset</button><span class="count" id="c8n"></span></div>
+    <p class="steptext" id="txt8"></p>
+    <div class="parts" id="d8w"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>In 2PL, the order between two conflicting transactions is decided at run time by whoever grabs the lock first, which can differ between replicas, so replicas must coordinate (2PC) to end up the same. Calvin moves the decision to before execution: the sequencer's log <i>is</i> the serial order, and each scheduler grants locks strictly in that order. Execution can't diverge, so there's nothing to vote on at the end; a node that crashes just replays the input log. The cost: a transaction waits for its epoch to close and be replicated, and it must declare its read/write sets up front. (The Calvin paper handles "dependent" transactions with a reconnaissance read and a retry if the sets changed <i>(not in the book)</i>.)</p></div>
+<pre class="code">// deterministic lock scheduler: grant locks strictly in sequence order
+function schedule(batch: Tx[], locks: LockTable) {
+  for (const tx of batch)                         // batch is already in global order
+    for (const key of [...tx.readSet, ...tx.writeSet].filter(isLocal))
+      locks.enqueue(key, tx);                     // FIFO per key = sequencer order
+  // a tx runs when it is at the head of every local queue it joined;
+  // non-conflicting txs run in parallel, conflicting ones in sequencer order
+}</pre>
+  <div class="box beyond"><b>Beyond the book: measured numbers</b><ul>
+    <li>The Calvin paper (SIGMOD 2012) reports about <b>500,000 TPC-C transactions per second</b> on a cluster of <b>100</b> commodity EC2 machines, with near-linear scaling, and argues that replicating transaction <i>inputs</i> instead of effects lets it use Paxos across distant replicas without lowering throughput.</li>
+    <li>Calvin's weak spot is the up-front read/write set: a transaction whose keys depend on data it reads (e.g. "update the row an index points to") needs the extra reconnaissance step above.</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[THOMSON12]</b> Thomson, Alexander, Thaddeus Diamond, Shu-Chun Weng, Kun Ren, Philip Shao and Daniel J. Abadi, "Calvin: Fast distributed transactions for partitioned database systems", SIGMOD 2012. Introduced the sequencer/scheduler design and deterministic execution at scale. Read it for the clearest argument that removing 2PC is about removing <i>non-determinism</i>.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch14_consensus.html">Ch.14</a>: Paxos and Multi-Paxos, which the sequencers use to agree on each epoch.</li>
+    <li><a href="ch11_replication_and_consistency.html">Ch.11</a>: state machine replication is the same idea (same log in → same state out) applied to a single replicated object.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · DISTRIBUTED TRANSACTIONS WITH SPANNER</div><h2>Spanner: 2PC between Paxos groups, ordered by TrueTime</h2></div><span class="chip">pdf p420–422 · Fig 13-8</span></div>
+  <p>Spanner [CORBETT12] is often contrasted with Calvin. Open-source implementations or derivatives include <b>CockroachDB</b> and <b>YugaByte DB</b>. Calvin gets a global order by reaching consensus on sequencers; Spanner runs <b>two-phase commit over consensus groups, one per partition (shard)</b>. The setup is complex; the book covers only the high level.</p>
+  <p>To order transactions consistently Spanner uses <b>TrueTime</b>: a high-precision wall-clock API that also reports an <b>uncertainty bound</b>, so local operations can add artificial delays until that uncertainty has passed.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Operation</th><th>Locks?</th><th>Where it can run</th></tr></thead>
+    <tbody>
+      <tr><td>Read-write transaction</td><td>yes: pessimistic concurrency control</td><td>needs the leader replica</td></tr>
+      <tr><td>Read-only transaction</td><td>lock-free</td><td>any replica; the leader is needed only to read at the latest timestamp (the latest committed value in the Paxos group)</td></tr>
+      <tr><td>Snapshot read</td><td>lock-free</td><td>any up-to-date replica; consistent because versions are immutable once written</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every record carries a timestamp equal to its transaction's commit time, so several timestamped versions of a record can exist. Architecture (Figure 13-8): each <b>spanserver</b> (a replica serving data) holds several <b>tablets</b>, each with a Paxos state machine attached. Replicas form <b>Paxos groups</b>, the unit of placement and replication, each with a long-lived leader (Multi-Paxos). Leaders talk to each other during multishard transactions.</p>
+  <p>Writes go through the group leader; reads can be served from the tablet on any up-to-date replica. The leader keeps a <b>lock table</b> (two-phase locking) and a <b>transaction manager</b> for multishard transactions. Operations needing synchronization (writes, reads inside a transaction) take locks from the lock table; snapshot reads go straight to the data.</p>
+  <p>For multishard transactions, group leaders run <b>2PC for consistency</b> and <b>2PL for isolation</b>. 2PC needs every participant, which hurts availability; Spanner fixes this by making the cohorts <b>Paxos groups</b>, so 2PC continues even when some group members are down. Inside a group, 2PC talks only to the leader. Paxos groups also replicate the transaction manager's state.</p>
+  <ol class="plain">
+    <li>Each participant leader takes its write locks, picks a <b>prepare timestamp</b> larger than any earlier transaction's, and logs a 2PC <code>prepare</code> record through Paxos.</li>
+    <li>The coordinator collects these and picks a <b>commit timestamp</b> greater than every prepare timestamp, and logs a commit record through Paxos.</li>
+    <li>It then <b>waits until the chosen timestamp is in the past</b> (clients may only see results whose timestamps are past).</li>
+    <li>It sends the timestamp to the client and the leaders, which log the commit record with that timestamp in their own Paxos groups and then release the locks.</li>
+  </ol>
+  <p><b>Single-shard</b> transactions skip the transaction manager and cross-partition 2PC: the Paxos group plus the lock table already order and protect them.</p>
+  <p>Read-write transactions get <b>external consistency</b>: timestamps reflect the serialization order even for distributed transactions, with real-time properties equivalent to linearizability. If T1 commits before T2 starts, T1's timestamp is smaller than T2's.</p>
+  <p>In short: Paxos for consistent log replication, 2PC for cross-shard transactions, TrueTime for deterministic ordering. Multipartition transactions therefore cost more than in Calvin because of the extra 2PC round [ABADI17]. Both designs matter because both make transactions possible on partitioned data.</p>
+  <div class="box picture"><b>Picture it</b><p>Each shard is a committee (Paxos group) with a chair (leader). For a cross-committee decision, only the chairs negotiate (2PC), but each chair writes every promise into the committee's minutes (Paxos log), so if a chair faints, the vice-chair reads the minutes and carries on. TrueTime is a wristwatch that says "it's 10:00:00, give or take 4 ms"; to be sure a stamped decision is really in the past, you wait out the "give or take".</p></div>
+  <div class="fig">
+    <h3>Try it: commit wait with an uncertain clock</h3>
+    <p>TT.now() returns an interval [earliest, latest] guaranteed to contain true time, of width 2ε. The coordinator picks commit timestamp s = TT.now().latest and waits until TT.now().earliest &gt; s. Paxos logging of the commit record runs at the same time <i>(overlap: from the Spanner paper, not in the book)</i>.</p>
+    <div class="controls">
+      <label for="e9">ε (ms) <input id="e9" type="range" min="1" max="20" value="4"><output id="e9o">4</output></label>
+      <label for="p9">Paxos commit round (ms) <input id="p9" type="range" min="1" max="100" value="10"><output id="p9o">10</output></label>
+    </div>
+    <canvas id="c9" class="short" aria-label="Timeline showing TrueTime intervals and commit wait"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="fig">
+    <h3>Step through a multishard commit</h3>
+    <div class="stepbar"><button id="b9prev" type="button">◀ back</button><button id="b9next" type="button">next ▶</button><button id="b9reset" type="button">reset</button><span class="count" id="c9n"></span></div>
+    <p class="steptext" id="txt9"></p>
+    <div class="seq" id="d9"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Why the wait gives external consistency: the commit timestamp s is at least TT.now().latest when chosen, and results are released only once TT.now().earliest &gt; s, so at release, true time is past s. Any transaction T2 that starts after that release picks its own timestamp from a later TT.now().latest, which is beyond true time, which is beyond s. So "commits before starts" implies "smaller timestamp" without any message between T1 and T2. The wait is about 2ε, which is why Google spends on GPS and atomic clocks to keep ε small. Making 2PC participants Paxos groups turns "a node failed" from "transaction blocked" into "a new leader reads the prepare record from the group's log and continues".</p></div>
+<pre class="code">// commit wait (from the Spanner paper's description)
+const s = Math.max(maxPrepareTs, TT.now().latest);   // commit timestamp
+paxosLog(commitRecord(s));                             // runs in parallel with the wait
+while (!(TT.now().earliest &gt; s)) await tick();         // TT.after(s)
+reply(client, s); notifyParticipants(s);               // participants log commit, release locks</pre>
+  <div class="box beyond"><b>Beyond the book: measured numbers and descendants</b><ul>
+    <li>The Spanner paper (OSDI 2012) reports ε as a sawtooth between about <b>1 and 7 ms</b> over each 30-second time-master poll, about 4 ms most of the time. The expected commit wait is therefore at least 2ε (about 8 ms), and the paper notes it is typically overlapped with Paxos communication.</li>
+    <li><b>CockroachDB</b> and <b>YugabyteDB</b> have no atomic clocks; they use hybrid logical clocks with a configured maximum clock offset and handle uncertainty at read time (a read that sees a value inside its uncertainty window restarts at a higher timestamp) instead of waiting at commit.</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[CORBETT12]</b> Corbett, James C., Jeffrey Dean, et al., "Spanner: Google's Globally-Distributed Database", OSDI 2012. TrueTime, commit wait, 2PC over Paxos and external consistency at global scale. Required reading for distributed SQL.</li>
+    <li><b>[ABADI17]</b> Abadi, Daniel, "Distributed consistency at scale: Spanner vs. Calvin", Fauna blog, 2017. A side-by-side of the two designs by one of Calvin's authors; good on where each pays its latency.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: clocks and time in distributed systems, the reason TrueTime needs an uncertainty bound at all.</li>
+    <li><a href="ch14_consensus.html">Ch.14</a>: Multi-Paxos and its long-lived leader.</li>
+    <li><a href="ch05_transaction_processing_and_recovery.html">Ch.5</a>: two-phase locking (the lock table) and MVCC (the timestamped versions).</li>
+  </ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · DATABASE PARTITIONING</div><h2>Splitting data: ranges, hot spots, and why <code>hash mod N</code> hurts</h2></div><span class="chip">pdf p423–424</span></div>
+  <p>Keeping every record on one node is unrealistic for most modern applications, so databases <b>partition</b>: they divide data logically into smaller, manageable segments.</p>
+  <ul class="plain">
+    <li><b>Range partitioning</b>: split the key space into ranges and let each replica set manage specific ranges. Clients (or query coordinators) route each read and write by the <b>routing key</b> to the right replica set. This scheme is usually called <b>sharding</b>: each replica set is the single source for its subset.</li>
+    <li><b>Size by load and density.</b> Frequently accessed, read/write-heavy ranges can be split smaller to spread the load; ranges that hold more values than others can also be split. Petrov's example: with zip code as the routing key, population is uneven, so some zip ranges carry far more people and orders.</li>
+    <li><b>Rebalancing.</b> When nodes join or leave, data must be re-partitioned. For consistent moves, <b>relocate the data first</b>, then update cluster metadata and start routing to the new targets. Some databases <b>auto-shard</b>, using placement algorithms that look at read load, write load and data volume per shard.</li>
+    <li><b>Hash partitioning.</b> Hash the routing key and map the hash to a node ID. Hash values don't sort like the keys, so two lexicographically close keys land on different replica sets instead of the same one: less <b>range hot-spotting</b>.</li>
+    <li><b><code>hash(v) mod N</code></b> is the simplest mapping. Its problem: when the cluster size changes from N to N′, most values of <code>hash(v) mod N′</code> differ from the old ones, so <b>most of the data has to move</b>.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Shelving library books by the first letter of the author: the "S" shelf overflows while "X" is nearly empty, so you give "S" three shelves (split hot ranges). Shelving by a scrambled code number spreads books evenly, but now finding "all authors from Sa to Sm" means visiting every shelf. And if you number shelves by "code mod 8" and buy a ninth shelf, almost every book changes shelf.</p></div>
+  <div class="fig">
+    <h3>Try it: where do 20,000 skewed records land on 8 shards?</h3>
+    <div class="controls"><label for="sel10">Scheme <select id="sel10"><option value="range">range: 8 equal zip ranges</option><option value="split">range: boundaries split by data volume</option><option value="hash">hash(key) mod 8</option></select></label></div>
+    <canvas id="c10" class="short" aria-label="Records per shard under the chosen partitioning scheme"></canvas>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="fig">
+    <h3>Try it: resize a <code>mod N</code> cluster</h3>
+    <div class="controls">
+      <label for="n10a">N <input id="n10a" type="range" min="2" max="32" value="8"><output id="n10ao">8</output></label>
+      <label for="n10b">N′ <input id="n10b" type="range" min="2" max="32" value="9"><output id="n10bo">9</output></label>
+    </div>
+    <div class="readout" id="r10b"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A key stays put under mod only if <code>h mod N = h mod N′</code>. Going from N to N + 1, that holds for about 1 in N + 1 keys, so a fraction N/(N + 1) moves: 89% for 8 → 9, 97% for 32 → 33 <i>(derivation not in the book)</i>. Yet the ideal is to move only the 1/(N + 1) share the new node should own. Range partitioning has the opposite profile: moving a boundary moves only the keys between the old and new boundary, but sequential or skewed keys pile onto one range unless it's split.</p></div>
+  <div class="box beyond"><b>Beyond the book: who does what</b><ul>
+    <li>Range sharding with automatic splits by size and load: HBase regions, Bigtable tablets, CockroachDB ranges, TiKV regions, MongoDB ranged shard keys.</li>
+    <li>Hash sharding: MongoDB hashed shard keys, Redis Cluster (CRC16 of the key mod 16,384 fixed slots, and slots, not keys, move between nodes), YugabyteDB's default.</li>
+    <li>The fixed-slot trick (many more slots than nodes, move whole slots) is another way around the mod-N problem.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch06_b_tree_variants.html">Ch.6</a> and <a href="ch07_log_structured_storage.html">Ch.7</a>: inside each partition, data still lives in a B-tree or LSM tree sorted by key, which is why range scans stay cheap under range partitioning.</li>
+    <li>Sections 8 and 9: "partition" in Calvin and Spanner means exactly these shards.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · CONSISTENT HASHING</div><h2>Consistent hashing: put nodes on a ring, move only the neighbours' keys</h2></div><span class="chip">pdf p425</span></div>
+  <p>To avoid the mass migration of <code>mod N</code>, databases such as <b>Apache Cassandra</b> and <b>Riak</b> use <b>consistent hashing</b>. Keys are hashed as before, but hash values are placed on a <b>ring</b>: after the largest value it wraps to the smallest. Each node takes a position on the ring and owns the range <b>between its predecessor's position and its own</b>.</p>
+  <p>A change to the ring affects only the <b>immediate neighbours</b> of the node joining or leaving, not the whole cluster. "Consistent" means that when the table is resized, with K possible keys and n nodes, on average only <b>K/n</b> keys move: the function's output changes as little as possible when its range changes [KARGER97].</p>
+  <div class="box picture"><b>Picture it</b><p>A round table with name cards at a few seats. Every guest sits at the first name card clockwise from where they happen to stand. Put down a new name card and only the guests standing just before it switch seats; everyone else stays where they were.</p></div>
+  <div class="fig">
+    <h3>Try it: add and remove nodes on the ring</h3>
+    <div class="controls">
+      <button id="b11add" type="button">add node</button>
+      <button id="b11rem" type="button">remove a node</button>
+      <button id="b11reset" type="button">reset to 4 nodes</button>
+      <label for="v11">Virtual nodes each <input id="v11" type="range" min="1" max="64" value="1"><output id="v11o">1</output></label>
+    </div>
+    <canvas id="c11" class="tall" aria-label="Hash ring with nodes and keys coloured by owner"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Ownership is "first node position clockwise from the key's hash", found with a binary search over the sorted node positions. A new node at position q takes only keys between its predecessor and q, all from one existing node; a removed node hands its keys to its successor. With one position per node, ranges are uneven (random gaps), so loads differ a lot; give each node many positions (<b>virtual nodes</b>, not in the book) and each node's load is a sum of many small random arcs, which evens out. Turn the slider up and watch max/mean load fall.</p></div>
+<pre class="code">class Ring {
+  private pos: number[] = []; private owner = new Map&lt;number, string&gt;();
+  add(node: string, vnodes = 1) {
+    for (let v = 0; v &lt; vnodes; v++) { const h = hash32(node + '#' + v); this.pos.push(h); this.owner.set(h, node); }
+    this.pos.sort((a, b) =&gt; a - b);
+  }
+  lookup(key: string): string {               // first position clockwise (&gt;= h), wrapping around
+    const h = hash32(key); let lo = 0, hi = this.pos.length;
+    while (lo &lt; hi) { const m = (lo + hi) &gt;&gt; 1; this.pos[m] &lt; h ? lo = m + 1 : hi = m; }
+    return this.owner.get(this.pos[lo % this.pos.length])!;
+  }
+}</pre>
+  <div class="box beyond"><b>Beyond the book: in production</b><ul>
+    <li>Amazon's Dynamo paper (DeCandia et al., SOSP 2007) popularised consistent hashing with <b>virtual nodes</b> for a database, also using the ring to pick the N replicas of each key (the next N distinct nodes clockwise).</li>
+    <li><b>Cassandra</b> calls positions tokens; <code>num_tokens</code> set the vnodes per node (256 in older releases; Cassandra 4.0 lowered the default to 16 together with a token-allocation algorithm that keeps balance with fewer tokens).</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[KARGER97]</b> Karger, D., E. Lehman, T. Leighton, R. Panigrahy, M. Levine and D. Lewin, "Consistent hashing and random trees: distributed caching protocols for relieving hot spots on the World Wide Web", STOC 1997, 654–663. The original definition (for web caches) and the K/n bound.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>My syllabus (<code>Notes/syllabus.html</code>) lists consistent hashing with DynamoDB, load balancers and distributed caches, and names the Amazon Dynamo paper as the reading.</li>
+    <li><a href="ch12_anti_entropy_and_dissemination.html">Ch.12</a>: Cassandra and Riak's hinted handoff and read repair work over this same ring.</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · DISTRIBUTED TRANSACTIONS WITH PERCOLATOR</div><h2>Snapshot isolation, and Percolator's 2PC built on Bigtable</h2></div><span class="chip">pdf p426–429 · Fig 13-9</span></div>
+  <p>Isolation levels are hard to reason about because of the read and write anomalies they allow. If an application doesn't need serializability, one way to avoid the write anomalies described in SQL-92 is <b>snapshot isolation (SI)</b>.</p>
+  <ul class="plain">
+    <li>All reads in a transaction see one <b>snapshot</b>: every value committed before the transaction's <b>start timestamp</b>.</li>
+    <li>If two concurrent transactions write the same cell (a <b>write-write conflict</b>), only one commits: <b>first committer wins</b>.</li>
+    <li>SI prevents <b>read skew</b>, which read committed allows. Petrov's example: x + y must be 100; T1 reads x; T2 rewrites both x and y and commits; T1 then reads the new y, and its old x with the new y don't add up. Under SI, T1 never sees T2's y [BERENSON95].</li>
+    <li>Useful properties: only repeatable reads of committed data; values consistent because they come from one timestamp; conflicting writes aborted and retried.</li>
+    <li>But SI histories are <b>not serializable</b>: only writes to the same cells conflict, so <b>write skew</b> is still possible. Two transactions modify disjoint values, each keeping the invariant for what it writes; both commit; together they break it.</li>
+    <li>SI's big advantage is <b>efficient reads</b>: no locks, because snapshot data can't change.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: read skew under read committed vs snapshot isolation</h3>
+    <p>My numbers (the book uses different ones): invariant x + y = 100, start x = 60, y = 40. T2 moves 30 from x to y.</p>
+    <div class="controls"><label for="sel12">Isolation <select id="sel12"><option value="rc">read committed</option><option value="si">snapshot isolation</option></select></label></div>
+    <div class="stepbar"><button id="a12prev" type="button">◀ back</button><button id="a12next" type="button">next ▶</button><button id="a12reset" type="button">reset</button><span class="count" id="c12a"></span></div>
+    <p class="steptext" id="txt12a"></p>
+    <div class="tablewrap" id="tbl12a"></div>
+  </div>
+  <div class="fig">
+    <h3>Try it: write skew still gets through SI</h3>
+    <p>My example: one customer's two accounts, a = 50 and b = 50; the bank's rule is a + b ≥ 0. T1 withdraws from a, T2 from b, each checking the rule against its own snapshot. They write different rows, so SI sees no conflict.</p>
+    <div class="controls">
+      <label for="w12a">T1 withdraws from a <input id="w12a" type="range" min="0" max="100" value="70"><output id="w12ao">70</output></label>
+      <label for="w12b">T2 withdraws from b <input id="w12b" type="range" min="0" max="100" value="60"><output id="w12bo">60</output></label>
+    </div>
+    <div class="verdict" id="r12w"></div>
+  </div>
+  <p><b>Percolator</b> is a library that adds a transactional API on top of <b>Bigtable</b>, a good example of building transactions on an existing system. It keeps <b>data</b>, <b>write metadata</b> (where the committed data points are) and <b>locks</b> in different columns. To lock reliably without races in a single RPC, it uses Bigtable's <b>conditional mutation</b> API (read-modify-write in one remote call). Each transaction asks the <b>timestamp oracle</b> (a cluster-wide source of monotonically increasing timestamps) <b>twice</b>: for its start timestamp and at commit. Writes are buffered and committed with a <b>client-driven two-phase commit</b>.</p>
+  <ul class="plain">
+    <li><b>(a) Initial state</b>: the latest write record for each account points to its last committed data; no locks.</li>
+    <li><b>(b) Prewrite</b> (phase 1): lock every cell the transaction writes; one lock is the <b>primary</b>, used for client recovery. Check for conflicts: any write by another transaction with a later timestamp, or any unreleased lock at any timestamp, aborts the transaction.</li>
+    <li><b>(c) Commit</b> (phase 2): if all locks were taken and no conflict is possible, release the locks <b>starting with the primary</b>, publishing each write by replacing the lock with a write record that points to the new data.</li>
+    <li><b>Client failure</b>: a later transaction that runs into an incomplete state should try to resolve it through the primary lock; if the primary lock was already released, the transaction's contents must be committed. One lock holder at a time plus atomic state changes mean two transactions can't operate on the same contents at once.</li>
+  </ul>
+  <div class="fig">
+    <h3>Step through a Percolator transaction (my own accounts and numbers)</h3>
+    <p>Move ₹40 from Ravi (90) to Asha (60). Last commit: data at ts 5, write record at ts 6. The new transaction gets start ts 7 and commit ts 8.</p>
+    <div class="controls"><label for="sel12p">Client <select id="sel12p"><option value="ok">finishes normally</option><option value="after">crashes after committing the primary</option><option value="before">crashes before committing the primary</option></select></label></div>
+    <div class="stepbar"><button id="p12prev" type="button">◀ back</button><button id="p12next" type="button">next ▶</button><button id="p12reset" type="button">reset</button><span class="count" id="c12p"></span></div>
+    <p class="steptext" id="txt12p"></p>
+    <div class="tablewrap" id="tbl12p"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A shared ledger where you can only change one line at a time. To move money you first pencil in both new balances and put a sticky note on each ("busy, see Asha's note"). Asha's note is the master. Committing is peeling the master note and writing "valid from 8" in ink; that single action is the moment of truth. If you faint after that, the next person who finds the leftover note on Ravi's line follows it to Asha's line, sees the ink, and finishes the job for you.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Bigtable only gives atomic changes to a single row. Percolator gets multi-row atomicity by making one row's change (the primary's lock → write record) the commit point, and making every other row's state point at the primary. Anyone who finds a stray secondary lock can read the primary and learn the outcome. The book's wording is that the later transaction tries to release the primary lock and commit; in the Percolator paper itself, the cleaner <b>rolls back</b> if the primary lock is still there (after checking the owner is presumed dead) and <b>rolls forward</b> if the primary was already replaced by a write record <i>(detail from the paper, not the book)</i>. The step-through follows the paper.</p></div>
+<pre class="code">// Percolator, client side (sketch after the paper)
+async function commit(tx: { start: number; writes: Write[] }) {
+  const [primary, ...secondaries] = tx.writes;
+  for (const w of tx.writes)                         // phase 1: prewrite (one conditional mutation per row)
+    if (!await prewrite(w, primary, tx.start)) return abort(tx);   // later write or any lock = conflict
+  const commitTs = await oracle.next();              // second oracle call
+  if (!await commitPrimary(primary, tx.start, commitTs)) return abort(tx); // the commit point
+  for (const w of secondaries) await commitSecondary(w, tx.start, commitTs); // may be done lazily by others
+}
+// prewrite(row): if write@[start, ∞) exists or lock@any exists -&gt; fail; else lock@start, data@start</pre>
+  <div class="box beyond"><b>Beyond the book: who uses it and what it bought</b><ul>
+    <li><b>TiDB</b> (the book's example; "Ti" is short for titanium) runs Percolator-style transactions in its storage layer TiKV, with its Placement Driver serving as the timestamp oracle.</li>
+    <li>The Percolator paper (Peng &amp; Dabek, OSDI 2010) reports that moving Google's web index from batch MapReduce to incremental Percolator transactions processed the same number of documents per day while cutting the <b>average age of documents in search results by 50%</b>.</li>
+    <li>PostgreSQL's <code>REPEATABLE READ</code> is snapshot isolation; its <code>SERIALIZABLE</code> (SSI, since 9.1) adds tracking that catches write skew.</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[BERENSON95]</b> Berenson, Hal, Phil Bernstein, Jim Gray, Jim Melton, Elizabeth O'Neil and Patrick O'Neil, "A critique of ANSI SQL isolation levels", <i>ACM SIGMOD Record</i> 24(2): 1–10, 1995. Defines snapshot isolation and shows the SQL-92 levels miss anomalies like write skew. Short and essential.</li>
+    <li>Percolator itself (Peng &amp; Dabek, "Large-scale Incremental Processing Using Distributed Transactions and Notifications", OSDI 2010) is described in the chapter but has no entry in the book's bibliography <i>(citation added by me)</i>.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch05_transaction_processing_and_recovery.html">Ch.5</a>: read/write anomalies, isolation levels and MVCC, the local versions of everything here.</li>
+    <li><a href="ch01_introduction_and_overview.html">Ch.1</a>: wide column stores (Bigtable's data model, the rows/columns/timestamps Percolator writes into).</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · COORDINATION AVOIDANCE</div><h2>Skip coordination when merging can't break the rules: I-confluence and RAMP</h2></div><span class="chip">pdf p430–432</span></div>
+  <p><b>Coordination avoidance</b> [BAILIS14b] tries to cut the cost of serializability while keeping strong guarantees. Coordination can be skipped, with integrity constraints still kept, when operations are <b>invariant confluent (I-confluent)</b>: any two invariant-valid but diverged database states can be merged into one valid final state. The invariants here mean consistency in the ACID sense. Since any two valid states merge into a valid state, I-confluent operations need no extra coordination, which greatly improves performance and scalability.</p>
+  <p>Besides the operation that moves the database to a new state, you define a <b>merge function</b> that takes two states and brings independently updated states back together. Transactions run against local versions (snapshots); any state needed from other partitions is made available locally. When a transaction commits, its changes to the local snapshot migrate to the other nodes and merge with their snapshots. A system that allows coordination avoidance must guarantee:</p>
+  <ul class="plain">
+    <li><b>Global validity</b>: required invariants always hold, for merged and diverged committed states, and transactions never see invalid states.</li>
+    <li><b>Availability</b>: if the client can reach all nodes holding the state, the transaction reaches a commit decision, or aborts if committing would break an invariant.</li>
+    <li><b>Convergence</b>: nodes keep local states independently, but with no further transactions and no indefinite partitions they must reach the same state.</li>
+    <li><b>Coordination freedom</b>: local execution doesn't depend on operations other nodes run against their local states.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: is this operation I-confluent for this invariant?</h3>
+    <div class="controls">
+      <label for="sel13">Case <select id="sel13"><option value="dep">balance ≥ 0, op: deposit</option><option value="wd">balance ≥ 0, op: withdraw</option><option value="uid">unique ids, op: insert with an id the user picks</option><option value="gid">unique ids, op: insert with id = replica prefix + counter</option></select></label>
+      <label for="a13">Replica A amount / id <input id="a13" type="range" min="0" max="100" value="60"><output id="a13o">60</output></label>
+      <label for="b13">Replica B amount / id <input id="b13" type="range" min="0" max="100" value="70"><output id="b13o">70</output></label>
+    </div>
+    <div class="parts" id="d13"></div>
+    <div class="verdict" id="r13"></div>
+  </div>
+  <p><b>RAMP</b> (Read-Atomic Multi-Partition) transactions [BAILIS14c] implement coordination avoidance. RAMP uses multiversion concurrency control plus <b>metadata about in-flight operations</b> to fetch missing updates from other nodes, so reads and writes can run concurrently. A reader that overlaps a writer of the same entry can be detected and, if needed, repaired by getting the missing information from the in-flight write's metadata in <b>one extra round of communication</b>. Instead of distributed locks, RAMP provides:</p>
+  <ul class="plain">
+    <li><b>Synchronization independence</b>: one client's transactions never stall, abort or make another client's transactions wait.</li>
+    <li><b>Partition independence</b>: clients don't contact partitions whose values their transactions don't involve.</li>
+  </ul>
+  <p>RAMP introduces the <b>read atomic</b> isolation level: transactions can't see in-progress changes from in-flight, uncommitted or aborted transactions; a transaction's updates are visible all together or not at all. That also rules out <b>fractured reads</b> (seeing only some of another transaction's writes). RAMP gets atomic visibility <b>without mutual exclusion</b>, which distributed locks usually bundle together, so transactions don't stall each other. Metadata lets transactions detect newer versions, fetch the latest and work on them. To avoid coordination, every local commit decision must also be valid globally: by the time a write is visible in one partition, the same transaction's writes on all other involved partitions are visible to readers there too.</p>
+  <p>Writes are installed with two-phase commit: <b>prepare</b> places writes on their partitions without making them visible; <b>commit/abort</b> publishes them atomically across all partitions or rolls back. Several versions of a record can coexist: the latest value, in-flight uncommitted changes, and stale versions overwritten by later transactions. Stale versions are kept only for in-progress reads and dropped once those readers finish.</p>
+  <p>Distributed transactions are hard to make fast because of the coordination needed to prevent, detect and avoid conflicts, and the bigger the system or the load, the bigger that overhead. These approaches use invariants to find where coordination can be skipped and pay the full price only when it's really needed.</p>
+  <div class="fig">
+    <h3>Step through a fractured read and RAMP's repair</h3>
+    <p>Writer T1 sets x = 1 and y = 1 (both were 0) on partitions X and Y. A reader reads x and y while T1 is half-published.</p>
+    <div class="controls"><label for="sel13r">Reader <select id="sel13r"><option value="plain">plain reads (latest committed at each partition)</option><option value="ramp">RAMP reads (use write metadata)</option></select></label></div>
+    <div class="stepbar"><button id="r13prev" type="button">◀ back</button><button id="r13next" type="button">next ▶</button><button id="r13reset" type="button">reset</button><span class="count" id="c13n"></span></div>
+    <p class="steptext" id="txt13"></p>
+    <div class="seq" id="d13r"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two friends update their shared holiday plan: one changes the hotel, the other the flight, and the two edits belong together. Someone glancing at the hotel page sees "new hotel, booked together with flight v2", checks the flight page, sees it still shows v1, and asks for v2 directly instead of waiting for anyone. Nobody blocked; the reader fixed its own view.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>I-confluence asks one question: if two replicas each make a change that's valid on its own, is the merge always valid? Deposits merge by adding, and adding non-negative amounts keeps a balance ≥ 0. Withdrawals don't: each may be fine alone while the sum overdraws. Uniqueness fails if ids are chosen freely, and holds if each replica draws from its own id space. When the answer is yes, no coordination is needed at all; when it's no, only those operations need it. RAMP's metadata is the list of sibling keys each write belongs to (plus the transaction timestamp); a reader that sees a write from T1 on one partition knows exactly which version of the other keys it must also see, and fetches them by timestamp, which works because prepared versions are already stored.</p></div>
+  <div class="box beyond"><b>Beyond the book: measured numbers</b><ul>
+    <li>Coordination avoidance paper (PVLDB 2015 / arXiv 1402.2237): of TPC-C's 12 invariants, 10 are I-confluent; a coordination-avoiding prototype scaled TPC-C New-Order linearly to <b>12.7 million transactions per second on 200 servers</b>, about <b>25×</b> the best prior distributed result.</li>
+    <li>RAMP (SIGMOD 2014): scales linearly to 100 servers; the authors' summary reports over <b>7 million operations per second</b> on 100 servers for a 95%-read workload, with under 5% overhead versus no isolation (figures from Bailis's blog summary; the paper's abstract states linear scaling and limited overhead). RAMP-Fast reads take one round trip when there is no racing writer and two when there is.</li>
+    <li>Facebook later layered RAMP-style atomic visibility on its TAO store (RAMP-TAO, VLDB 2021).</li>
+  </ul></div>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[BAILIS14b]</b> Bailis, Peter, Alan Fekete, Michael J. Franklin, Ali Ghodsi, Joseph M. Hellerstein and Ion Stoica, "Coordination Avoidance in Database Systems", <i>PVLDB</i> 8(3): 185–196, 2014. Defines I-confluence and classifies common invariants. Read it to learn to ask "does this rule actually need coordination?"</li>
+    <li><b>[BAILIS14c]</b> Bailis, Peter, Alan Fekete, Ali Ghodsi, Joseph M. Hellerstein and Ion Stoica, "Scalable Atomic Visibility with RAMP Transactions", <i>ACM Transactions on Database Systems</i> 41(3) (as listed in the book). Read atomic isolation and three RAMP variants (Fast, Small, Hybrid) for secondary indexes, foreign keys and materialized views.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch12_anti_entropy_and_dissemination.html">Ch.12</a> and Ch.11's CRDTs: merge functions that always converge are the same idea, applied to data types instead of invariants.</li>
+    <li>Section 12: read atomic is weaker than snapshot isolation (no single snapshot), but it never needs locks or a timestamp oracle.</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · SUMMARY + FURTHER READING</div><h2>Atomic commit is simple but fragile; consensus is the way forward</h2></div><span class="chip">pdf p433–434</span></div>
+  <p>The chapter covered several ways to implement distributed transactions. 2PC and 3PC are easy to understand and implement, but have shortcomings. In 2PC the coordinator (or a substitute) must be alive for the whole commitment, which <b>significantly reduces availability</b>. 3PC lifts that requirement in some cases but is <b>prone to split brain</b> under a network partition.</p>
+  <p>Modern databases often implement distributed transactions with <b>consensus</b> algorithms (next chapter): Calvin and Spanner both use Paxos. Consensus algorithms are more involved than atomic commitment, but they tolerate faults much better, <b>decouple decisions from their initiators</b>, and let participants <b>decide on a value</b> rather than on whether to accept a value [GRAY04].</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Approach</th><th>How it orders/commits</th><th>Survives coordinator loss?</th><th>Round trips to commit (multi-shard)</th><th>Isolation</th><th>Seen in</th></tr></thead>
+    <tbody>
+      <tr><td>2PC</td><td>coordinator collects unanimous votes</td><td>no: blocks</td><td class="num">2</td><td>whatever local CC gives (often 2PL)</td><td>MySQL XA, PostgreSQL, MongoDB, Kafka</td></tr>
+      <tr><td>3PC</td><td>votes + prepare round + timeouts</td><td>yes, unless partitioned</td><td class="num">3</td><td>same</td><td>rarely</td></tr>
+      <tr><td>Calvin</td><td>sequencer fixes order per epoch (Paxos), deterministic execution</td><td>yes (replay input log)</td><td>no commit round; epoch wait + replication</td><td>serializable</td><td>FaunaDB</td></tr>
+      <tr><td>Spanner</td><td>2PC over Paxos groups, TrueTime commit wait</td><td>yes (leaders replicated)</td><td class="num">2 (each a Paxos write) + commit wait</td><td>external consistency</td><td>Spanner, CockroachDB, YugaByte DB</td></tr>
+      <tr><td>Percolator</td><td>client-driven 2PC, primary lock, timestamp oracle</td><td>client loss resolved via primary lock</td><td class="num">2 + 2 oracle calls</td><td>snapshot isolation</td><td>TiDB</td></tr>
+      <tr><td>RAMP</td><td>2PC to install versions; readers repair via metadata</td><td>no blocking of readers</td><td class="num">2 (writes), 1–2 (reads)</td><td>read atomic</td><td>research; RAMP-TAO <i>(not in the book)</i></td></tr>
+    </tbody>
+  </table></div>
+  <p class="foot">The "seen in" column and the round-trip counts combine the chapter with sections 3–13 above; RAMP's read round trips and RAMP-TAO come from outside the book.</p>
+  <h3>Further reading the book lists</h3>
+  <ul class="plain papers">
+    <li><b>Atomic commitment with local transaction processing and recovery:</b> Silberschatz, Korth and Sudarshan, <i>Database System Concepts</i> (6th ed.), McGraw-Hill, 2010; Garcia-Molina, Ullman and Widom, <i>Database Systems: The Complete Book</i> (2nd ed.), Pearson, 2008.</li>
+    <li><b>Recent progress</b> (the book's chronological list): Cowling and Liskov, "Granola: low-overhead distributed transaction coordination", USENIX ATC 2012 · Balakrishnan et al., "Tango: distributed data structures over a shared log", SOSP 2013 · Ding, Kot, Demers and Gehrke, "Centiman: elastic, high performance optimistic concurrency control by watermarking", SoCC 2015 · Dragojević et al., "No compromises: distributed transactions with consistency, availability, and performance", SOSP 2015 (the FaRM system, <i>name not in the book</i>) · Zhang, Sharma, Szekeres, Krishnamurthy and Ports, "Building consistent transactions with inconsistent replication", SOSP 2015 (TAPIR, <i>name not in the book</i>).</li>
+  </ul>
+  <p class="foot">Footnotes on pdf p434: (1) 3PC's non-blocking claim assumes a highly reliable network, one without partitions [ALHOUMAILY10] (section 2). (2) MongoDB's documentation said that as of v3.6 its 2PC gives only transaction-like semantics (section 5).</p>
+  <details class="papers"><summary>Papers this section relies on</summary><ul class="papers">
+    <li><b>[GRAY04]</b> Gray, Jim and Leslie Lamport, "Consensus on Transaction Commit", <i>ACM Transactions on Database Systems</i> 31(1): 133–160 (as listed in the book). Paxos Commit: replace 2PC's single coordinator with Paxos acceptors so commit is non-blocking with F failures; with F = 0 it is exactly 2PC. The bridge between this chapter and the next.</li>
+  </ul></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch14_consensus.html">Ch.14 Consensus</a>: broadcast, Paxos (and Multi-Paxos), Raft, ZAB, the tools this chapter's modern systems stand on.</li>
+    <li>My syllabus (<code>Notes/syllabus.html</code>, section 2D Kafka) lists exactly-once semantics and idempotent consumers; Kafka's exactly-once is the 2PC from section 3 plus idempotent producers.</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Why can't single-partition concurrency control (2PL, OCC) on its own make a cross-shard transfer atomic?</summary><p>Each partition can only decide for itself. Nothing stops partition A from committing its half while partition B aborts or crashes. You need a distributed commit and rollback protocol that makes all partitions reach the same outcome (sections 1–2).</p></details>
+  <details><summary>2. In 2PC, what exactly does a cohort promise when it votes yes, and what must it do before sending the vote?</summary><p>That it will not abort on its own; only the coordinator may abort. Before voting it must execute its part and make it durable (force a "prepared" record), so it can keep the promise even after a crash (sections 3–4).</p></details>
+  <details><summary>3. A cohort crashes before voting. A different cohort crashes after voting yes. What does each do on recovery?</summary><p>The first has no prepared record, so it rolls back its part (the coordinator will have aborted after a timeout). The second is in doubt: it must keep locks and not serve those rows until it learns the coordinator's decision (section 4).</p></details>
+  <details><summary>4. Why is it safe for an in-doubt cohort to copy a "commit" decision from a peer?</summary><p>2PC decisions are unanimous: a cohort can only have committed if the coordinator decided commit, and then every cohort must commit. Copying a decision can never contradict it (section 5).</p></details>
+  <details><summary>5. Why is 2PC called blocking? Describe the exact failure.</summary><p>If the coordinator fails after collecting votes and before telling anyone the result, all cohorts are prepared and none knows the outcome. Guessing could contradict a decision the coordinator logged or sent to an unreachable node, so they must wait, holding locks, until it (or a replacement that re-collects the votes) returns (section 5).</p></details>
+  <details><summary>6. What does 3PC's extra phase buy, and what does a cohort do on timeout in each state?</summary><p>It guarantees no one commits until everyone is prepared, so a cohort's own state tells it what is safe: timeout while only "voted" → abort; timeout while "prepared" → commit (section 6).</p></details>
+  <details><summary>7. Why does 3PC's fix fail under a network partition, and why doesn't 2PC have that failure?</summary><p>Cohorts that received Prepare commit on timeout; cohorts cut off before it abort on timeout: split brain. 3PC's safety depends on timeouts meaning "dead", which a partition breaks. 2PC never decides by timeout after a yes vote; it blocks instead, staying consistent (section 7).</p></details>
+  <details><summary>8. Calvin avoids a commit protocol at the end of each transaction. What does it pay instead?</summary><p>Transactions wait for their epoch (about 10 ms in the paper) to close and be replicated through Paxos or a leader before running, and they must declare read and write sets up front; transactions whose sets depend on reads aren't natively supported (section 8).</p></details>
+  <details><summary>9. In Calvin's worker steps, which nodes execute the write logic, and why don't they send results to each other?</summary><p>The active participants: nodes holding write-set records. Passive nodes only forward their local reads. Results aren't forwarded because each active node gets the same inputs and executes deterministically, so it computes the same results itself (section 8).</p></details>
+  <details><summary>10. Why does Spanner's coordinator wait after choosing a commit timestamp, and roughly how long?</summary><p>So that when results are released, the timestamp is certainly in the past by TrueTime's bounds. Any later transaction then gets a larger timestamp: external consistency. The wait is about 2ε (a few ms with ε ≈ 4 ms in the paper), mostly overlapped with Paxos logging (section 9).</p></details>
+  <details><summary>11. How does Spanner keep 2PC available when a cohort's leader dies?</summary><p>Each cohort is a Paxos group whose leader logs prepare and commit records through Paxos. A new leader reads the group's log and continues, so 2PC only stalls if a group loses its majority (sections 4, 9).</p></details>
+  <details><summary>12. A cluster grows from 10 to 11 nodes. Roughly what share of keys move under hash mod N, and under consistent hashing?</summary><p>mod N: about 10/11 ≈ 91%. Consistent hashing: about 1/11 ≈ 9%, all taken from the new node's ring neighbour(s) (sections 10–11).</p></details>
+  <details><summary>13. Snapshot isolation prevents read skew. Give the reason, and say what it still allows.</summary><p>All reads come from one snapshot at the start timestamp, so a value committed later (like T2's new y) is invisible. It still allows write skew: two transactions writing different rows, each valid on its own snapshot, together break an invariant (section 12).</p></details>
+  <details><summary>14. In Percolator, what is the commit point, and how does a later transaction clean up after a crashed client?</summary><p>Replacing the primary lock with a write record. A later transaction that finds a leftover secondary lock checks the primary: if it was committed, it rolls the secondary forward; if the primary lock is still there (and its owner is dead), the paper rolls back (section 12).</p></details>
+  <details><summary>15. Which is I-confluent under "balance ≥ 0": deposits or withdrawals? What does RAMP's metadata let a reader do?</summary><p>Deposits (merged sums of non-negative changes stay ≥ 0); withdrawals aren't, since two valid withdrawals can overdraw together. RAMP's per-write list of sibling keys and timestamp lets a reader spot a fractured read and fetch the missing version in one more round, without locks (section 13).</p></details>
+</section>
+
+<footer>Built from Alex Petrov, <i>Database Internals: A Deep Dive into How Distributed Data Systems Work</i> (O'Reilly, 2019), Chapter 13 "Distributed Transactions" (PDF pages 403–434, bibliography pdf p489–516), explained in my own words with my own examples and redrawn figures. Simulations use generated workloads and modelled costs, not measurements of real systems. Material from outside the book (real-system details, paper numbers, code sketches) is marked "Beyond the book" or "(not in the book)".</footer>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // ======================= chapter 13 helpers =======================
+  let seed = 7;
+  const PAL = ['c1', 'c2', 'c3', 'buy', 'sell', 'price', 'muted'];
+  function hash32(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+    return h >>> 0;
+  }
+  function shuffle(arr, r) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function cvs(id) {
+    const c = $(id); if (!c) return null;
+    const dpr = window.devicePixelRatio || 1; const W = c.clientWidth, H = c.clientHeight; if (!W || !H) return null;
+    c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+    const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    g.font = '11px ' + css('mono'); return { g, W, H };
+  }
+  const pct = (v, d = 1) => (v * 100).toFixed(d) + '%';
+
+  // ---- scenario model shared by every message step-through ----
+  function Scn(lanes) { this.lanes = lanes; this.msgs = []; this.marks = []; this.steps = []; this.phases = []; this.st = lanes.map(() => ({ s: 'idle', c: 'dim', log: [], nw: false })); }
+  Scn.prototype.set = function (i, s, c, log) { const x = this.st[i]; x.s = s; x.c = c || ''; if (log) x.log = x.log.concat([log]); x.nw = true; };
+  Scn.prototype.msg = function (from, to, t0, t1, label, kind) { this.msgs.push({ k: this.steps.length, from, to, t0, t1, label, kind: kind || 'ok' }); };
+  Scn.prototype.mark = function (lane, t, kind, label) { this.marks.push({ k: this.steps.length, lane, t, kind, label }); };
+  Scn.prototype.step = function (text) { this.steps.push({ text, st: this.st.map((x) => ({ s: x.s, c: x.c, log: x.log.slice(), nw: x.nw })) }); this.st.forEach((x) => { x.nw = false; }); };
+
+  let svgN = 0;
+  function seqSVG(sc, cur, T) {
+    const L = sc.lanes.length, W = 760, x0 = 112, x1 = 748, top = 40;
+    const gap = L > 1 ? Math.min(54, 250 / (L - 1)) : 40; const H = top + gap * (L - 1) + 26;
+    const X = (t) => x0 + t / T * (x1 - x0), Y = (i) => top + i * gap;
+    const mid = 'q' + (++svgN);
+    const col = { ok: 'var(--ink)', no: 'var(--sell)', lost: 'var(--muted)', peer: 'var(--c2)', now: 'var(--c1)' };
+    let o = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Message sequence diagram: time runs left to right, one line per node"><defs>`;
+    Object.keys(col).forEach((k) => { o += `<marker id="${mid}${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:${col[k]}"/></marker>`; });
+    o += '</defs>';
+    sc.phases.forEach((p) => { o += `<line x1="${X(p.t)}" y1="${top - 26}" x2="${X(p.t)}" y2="${H - 6}" style="stroke:var(--rule);stroke-dasharray:3 4"/><text x="${X(p.t) + 4}" y="${top - 16}" style="fill:var(--muted);font-size:11px">${p.label}</text>`; });
+    sc.lanes.forEach((n, i) => { o += `<line x1="${x0 - 6}" y1="${Y(i)}" x2="${x1}" y2="${Y(i)}" style="stroke:var(--rule)"/><text x="6" y="${Y(i) + 4}" style="font-size:12px">${n}</text>`; });
+    sc.msgs.forEach((m) => {
+      if (m.k > cur) return;
+      const now = m.k === cur; const kind = now && m.kind === 'ok' ? 'now' : m.kind;
+      const xa = X(m.t0), ya = Y(m.from); let xb = X(m.t1), yb = Y(m.to);
+      if (m.kind === 'lost') { xb = xa + (xb - xa) * 0.6; yb = ya + (yb - ya) * 0.6; }
+      o += `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" style="stroke:${col[kind]};stroke-width:${now ? 2.2 : 1.3}${m.kind === 'lost' ? ';stroke-dasharray:5 4' : ''}" ${m.kind === 'lost' ? '' : `marker-end="url(#${mid}${kind})"`}/>`;
+      if (m.kind === 'lost') o += `<text x="${xb}" y="${yb + 5}" text-anchor="middle" style="fill:var(--sell);font-size:15px">✕</text>`;
+      if (m.label) { const lx = (xa + xb) / 2 + 5, ly = (ya + yb) / 2 - 3; o += `<text x="${lx}" y="${ly}" style="fill:${col[kind]};font-size:11px">${m.label}</text>`; }
+    });
+    sc.marks.forEach((m) => {
+      if (m.k > cur) return;
+      const x = X(m.t), y = Y(m.lane); const now = m.k === cur;
+      if (m.kind === 'crash') o += `<text x="${x}" y="${y + 6}" text-anchor="middle" style="fill:var(--sell);font-size:20px;font-weight:600">✕</text><text x="${x}" y="${y - 10}" text-anchor="middle" style="fill:var(--sell);font-size:10px">${m.label || 'crash'}</text>`;
+      else {
+        const c = m.kind === 'log' ? 'var(--c2)' : m.kind === 'ok' ? 'var(--buy)' : 'var(--c1)';
+        const sym = m.kind === 'log' ? '■' : m.kind === 'ok' ? '●' : '◷';
+        o += `<text x="${x}" y="${y + 4}" text-anchor="middle" style="fill:${c};font-size:12px">${sym}</text><text x="${x}" y="${y - 8}" text-anchor="middle" style="fill:${c};font-size:10px;${now ? 'font-weight:600' : ''}">${m.label || ''}</text>`;
+      }
+    });
+    return o + '</svg>';
+  }
+  function stTable(sc, k) {
+    const st = sc.steps[k].st;
+    return '<table class="st"><thead><tr><th>Node</th><th>State now</th><th>Durable log</th></tr></thead><tbody>' +
+      sc.lanes.map((n, i) => `<tr><td>${n}</td><td class="${st[i].c}${st[i].nw ? ' new' : ''}">${st[i].s}</td><td class="dim">${st[i].log.join(' · ') || '—'}</td></tr>`).join('') + '</tbody></table>';
+  }
+  function stepper(p, build, render) {
+    const S = { k: 0, sc: null };
+    const draw = () => { if (!S.sc) S.sc = build(); S.k = Math.max(0, Math.min(S.k, S.sc.steps.length - 1)); render(S.sc, S.k); };
+    $(p + 'prev').addEventListener('click', () => { S.k--; draw(); });
+    $(p + 'next').addEventListener('click', () => { S.k++; draw(); });
+    $(p + 'reset').addEventListener('click', () => { S.k = 0; draw(); });
+    S.rebuild = () => { S.sc = null; S.k = 0; draw(); };
+    reg(draw); return S;
+  }
+  function seqRender(txt, d, tbl, cnt, T) {
+    return (sc, k) => {
+      $(txt).innerHTML = sc.steps[k].text; $(d).innerHTML = seqSVG(sc, k, T);
+      if (tbl) $(tbl).innerHTML = stTable(sc, k);
+      $(cnt).textContent = `step ${k + 1} / ${sc.steps.length}`;
+    };
+  }
+
+  // ======================= 01: transfer demo =======================
+  reg(() => {
+    const mode = $('sel1m').value, crash = $('sel1c').value; const A0 = 1000, B0 = 500, amt = 300;
+    let a = A0 - amt, b = B0 + amt, an = 'debited ₹300', bn = 'credited ₹300', note, ok = true;
+    if (mode === 'none') {
+      if (crash === 'mid') { b = B0; bn = 'crashed before crediting'; ok = false; note = 'Pune applied its half on its own; Delhi never did. ₹300 has disappeared: total ₹' + (a + b) + ' instead of ₹1,500. No serial history produces this state.'; }
+      else if (crash === 'late') { bn = 'credited ₹300, then crashed before replying'; note = 'Both halves happened to be applied, but nobody coordinated it: the client got an error and may retry the transfer, applying it twice. Luck, not a guarantee.'; }
+      else note = 'Both halves applied. Fine this time, but nothing would have stopped a crash in between.';
+    } else {
+      if (crash === 'mid') { a = A0; b = B0; an = 'prepared, then rolled back on Abort'; bn = 'down: never voted'; note = 'Delhi never voted, the coordinator timed out and aborted, and Pune rolled back its prepared half. Neither half is visible: total ₹1,500.'; }
+      else if (crash === 'late') { an = 'committed'; bn = 'prepared → down → on restart asks the outcome → commits'; note = 'Both voted yes, so the coordinator committed. Delhi had its "prepared" record on disk; after restarting it was in doubt until it learned the decision, then committed. Total ₹1,500.'; }
+      else note = 'Both prepared, both voted yes, both committed. Total ₹1,500.';
+    }
+    $('st1').innerHTML = `<div class="part"><b>Pune node</b>Asha: ₹${A0} → <span class="${ok ? 'ok' : ''}">₹${a}</span><span class="msg">${an}</span></div>` +
+      `<div class="part"><b>Delhi node</b>Ravi: ₹${B0} → <span class="${ok ? 'ok' : 'bad'}">₹${b}</span><span class="msg">${bn}</span></div>` +
+      `<div class="part ${ok ? '' : 'active'}"><b>Invariant</b>Asha + Ravi = <span class="${a + b === 1500 ? 'ok' : 'bad'}">₹${a + b}</span> (should be ₹1500)</div>`;
+    $('r1').innerHTML = note;
+  });
+  $('sel1m').addEventListener('change', redrawAll); $('sel1c').addEventListener('change', redrawAll);
+
+  // ======================= 02: unanimity =======================
+  const d2 = reg(() => {
+    const ids = ['v2a', 'v2b', 'v2c', 'v2d']; const v = ids.map((x) => $(x).value);
+    const coordSees = v.map((x) => (x === 'liar' ? 'yes' : x));
+    const down = coordSees.filter((x) => x === 'down').length, no = coordSees.filter((x) => x === 'no').length;
+    const decision = down || no ? 'abort' : 'commit';
+    $('st2').innerHTML = v.map((x, i) => {
+      const local = x === 'liar' ? (decision === 'commit' ? 'secretly aborts' : 'secretly commits') : x === 'down' ? 'no answer' : decision === 'commit' ? 'commits' : 'aborts';
+      const told = x === 'down' ? '— (timeout)' : coordSees[i];
+      return `<div class="part ${x === 'liar' ? 'active' : ''}"><b>Cohort ${i + 1}</b>tells coordinator: ${told}<span class="msg">does: ${local}</span></div>`;
+    }).join('');
+    const liars = v.filter((x) => x === 'liar').length; const el = $('r2');
+    if (liars) { el.className = 'verdict bad'; el.textContent = `Coordinator decides ${decision.toUpperCase()}, but ${liars} cohort(s) did the opposite. The outcome is no longer all-or-nothing, and no one can detect it: atomic commitment assumes no Byzantine failures.`; }
+    else if (down) { el.className = 'verdict warn'; el.textContent = `ABORT: ${down} cohort(s) never answered; after the timeout a missing vote counts as no. One down node vetoes the transaction.`; }
+    else if (no) { el.className = 'verdict warn'; el.textContent = `ABORT: ${no} cohort(s) voted no. One no is enough.`; }
+    else { el.className = 'verdict good'; el.textContent = 'COMMIT: every cohort voted yes, so every cohort commits.'; }
+  });
+  ['v2a', 'v2b', 'v2c', 'v2d'].forEach((x) => $(x).addEventListener('change', d2));
+
+  // ======================= 2PC builder (sections 3-5) =======================
+  function build2pc(o) {
+    const N = o.N; const lanes = ['Coordinator']; for (let i = 1; i <= N; i++) lanes.push('Cohort ' + i);
+    const sc = new Scn(lanes); sc.phases = [{ t: 0.6, label: 'propose phase' }, { t: 4.7, label: 'commit / abort phase' }];
+    const C = []; for (let i = 1; i <= N; i++) C.push(i);
+    const crashed = o.cc && o.cc !== 'none' ? N : -1;
+    sc.set(0, 'begin T1', 'wait', 'begin T1'); C.forEach((i) => sc.set(i, 'running other work', 'dim'));
+    sc.step(`The client asks the coordinator to commit transaction T1, which touches ${N} partitions. The coordinator writes "begin T1" and the list of cohorts to its log.`);
+    C.forEach((i) => sc.msg(0, i, 1, 2 + 0.12 * i, i === 1 ? 'Propose T1' : ''));
+    sc.set(0, 'collecting votes', 'wait'); C.forEach((i) => sc.set(i, 'executing its part', 'wait'));
+    let t = 'The coordinator sends Propose(T1) to every cohort, carrying the operations each one must run on its partition.';
+    if (o.cc === 'before') { sc.mark(N, 2.7, 'crash', 'crash'); sc.set(N, 'DOWN (no prepared record)', 'bad'); t += ` Cohort ${N} crashes before it can answer.`; }
+    sc.step(t);
+    const votes = {};
+    C.forEach((i) => {
+      if (i === crashed && o.cc === 'before') return;
+      const v = i === o.no ? 'no' : 'yes'; votes[i] = v;
+      sc.msg(i, 0, 2.8 + 0.1 * i, 3.8 + 0.12 * i, v === 'yes' ? 'Yes' : 'No', v === 'yes' ? 'ok' : 'no');
+      if (v === 'yes') sc.set(i, 'PREPARED (promised yes)', 'wait', 'prepared T1'); else sc.set(i, 'aborted its part', 'bad', 'abort T1');
+    });
+    t = o.no ? `Cohorts run their parts. Cohort ${o.no} can't (say a conflicting transaction already committed), so it logs abort and votes No. The others force a "prepared" record and vote Yes.`
+      : 'Each live cohort runs its part, forces a "prepared" record to its log, and votes Yes. The vote is a promise: from now on it may not abort on its own.';
+    if (o.cc === 'after') { sc.mark(N, 4.3, 'crash', 'crash'); sc.set(N, 'DOWN (log: prepared T1)', 'bad'); t += ` Right after sending Yes, cohort ${N} crashes. Its "prepared" record is safe on disk.`; }
+    if (o.cc === 'before') { sc.mark(0, 4.4, 'timeout', 'timeout'); t += ` The coordinator waits for cohort ${N}, then times out: a missing vote counts as No.`; }
+    sc.step(t);
+    const allYes = C.every((i) => votes[i] === 'yes'); const dec = allYes ? 'commit' : 'abort', D = allYes ? 'Commit' : 'Abort';
+    if (o.co === 'afterVotes') {
+      sc.mark(0, 4.6, 'crash', 'crash'); sc.set(0, 'DOWN', 'bad');
+      sc.step('The coordinator has every vote but crashes before telling anyone the result (Figure 13-4). Did it log a decision first? Nobody outside can know.');
+      C.forEach((i) => sc.mark(i, 7.0, 'timeout', 'timeout'));
+      for (let i = 2; i <= N; i++) sc.msg(i, 1, 7.3, 7.9, i === 2 ? 'outcome?' : '', 'peer');
+      sc.msg(1, 2, 8.1, 8.6, "don't know", 'peer');
+      C.forEach((i) => sc.set(i, 'BLOCKED: prepared, outcome unknown, holding locks', 'bad'));
+      sc.step("Cohorts time out waiting for phase 2 and ask each other. Every peer is prepared and in doubt too, so nobody can decide safely. They keep T1's locks and wait: 2PC is blocking.");
+      sc.phases.push({ t: 9, label: 'replacement' });
+      C.forEach((i) => sc.msg(0, i, 9.3, 10.1 + 0.1 * i, i === 1 ? 'Propose T1 again' : ''));
+      C.forEach((i) => sc.msg(i, 0, 10.5, 11.2 + 0.1 * i, i === 1 ? 'Yes (from log)' : ''));
+      sc.set(0, 'replacement: re-collecting votes', 'wait', 'begin T1 (new coordinator)');
+      sc.step('A replacement coordinator (or the old one after recovery) collects the votes for T1 again. Cohorts still hold their promises, so they answer Yes from their logs.');
+      sc.set(0, 'decided COMMIT', 'ok', 'commit T1');
+      C.forEach((i) => sc.msg(0, i, 11.8, 12.6 + 0.1 * i, i === 1 ? 'Commit' : ''));
+      C.forEach((i) => sc.set(i, 'COMMITTED, locks released', 'ok', 'commit T1'));
+      sc.step("It decides, logs and broadcasts Commit. Cohorts commit and finally release T1's locks. Everything that needed those rows waited for the coordinator's whole downtime.");
+      return sc;
+    }
+    sc.set(0, 'decided ' + dec.toUpperCase(), allYes ? 'ok' : 'bad', dec + ' T1'); sc.mark(0, 4.5, 'log', 'force ' + dec);
+    sc.step(allYes ? 'All votes are Yes. The coordinator forces "commit T1" to its log. This record is the commit point of the whole distributed transaction: T1 is now committed, whatever crashes next.'
+      : 'At least one vote is No or missing, so the coordinator forces "abort T1" to its log. One rejection aborts the whole round.');
+    if (o.co === 'partial') {
+      sc.msg(0, 1, 5, 6, 'Commit'); sc.mark(0, 5.7, 'crash', 'crash'); sc.set(0, 'DOWN (log: commit T1)', 'bad');
+      sc.set(1, 'COMMITTED', 'ok', 'commit T1');
+      sc.step('The coordinator sends Commit to cohort 1 and crashes before reaching the others (Figure 13-3). Cohort 1 commits.');
+      for (let i = 2; i <= N; i++) { sc.mark(i, 7.2, 'timeout', 'timeout'); sc.msg(i, 1, 7.5, 8.1 + 0.05 * i, i === 2 ? 'outcome?' : '', 'peer'); sc.set(i, 'in doubt: asking peers', 'wait'); }
+      sc.step(`Cohorts 2–${N} time out waiting for phase 2 and ask their peers (or a backup coordinator) what was decided.`);
+      for (let i = 2; i <= N; i++) { sc.msg(1, i, 8.7, 9.4 + 0.05 * i, i === 2 ? 'committed' : '', 'peer'); sc.set(i, 'COMMITTED (decision copied)', 'ok', 'commit T1'); }
+      sc.step('Cohort 1 answers "committed". Copying that is safe because 2PC decisions are unanimous: a commit anywhere means the coordinator decided commit for everyone. No blocking this time.');
+      return sc;
+    }
+    C.forEach((i) => { if (i === crashed) { sc.msg(0, i, 5, 6 + 0.1 * i, '', 'lost'); return; } sc.msg(0, i, 5, 6 + 0.1 * i, i === 1 ? D : ''); });
+    C.forEach((i) => { if (i === crashed || votes[i] === 'no') return; sc.set(i, allYes ? 'COMMITTED' : 'ABORTED (rolled back)', allYes ? 'ok' : 'bad', dec + ' T1'); });
+    sc.step(`The coordinator sends ${D} to every cohort. Each logs it, ${allYes ? 'makes T1 visible (a pointer swap: the real work happened during prepare)' : 'undoes its part'} and releases its locks.` +
+      (crashed > 0 ? ` The message to crashed cohort ${N} is lost; the coordinator keeps the decision in its log and will answer when asked.` : ''));
+    C.forEach((i) => { if (i !== crashed) sc.msg(i, 0, 6.6 + 0.08 * i, 7.6 + 0.1 * i, i === 1 ? 'Ack' : ''); });
+    if (o.cc === 'after') { sc.set(0, `waiting for cohort ${N}'s ack`, 'wait'); sc.step(`Live cohorts acknowledge. The coordinator still lacks cohort ${N}'s ack, so it must keep T1's decision in its log.`); }
+    else { sc.set(0, 'done (' + dec + ')', allYes ? 'ok' : 'bad', 'end T1'); sc.step('Cohorts acknowledge. The coordinator writes "end T1" and can forget the transaction.'); }
+    if (o.cc === 'after') {
+      sc.phases.push({ t: 8.4, label: 'recovery' });
+      sc.mark(N, 8.8, 'ok', 'restart'); sc.set(N, 'IN DOUBT: prepared, no decision; T1 rows unreadable', 'wait');
+      sc.step(`Cohort ${N} restarts. Its log says "prepared T1" and nothing more. It promised, so it can't decide alone: it re-takes T1's locks and refuses to serve those rows.`);
+      sc.msg(N, 0, 9.2, 10.1, 'outcome of T1?', 'peer'); sc.msg(0, N, 10.5, 11.4, 'Commit');
+      sc.set(N, 'COMMITTED', 'ok', 'commit T1');
+      sc.step(`It asks the coordinator, which answers from its decision log: Commit. Cohort ${N} commits, releases its locks and serves again.`);
+      sc.msg(N, 0, 11.8, 12.7, 'Ack'); sc.set(0, 'done (commit)', 'ok', 'end T1');
+      sc.step('Its Ack arrives; only now can the coordinator write "end T1" and forget the transaction.');
+    }
+    if (o.cc === 'before') {
+      sc.phases.push({ t: 8.4, label: 'recovery' });
+      sc.mark(N, 9, 'ok', 'restart'); sc.set(N, 'ABORTED (it never promised)', 'bad', 'abort T1');
+      sc.step(`When cohort ${N} restarts, its log has no "prepared" record for T1: it never promised anything. It rolls back its partial work by itself, which matches the coordinator's abort.`);
+    }
+    return sc;
+  }
+
+  // ---- 03 ----
+  const S3 = stepper('b3', () => build2pc({ N: val('n3'), no: $('sel3').value === 'no' ? 2 : 0, cc: 'none', co: 'none' }), (sc, k) => {
+    seqRender('txt3', 'd3', 'tbl3', 'c3n', 14)(sc, k);
+    const shown = sc.msgs.filter((m) => m.k <= k).length; const forced = sc.steps[k].st.reduce((s, x) => s + x.log.filter((l) => !/^begin|^end/.test(l)).length, 0);
+    const N = val('n3');
+    $('r3').innerHTML = `messages so far <b>${shown}</b> (full round: <b>${4 * N}</b> = 4N) · forced log writes so far <b>${forced}</b> (full commit: <b>${2 * N + 1}</b> = 2N+1) · round trips: <b>2</b>`;
+  });
+  bindRange('n3', () => S3.rebuild()); $('sel3').addEventListener('change', () => S3.rebuild());
+
+  // ---- 04 ----
+  const S4 = stepper('b4', () => build2pc({ N: 3, no: 0, cc: $('sel4').value, co: 'none' }), seqRender('txt4', 'd4', 'tbl4', 'c4n', 14));
+  $('sel4').addEventListener('change', () => S4.rebuild());
+  function binom(n, k) { let r = 1; for (let i = 1; i <= k; i++) r = r * (n - k + i) / i; return r; }
+  const d4 = reg(() => {
+    const p = val('p4') / 10000, r = +$('g4').value; $('p4o').textContent = (p * 100).toFixed(2) + '%';
+    let q = 0; for (let k = Math.floor(r / 2) + 1; k <= r; k++) q += binom(r, k) * Math.pow(p, k) * Math.pow(1 - p, r - k);
+    const n = 51, single = nulls(n), group = nulls(n);
+    for (let N = 1; N < n; N++) { single[N] = Math.pow(p, N); group[N] = Math.pow(q, N); }
+    plot('c4', { n, x0: 1, x1: 50, ymin: 0, ymax: 1, lines: [{ d: single, col: 'sell', w: 2, label: 'single-node cohorts: p^N' }, { d: group, col: 'buy', w: 2, label: `Paxos-group cohorts (${r} replicas)` }], label: 'P(transaction can commit) vs shards touched (1–50)' });
+    $('r4').innerHTML = `one group up: <b>${(q * 100).toFixed(4)}%</b> · 10 shards: single <b>${pct(Math.pow(p, 10), 2)}</b> vs groups <b>${pct(Math.pow(q, 10), 4)}</b> · 50 shards: single <b>${pct(Math.pow(p, 50), 2)}</b> vs groups <b>${pct(Math.pow(q, 50), 4)}</b> · modelled, independent failures`;
+  });
+  bindRange('p4', d4); $('g4').addEventListener('change', d4);
+
+  // ---- 05 ----
+  const S5 = stepper('b5', () => build2pc({ N: 3, no: 0, cc: 'none', co: $('sel5').value === 'partial' ? 'partial' : 'afterVotes' }), seqRender('txt5', 'd5', 'tbl5', 'c5n', 14));
+  $('sel5').addEventListener('change', () => S5.rebuild());
+  const d5 = reg(() => {
+    const v = ['t5a', 't5b', 't5c'].map((x) => $(x).value); const el = $('r5');
+    if (v.includes('committed') && (v.includes('aborted') || v.includes('novote'))) { el.className = 'verdict bad'; el.textContent = 'Impossible combination: if any peer committed, every cohort voted yes and the coordinator decided commit, so no peer can have aborted or skipped its yes vote.'; return; }
+    if (v.includes('committed')) { el.className = 'verdict good'; el.textContent = 'COMMIT. A peer committed, which proves the coordinator decided commit. Copying it is safe.'; }
+    else if (v.includes('aborted')) { el.className = 'verdict good'; el.textContent = 'ABORT. A peer aborted, which can only happen if the decision was abort (or it never promised). Safe to abort.'; }
+    else if (v.includes('novote')) { el.className = 'verdict good'; el.textContent = 'ABORT. A peer never voted yes, so the coordinator cannot have decided commit. Safe to abort.'; }
+    else if (v.includes('down')) { el.className = 'verdict bad'; el.textContent = 'BLOCKED. Every reachable peer is in doubt, and an unreachable peer (or the coordinator) may already know the outcome. Any guess could contradict it: keep the locks and wait.'; }
+    else { el.className = 'verdict bad'; el.textContent = 'BLOCKED. Everyone voted yes and nobody heard the decision. Only the coordinator knows (it may have logged commit or abort). Wait for it or a replacement to re-collect votes.'; }
+  });
+  ['t5a', 't5b', 't5c'].forEach((x) => $(x).addEventListener('change', d5));
+  const d5b = reg(() => {
+    const h = val('h5'), q = val('q5'); const blocked = h * q;
+    $('r5b').innerHTML = `transactions stuck behind T1's locks: <b>${blocked.toLocaleString('en-IN')}</b> (= ${h} s × ${q}/s) · each waits up to <b>${h} s</b> instead of milliseconds · modelled: assumes every one of them needs a row T1 locked`;
+  });
+  bindRange('h5', d5b); bindRange('q5', d5b);
+
+  // ======================= 3PC (sections 6-7) =======================
+  function build3pc(scn) {
+    const C = [1, 2, 3]; const sc = new Scn(['Coordinator', 'Cohort 1', 'Cohort 2', 'Cohort 3']);
+    sc.phases = [{ t: 0.5, label: 'propose' }, { t: 4.6, label: 'prepare' }, { t: 8.8, label: 'commit' }];
+    sc.set(0, 'begin T1', 'wait', 'begin T1'); C.forEach((i) => sc.set(i, 'idle', 'dim'));
+    sc.step('The coordinator starts round T1 and logs it.');
+    C.forEach((i) => sc.msg(0, i, 1, 2 + 0.12 * i, i === 1 ? 'Propose' : '')); C.forEach((i) => sc.msg(i, 0, 2.5 + 0.1 * i, 3.6 + 0.1 * i, i === 1 ? 'Yes' : ''));
+    C.forEach((i) => sc.set(i, 'VOTED yes · timeout ⇒ abort', 'wait', 'voted yes')); sc.set(0, 'votes collected', 'wait');
+    sc.step('Propose phase, as in 2PC: the coordinator sends the proposal and every cohort votes Yes. Each cohort starts a timer; in this state its timeout action is abort.');
+    if (scn === 'crashPropose') {
+      sc.mark(0, 4.1, 'crash', 'crash'); sc.set(0, 'DOWN', 'bad');
+      sc.step('The coordinator crashes before sending Prepare. No cohort has reached the prepared state, so nobody can have committed.');
+      C.forEach((i) => { sc.mark(i, 7, 'timeout', 'timeout'); sc.set(i, 'ABORTED (timed out while voted)', 'bad', 'abort T1'); });
+      sc.step('Cohorts time out in the "voted" state and abort, each on its own and all the same way. No blocking and no inconsistency.');
+      return sc;
+    }
+    C.forEach((i) => sc.msg(0, i, 5, 6 + 0.12 * i, i === 1 ? 'Prepare' : '')); sc.set(0, 'all yes: preparing', 'wait', 'prepare T1');
+    C.forEach((i) => sc.set(i, 'PREPARED · timeout ⇒ commit', 'wait', 'prepared T1'));
+    sc.step('All votes were Yes, so the coordinator sends Prepare ("everyone said yes, get ready"). Each cohort logs prepared and switches its timeout action to commit.');
+    C.forEach((i) => sc.msg(i, 0, 6.5 + 0.1 * i, 7.6 + 0.1 * i, i === 1 ? 'Ack' : '')); sc.set(0, 'all prepared', 'ok');
+    sc.step('Cohorts acknowledge. With every ack in hand, all participants share one view of the state: T1 will commit even if either side fails now.');
+    if (scn === 'crashPrepared') {
+      sc.mark(0, 8.3, 'crash', 'crash'); sc.set(0, 'DOWN', 'bad');
+      sc.step('The coordinator crashes before sending Commit. In 2PC, cohorts would now be stuck.');
+      C.forEach((i) => { sc.mark(i, 11, 'timeout', 'timeout'); sc.set(i, 'COMMITTED (timed out while prepared)', 'ok', 'commit T1'); });
+      sc.step('Each cohort times out in the "prepared" state and commits on its own. Since all are prepared, all choose commit: a deterministic decision without the coordinator.');
+      return sc;
+    }
+    C.forEach((i) => sc.msg(0, i, 9.2, 10.2 + 0.12 * i, i === 1 ? 'Commit' : '')); C.forEach((i) => sc.set(i, 'COMMITTED', 'ok', 'commit T1')); sc.set(0, 'commit sent', 'ok', 'commit T1');
+    sc.step('Commit phase: the coordinator sends Commit; cohorts commit and their timers are reset. The transaction is finished.');
+    C.forEach((i) => sc.msg(i, 0, 10.8 + 0.1 * i, 11.9 + 0.1 * i, i === 1 ? 'Committed' : '')); sc.set(0, 'done', 'ok', 'end T1');
+    sc.step('Cohorts confirm. Three round trips and 6N messages, against two and 4N for 2PC.');
+    return sc;
+  }
+  const S6 = stepper('b6', () => build3pc($('sel6').value), seqRender('txt6', 'd6', 'tbl6', 'c6n', 14));
+  $('sel6').addEventListener('change', () => S6.rebuild());
+
+  const d7 = reg(() => {
+    const got = ['k7a', 'k7b', 'k7c', 'k7d'].map((x) => $(x).checked); const C = [1, 2, 3, 4];
+    const sc = new Scn(['Coordinator', 'Cohort 1', 'Cohort 2', 'Cohort 3', 'Cohort 4']);
+    sc.phases = [{ t: 0.5, label: 'propose' }, { t: 4.6, label: 'prepare' }, { t: 7.4, label: 'partition' }, { t: 9.6, label: 'timeouts' }];
+    C.forEach((i) => sc.msg(0, i, 1, 2 + 0.1 * i, i === 1 ? 'Propose' : '')); C.forEach((i) => sc.msg(i, 0, 2.5 + 0.1 * i, 3.6 + 0.1 * i, i === 1 ? 'Yes' : ''));
+    C.forEach((i) => sc.msg(0, i, 5, 6.2 + 0.1 * i, i === 1 ? 'Prepare' : '', got[i - 1] ? 'ok' : 'lost'));
+    sc.mark(0, 7.8, 'crash', 'cut off');
+    C.forEach((i) => sc.mark(i, 11.5, got[i - 1] ? 'ok' : 'timeout', got[i - 1] ? 'commit' : 'abort'));
+    sc.step('');
+    $('d7').innerHTML = seqSVG(sc, 0, 14);
+    const c = got.filter(Boolean).length; const el = $('r7');
+    if (c === 0) { el.className = 'verdict good'; el.textContent = 'Nobody got Prepare: all four time out in "voted" and abort. Consistent.'; }
+    else if (c === 4) { el.className = 'verdict good'; el.textContent = 'Everyone got Prepare: all four time out in "prepared" and commit. Consistent.'; }
+    else { el.className = 'verdict bad'; el.textContent = `SPLIT BRAIN: ${c} cohort(s) commit on timeout, ${4 - c} abort on timeout. Every node followed the protocol, and T1 is now both committed and aborted.`; }
+  });
+  ['k7a', 'k7b', 'k7c', 'k7d'].forEach((x) => $(x).addEventListener('change', d7));
+  const d7b = reg(() => {
+    const N = val('n7'), l = val('l7'), f = val('f7');
+    const rows = [
+      ['Messages', 4 * N, 6 * N],
+      ['Round trips', 2, 3],
+      ['Forced log writes', `${2 * N + 1} (2N+1)`, `${3 * N + 2} (3N+2)`],
+      ['Time until the outcome is fixed (ms)', (2 * l + 2 * f).toFixed(1) + ' = 2·lat + 2·fsync', (4 * l + 3 * f).toFixed(1) + ' = 4·lat + 3·fsync'],
+      ['Time until every cohort has committed (ms)', (3 * l + 3 * f).toFixed(1), (5 * l + 4 * f).toFixed(1)]
+    ];
+    $('tb7').innerHTML = '<table class="st"><thead><tr><th>Modelled cost</th><th>2PC</th><th>3PC</th></tr></thead><tbody>' + rows.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('') + '</tbody></table>';
+  });
+  bindRange('n7', d7b); bindRange('l7', d7b); bindRange('f7', d7b);
+
+  // ======================= 08: Calvin =======================
+  const d8 = reg(() => {
+    const E = val('e8'), T = 100, rate = 2.5; const r = rng(seed * 31 + 5); const arr = []; let t = 0;
+    while (true) { t += -Math.log(1 - r()) / rate; if (t >= T) break; arr.push(t); }
+    const c = cvs('c8'); let wait = 0, epochs = 0;
+    const waits = arr.map((a) => { const end = Math.min(T, Math.ceil((a + 1e-9) / E) * E); return end - a; });
+    wait = waits.reduce((s, x) => s + x, 0) / Math.max(1, arr.length); epochs = Math.ceil(T / E);
+    if (c) {
+      const { g, W, H } = c; const pl = 10, pr = 10, top = 22, bot = 26; const X = (v) => pl + v / T * (W - pl - pr);
+      g.fillStyle = colorOf('muted'); g.fillText('simulated arrivals (one dot = one transaction); dashed = epoch boundaries', pl, 14);
+      for (let e = 0; e <= T + 1e-9; e += E) { g.strokeStyle = colorOf('c1', 0.8); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(X(e), top); g.lineTo(X(e), H - bot); g.stroke(); g.setLineDash([]); }
+      const rr = rng(seed + 99);
+      arr.forEach((a, i) => { const y = top + 8 + rr() * (H - top - bot - 16); const end = Math.min(T, Math.ceil((a + 1e-9) / E) * E); g.strokeStyle = colorOf('c2', 0.35); g.beginPath(); g.moveTo(X(a), y); g.lineTo(X(end), y); g.stroke(); g.fillStyle = colorOf('c2'); g.beginPath(); g.arc(X(a), y, 2.2, 0, Math.PI * 2); g.fill(); });
+      g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(pl, H - bot); g.lineTo(W - pr, H - bot); g.stroke();
+      for (let v = 0; v <= T; v += 20) g.fillText(v + ' ms', Math.min(X(v), W - 40), H - 8);
+    }
+    const L = $('c8L'); if (L) L.innerHTML = `<span style="--sw:${colorOf('c2')}">arrival → wait until its epoch closes</span><span style="--sw:${colorOf('c1')}">epoch boundary</span>`;
+    $('r8').innerHTML = `transactions <b>${arr.length}</b> in 100 ms · epochs <b>${epochs}</b> · avg wait for epoch to close <b>${wait.toFixed(1)} ms</b> (≈ E/2 = ${(E / 2).toFixed(1)}) · avg batch <b>${(arr.length / epochs).toFixed(1)}</b> txns · replication rounds: <b>${epochs}</b> batched vs <b>${arr.length}</b> one-per-transaction (${(arr.length / epochs).toFixed(1)}× fewer) · simulated Poisson arrivals, 2.5 txn/ms`;
+  });
+  bindRange('e8', d8);
+  let shuf8 = 0;
+  const d8b = reg(() => {
+    const ops = [{ n: 'T1', s: '× 2', f: (x) => x * 2 }, { n: 'T2', s: '+ 5', f: (x) => x + 5 }, { n: 'T3', s: '− 3', f: (x) => x - 3 }];
+    const seqOrd = shuffle([0, 1, 2], rng(seed * 7 + 1));
+    const pa = shuffle([0, 1, 2], rng(seed * 13 + shuf8 * 101 + 2)), pb = shuffle([0, 1, 2], rng(seed * 17 + shuf8 * 103 + 3));
+    const calvin = $('sel8').value === 'calvin';
+    const oa = calvin ? seqOrd : pa, ob = calvin ? seqOrd : pb;
+    const run = (ord) => ord.reduce((x, i) => ops[i].f(x), 10);
+    const xa = run(oa), xb = run(ob); const nm = (o) => o.map((i) => `${ops[i].n} (x ${ops[i].s})`).join(' → ');
+    $('d8').innerHTML = `<div class="part"><b>Sequencer order</b>${nm(seqOrd)}</div>` +
+      `<div class="part"><b>Replica A</b>arrived: ${pa.map((i) => ops[i].n).join(', ')}<span class="msg">applies ${nm(oa)}</span>x = <b>${xa}</b></div>` +
+      `<div class="part"><b>Replica B</b>arrived: ${pb.map((i) => ops[i].n).join(', ')}<span class="msg">applies ${nm(ob)}</span>x = <b>${xb}</b></div>`;
+    const el = $('r8b');
+    if (xa === xb) { el.className = 'verdict good'; el.textContent = calvin ? `Same order in, same state out: both replicas reach x = ${xa} with no messages between them during execution.` : `Both reached x = ${xa}, but only by luck (these orders happen to agree, e.g. +5 and −3 commute). Re-deliver to see them split.`; }
+    else { el.className = 'verdict bad'; el.textContent = `Replicas diverged: ${xa} vs ${xb}. Without an agreed order, they would have to coordinate (e.g. lock + 2PC) to stay equal.`; }
+  });
+  $('sel8').addEventListener('change', d8b); $('b8shuf').addEventListener('click', () => { shuf8++; d8b(); });
+
+  const W8 = [
+    { t: 'The epoch\'s batch reaches every scheduler in the same order. T reads x and y and writes y and z. Current values: x = 4 on P1, y = 7 on P2, z = 0 on P3.', p: [['P1', 'holds x = 4', ''], ['P2', 'holds y = 7', ''], ['P3', 'holds z = 0', '']] },
+    { t: 'Step 1, analyse: each worker reads T\'s read and write sets. Write set {y, z} → active participants are P2 and P3. P1 holds only a read-set record (x): it is passive.', p: [['P1', 'x = 4 · passive (read set only)', 'passive'], ['P2', 'y = 7 · ACTIVE (y in write set)', 'active'], ['P3', 'z = 0 · ACTIVE (z in write set)', 'active']] },
+    { t: 'Step 2, local reads: each node reads the read-set records it holds and forwards them to the active participants. P1 sends x = 4 to P2 and P3; P2 sends y = 7 to P3. P3 holds no read-set record.', p: [['P1', 'reads x = 4 → sends to P2, P3', 'passive'], ['P2', 'reads y = 7 → sends to P3', 'active'], ['P3', 'nothing local to read', 'active']] },
+    { t: 'Step 3, receive: active participants collect what others forwarded. P2 now has x and y; P3 now has x and y too.', p: [['P1', 'done (passive)', 'passive'], ['P2', 'has x = 4 (from P1), y = 7', 'active'], ['P3', 'has x = 4 (from P1), y = 7 (from P2)', 'active']] },
+    { t: 'Step 4, execute and persist: each active node runs the same deterministic code on the same inputs and writes only its own records. P2 writes y = 6; P3 writes z = 11. Nobody sends results anywhere.', p: [['P1', 'x = 4 (unchanged)', 'passive'], ['P2', 'y = 7 − 1 = 6 · persisted', 'active'], ['P3', 'z = 4 + 7 = 11 · persisted', 'active']] }
+  ];
+  const sW8 = { k: 0 };
+  const d8w = reg(() => {
+    sW8.k = Math.max(0, Math.min(W8.length - 1, sW8.k)); const s = W8[sW8.k];
+    $('txt8').textContent = s.t; $('c8n').textContent = `step ${sW8.k + 1} / ${W8.length}`;
+    $('d8w').innerHTML = s.p.map((x) => `<div class="part ${x[2]}"><b>${x[0]}</b>${x[1]}</div>`).join('');
+  });
+  $('w8prev').addEventListener('click', () => { sW8.k--; d8w(); }); $('w8next').addEventListener('click', () => { sW8.k++; d8w(); }); $('w8reset').addEventListener('click', () => { sW8.k = 0; d8w(); });
+
+  // ======================= 09: Spanner =======================
+  const d9 = reg(() => {
+    const e = val('e9'), P = val('p9'); const wait = 2 * e; const rel = Math.max(wait, P);
+    const c = cvs('c9');
+    if (c) {
+      const { g, W, H } = c; const lo = -e - 2, hi = rel + e + 3; const pl = 150, pr = 14; const X = (v) => pl + (v - lo) / (hi - lo) * (W - pl - pr);
+      const rows = ['TT.now() at commit', 'Paxos: log commit', 'commit wait', 'TT.now() at release']; const rh = (H - 40) / rows.length;
+      const Yr = (i) => 16 + i * rh + rh / 2;
+      g.fillStyle = colorOf('muted'); rows.forEach((r, i) => g.fillText(r, 6, Yr(i) + 4));
+      const bar = (i, a, b, col, a2) => { g.fillStyle = colorOf(col, a2 || 0.35); g.fillRect(X(a), Yr(i) - 7, Math.max(2, X(b) - X(a)), 14); g.strokeStyle = colorOf(col); g.strokeRect(X(a), Yr(i) - 7, Math.max(2, X(b) - X(a)), 14); };
+      bar(0, -e, e, 'c2'); bar(1, 0, P, 'c3'); bar(2, 0, wait, 'c1'); bar(3, rel - e, rel + e, 'buy');
+      const vline = (v, col, lab, row) => { g.strokeStyle = colorOf(col); g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(v), 10); g.lineTo(X(v), H - 22); g.stroke(); g.setLineDash([]); g.fillStyle = colorOf(col); g.fillText(lab, Math.min(X(v) + 3, W - 90), H - 8 - row * 12); };
+      vline(0, 'muted', 'true time of commit = 0', 1); vline(e, 'sell', 's = latest = +' + e + ' ms', 0); vline(rel, 'buy', 'release @ ' + rel + ' ms', 2);
+    }
+    const L = $('c9L'); if (L) L.innerHTML = `<span style="--sw:${colorOf('c2')}">TT interval [earliest, latest]</span><span style="--sw:${colorOf('c3')}">Paxos commit round</span><span style="--sw:${colorOf('c1')}">commit wait (≈ 2ε)</span><span style="--sw:${colorOf('buy')}">at release: earliest &gt; s</span>`;
+    $('r9').innerHTML = `commit timestamp s = now + ε · wait until earliest &gt; s ⇒ true time &gt; s + ε = <b>${wait} ms</b> after commit · Paxos round <b>${P} ms</b> runs alongside · client sees results at <b>${rel} ms</b> · extra latency caused by the clock: <b class="${wait > P ? 'bad' : 'good'}">${Math.max(0, wait - P)} ms</b> · modelled`;
+  });
+  bindRange('e9', d9); bindRange('p9', d9);
+  function buildSpanner() {
+    const sc = new Scn(['Client', 'Leader A*', 'Leader B', 'Leader C']);
+    sc.phases = [{ t: 0.4, label: 'prepare' }, { t: 5.6, label: 'commit' }, { t: 8.6, label: 'wait' }, { t: 11, label: 'finish' }];
+    [1, 2, 3].forEach((i) => sc.set(i, 'holds read locks from the transaction body', 'dim')); sc.set(0, 'writes buffered', 'wait');
+    sc.step('The transaction read under locks and buffered its writes on the client. Now the client asks to commit. Shards A, B and C are touched; A\'s leader (A*) is the coordinator.');
+    [1, 2, 3].forEach((i) => sc.msg(0, i, 0.8, 1.8 + 0.1 * i, i === 1 ? 'commit (writes)' : ''));
+    sc.mark(2, 3, 'log', 'Paxos: prepare@101'); sc.mark(3, 3.6, 'log', 'Paxos: prepare@104');
+    sc.set(2, 'write locks · prepared @101', 'wait', 'prepare@101'); sc.set(3, 'write locks · prepared @104', 'wait', 'prepare@104');
+    sc.msg(2, 1, 4.2, 5.0, '101'); sc.msg(3, 1, 4.4, 5.2, '104');
+    sc.step('Participant leaders B and C take write locks, each picks a prepare timestamp larger than any earlier transaction it saw (101, 104), logs a prepare record through its Paxos group, and reports the timestamp to the coordinator.');
+    sc.mark(1, 6.6, 'log', 'Paxos: commit@107'); sc.set(1, 'write locks · commit ts 107', 'wait', 'commit@107');
+    sc.step('The coordinator takes its own locks and picks commit timestamp s = 107: larger than every prepare timestamp and not below TT.now().latest. It logs the commit record through Paxos A.');
+    sc.mark(1, 9.6, 'timeout', 'wait until TT.after(107)'); sc.set(1, 'commit wait', 'wait');
+    sc.step('Commit wait: the coordinator holds the result until TT.now().earliest > 107, so 107 is certainly in the past. This overlaps with the Paxos logging above.');
+    [0, 2, 3].forEach((i) => sc.msg(1, i, 11.3, 12.2 + 0.1 * i, i === 0 ? 'committed @107' : i === 2 ? 'commit 107' : ''));
+    sc.mark(2, 13.2, 'log', 'Paxos: commit@107'); sc.mark(3, 13.6, 'log', 'Paxos: commit@107');
+    [1, 2, 3].forEach((i) => sc.set(i, 'committed @107 · locks released', 'ok', i === 1 ? '' : 'commit@107')); sc.set(0, 'sees commit @107', 'ok');
+    sc.step('The coordinator sends 107 to the client and the participant leaders; each logs the commit record in its own Paxos group, applies the writes with version 107 and releases its locks. Single-shard transactions skip all of this 2PC machinery.');
+    return sc;
+  }
+  stepper('b9', buildSpanner, seqRender('txt9', 'd9', null, 'c9n', 14));
+
+  // ======================= 10: partitioning =======================
+  function bars(id, vals, labels, colFn, title) {
+    const c = cvs(id); if (!c) return; const { g, W, H } = c; const pl = 40, pr = 10, top = 20, bot = 22;
+    const mx = Math.max(1, ...vals); const bw = (W - pl - pr) / vals.length;
+    g.fillStyle = colorOf('muted'); if (title) g.fillText(title, pl, 13);
+    niceTicks(0, mx, 3).forEach((t) => { const y = top + (1 - t / mx) * (H - top - bot); g.strokeStyle = colorOf('rule', 0.8); g.beginPath(); g.moveTo(pl, y); g.lineTo(W - pr, y); g.stroke(); g.fillStyle = colorOf('muted'); g.fillText(fmt(t), 2, y + 4); });
+    vals.forEach((v, i) => { const h = v / mx * (H - top - bot); g.fillStyle = colorOf(colFn(i, v), 0.75); g.fillRect(pl + i * bw + bw * 0.15, top + (H - top - bot) - h, bw * 0.7, h); g.fillStyle = colorOf('muted'); g.fillText(labels[i], pl + i * bw + bw * 0.2, H - 6); });
+  }
+  const d10 = reg(() => {
+    const r = rng(seed * 3 + 11); const Z = 100; const perm = shuffle([...Array(Z).keys()], r);
+    const w = []; for (let z = 0; z < Z; z++) w[z] = 1 / Math.pow(1 + perm[z], 1.1);
+    const sw = w.reduce((a, b) => a + b, 0); const cum = []; let acc = 0; for (let z = 0; z < Z; z++) { acc += w[z] / sw; cum[z] = acc; }
+    const recs = []; for (let i = 0; i < 20000; i++) { const u = r(); let z = 0; while (z < Z - 1 && cum[z] < u) z++; recs.push({ z, key: String(z).padStart(3, '0') + '/' + i }); }
+    const mode = $('sel10').value; const S = 8; const cnt = new Array(S).fill(0);
+    if (mode === 'range') recs.forEach((x) => { cnt[Math.min(S - 1, Math.floor(x.z / (Z / S)))]++; });
+    else if (mode === 'hash') recs.forEach((x) => { cnt[hash32(x.key) % S]++; });
+    else { const sorted = recs.map((x) => x.key).sort(); const bounds = []; for (let s = 1; s < S; s++) bounds.push(sorted[Math.floor(s * sorted.length / S)]); recs.forEach((x) => { let s = 0; while (s < S - 1 && x.key >= bounds[s]) s++; cnt[s]++; }); }
+    const mean = 20000 / S, mx = Math.max(...cnt);
+    bars('c10', cnt, cnt.map((_, i) => 'S' + (i + 1)), (i, v) => (v > 1.5 * mean ? 'sell' : 'c2'), 'records per shard (simulated skewed zip codes, 20,000 records)');
+    const scan = mode === 'hash' ? 'a scan of one zip code touches <b>all 8</b> shards' : 'a scan of one zip code touches <b>1</b> shard (maybe 2 at a boundary)';
+    $('r10').innerHTML = `busiest shard <b>${mx}</b> records = <b>${(mx / mean).toFixed(2)}×</b> the mean of ${mean} · ${scan} · routing key = zip/customer-id`;
+  });
+  $('sel10').addEventListener('change', d10);
+  const d10b = reg(() => {
+    const N = val('n10a'), N2 = val('n10b'); const K = 10000; let moved = 0;
+    for (let i = 0; i < K; i++) { const h = hash32('user:' + seed + ':' + i); if (h % N !== h % N2) moved++; }
+    const ideal = N === N2 ? 0 : Math.abs(N2 - N) / Math.max(N, N2);
+    $('r10b').innerHTML = `keys that change node under mod: <b>${moved.toLocaleString('en-IN')}</b> of 10,000 = <b class="bad">${pct(moved / K)}</b>` + (N2 === N + 1 ? ` (theory N/(N+1) = ${pct(N / (N + 1))})` : '') + ` · minimum possible (only the share that must change hands): <b class="good">${pct(ideal)}</b> · simulated keys`;
+  });
+  bindRange('n10a', d10b); bindRange('n10b', d10b);
+
+  // ======================= 11: consistent hashing ring =======================
+  const ring = { nodes: ['A', 'B', 'C', 'D'], next: 4, last: null };
+  const NAMES = 'ABCDEFGHIJKLMNOP';
+  function ringOwners(nodes, vn, keys) {
+    const pos = []; nodes.forEach((n) => { for (let v = 0; v < vn; v++) pos.push([hash32('node-' + n + '#' + v), n]); });
+    pos.sort((a, b) => a[0] - b[0]);
+    const own = keys.map((h) => { let lo = 0, hi = pos.length; while (lo < hi) { const m = (lo + hi) >> 1; if (pos[m][0] < h) lo = m + 1; else hi = m; } return pos[lo % pos.length][1]; });
+    return { pos, own };
+  }
+  function ringKeys() { const k = []; for (let i = 0; i < 1500; i++) k.push(hash32('key:' + seed + ':' + i)); return k; }
+  function ringChange(newNodes) {
+    const vn = val('v11'), keys = ringKeys(); const before = ringOwners(ring.nodes, vn, keys).own, after = ringOwners(newNodes, vn, keys).own;
+    let moved = 0; before.forEach((o, i) => { if (o !== after[i]) moved++; });
+    let modMoved = 0; keys.forEach((h) => { if (h % ring.nodes.length !== h % newNodes.length) modMoved++; });
+    ring.last = { moved, modMoved, from: ring.nodes.length, to: newNodes.length }; ring.nodes = newNodes; d11();
+  }
+  const d11 = reg(() => {
+    const vn = val('v11'), keys = ringKeys(); const { pos, own } = ringOwners(ring.nodes, vn, keys);
+    const colOf = (n) => PAL[ring.nodes.indexOf(n) % PAL.length];
+    const load = {}; ring.nodes.forEach((n) => { load[n] = 0; }); own.forEach((o) => { load[o]++; });
+    const c = cvs('c11');
+    if (c) {
+      const { g, W, H } = c; const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 34; const ang = (h) => h / 4294967296 * Math.PI * 2 - Math.PI / 2;
+      g.strokeStyle = colorOf('rule'); g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke(); g.lineWidth = 1;
+      keys.forEach((h, i) => { const a = ang(h); const rr = R - 8 - (i % 5) * 4; g.fillStyle = colorOf(colOf(own[i]), 0.75); g.fillRect(cx + Math.cos(a) * rr - 1.5, cy + Math.sin(a) * rr - 1.5, 3, 3); });
+      pos.forEach(([h, n]) => { const a = ang(h); g.strokeStyle = colorOf(colOf(n)); g.lineWidth = 3; g.beginPath(); g.moveTo(cx + Math.cos(a) * (R - 4), cy + Math.sin(a) * (R - 4)); g.lineTo(cx + Math.cos(a) * (R + 10), cy + Math.sin(a) * (R + 10)); g.stroke(); g.lineWidth = 1;
+        if (vn <= 2) { g.fillStyle = colorOf(colOf(n)); g.fillText(n, cx + Math.cos(a) * (R + 20) - 4, cy + Math.sin(a) * (R + 20) + 4); } });
+      g.fillStyle = colorOf('muted'); g.fillText('0 / 2³²', cx - 20, cy - R - 16); g.fillText('keys go clockwise to the next node', cx - 105, cy + 4);
+    }
+    const L = $('c11L'); if (L) L.innerHTML = ring.nodes.map((n) => `<span style="--sw:${colorOf(colOf(n))}">${n}: ${load[n]} keys</span>`).join('');
+    const vals = ring.nodes.map((n) => load[n]); const mean = 1500 / ring.nodes.length; const mx = Math.max(...vals);
+    let txt = `nodes <b>${ring.nodes.length}</b> × <b>${vn}</b> position(s) · busiest node <b>${mx}</b> keys = <b>${(mx / mean).toFixed(2)}×</b> mean`;
+    if (ring.last) txt += ` · last change ${ring.last.from}→${ring.last.to} nodes: ring moved <b class="good">${ring.last.moved}</b> keys (${pct(ring.last.moved / 1500)}; K/n ≈ ${Math.round(1500 / Math.max(ring.last.from, ring.last.to))}) vs <b class="bad">${ring.last.modMoved}</b> (${pct(ring.last.modMoved / 1500)}) under mod N`;
+    $('r11').innerHTML = txt + ' · 1,500 simulated keys';
+  });
+  $('b11add').addEventListener('click', () => { if (ring.nodes.length >= 16) return; const n = NAMES[ring.next % 16]; ring.next++; ringChange(ring.nodes.concat([n])); });
+  $('b11rem').addEventListener('click', () => { if (ring.nodes.length <= 2) return; const r = rng(seed + ring.next * 7); const i = Math.floor(r() * ring.nodes.length); ring.next++; ringChange(ring.nodes.filter((_, j) => j !== i)); });
+  $('b11reset').addEventListener('click', () => { ring.nodes = ['A', 'B', 'C', 'D']; ring.next = 4; ring.last = null; d11(); });
+  bindRange('v11', () => { ring.last = null; d11(); });
+
+  // ======================= 12: SI, write skew, Percolator =======================
+  function buildSkew(si) {
+    const rows = [
+      ['T1 begins' + (si ? ' (snapshot = commits before now)' : ''), '', '60 / 40', '—'],
+      ['T1 reads x', '', '60 / 40', 'x = 60'],
+      ['', 'T2: x = 30, y = 70, commit', '30 / 70', 'x = 60'],
+      ['T1 reads y', '', '30 / 70', si ? 'y = 40 (from its snapshot)' : 'y = 70 (latest committed)'],
+      ['T1 computes x + y', '', '30 / 70', si ? '100 ✓ consistent' : '130 ✗ read skew']
+    ];
+    const text = [
+      'Invariant x + y = 100. T1 starts; it will read x, then y.',
+      'T1 reads x = 60.',
+      'T2 moves 30 from x to y and commits. The committed state is still valid (30 + 70 = 100).',
+      si ? 'Under snapshot isolation T1 reads y from its snapshot, taken before T2 committed: y = 40.' : 'Under read committed, T1 reads the latest committed y: 70, written by T2 after T1 read x.',
+      si ? 'T1 sees 60 + 40 = 100: one consistent point in time. The new y is invisible to it.' : 'T1 sees 60 + 70 = 130: an old x with a new y, a state that never existed. That is read skew.'
+    ];
+    return { rows, text };
+  }
+  const sA12 = { k: 0 };
+  const d12a = reg(() => {
+    const si = $('sel12').value === 'si'; const B = buildSkew(si); sA12.k = Math.max(0, Math.min(B.rows.length - 1, sA12.k));
+    $('txt12a').textContent = B.text[sA12.k]; $('c12a').textContent = `step ${sA12.k + 1} / ${B.rows.length}`;
+    $('tbl12a').innerHTML = '<table class="st"><thead><tr><th>#</th><th>T1</th><th>T2</th><th>committed x / y</th><th>T1 sees</th></tr></thead><tbody>' +
+      B.rows.slice(0, sA12.k + 1).map((r, i) => `<tr class="${i === sA12.k ? 'hot' : ''}"><td>${i + 1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="${/✗/.test(r[3]) ? 'bad' : /✓/.test(r[3]) ? 'ok' : ''}">${r[3]}</td></tr>`).join('') + '</tbody></table>';
+  });
+  $('sel12').addEventListener('change', d12a); $('a12prev').addEventListener('click', () => { sA12.k--; d12a(); }); $('a12next').addEventListener('click', () => { sA12.k++; d12a(); }); $('a12reset').addEventListener('click', () => { sA12.k = 0; d12a(); });
+  const d12w = reg(() => {
+    const w1 = val('w12a'), w2 = val('w12b'); const el = $('r12w'); const ok1 = w1 <= 100, ok2 = w2 <= 100; const fin = 100 - w1 - w2;
+    const each = `T1 checks 50 + 50 − ${w1} = ${100 - w1} ≥ 0 ${ok1 ? '✓' : '✗'}; T2 checks 50 + 50 − ${w2} = ${100 - w2} ≥ 0 ${ok2 ? '✓' : '✗'}. They write different rows (a and b), so first-committer-wins sees no conflict and both commit.`;
+    if (fin < 0) { el.className = 'verdict bad'; el.textContent = `${each} Final a + b = ${50 - w1} + ${50 - w2} = ${fin}: rule broken. Write skew. A serializable system would have aborted one of them.`; }
+    else { el.className = 'verdict good'; el.textContent = `${each} Final a + b = ${fin} ≥ 0: fine this time. Push the two withdrawals above 100 in total to see write skew.`; }
+  });
+  bindRange('w12a', d12w); bindRange('w12b', d12w);
+
+  function buildPerc(mode) {
+    const st = { Asha: { 6: { w: '→ data@5' }, 5: { d: '₹60' } }, Ravi: { 6: { w: '→ data@5' }, 5: { d: '₹90' } } };
+    const steps = []; let changed = [];
+    const put = (acc, ts, col, v) => { st[acc][ts] = st[acc][ts] || {}; if (v === null) delete st[acc][ts][col]; else st[acc][ts][col] = v; changed.push(acc + ts + col); };
+    const snap = (text) => { steps.push({ text, st: JSON.parse(JSON.stringify(st)), ch: changed }); changed = []; };
+    snap('Initial state. For each account the newest write record (ts 6) points at the data written at ts 5. No locks. A reader at any ts ≥ 6 finds write@6 and reads data@5.');
+    snap('The client asks the timestamp oracle for a start timestamp: 7. It will read the snapshot as of 7 and buffer its writes.');
+    put('Asha', 7, 'd', '₹100'); put('Asha', 7, 'l', 'PRIMARY');
+    snap('Prewrite the primary (Asha), in one conditional mutation: check there is no write record after 7 and no lock at any timestamp, then write data@7 = ₹100 and lock@7 = primary.');
+    put('Ravi', 7, 'd', '₹50'); put('Ravi', 7, 'l', '→ primary Asha@7');
+    snap('Prewrite the secondary (Ravi) the same way: data@7 = ₹50 and a lock that points at the primary. Any conflict found here would abort the whole transaction.');
+    snap('All locks taken, no conflict. The client asks the oracle again: commit timestamp 8.');
+    if (mode === 'before') {
+      snap('The client crashes now, before committing the primary. Both locks and the data@7 cells stay behind; no write record points at them, so no reader can see ₹100 or ₹50.');
+      put('Asha', 7, 'l', null); put('Asha', 7, 'd', null); put('Ravi', 7, 'l', null); put('Ravi', 7, 'd', null);
+      snap('Later, a reader at ts 9 hits Ravi\'s lock and follows it to the primary. The primary lock is still there and its owner is presumed dead (a lock timeout, from the paper), so the reader rolls the transaction back: it erases the primary lock first, then cleans the secondary. Ravi reads ₹90 via write@6.');
+      return steps;
+    }
+    put('Asha', 8, 'w', '→ data@7'); put('Asha', 7, 'l', null);
+    snap('Commit the primary: replace lock@7 with write@8 → data@7, in one atomic row operation. This is the commit point: the transaction is now committed.');
+    if (mode === 'after') {
+      snap('The client crashes before committing the secondary. Asha shows ₹100, but Ravi still carries a lock at 7.');
+      put('Ravi', 8, 'w', '→ data@7'); put('Ravi', 7, 'l', null);
+      snap('A reader at ts 9 hits Ravi\'s lock, follows it to the primary, finds the primary already replaced by write@8 → committed. So it rolls Ravi forward: write@8 → data@7, lock erased. Ravi reads ₹50.');
+      return steps;
+    }
+    put('Ravi', 8, 'w', '→ data@7'); put('Ravi', 7, 'l', null);
+    snap('Commit the secondary the same way. Readers at ts ≥ 8 now see Asha ₹100 and Ravi ₹50; readers at ts 6–7 still see ₹60 and ₹90 (old versions stay).');
+    return steps;
+  }
+  const sP12 = { k: 0 };
+  const d12p = reg(() => {
+    const steps = buildPerc($('sel12p').value); sP12.k = Math.max(0, Math.min(steps.length - 1, sP12.k)); const s = steps[sP12.k];
+    $('txt12p').textContent = s.text; $('c12p').textContent = `step ${sP12.k + 1} / ${steps.length}`;
+    let h = '<table class="st"><thead><tr><th>Row</th><th>ts</th><th>data</th><th>lock</th><th>write</th></tr></thead><tbody>';
+    ['Asha', 'Ravi'].forEach((acc) => {
+      Object.keys(s.st[acc]).map(Number).sort((a, b) => b - a).forEach((ts, j) => {
+        const cell = s.st[acc][ts]; const cls = (col) => (s.ch.includes(acc + ts + col) ? ' class="new"' : '');
+        h += `<tr><td>${j === 0 ? acc : ''}</td><td>${ts}</td><td${cls('d')}>${cell.d || '—'}</td><td${cls('l')}>${cell.l || '—'}</td><td${cls('w')}>${cell.w || '—'}</td></tr>`;
+      });
+    });
+    $('tbl12p').innerHTML = h + '</tbody></table>';
+  });
+  $('sel12p').addEventListener('change', () => { sP12.k = 0; d12p(); }); $('p12prev').addEventListener('click', () => { sP12.k--; d12p(); }); $('p12next').addEventListener('click', () => { sP12.k++; d12p(); }); $('p12reset').addEventListener('click', () => { sP12.k = 0; d12p(); });
+
+  // ======================= 13: I-confluence + RAMP =======================
+  const d13 = reg(() => {
+    const cs = $('sel13').value, a = val('a13'), b = val('b13'); let base, sa, sb, mg, okA = true, okB = true, okM, conf, why;
+    if (cs === 'dep') { base = 20; sa = base + a; sb = base + b; mg = base + a + b; okM = mg >= 0; conf = true; why = 'Adding non-negative deposits to a non-negative balance can never go below zero, whatever the other replica did.'; base = '₹' + base; sa = '₹' + sa; sb = '₹' + sb; mg = '₹' + mg; }
+    else if (cs === 'wd') { const B = 100; okA = B - a >= 0; okB = B - b >= 0; const m = B - a - b; okM = m >= 0; conf = false; base = '₹100'; sa = '₹' + (B - a); sb = '₹' + (B - b); mg = '₹' + m; why = 'Each withdrawal is valid against its own copy, but the merge subtracts both. Withdrawals need coordination (or a reserved per-replica budget).'; }
+    else if (cs === 'uid') { base = '{ }'; sa = `{ ${a} }`; sb = `{ ${b} }`; mg = a === b ? `{ ${a}, ${b} } duplicate!` : `{ ${a}, ${b} }`; okM = a !== b; conf = false; why = 'Two replicas can pick the same id independently; the merge then holds a duplicate. Set the two sliders equal to see it.'; }
+    else { base = '{ }'; sa = `{ A-${a} }`; sb = `{ B-${b} }`; mg = `{ A-${a}, B-${b} }`; okM = true; conf = true; why = 'Each replica draws from its own id space, so ids can never collide, and the union of two valid sets is valid.'; }
+    $('d13').innerHTML = `<div class="part"><b>Common start</b>${base}</div><div class="part"><b>Replica A</b>${sa}<span class="${okA ? 'ok' : 'bad'}">${okA ? 'valid' : 'invalid locally (rejected)'}</span></div><div class="part"><b>Replica B</b>${sb}<span class="${okB ? 'ok' : 'bad'}">${okB ? 'valid' : 'invalid locally (rejected)'}</span></div><div class="part ${okA && okB && !okM ? 'active' : ''}"><b>merge(A, B)</b>${mg}<span class="${okM ? 'ok' : 'bad'}">${okM ? 'valid' : 'INVALID'}</span></div>`;
+    const el = $('r13'); el.className = 'verdict ' + (conf ? 'good' : 'bad'); el.textContent = (conf ? 'I-confluent: safe to run without coordination. ' : 'Not I-confluent: needs coordination. ') + why;
+  });
+  $('sel13').addEventListener('change', d13); bindRange('a13', d13); bindRange('b13', d13);
+  function buildRamp(ramp) {
+    const sc = new Scn(['Writer T1', 'Partition X', 'Partition Y', 'Reader R']);
+    sc.phases = [{ t: 0.4, label: 'prepare' }, { t: 3.6, label: 'commit at X' }, { t: 6, label: 'reader round 1' }, { t: 9.6, label: ramp ? 'round 2' : 'result' }, { t: 12, label: 'commit at Y' }];
+    sc.set(1, 'x = 0 @ts0 visible', 'dim'); sc.set(2, 'y = 0 @ts0 visible', 'dim'); sc.set(0, 'T1: x = 1, y = 1', 'wait'); sc.set(3, 'idle', 'dim');
+    sc.step('Start: x = 0 and y = 0, both written at ts 0. Writer T1 wants x = 1 and y = 1 to become visible together.');
+    sc.msg(0, 1, 0.8, 1.8, 'prepare x=1@1 {sib: y}'); sc.msg(0, 2, 0.9, 2.2, 'prepare y=1@1 {sib: x}');
+    sc.set(1, 'x: 0@0 visible · 1@1 prepared', 'wait', 'x=1@1 (prepared)'); sc.set(2, 'y: 0@0 visible · 1@1 prepared', 'wait', 'y=1@1 (prepared)');
+    sc.step('Prepare: T1 places both new versions on their partitions, invisible to readers. Each version carries metadata: T1\'s timestamp and the list of sibling keys it wrote.');
+    sc.msg(0, 1, 4, 5, 'commit ts1'); sc.set(1, 'x: 1@1 visible (latest)', 'ok', 'commit ts1');
+    sc.step('Commit reaches X first: x = 1 is now the latest visible value there. The commit for Y is still in flight.');
+    sc.msg(3, 1, 6.2, 7.0, 'get x'); sc.msg(3, 2, 6.3, 7.2, 'get y'); sc.msg(1, 3, 7.4, 8.4, 'x=1@1 {sib: y}'); sc.msg(2, 3, 7.5, 8.6, 'y=0@0');
+    sc.set(3, 'got x = 1 (ts1, sibling y), y = 0 (ts0)', 'wait');
+    sc.step('Reader R asks both partitions for their latest visible versions: x = 1 (from T1, which also wrote y) and y = 0.');
+    if (ramp) {
+      sc.msg(3, 2, 9.9, 10.6, 'get y @ts1', 'peer'); sc.msg(2, 3, 10.8, 11.6, 'y=1@1', 'peer'); sc.set(3, 'returns x = 1, y = 1 ✓', 'ok');
+      sc.step('RAMP: x\'s metadata says T1 also wrote y at ts 1, but R got y at ts 0, which is older. So R asks Y for y at exactly ts 1. Y has it (prepared versions are stored), returns y = 1. No locks, no waiting on the writer.');
+    } else {
+      sc.set(3, 'returns x = 1, y = 0 ✗ fractured', 'bad');
+      sc.step('Plain reads: R returns x = 1, y = 0. It saw half of T1: a fractured read, which read atomic isolation forbids.');
+    }
+    sc.msg(0, 2, 12.2, 13.2, 'commit ts1'); sc.set(2, 'y: 1@1 visible (latest)', 'ok', 'commit ts1');
+    sc.step('Y finally gets its commit. Old versions x@0 and y@0 are kept only while readers that might need them are still running, then discarded.');
+    return sc;
+  }
+  const S13 = stepper('r13', () => buildRamp($('sel13r').value === 'ramp'), seqRender('txt13', 'd13r', null, 'c13n', 14));
+  $('sel13r').addEventListener('change', () => S13.rebuild());
+
+  // ======================= global =======================
+  function setSeed() { $('seedOut').textContent = seed; }
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; setSeed(); ring.last = null; redrawAll(); });
+  setSeed(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

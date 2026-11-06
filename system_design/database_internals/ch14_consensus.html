@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.14 Consensus</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* page-specific additions (template style above is kept verbatim) */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.beyond { background: var(--paper); border: 1px dashed var(--c2); }
+.papers { background: var(--paper); border: 1px solid var(--rule); }
+.papers li { font-size: 15px; }
+pre.code { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; white-space: pre; }
+.cells { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-family: var(--mono); font-size: 12px; }
+.cell { display: inline-block; border: 1px solid var(--rule); border-radius: 3px; padding: 2px 6px; background: var(--paper); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cell.hot { background: var(--tint); border-color: var(--c1); }
+.cell.dead { opacity: .38; text-decoration: line-through; }
+.cell.tomb { border-color: var(--sell); color: var(--sell); }
+.cell.new { outline: 2px solid var(--buy); }
+.cell.blue { background: var(--tint2); border-color: var(--c2); }
+.cell.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+.comp { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; display: grid; gap: 6px; background: var(--plate); min-width: 0; }
+.comp > .t { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.comp.hot { border-color: var(--c1); box-shadow: inset 3px 0 0 var(--c1); }
+.comp.off { opacity: .45; }
+.stack { display: grid; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.steptxt { font-family: var(--body); font-size: 16px; border-left: 3px solid var(--c1); padding: 4px 10px; background: var(--paper); }
+.steplog { font-family: var(--mono); font-size: 12.5px; display: grid; gap: 2px; max-height: 220px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; background: var(--paper); }
+.steplog .bad { color: var(--sell); font-weight: 600; } .steplog .good { color: var(--buy); font-weight: 600; }
+.bits { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; font-family: var(--mono); font-size: 12px; text-align: center; }
+.bits div { border: 1px solid var(--rule); border-radius: 2px; padding: 4px 0; background: var(--paper); }
+.bits div.one { background: var(--c2); color: var(--plate); border-color: var(--c2); }
+.bits div.probe { outline: 2px solid var(--c1); outline-offset: -2px; }
+.bits div.miss { outline: 2px solid var(--sell); outline-offset: -2px; }
+.bits small { display: block; font-size: 9px; color: var(--muted); }
+.bits div.one small { color: var(--plate); }
+.svgwrap { overflow-x: auto; }
+.svgwrap svg { display: block; max-width: 100%; height: auto; }
+svg .bx { fill: var(--paper); stroke: var(--rule); }
+svg .bxh { fill: var(--tint); stroke: var(--c1); stroke-width: 2; }
+svg .bxg { fill: var(--tint2); stroke: var(--c2); }
+svg .bxd { fill: none; stroke: var(--muted); stroke-dasharray: 4 3; }
+svg .ln { stroke: var(--muted); fill: none; }
+svg .lnh { stroke: var(--c1); stroke-width: 2.5; fill: none; }
+svg .lng { stroke: var(--c2); stroke-width: 2; fill: none; }
+svg text.sm { font-size: 10px; fill: var(--muted); }
+svg text.hd { font-size: 11px; fill: var(--muted); letter-spacing: .05em; }
+.matrix td.y { color: var(--buy); font-weight: 600; } .matrix td.n { color: var(--muted); }
+.matrix tr.hit td { background: var(--tint); }
+.matrix tr.miss td { opacity: .45; }
+.fig .readout, .readout.blockro { display: block; line-height: 1.75; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.badges .comp.miss { opacity: .35; }
+/* ch14 additions */
+.seqwrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--plate); }
+.seqwrap svg { display: block; width: 100%; min-width: 560px; height: auto; }
+svg .lane { stroke: var(--rule); stroke-width: 1.2; }
+svg .phase { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+svg .msg { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+svg .msg.hl { stroke: var(--c1); stroke-width: 2.4; }
+svg .msg.ok { stroke: var(--c2); stroke-width: 1.8; }
+svg .msg.bad { stroke: var(--sell); stroke-width: 1.8; }
+svg .msg.lost { stroke: var(--muted); stroke-dasharray: 4 3; }
+svg .msg.dim { stroke: var(--muted); opacity: .45; }
+svg .ah { fill: var(--ink); } svg .ah.hl { fill: var(--c1); } svg .ah.ok { fill: var(--c2); } svg .ah.bad { fill: var(--sell); } svg .ah.lost, svg .ah.dim { fill: var(--muted); }
+svg .xmark { stroke: var(--sell); stroke-width: 2.4; }
+svg text.lb { font-size: 12px; font-weight: 600; }
+svg text.ml { font-size: 10.5px; fill: var(--muted); }
+svg text.ml.hl { fill: var(--c1); font-weight: 600; }
+svg .dot { fill: var(--c2); } svg .dot.hl { fill: var(--c1); }
+.nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.nd { border: 1px solid var(--rule); border-radius: 4px; padding: 6px 8px; background: var(--paper); font-family: var(--mono); font-size: 12px; display: grid; gap: 4px; min-width: 0; }
+.nd .h { display: flex; justify-content: space-between; gap: 6px; font-weight: 600; }
+.nd.leader { border-color: var(--c1); box-shadow: inset 3px 0 0 var(--c1); }
+.nd.cand { border-color: var(--c3); box-shadow: inset 3px 0 0 var(--c3); }
+.nd.down { opacity: .4; }
+.nd.faulty { border-color: var(--sell); box-shadow: inset 3px 0 0 var(--sell); }
+.nd .bar { height: 4px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+.nd .bar i { display: block; height: 100%; background: var(--c2); }
+.lg { display: flex; flex-wrap: wrap; gap: 2px; }
+.lg span { border: 1px solid var(--rule); border-radius: 2px; padding: 1px 4px; background: var(--plate); font-size: 11px; position: relative; }
+.lg span sup { font-size: 9px; color: var(--muted); margin-left: 2px; }
+.lg span.cm { border-color: var(--c2); background: var(--tint2); }
+.lg span.un { opacity: .6; border-style: dashed; }
+.lg span.cf { border-color: var(--sell); color: var(--sell); }
+.lg span.nw { outline: 2px solid var(--buy); }
+.tag { font-family: var(--mono); font-size: 11px; border-radius: 3px; padding: 1px 6px; border: 1px solid var(--rule); white-space: nowrap; }
+.tag.y { color: var(--buy); border-color: var(--buy); } .tag.n { color: var(--sell); border-color: var(--sell); } .tag.m { color: var(--c1); border-color: var(--c1); }
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .ba { grid-template-columns: 1fr; } }
+.ba > div { border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; display: grid; gap: 4px; background: var(--paper); }
+.ba > div > b { font-family: var(--display); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.ba > div.after { border-color: var(--c2); }
+.ba p, .ba li { font-size: 15.5px; }
+table.mini { font-size: 13px; font-family: var(--mono); }
+table.mini th, table.mini td { padding: 4px 8px; }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch13_distributed_transactions.html">← Ch.13 Distributed Transactions</a><a href="index.html">Contents →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals (2019) · Chapter 14 · pdf p435–488 (incl. Part II conclusion)</div>
+  <h1>Consensus: getting machines to <em>agree</em> while some of them die</h1>
+  <p class="lede">The whole chapter in plain words and in the book's order: what "agreement" formally means, broadcast and atomic broadcast, virtual synchrony, ZooKeeper's ZAB, Paxos and its family (Multi-, Fast, Egalitarian, Flexible, and the generalised register view), Raft, and Byzantine fault tolerance with PBFT. Every protocol has a step-through that shows the state of every node at each step, and the simulators run the code printed next to them. Numbers marked <b>modelled</b> come from these simulations, not from real hardware; numbers marked <b>Beyond the book</b> come from the cited papers and docs.</p>
+  <div class="topbar">
+    <button id="reroll" type="button">Re-seed all simulations</button>
+    <span class="readout">seed <b id="seedOut">1</b> · random delays, proposals and timeouts in every demo use it</span>
+  </div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Everything in Part II has been building to this chapter. Consensus is the tool that lets a group of replicas behave like one reliable machine: they agree on <em>which</em> value (or which <em>order</em> of values) wins, even when some members crash, messages are delayed, or (at the end) some members lie. The chapter moves from the weakest tool to the strongest:</p>
+  <div class="flow">
+    <div class="row"><span class="tag">foundations</span><span class="node key">3 properties: agreement · validity · termination</span><span class="arr">+</span><span class="node">FLP: no bounded-time guarantee in a fully async system</span></div>
+    <div class="row"><span class="tag">spreading</span><span class="node">best-effort broadcast</span><span class="arr">→</span><span class="node">reliable broadcast (flooding, N² msgs)</span><span class="arr">→</span><span class="node key">atomic broadcast = reliable + same order</span></div>
+    <div class="row"><span class="tag">atomic bcast</span><span class="node">virtual synchrony (groups, views)</span><span class="node">ZAB (ZooKeeper: epochs, 3 phases)</span><span class="arr">≡ consensus</span></div>
+    <div class="row"><span class="tag">Paxos family</span><span class="node key">classic Paxos (prepare/promise, accept/accepted)</span><span class="arr">→</span><span class="node">Multi-Paxos (stable leader)</span><span class="node">Fast Paxos (skip the leader)</span><span class="node">EPaxos (no single leader)</span><span class="node">Flexible Paxos (Q₁+Q₂&gt;N)</span><span class="node">generalised (write-once registers)</span></div>
+    <div class="row"><span class="tag">Raft</span><span class="node key">leader election · heartbeats · log replication</span><span class="arr">→</span><span class="node">failure handling + 4 guarantees</span></div>
+    <div class="row"><span class="tag">liars</span><span class="node">Byzantine faults</span><span class="arr">→</span><span class="node key">PBFT: 3f+1 nodes, pre-prepare / prepare / commit</span><span class="arr">→</span><span class="node">checkpoints</span></div>
+    <div class="row"><span class="tag">wrap-up</span><span class="node">chapter summary</span><span class="arr">→</span><span class="node">Part II conclusion</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>What consensus must guarantee</a>
+    <a href="#s2"><span>02</span>Broadcast</a>
+    <a href="#s3"><span>03</span>Atomic broadcast</a>
+    <a href="#s4"><span>04</span>Virtual synchrony</a>
+    <a href="#s5"><span>05</span>ZAB (ZooKeeper)</a>
+    <a href="#s6"><span>06</span>Paxos: roles &amp; numbers</a>
+    <a href="#s7"><span>07</span>The Paxos algorithm</a>
+    <a href="#s8"><span>08</span>Quorums in Paxos</a>
+    <a href="#s9"><span>09</span>Paxos failure scenarios</a>
+    <a href="#s10"><span>10</span>Multi-Paxos</a>
+    <a href="#s11"><span>11</span>Fast Paxos</a>
+    <a href="#s12"><span>12</span>Egalitarian Paxos</a>
+    <a href="#s13"><span>13</span>Flexible Paxos</a>
+    <a href="#s14"><span>14</span>Generalised solution</a>
+    <a href="#s15"><span>15</span>Raft basics</a>
+    <a href="#s16"><span>16</span>Leader role in Raft</a>
+    <a href="#s17"><span>17</span>Raft failure scenarios</a>
+    <a href="#s18"><span>18</span>Byzantine consensus</a>
+    <a href="#s19"><span>19</span>The PBFT algorithm</a>
+    <a href="#s20"><span>20</span>PBFT recovery &amp; checkpoints</a>
+    <a href="#s21"><span>21</span>Summary &amp; comparison</a>
+    <a href="#s22"><span>22</span>Part II conclusion</a>
+    <a href="#s23"><span>23</span>Beyond the book: real systems</a>
+    <a href="#quiz"><span>?</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 01 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>What "agreeing" has to mean</h2></div><span class="chip">pdf p435–436</span></div>
+  <p>The previous chapters gave us the parts: links and processes, failure models, failure detectors, leader election, consistency models. Consensus puts them together. A <b>consensus algorithm</b> lets several processes agree on one value. The catch is the <b>FLP impossibility</b> result (Chapter 8): in a completely asynchronous system you can't guarantee consensus in bounded time, because even with guaranteed delivery a process can't tell whether another process has crashed or is just slow.</p>
+  <p>Chapter 9 showed the trade-off between how <em>accurate</em> a failure detector is and how <em>fast</em> it detects. Consensus algorithms work around FLP by splitting the job: the algorithm assumes an asynchronous model and guarantees <b>safety</b> on its own, while an external failure detector supplies information about other processes and so provides <b>liveness</b> [CHANDRA96]. Because detectors are not perfectly accurate, sometimes the algorithm waits for a crash to be detected, and sometimes it restarts because a healthy process was wrongly suspected.</p>
+  <p>Processes must agree on a value <em>proposed by one of them</em>, even if some crash. A process is <b>correct</b> if it hasn't crashed and keeps executing the algorithm's steps. Consensus is very useful for putting events in an order and keeping participants consistent: processes can move from one value to the next without losing certainty about what clients observed. Formally, three properties:</p>
+  <ul class="plain">
+    <li><b>Agreement</b>: every correct process decides the same value. This is the everyday meaning (the dictionary definition says "unanimity"): once agreed, nobody may hold a different outcome. Like friends agreeing on a meeting place: everyone wants to meet; only the details are being settled.</li>
+    <li><b>Validity</b>: the decided value was proposed by one of the processes. Without it consensus is trivial: everybody could output a fixed default value and be "unanimous" without being useful.</li>
+    <li><b>Termination</b>: every correct process eventually decides. Without it the algorithm could run forever or wait forever for a crashed process to return. To be practical, the decision should also come quickly.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Five friends texting to pick a restaurant. <i>Agreement</i>: nobody shows up at a different place. <i>Validity</i>: the place is one somebody actually suggested, not "the default restaurant" nobody asked for. <i>Termination</i>: you don't stay in the group chat forever because one friend's phone died.</p></div>
+  <div class="fig">
+    <h3>Break the properties yourself: five toy "consensus" rules</h3>
+    <div class="controls">
+      <label for="sel1">rule <select id="sel1">
+        <option value="maj">run a majority-quorum protocol (Paxos-style)</option>
+        <option value="zero">always decide 0</option>
+        <option value="own">decide my own proposal</option>
+        <option value="all">wait for everyone, decide the minimum</option>
+        <option value="some">wait for any majority, decide the minimum I saw</option>
+      </select></label>
+      <label for="n1">crashed processes <input id="n1" type="range" min="0" max="4" value="1"><output id="n1o">1</output></label>
+      <button id="btn1" type="button">New proposals</button>
+    </div>
+    <div class="tablewrap" id="t1"></div>
+    <div class="readout" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each rule is run against five processes P1–P5 with random proposals; the crashed ones (counted from P5 down) stop sending. "Decide 0" always terminates and always agrees but breaks validity whenever nobody proposed 0. "Decide my own" is valid and terminates but disagrees. "Wait for everyone" is valid and agrees, but one crash blocks it forever: termination fails. "Any majority, then minimum" terminates with up to 2 crashes, yet two processes can hear from different majorities and pick different minimums. Only the quorum protocol gets all three, and only while a majority (3 of 5) is alive. With 3 or more crashed it can't terminate, which is the price of never deciding wrongly. Even then, FLP says that in a truly asynchronous network an unlucky schedule could postpone the decision indefinitely; real protocols escape with timeouts and randomisation (sections 9 and 17).</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: FLP impossibility and the system models (synchronous, asynchronous, partially synchronous) this chapter assumes.</li>
+    <li><a href="ch09_failure_detection.html">Ch.9</a>: the failure detectors that supply liveness here; their accuracy/speed trade-off is why elections sometimes restart.</li>
+    <li><a href="ch10_leader_election.html">Ch.10</a>: leader election, which Multi-Paxos, ZAB and Raft use as a performance shortcut, never as the safety guarantee.</li>
+  </ul></div>
+  <div class="box papers"><b>Paper behind this plate</b><ul>
+    <li>Chandra &amp; Toueg, "Unreliable failure detectors for reliable distributed systems", JACM 43(2), 1996 [CHANDRA96]: shows consensus is solvable in an asynchronous system once you add an (imperfect) failure detector, and that atomic broadcast and consensus are equivalent. The theory behind "safety from the algorithm, liveness from the detector".</li>
+  </ul></div>
+</section>
+
+<!-- 02 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · BROADCAST</div><h2>Telling everyone, even if the sender dies halfway</h2></div><span class="chip">pdf p437–438 · Fig 14-1</span></div>
+  <p>A <b>broadcast</b> is a communication abstraction for spreading information to a set of processes. There are many broadcast algorithms with different assumptions and guarantees; broadcast is a primitive used in many places, consensus included. Gossip dissemination (Chapter 12) is one form. Databases use broadcast for replication when one coordinator must send data to all others. Making it reliable is hard: if the coordinator crashes after sending to some nodes but not others, the system is inconsistent (some nodes saw the message, some didn't).</p>
+  <p>The simplest form is <b>best-effort broadcast</b> [CACHIN11]: the sender alone is responsible for delivery to every target. If it fails, nobody re-sends; if the coordinator crashes, the broadcast fails <em>silently</em>. A <b>reliable broadcast</b> must guarantee that all correct processes receive the same messages, even if the sender crashes mid-way.</p>
+  <p>A naive reliable broadcast uses a failure detector plus a fallback: every process that received the message forwards it to every other process it knows. When the source fails, the others detect it and keep broadcasting, flooding the network with <b>N² messages</b> (Fig 14-1), where N is the number of <em>remaining</em> recipients (each forwarder skips the original sender and itself). Even with the sender crashed, the rest of the system delivers, and all receivers see the same messages. The downside is the N² message count; ideally we'd use fewer.</p>
+  <div class="fig">
+    <h3>Crash the sender mid-broadcast</h3>
+    <div class="controls">
+      <label for="sel2">mode <select id="sel2"><option value="eager">reliable: everyone forwards (eager flooding)</option><option value="lazy">reliable: forward only after the sender is suspected</option><option value="best">best effort: sender only</option></select></label>
+      <label for="n2">processes N <input id="n2" type="range" min="3" max="7" value="4"><output id="n2o">4</output></label>
+      <label for="k2">sender reaches before crash <input id="k2" type="range" min="0" max="6" value="1"><output id="k2o">1</output></label>
+      <label for="chk2"><input id="chk2" type="checkbox" checked> sender crashes</label>
+    </div>
+    <div class="seqwrap" id="q2"></div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A teacher starts phoning parents about a school closure and her phone dies after two calls. Best effort: the other parents never hear. Reliable: every parent who got the news phones every other parent. Everyone is told, but each parent gets the news several times.</p></div>
+  <div class="fig">
+    <h3>Messages per broadcast as the group grows</h3>
+    <canvas id="c2" class="short" aria-label="Messages per broadcast vs number of processes for best effort and flooding"></canvas>
+    <div class="legend" id="c2L"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>With N processes, the sender sends N−1 copies. In eager flooding each of the N−1 receivers forwards to the N−2 processes that are neither the sender nor itself, so the total is (N−1) + (N−1)(N−2) = (N−1)²: the book's "N² with N = remaining recipients". At N = 7 that's 36 messages instead of 6, and at N = 100 it's 9,801 instead of 99. The "forward only after suspicion" variant pays the N² cost only when the sender is actually suspected, but it now depends on the failure detector's speed, and a wrong suspicion triggers a useless flood. Duplicates are discarded by message ID, so delivery happens once per process.</p></div>
+  <pre class="code" id="code2"></pre>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch12_anti_entropy_and_dissemination.html">Ch.12</a>: gossip spreads the same message in about log N rounds with far fewer messages per round, trading certainty for probability.</li>
+    <li>Section 3: reliable broadcast agrees on the <em>set</em> of messages but not on their <em>order</em>.</li>
+  </ul></div>
+  <div class="box papers"><b>Reference behind this plate</b><ul><li>Cachin, Guerraoui &amp; Rodrigues, <i>Introduction to Reliable and Secure Distributed Programming</i> (2nd ed.), Springer, 2011 [CACHIN11]: the textbook definitions of best-effort, reliable and uniform reliable broadcast, with proofs. Also on the Part II reading list.</li></ul></div>
+</section>
+
+<!-- 03 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · ATOMIC BROADCAST</div><h2>Same messages, same order, everywhere</h2></div><span class="chip">pdf p439</span></div>
+  <p>Flooding guarantees delivery but not order: messages arrive eventually, at unknown times. When order matters you need <b>atomic broadcast</b> (also called <b>total order multicast</b>), which guarantees both reliable delivery and total order. Reliable broadcast makes processes agree on the <em>set</em> of messages; atomic broadcast also makes them agree on the <em>sequence</em>. Two properties:</p>
+  <ul class="plain">
+    <li><b>Atomicity</b>: processes agree on the set of received messages. Either all non-failed processes deliver a message, or none do.</li>
+    <li><b>Order</b>: all non-failed processes deliver messages in the same order.</li>
+  </ul>
+  <p>So each message is delivered to all or none, and every other delivered message is ordered either before or after it.</p>
+  <div class="fig">
+    <h3>Two clients write at once: reliable vs atomic delivery</h3>
+    <div class="controls"><button id="btn3" type="button">New random network delays</button><label for="sel3">delivery <select id="sel3"><option value="rel">reliable broadcast (deliver on arrival)</option><option value="seq">atomic broadcast via a sequencer</option></select></label></div>
+    <div class="seqwrap" id="q3"></div>
+    <div class="tablewrap" id="t3"></div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two people edit the same bank balance: one deposits 100, the other adds 10% interest. If replica A applies "deposit then interest" and replica B "interest then deposit", their balances differ forever, even though both got both messages. Atomic broadcast makes everyone apply the operations in one agreed order.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>In the reliable mode every replica applies a message the moment it arrives, so the per-replica order follows random network delays; press the button a few times and you'll regularly see replicas with different balances. In the sequencer mode (which the book introduces in section 4), messages go to one process that stamps a sequence number; replicas hold back message #2 until #1 is applied. Every replica then shows the same balance, at the cost of one extra hop and a single process that must be replaced if it fails. Total order is exactly the problem consensus solves: deciding "what is message #k?" is one consensus instance per slot.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch11_replication_and_consistency.html">Ch.11</a>: total order is what linearizability and sequential consistency need underneath.</li>
+    <li>Section 6: the book notes that atomic broadcast is equivalent to consensus in an asynchronous system with crash failures [CHANDRA96].</li>
+  </ul></div>
+</section>
+
+<!-- 04 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · VIRTUAL SYNCHRONY</div><h2>Ordered delivery to a group whose membership changes</h2></div><span class="chip">pdf p440–441</span></div>
+  <p><b>Virtual synchrony</b> is a framework for group communication using broadcast. Atomic broadcast delivers totally ordered messages to a <em>static</em> group; virtual synchrony delivers them to a <em>dynamic</em> group of peers. Processes are organised into <b>groups</b>; while a group exists, its members get messages in the same order. The model doesn't say <em>which</em> order, and implementations can exploit that for performance as long as the order is the same for every member [BIRMAN10].</p>
+  <p>All members share the same <b>view</b> of the group, and each message is tied to the group identity: processes see the same messages only while they're in the same group. When someone joins, leaves, or fails and is forced out, the <b>view changes</b>, announced to all members. Each message is uniquely associated with the view it came from.</p>
+  <p>Virtual synchrony separates <b>receipt</b> (a member got the message) from <b>delivery</b> (all members got it). A message sent in one view can only be delivered in that same view, checked by comparing the current group with the message's group. Received messages wait in a queue until the process learns delivery succeeded. Unless every member received a message before the view change, no member may consider it delivered. So all messages are sent and delivered <em>between</em> view changes, which gives atomic delivery: the view acts as a <b>barrier</b> broadcasts can't cross.</p>
+  <p>Some total-order algorithms use a single <b>sequencer</b> process to decide the order. They're easier to implement but rely on detecting the leader's failure for liveness. A sequencer helps performance: no consensus round per message, just the sequencer's local view; and it can still scale by partitioning the requests. Despite being technically sound, virtual synchrony hasn't been broadly adopted in commercial end-user systems [BIRMAN06].</p>
+  <div class="fig">
+    <h3>Step through a view change</h3>
+    <div class="seqwrap" id="q4"></div>
+    <div class="nodes" id="nd4"></div>
+    <div class="steptxt" id="tx4"></div>
+    <div class="controls"><button id="vs4Prev" type="button">◀ Back</button><button id="vs4Next" type="button">Next step ▶</button><button id="vs4Reset" type="button">Reset</button><span class="readout">step <b id="vs4No">0</b></span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A meeting with minutes. A remark counts as "in the minutes" only once everybody in the room has heard it. When someone leaves, the chair calls a break: the current minutes are closed, everyone confirms they have the same minutes, and a new section starts with the new attendee list. Nothing said before the break can appear after it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each process keeps a pending queue tagged with the view number. A message moves from pending to delivered only when the process knows all current members have it. When a failure is detected, the survivors stop sending in the old view, make sure each survivor holds the same pending messages for that view (in classic implementations this is a "flush"; the word is not in the book), deliver them, and only then install the new view. A message from view 1 that arrives during view 2 is discarded: view 1 is closed.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 5: ZAB's epochs play the same barrier role as views.</li>
+    <li><a href="ch09_failure_detection.html">Ch.9</a>: view changes are triggered by failure detection.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Birman, "A History of the Virtual Synchrony Replication Model", in <i>Replication</i> (Springer), 2010 [BIRMAN10]: the model's designer on what it guarantees and why order is left unspecified.</li>
+    <li>Birman, Chandersekaran, Dolev, van Renesse, "How the Hidden Hand Shapes the Market for Software Reliability", WASR 2006 [BIRMAN06]: why a sound model like this saw little commercial adoption.</li>
+  </ul></div>
+</section>
+
+<!-- 05 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · ZOOKEEPER ATOMIC BROADCAST (ZAB)</div><h2>One leader per epoch, three phases</h2></div><span class="chip">pdf p442–444 · Fig 14-2</span></div>
+  <p>One of the most popular atomic broadcast implementations is <b>ZAB</b>, used by Apache ZooKeeper [HUNT10][JUNQUEIRA11], a hierarchical distributed key-value store. ZAB gives the total order and atomic delivery needed to keep replica states consistent.</p>
+  <p>Processes are either <b>leader</b> or <b>follower</b>. Leadership is temporary: the leader runs the algorithm's steps, broadcasts to followers and sets the event order. Clients connect to any node to write or to read the most recent values; a non-leader forwards the request to the leader.</p>
+  <p>To guarantee a unique leader, time is split into <b>epochs</b>, each with a unique, monotonically and incrementally sequenced number; each epoch has at most one leader. It starts with finding a <b>prospective leader</b> with any election algorithm that picks a process that's up with high probability. Since later steps guarantee safety, choosing the prospective leader is just a performance optimisation. A prospective leader can also appear because the previous one failed. It then runs three phases:</p>
+  <ul class="plain">
+    <li><b>Discovery</b>: the prospective leader learns the latest epoch each process knows and proposes a new epoch greater than any follower's. Followers reply with the ID of the latest transaction they saw in the previous epoch. After this, no process accepts broadcast proposals from earlier epochs.</li>
+    <li><b>Synchronization</b>: recover from the previous leader's failure and bring lagging followers up to date. The prospective leader proposes itself as leader for the new epoch and collects acknowledgments; once it has them, it is established, and followers won't accept leadership attempts from anyone else for that epoch. The new leader makes sure followers have the same history and delivers committed proposals from earlier epochs' leaders <em>before</em> any new-epoch proposal.</li>
+    <li><b>Broadcast</b>: active messaging. The leader receives client messages, orders them, and broadcasts: send a proposal, wait for a quorum of follower acknowledgments, then commit. It's like two-phase commit <em>without aborts</em>: votes are only acknowledgments, and a follower can't vote against a valid leader's proposal, though proposals from leaders of the wrong epoch must <em>not</em> be acknowledged. This phase lasts until the leader crashes, is partitioned, or is suspected to have crashed because of message delay.</li>
+  </ul>
+  <p>Safety holds if followers accept proposals only from the established epoch's leader. Two processes may <em>try</em> to get elected, but only one can win the epoch. Processes are assumed to act in good faith. Leader and followers both use <b>heartbeats</b>: if the leader stops hearing from a quorum of followers it steps down and restarts election; if a follower decides the leader crashed it starts a new election.</p>
+  <p>Messages are totally ordered, and the leader won't send the next message until the previous one is acknowledged. Duplicate receipt is harmless if delivery order is respected. ZAB handles many concurrent client state changes since one leader receives the writes, orders them and broadcasts them. Total order also speeds recovery: in synchronization, followers report their highest committed proposal, and the leader can pick the node with the highest one as the <em>only</em> node to copy from. ZAB's advantages: broadcast takes only <b>two rounds of messages</b>, leader failure is recovered by streaming missing messages from <b>one</b> up-to-date process, and a long-lived leader can sequence events from its local view without extra consensus rounds.</p>
+  <div class="fig">
+    <h3>Step through ZAB after a leader crash (my own example, not the book's figure)</h3>
+    <div class="seqwrap" id="q5"></div>
+    <div class="nodes" id="nd5"></div>
+    <div class="steptxt" id="tx5"></div>
+    <div class="controls"><button id="zb5Prev" type="button">◀ Back</button><button id="zb5Next" type="button">Next step ▶</button><button id="zb5Reset" type="button">Reset</button><span class="readout">step <b id="zb5No">0</b></span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A ship changing captains. First the new captain asks every officer "what's the latest voyage you served on, and the last order you logged?" and declares voyage 2 (discovery). Then she copies the most complete logbook and makes every officer's logbook match it before giving any new order (synchronization). Only then does she give orders: each one is read out, acknowledged by most officers, then marked done (broadcast). Orders from the old captain's voyage are ignored.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each transaction ID is a pair (epoch, counter); ZooKeeper calls it a <i>zxid</i> (the name isn't in the book). Comparing pairs, a higher epoch always wins, so "newest history" is just the follower with the largest zxid. That's why recovery can copy from a single node. Followers remember the highest epoch they acknowledged and reject anything older: this is the fence that stops a deposed leader. In the broadcast phase each write costs PROPOSE → ACK from a quorum → COMMIT: two message rounds, and the commit can be piggybacked on the next proposal.</p></div>
+  <div class="ba"><div><b>Before: plain primary-backup</b><p>A primary pushes updates; if it dies with some backups ahead of others, there's no rule for whose history wins, and an old primary that comes back can still push stale writes.</p></div><div class="after"><b>After: ZAB</b><p>Epoch numbers fence old leaders, the new leader adopts the most complete history before accepting writes, and each write needs only a quorum ACK. Cost per write: 2 message rounds; recovery: stream from one node.</p></div></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li><a href="ch10_leader_election.html">Ch.10</a>: the prospective-leader election can be any algorithm; correctness doesn't depend on it.</li>
+    <li><a href="ch13_distributed_transactions.html">Ch.13</a>: the broadcast phase is "2PC without aborts".</li>
+    <li>Section 15: Raft's terms, heartbeats and leader-only log flow look very similar.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Hunt, Konar, Junqueira, Reed, "ZooKeeper: wait-free coordination for internet-scale systems", USENIX ATC 2010 [HUNT10]: the system and its API.</li>
+    <li>Junqueira, Reed, Serafini, "Zab: High-performance broadcast for primary-backup systems", DSN 2011 [JUNQUEIRA11]: the protocol, its phases and its proof. Both are on the chapter's further-reading list.</li>
+  </ul></div>
+</section>
+
+<!-- 06 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · PAXOS</div><h2>Proposers, acceptors, learners, and numbers that never repeat</h2></div><span class="chip">pdf p445–446</span></div>
+  <p>Atomic broadcast is equivalent to consensus in an asynchronous system with crash failures [CHANDRA96]: participants must agree on the message order and be able to learn it. So the two families look alike in motivation and implementation.</p>
+  <p>The best-known consensus algorithm is <b>Paxos</b>, introduced by Leslie Lamport in "The Part-Time Parliament" [LAMPORT98], which tells the algorithm as the legislature of the Aegean island of Paxos. In 2001 the follow-up "Paxos Made Simple" [LAMPORT01] introduced the simpler terms used today. Participants take one of three roles:</p>
+  <ul class="plain">
+    <li><b>Proposers</b> receive values from clients, create proposals to accept them, and try to collect votes from acceptors.</li>
+    <li><b>Acceptors</b> vote to accept or reject proposed values. Fault tolerance needs several acceptors, but liveness needs only a <b>quorum (majority)</b> of their votes.</li>
+    <li><b>Learners</b> act as replicas, storing the outcomes of accepted proposals.</li>
+  </ul>
+  <p>Any participant can take any role; most implementations co-locate them, so one process is proposer, acceptor and learner at once. Every proposal has a <b>value</b> (from the client) and a <b>unique, monotonically increasing proposal number</b>. The number gives a total order of operations and establishes happened-before/after between them. It is often an <b>(id, timestamp)</b> pair: compare timestamps first and break ties with the (comparable) node ID.</p>
+  <div class="fig">
+    <h3>Which proposal number wins?</h3>
+    <div class="controls">
+      <label for="ta6">P-a timestamp <input id="ta6" type="range" min="1" max="9" value="5"><output id="ta6o">5</output></label>
+      <label for="ia6">P-a node id <input id="ia6" type="range" min="1" max="5" value="2"><output id="ia6o">2</output></label>
+      <label for="tb6">P-b timestamp <input id="tb6" type="range" min="1" max="9" value="5"><output id="tb6o">5</output></label>
+      <label for="ib6">P-b node id <input id="ib6" type="range" min="1" max="5" value="4"><output id="ib6o">4</output></label>
+    </div>
+    <div class="readout" id="r6"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Ticket numbers at a deli counter, except two machines print them. To make every ticket unique you print "minute.machine" (5.2, 5.4): later minutes win, and if two tickets share a minute, the machine number decides. Nobody can ever hold the same ticket as someone else.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Paxos only needs proposal numbers to be unique and comparable; it doesn't need them to match real time. If two proposers could pick the same number, an acceptor couldn't tell whose promise it made, and two different values could each collect a "majority" under the same number. Pairing a counter or timestamp with a node ID makes collisions impossible. A common alternative (not in the book) is round-robin numbering: node i of N uses i, i+N, i+2N…, and after seeing a higher number it jumps to the next one of its own above it.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: logical clocks and happened-before; proposal numbers are a specialised logical clock.</li><li>Section 15: Raft's <i>term</i> numbers play the same role.</li></ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Lamport, "The Part-Time Parliament", ACM TOCS 16(2), 1998 [LAMPORT98]: the original, written as a parable; famously hard to read but historically essential.</li>
+    <li>Lamport, "Paxos Made Simple", ACM SIGACT News 32(4), 2001 [LAMPORT01]: 14 pages in plain terms; read this one first.</li>
+  </ul></div>
+</section>
+
+<!-- 07 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · PAXOS ALGORITHM</div><h2>Two phases: win the right to propose, then get the value accepted</h2></div><span class="chip">pdf p447–449 · Fig 14-3</span></div>
+  <p>Paxos has two phases: <b>voting</b> (the <b>propose</b> phase), where proposers compete for leadership, and <b>replication</b>, where the winning proposer distributes the value to acceptors. The proposer is the client's first point of contact: it gets the value to decide on and tries to collect votes from a quorum of acceptors; then acceptors tell learners the agreed value, ratifying the result. Learners raise the value's replication factor. Only one proposer can win a majority. Votes can split evenly so that nobody gets a majority in a round, forcing a restart (section 9).</p>
+  <p><b>Propose phase.</b> The proposer sends <code>Prepare(n)</code> to a majority of acceptors. An acceptor answers while keeping these invariants [LAMPORT01]:</p>
+  <ul class="plain">
+    <li>If it hasn't answered a prepare with a higher number yet, it <b>promises</b> never to accept a proposal with a lower number.</li>
+    <li>If it has already accepted another proposal (got <code>Accept!(m, v<sub>accepted</sub>)</code>), it replies <code>Promise(m, v<sub>accepted</sub>)</code>, telling the proposer it already accepted proposal m.</li>
+    <li>If it has already answered a prepare with a higher number, it tells the proposer that a higher-numbered proposal exists.</li>
+    <li>An acceptor can answer several prepares, as long as each later one has a higher number.</li>
+  </ul>
+  <p><b>Replication phase.</b> With a majority of promises, the proposer sends <code>Accept!(n, v)</code>. The value v is the one attached to the <b>highest-numbered</b> proposal among the replies, or <b>any value of its own</b> if no reply carried an earlier accepted proposal. An acceptor accepts proposal n unless it already answered <code>Prepare(m)</code> with m &gt; n; if it rejects, it sends back the highest number it has seen so the proposer can catch up [LAMPORT01].</p>
+  <p>Once a value is accepted by even one acceptor, future proposers must decide the same value to preserve agreement: that's why acceptors return the latest value they accepted. If none has, the proposer is free to choose. A <b>learner</b> knows the decided value once it hears from a majority of acceptors. To learn sooner, acceptors notify learners as soon as they accept. With several learners each acceptor must notify each one, or one or more <b>distinguished learners</b> can relay to the rest. In short: phase 1 establishes a leader for the round and learns which value must be accepted; phase 2 broadcasts it. The base algorithm runs both phases for every value; Multi-Paxos (section 10) removes that cost.</p>
+  <div class="fig">
+    <h3>A normal Paxos round, run on the acceptor code below</h3>
+    <div class="seqwrap" id="q7"></div>
+    <div class="tablewrap" id="t7"></div>
+    <div class="steptxt" id="tx7"></div>
+    <div class="controls"><button id="px7Prev" type="button">◀ Back</button><button id="px7Next" type="button">Next step ▶</button><button id="px7Reset" type="button">Reset</button><span class="readout">step <b id="px7No">0</b></span></div>
+  </div>
+  <pre class="code" id="code7"></pre>
+  <div class="box picture"><b>Picture it</b><p>Booking a meeting room through three receptionists. First you ask a majority: "I'm request #7, will you hold the room for me and tell me if you've already booked it for someone?" (prepare/promise). If anyone says "I already penciled in Priya's meeting", you must book <i>Priya's</i> meeting, not yours. Then you say "confirm booking #7 for meeting X" (accept). A receptionist who has since promised #8 to someone else refuses.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The acceptor stores just three things on disk: the highest number it promised, and the number and value it last accepted. Safety comes from two rules working together. "Promise not to accept lower numbers" closes the window during which an old proposer could sneak a value in. "Adopt the highest-numbered accepted value you hear about" means that if any value could already have been chosen by a majority, every later proposer will re-propose exactly that value, because any majority it contacts overlaps the majority that accepted it. The cost: 2 round trips (4 message delays) and 4·(N−1) messages per decided value, plus learner notifications.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch13_distributed_transactions.html">Ch.13</a>: 2PC also has a "prepare" and a "commit" phase, but one participant can veto; in Paxos a minority can't block.</li><li>Section 14: the same logic expressed as write-once registers.</li></ul></div>
+  <div class="box papers"><b>Paper behind this plate</b><ul><li>Lamport, "Paxos Made Simple", 2001 [LAMPORT01]: the acceptor invariants above are its P1a/P2c rules.</li><li>Further reading listed by the book: Lamport, "Generalized Consensus and Paxos", MSR-TR-2005-33; Primi, "Paxos made code: Implementing a high throughput Atomic Broadcast", 2009 (Libpaxos).</li></ul></div>
+</section>
+
+<!-- 08 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · QUORUMS IN PAXOS</div><h2>Why "any two majorities share a member" is the whole trick</h2></div><span class="chip">pdf p450</span></div>
+  <p>Quorums let some participants fail while the rest proceed. A <b>quorum</b> is the minimum number of votes needed for an operation, usually a majority. Even if participants fail or are split by a partition, at least one participant acts as an <b>arbiter</b> that keeps the protocol correct. Once enough participants accept a proposal, the value is guaranteed to be accepted, since <b>any two majorities have at least one participant in common</b>.</p>
+  <p>Paxos guarantees <b>safety under any number of failures</b>: no configuration can produce an inconsistent state. <b>Liveness</b> is guaranteed with up to <b>f</b> failed processes, which requires <b>2f + 1</b> processes in total, so that f + 1 can still proceed. Section 13 (Flexible Paxos) restates quorums so that only the quorums of the two different steps must intersect.</p>
+  <p><b>Tip from the book:</b> quorums describe only the system's <i>blocking</i> properties. For safety, each step must wait for at least a quorum of replies. You may send proposals and accepts to more nodes; you just don't wait for all of them. Some systems use <b>speculative execution</b> (redundant requests so a node failure doesn't delay reaching the needed count), but for liveness you proceed as soon as you hear from a quorum.</p>
+  <div class="fig">
+    <h3>Check every pair of majorities</h3>
+    <div class="controls"><label for="n8">acceptors N <input id="n8" type="range" min="1" max="9" value="5"><output id="n8o">5</output></label><label for="q8">quorum size <input id="q8" type="range" min="1" max="9" value="3"><output id="q8o">3</output></label><button id="btn8" type="button">Use majority</button></div>
+    <div class="readout" id="r8"></div>
+  </div>
+  <div class="fig">
+    <h3>The tip, measured on a model: send to all, wait for the fastest quorum</h3>
+    <canvas id="c8" class="short" aria-label="Commit latency when sending to exactly a quorum versus sending to all and waiting for the fastest quorum"></canvas>
+    <div class="legend" id="c8L"></div>
+    <div class="controls"><label for="sl8">chance a node is slow (GC pause, disk stall) <input id="sl8" type="range" min="0" max="40" value="10"><output id="sl8o">10</output>%</label></div>
+    <div class="readout" id="r8b"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>In a class of 5, "3 people agree" twice can never be two completely different groups of 3: there are only 5 people, so some person is in both. That shared person remembers what the first group decided and tells the second group.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The calculator enumerates every pair of size-Q subsets of N acceptors and counts disjoint pairs. With Q ≥ ⌊N/2⌋+1 there are none and the minimum overlap is 2Q−N. The fault tolerance is N−Q crashed acceptors. Notice N = 4 tolerates 1 crash just like N = 3 (quorum 3 of 4): even sizes add cost without adding tolerance, which is why clusters are 3, 5 or 7. The latency model (modelled, not measured; 4,000 pooled trials per point) gives every node a round trip of 1 ms ± 0.3 ms, plus a 20 ms stall with the chance you set. Waiting for the fastest Q of N almost never sees the stall; sending to exactly Q nodes waits for the slowest of them.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch11_replication_and_consistency.html">Ch.11</a>: the same intersection argument as R + W &gt; N in tunable consistency.</li><li>Section 13 relaxes it to Q₁ + Q₂ &gt; N.</li></ul></div>
+</section>
+
+<!-- 09 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · FAILURE SCENARIOS</div><h2>When proposers and acceptors die mid-round</h2></div><span class="chip">pdf p451–453 · Figs 14-4, 14-5, 14-6</span></div>
+  <p>Failures are where distributed algorithms get interesting. Suppose the proposer fails in phase 2 before broadcasting the value to every acceptor (the same happens if it is alive but slow or can't reach some acceptors). A new proposer can pick up and commit the value. Three cases from the book, all with proposers P1, P2 and acceptors A1, A2, A3:</p>
+  <ul class="plain">
+    <li><b>Fig 14-4, old value decided.</b> P1 completes the election with proposal 1 but crashes after sending V1 to A1 only. P2 starts round 2, gets a quorum of replies from A1 and A2, and commits the <i>old</i> value V1. Because the state is replicated, a proposer crash doesn't stop consensus: if even one acceptor accepted, the next proposer can carry the value forward, without the original proposer knowing. A client connected only to P1 may never learn the outcome (the book's footnote points to a real case described at databass.dev/links/68).</li>
+    <li><b>Fig 14-5, new value decided.</b> Same crash, but A2 and A3 answer P2 first. P2 sees no accepted value and commits its <i>own</i> V2, even though A1 holds V1. That's fine: V1 never reached a majority, so it was never decided.</li>
+    <li><b>Fig 14-6, acceptor fails too.</b> P1 crashes after A1 accepts V1, and A1 then crashes before telling anyone. P2's quorum doesn't include A1, so P2 commits V2. Any later proposer that does reach A1 ignores A1's value (number 1) in favour of the more recent accepted proposal (number 2).</li>
+  </ul>
+  <p>Another failure mode: <b>dueling proposers</b>. Acceptors promise not to accept lower numbers but can still answer several prepares with increasing numbers. A proposer may reach its accept step and find the acceptors have promised a higher number to a rival; both keep retrying and block each other. The usual fix is a <b>random backoff</b>, which eventually lets one proceed while the other sleeps. Paxos tolerates acceptor failures only while enough acceptors are alive to form a majority.</p>
+  <div class="fig">
+    <h3>Replay the book's scenarios on the real acceptor code</h3>
+    <div class="controls"><label for="sel9">scenario <select id="sel9"><option value="old">Fig 14-4: P2 reaches A1, A2 → old value V1</option><option value="new">Fig 14-5: P2 reaches A2, A3 → new value V2</option><option value="acc">Fig 14-6: A1 also crashes → V2, later proposer ignores A1</option><option value="duel">dueling proposers (no backoff)</option></select></label></div>
+    <div class="seqwrap" id="q9"></div>
+    <div class="tablewrap" id="t9"></div>
+    <div class="steptxt" id="tx9"></div>
+    <div class="controls"><button id="fs9Prev" type="button">◀ Back</button><button id="fs9Next" type="button">Next step ▶</button><button id="fs9Reset" type="button">Reset</button><span class="readout">step <b id="fs9No">0</b></span></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two people keep calling the same three receptionists with ever-higher request numbers, each call cancelling the other's hold before they can confirm. If each waits a random few seconds after being refused, soon one of them gets through a full call while the other is waiting.</p></div>
+  <div class="fig">
+    <h3>Random backoff ends the duel (modelled)</h3>
+    <canvas id="c9" class="short" aria-label="Probability that a value is decided within k attempts, for different backoff ranges"></canvas>
+    <div class="legend" id="c9L"></div>
+    <div class="controls"><label for="j9">proposer's pause between promises and Accept! (tenths of a round trip) <input id="j9" type="range" min="0" max="30" value="15"><output id="j9o">15</output></label><button id="btn9" type="button">Run 1,000 duels per curve</button></div>
+    <div class="readout" id="r9"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>In every replay the acceptors run the same three functions from section 7, and the table shows their stored (promised, accepted number, accepted value). In Fig 14-4 the promise from A1 carries (1, V1), so <code>chooseValue</code> must return V1. In Fig 14-5 neither A2 nor A3 accepted anything, so P2 may use V2: V1 was never chosen. The duel model (modelled, not measured): two proposers start within one round trip of each other; one-way delay is half a round trip with ±10% jitter; a proposer's Accept! fails if the rival's Prepare (always a higher number) lands at the acceptors between its own Prepare and Accept!; after a rejection it re-prepares immediately (B = 0) or after a uniform random wait in [0, B] round trips. The slider sets how long a proposer pauses between collecting promises and sending Accept! (disk writes, batching). A livelock is only possible when that window is longer than the time it takes the rival to learn of its failure and re-prepare, so try 0 and then 15+. Each curve pools 1,000 duels.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 17: Raft solves its version of the duel (split votes) the same way, with randomised election timers.</li><li>Section 10: Multi-Paxos avoids most duels by having one stable leader.</li></ul></div>
+</section>
+
+<!-- 10 -->
+<section class="plate" id="s10">
+  <div class="plate-head"><div><div class="secno">10 · MULTI-PAXOS</div><h2>Elect once, then replicate many values</h2></div><span class="chip">pdf p454–455</span></div>
+  <p>Classic Paxos picks an arbitrary proposer and runs a full round, so every replicated value needs a propose phase; replication starts only after a majority answers <code>Prepare</code> with <code>Promise</code>. <b>Multi-Paxos</b> avoids repeating it by introducing a <b>leader</b>, a <b>distinguished proposer</b> [LAMPORT01] that reuses its recognised position. This is a crucial addition that significantly improves efficiency: with an established leader, skip the propose phase and go straight to replication (send the value, collect acknowledgments).</p>
+  <p><b>Reads.</b> In classic Paxos a read can be done by running a Paxos round that collects values from incomplete rounds, because the last known proposer may not hold the latest data: another proposer could have changed state without it knowing. Multi-Paxos has the same issue: reading from the "known" leader after another leader was elected returns stale data and breaks linearizability. To prevent that, some implementations use <b>leases</b>: the leader periodically tells participants it's alive, extending its lease; participants reply and promise not to accept proposals from other leaders for the lease period [CHANDRA07]. Leases are a performance optimisation that allows reads from the leader without a quorum, not a correctness guarantee. Their safety depends on bounded clock synchrony: if clocks drift too far and the leader thinks its lease is valid while others think it expired, linearizability is lost.</p>
+  <p><b>The log.</b> Multi-Paxos is often described as a <b>replicated log</b> of operations applied to some structure. The algorithm ignores the structure's meaning; it only replicates values appended to the log. Participants keep a <b>durable log</b> of received messages to survive crashes. To keep the log from growing forever, its contents are applied to the structure; once synchronised (a <b>snapshot</b>), the log can be <b>truncated</b>. Snapshot and log must be mutually consistent, and the snapshot change must be applied atomically with truncation [CHANDRA07].</p>
+  <p><b>Register vs log.</b> Single-decree Paxos is a <b>write-once register</b>: once a value is in the slot, it can't change. Phase 1 is proposers competing for ownership of the register; phase 2 is one of them writing. Multi-Paxos is an <b>append-only log</b> of such registers: one value at a time, strictly ordered, never modified [RYSTSOV16]. Some algorithms instead offer collections of read-modify-write registers and share state rather than replicate a state machine: <b>Active Disk Paxos</b> [CHOCKLER15] and <b>CASPaxos</b> [RYSTSOV18].</p>
+  <div class="fig">
+    <h3>Cost of k commands: classic vs Multi-Paxos</h3>
+    <div class="controls"><label for="k10">commands k <input id="k10" type="range" min="1" max="50" value="10"><output id="k10o">10</output></label><label for="n10">acceptors N <input id="n10" type="range" min="3" max="9" step="2" value="5"><output id="n10o">5</output></label></div>
+    <canvas id="c10" class="short" aria-label="Message delays to commit k commands with classic Paxos and Multi-Paxos"></canvas>
+    <div class="legend" id="c10L"></div>
+    <div class="readout" id="r10"></div>
+  </div>
+  <div class="fig">
+    <h3>Replicated log, snapshot and truncation</h3>
+    <div class="cells" id="lg10"></div>
+    <div class="controls"><button id="ap10" type="button">Leader appends a command</button><button id="sn10" type="button">Snapshot + truncate</button><button id="rs10" type="button">Reset log</button></div>
+    <div class="readout" id="r10b"></div>
+  </div>
+  <div class="fig">
+    <h3>Leases and clock drift</h3>
+    <div class="controls"><label for="ls10">lease length (s) <input id="ls10" type="range" min="1" max="30" value="10"><output id="ls10o">10</output></label><label for="dr10">max clock rate error between nodes <input id="dr10" type="range" min="0" max="100" value="10"><output id="dr10o">10</output> ‰</label><label for="chk10"><input id="chk10" type="checkbox"> leader subtracts a drift margin</label></div>
+    <div class="readout" id="r10c"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Classic Paxos is holding a fresh election before every sentence of the meeting minutes. Multi-Paxos elects a secretary once, and she writes sentence after sentence, each confirmed by a nod from most of the room. A lease is the room saying "for the next 10 minutes, nobody else may take minutes", so she can read the minutes aloud without polling the room, as long as everyone's watch agrees on what "10 minutes" means.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Classic Paxos per value: Prepare → Promise → Accept! → Accepted = 4 message delays (2 round trips) and 4(N−1) messages. Multi-Paxos pays phase 1 once for all future slots (the leader prepares "every slot from i onward"), then each value costs Accept! → Accepted = 2 delays and 2(N−1) messages: half the latency and half the messages. The lease calculator: the leader counts L seconds on its clock, a follower counts L on its own. If the follower's clock runs faster by ε, it thinks the lease ended after L/(1+ε) real seconds and may promise a new leader while the old one still serves reads: a stale-read window of L − L/(1+ε). Subtracting a margin (the leader stops serving lease reads at L(1−ε) on its own clock) closes the window, which is why lease designs bound clock drift.</p></div>
+  <div class="ba"><div><b>Before: classic Paxos per value</b><p>2 round trips per value; any proposer may start a round, so concurrent proposers duel; reads need a Paxos round.</p></div><div class="after"><b>After: Multi-Paxos</b><p>1 round trip per value from a stable leader; duels only during leader changes; leader reads served locally under a lease (if clocks are bounded).</p></div></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch05_transaction_processing_and_recovery.html">Ch.5</a>: snapshot + log truncation is the same idea as checkpoints + WAL truncation.</li><li>Section 15: Raft is essentially Multi-Paxos with leadership built into the rules.</li><li><a href="ch08_distributed_systems_introduction_and_ove.html">Ch.8</a>: clock drift, why physical clocks can't be fully trusted.</li></ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Chandra, Griesemer, Redstone, "Paxos made live: an engineering perspective", PODC 2007 [CHANDRA07]: Google's Chubby team on leases, snapshots, disk corruption and testing. The best "what it takes in production" paper.</li>
+    <li>Rystsov, "Best of both worlds: Raft's joint consensus + Single Decree Paxos", 2016 [RYSTSOV16], and "Replicated State Machines without logs" (CASPaxos), arXiv 2018 [RYSTSOV18].</li>
+    <li>Chockler &amp; Malkhi, "Active disk paxos with infinitely many processes", PODC 2002 (dated 2015 in the book's bibliography) [CHOCKLER15].</li>
+    <li>Further reading in the book: van Renesse &amp; Altinbuken, "Paxos Made Moderately Complex", ACM Computing Surveys 47(3), 2015.</li>
+  </ul></div>
+</section>
+
+<!-- 11 -->
+<section class="plate" id="s11">
+  <div class="plate-head"><div><div class="secno">11 · FAST PAXOS</div><h2>Skip the leader hop, pay with bigger quorums and collisions</h2></div><span class="chip">pdf p456–457 · Fig 14-7</span></div>
+  <p><b>Fast Paxos</b> [LAMPORT06] cuts one round trip compared with classic Paxos by letting any proposer contact acceptors directly instead of going through the leader. The price: the quorum grows to <b>2f + 1</b> (instead of f + 1) and the total number of acceptors to <b>3f + 1</b> [JUNQUEIRA07].</p>
+  <p>In classic Paxos, during replication the proposer may pick any value it collected in the propose phase. Fast Paxos has two kinds of rounds: <b>classic</b> (as before) and <b>fast</b>, where acceptors may accept other values. The proposer that collected enough replies in the propose phase is called the <b>coordinator</b>; "proposer" means all the others. Some descriptions let clients contact acceptors directly [ZHAO15]. In a fast round, if the coordinator is free to pick its own value, it sends a special <b>Any</b> message instead. Acceptors may then treat any proposer's value as if it came from the coordinator in a classic round: they decide independently on values from different proposers. Fig 14-7 can make the fast round look longer, but remember that in a classic round a proposer would first have to go through the coordinator.</p>
+  <p>Fast rounds can <b>collide</b>: two or more proposers use the fast step and acceptors receive different values. The coordinator must step in and start recovery with a new round, re-running a propose phase so acceptors converge on one value. A disadvantage is more round trips and higher latency on collisions when the request rate is high. [JUNQUEIRA07] shows that because of more replicas and therefore more messages, Fast Paxos can have <b>higher latency</b> than classic Paxos despite fewer steps.</p>
+  <div class="fig">
+    <h3>Quorum sizes and a collision model</h3>
+    <div class="controls">
+      <label for="f11">tolerated failures f <input id="f11" type="range" min="1" max="4" value="1"><output id="f11o">1</output></label>
+      <label for="g11">spacing between client requests (ms) <input id="g11" type="range" min="0" max="20" value="4"><output id="g11o">4</output></label>
+    </div>
+    <div class="tablewrap" id="t11"></div>
+    <canvas id="c11" class="short" aria-label="Collision probability and expected latency versus request spacing"></canvas>
+    <div class="legend" id="c11L"></div>
+    <div class="readout" id="r11"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Classic: everyone hands their form to one clerk who stamps them in order. Fast: you drop your form straight into the inboxes of many clerks, saving a trip. If two people drop forms at the same moment, some clerks take one first and some the other, and a supervisor has to sort out the mess, which costs more than the trip you saved.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Why bigger quorums: in a fast round acceptors accept whatever arrives first, so after a collision the coordinator must be able to see, from any classic quorum, which value <em>might</em> have reached a fast quorum. That requires any two fast quorums and one classic quorum to share a member, which is what pushes N to 3f+1 and the fast quorum to 2f+1. The model (modelled, not measured): two requests arrive with the spacing you set; each of the N acceptors sees them with independent one-way delay 5 ms ± 3 ms; a fast round succeeds if one value reaches 2f+1 acceptors first. Latency counts a fast success as 2 one-way delays (proposer → acceptors → learner), classic via coordinator as 3, and a collision as the fast attempt plus a classic recovery (2 + 4 delays). 2,000 pooled trials per point. When requests are well spaced fast wins; when they're close together, collisions make it slower than classic.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Section 12: EPaxos also has a fast path, but only conflicting commands need to agree on order.</li><li>Section 13: Flexible Paxos tunes quorum sizes in the opposite direction.</li></ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Lamport, "Fast Paxos", Distributed Computing 19(2), 2006 [LAMPORT06] (a 2005 MSR report in the further-reading list).</li>
+    <li>Junqueira, Mao, Marzullo, "Classic Paxos vs. Fast Paxos: caveat emptor", HotDep 2007 [JUNQUEIRA07]: the measurement showing fewer steps doesn't mean lower latency.</li>
+    <li>Zhao, "Fast Paxos Made Easy: Theory and Implementation", IJDST 6(1), 2015 [ZHAO15].</li>
+  </ul></div>
+</section>
+
+<!-- 12 -->
+<section class="plate" id="s12">
+  <div class="plate-head"><div><div class="secno">12 · EGALITARIAN PAXOS</div><h2>No single leader: order only the commands that conflict</h2></div><span class="chip">pdf p458–461 · Fig 14-8</span></div>
+  <p>A distinguished leader makes the system fragile (when it fails, a new one must be elected before progress) and puts disproportionate load on one node.</p>
+  <p><b>Note from the book: partitioning.</b> One way to spread leader load is to split the value range into segments, each owned by part of the system. This helps <b>availability</b> (failures are isolated to one partition), <b>performance</b> (segments don't overlap) and <b>scalability</b> (add partitions). But an operation across several partitions needs an atomic commitment.</p>
+  <p>Instead of a leader plus proposal numbers to sequence commands, use a leader <em>per command</em> and establish order through <b>dependencies</b>. This is <b>Egalitarian Paxos</b>, EPaxos [MORARU11]. Letting non-conflicting writes commit independently was first introduced as <b>Generalized Paxos</b> [LAMPORT05]; EPaxos is its first implementation. EPaxos aims for the best of both: classic Paxos has high availability (a leader per round) but more messages; Multi-Paxos has high throughput and fewer messages but a bottleneck leader.</p>
+  <p>EPaxos starts with a <b>Pre-Accept</b> phase in which a process becomes leader for a proposal. Each proposal carries <b>dependencies</b> (all commands that might interfere with it, not necessarily committed) and a <b>sequence number</b> that breaks dependency cycles, set larger than any known dependency's. The leader sends <code>PreAccept</code> to a <b>fast quorum</b>, which the book gives as ⌈3f/4⌉ replicas (see the note below). Replicas check their command logs, add any interfering proposals to the dependencies, and reply. If the leader gets replies from a fast quorum and their dependency lists agree with each other and with its own, it commits. Otherwise it merges all reported dependencies, picks a sequence number above everything seen, sends the updated command to ⌊f/2⌋ + 1 replicas (book's wording), and then commits. So: a <b>fast path</b> when dependencies match, and a <b>slow path</b> when replicas disagree and must be brought to the same dependency list.</p>
+  <p>Fig 14-8: P1 sends <code>PreAccept(1, ∅)</code>; P2 and P3 have empty logs, so P1 commits. P5 then proposes sequence 2 with no dependencies, <code>PreAccept(2, ∅)</code>. P4 doesn't know about committed proposal 1, but P3 reports the conflict and its log {1}. P5 updates its dependencies and sends <code>Accept(2, {1})</code>; once replicas answer it commits.</p>
+  <p>Commands A and B <b>interfere</b> only if their order matters: running A then B gives a different result from B then A. Commit means replying to the client and asynchronously sending <code>Commit</code> to replicas; commands <b>execute after commit</b>. Since dependencies are gathered during Pre-Accept, by execution time the order is fixed and no command can appear in between; a new one can only come after the highest sequence number. To execute, replicas build a <b>dependency graph</b> and run commands in reverse dependency order: a command runs only after all its dependencies (and theirs). Because only interfering commands depend on each other, this is rare for most workloads [MORARU13]. Like Paxos, EPaxos uses proposal numbers to stop stale messages. They consist of an <b>epoch</b> (cluster configuration ID, changes when nodes join or leave), a monotonically increasing node-local counter, and a replica ID. A replica that gets a lower number than one it has seen sends a negative acknowledgment with the highest number and its updated command list.</p>
+  <div class="box beyond"><b>Beyond the book: check the quorum formulas against the paper</b><p>The EPaxos correctness report [MORARU11, CMU-PDL-13-111, §5] states the fast quorum in terms of the number of replicas <b>N</b>, not failures f: the simplified protocol starts with N−1, and it shows the fast quorum can be cut to <b>⌈3N/4⌉</b> when N &gt; 3; the slow path uses <b>⌊N/2⌋ + 1</b> replicas. So the book's "⌈3f/4⌉" and "⌊f/2⌋ + 1" read correctly with N in place of f (with f = 1 the book's formula would give a quorum of 1, which can't be right). The calculator below uses the paper's N-based form.</p></div>
+  <div class="fig">
+    <h3>Replay Fig 14-8 (fast path for P1, slow path for P5)</h3>
+    <div class="seqwrap" id="q12"></div>
+    <div class="nodes" id="nd12"></div>
+    <div class="steptxt" id="tx12"></div>
+    <div class="controls"><button id="ep12Prev" type="button">◀ Back</button><button id="ep12Next" type="button">Next step ▶</button><button id="ep12Reset" type="button">Reset</button><span class="readout">step <b id="ep12No">0</b></span></div>
+  </div>
+  <div class="fig">
+    <h3>Execute committed commands from their dependency graph</h3>
+    <div class="controls"><label for="sel12">committed commands <select id="sel12"><option value="mix">mixed keys (some interfere)</option><option value="none">all on different keys</option><option value="cycle">concurrent conflict → dependency cycle</option></select></label><label for="n12">replicas N <input id="n12" type="range" min="3" max="9" step="2" value="5"><output id="n12o">5</output></label></div>
+    <div class="tablewrap" id="t12"></div>
+    <div class="readout" id="r12"></div>
+  </div>
+  <pre class="code" id="code12"></pre>
+  <div class="box picture"><b>Picture it</b><p>A shared kitchen without a head chef. If you're making toast and I'm making tea, we just go. If we both want the only frying pan, we have to agree who's first, and we write it down as "your omelette depends on my pancakes". Each cook can act as the organiser for their own dish; only clashes need coordination.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The executor finds strongly connected components (cycles appear when two conflicting commands were proposed concurrently and each saw the other), runs components in reverse topological order so dependencies come first, and inside a cycle orders commands by sequence number, then replica ID. Every replica runs the same deterministic procedure on the same committed graph, so they execute interfering commands in the same order while non-interfering ones may run in any order. The quorum table shows the per-command cost: a fast-path commit is one round trip to ⌈3N/4⌉ replicas; a conflict adds a second round trip to a majority.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch13_distributed_transactions.html">Ch.13</a>: the partitioning note links to atomic commitment across partitions (Spanner, Calvin).</li><li>Section 11: EPaxos's fast path is like Fast Paxos's, but collisions only matter for interfering commands.</li></ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Moraru, Andersen, Kaminsky, "There Is More Consensus in Egalitarian Parliaments", SOSP 2013 [MORARU13]: the EPaxos paper.</li>
+    <li>Moraru, Andersen, Kaminsky, "A Proof of Correctness for Egalitarian Paxos", CMU-PDL-13-111, 2013 [MORARU11].</li>
+    <li>Lamport, "Generalized Consensus and Paxos", MSR-TR-2005-33, 2005 [LAMPORT05]: why only non-commuting commands need ordering.</li>
+  </ul></div>
+</section>
+
+<!-- 13 -->
+<section class="plate" id="s13">
+  <div class="plate-head"><div><div class="secno">13 · FLEXIBLE PAXOS</div><h2>Quorums only have to intersect across phases</h2></div><span class="chip">pdf p462–463</span></div>
+  <p>A quorum is usually a majority, so any two quorums intersect: some node can always break ties. Two questions: must every step contact a majority? And must <em>all</em> quorums intersect: the phase-1 quorum (choosing the distinguished proposer), the phase-2 quorum (deciding a value), and every execution instance (e.g. concurrent phase-2 instances)? Safety can't change: agreement must hold.</p>
+  <p>In Multi-Paxos, leader election is rare and the leader commits many values without re-electing. Chapter 11's tunable consistency showed that as long as <b>R + W &gt; N</b>, read and write sets share a node (e.g. write to one node, read from all). The same logic works for consensus: Paxos only needs the <b>phase-1 group</b> (electing a leader) to overlap the <b>phase-2 group</b> (accepting proposals). A quorum needs only to be a non-empty group. With N participants, Q₁ nodes for the propose phase and Q₂ for the accept phase, it suffices that <b>Q₁ + Q₂ &gt; N</b>. Because phase 2 is far more common, Q₂ can be as small as N/2 if Q₁ grows to match (<b>Q₁ = N − Q₂ + 1</b>). The book calls this an important observation for understanding consensus. The algorithm is <b>Flexible Paxos</b> [HOWARD16].</p>
+  <p>Example: with five acceptors, if winning an election needs four votes, the leader can wait for just <b>two</b> replies during replication. And because every two-node set overlaps every election quorum, proposals can even go to disjoint pairs of acceptors. Intuitively: whenever a new leader is elected without the current one knowing, at least one acceptor knows about the new leader. Flexible Paxos trades <b>availability for latency</b>: phase 2 involves fewer nodes, but elections need more nodes up. The upside: with a stable leader, replication continues through up to <b>N − Q₂</b> failures.</p>
+  <p><b>Vertical Paxos</b> also uses intersecting quorums, distinguishing read and write quorums that must intersect: a leader collects a smaller read quorum for one or more lower-numbered proposals and a larger write quorum for its own [LAMPORT09]. [LAMPSON01] distinguishes <b>out</b> and <b>decision</b> quorums (prepare and accept phases) and gives a quorum definition similar to Flexible Paxos.</p>
+  <div class="fig">
+    <h3>Pick Q₂, see what Q₁ must be, and what it costs</h3>
+    <div class="controls">
+      <label for="n13">acceptors N <input id="n13" type="range" min="3" max="9" value="5"><output id="n13o">5</output></label>
+      <label for="q213">replication quorum Q₂ <input id="q213" type="range" min="1" max="9" value="2"><output id="q213o">2</output></label>
+      <label for="chk13"><input id="chk13" type="checkbox"> let me (unsafely) shrink Q₁ by one</label>
+      <label for="p13">per-node failure chance <input id="p13" type="range" min="1" max="30" value="5"><output id="p13o">5</output>%</label>
+    </div>
+    <div class="tablewrap" id="t13"></div>
+    <canvas id="c13" class="short" aria-label="Probability that election and replication quorums are available versus Q2"></canvas>
+    <div class="legend" id="c13L"></div>
+    <div class="readout" id="r13"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A club where electing a new president needs 4 of 5 members, but once elected she only needs 2 signatures for day-to-day decisions. Any 2 signers include at least one of the 4 who voted in the most recent election, so a deposed president's paperwork always meets someone who knows she was replaced.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The table enumerates every phase-1 set of size Q₁ and every phase-2 set of size Q₂ and counts disjoint pairs. With Q₁ + Q₂ = N + 1 the overlap is exactly 1 and there are none; shrink Q₁ by one and disjoint pairs appear, meaning a new leader could be elected by nodes that never saw a value an old leader got accepted. The chart (computed exactly from the binomial distribution, each node independently down with the probability you set) shows the trade: smaller Q₂ makes replication available more often and faster (wait for the 2nd reply instead of the 3rd), but election needs more nodes up.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li><a href="ch11_replication_and_consistency.html">Ch.11</a>: R + W &gt; N, the same inequality.</li><li>Section 8: majorities are the special case Q₁ = Q₂ = ⌊N/2⌋+1.</li></ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Howard, Malkhi, Spiegelman, "Flexible Paxos: Quorum intersection revisited", arXiv 1608.06696, 2016 [HOWARD16]: short and very readable.</li>
+    <li>Lamport, Malkhi, Zhou, "Vertical Paxos and Primary-Backup Replication", PODC 2009 [LAMPORT09].</li>
+    <li>Lampson, "The ABCD's of Paxos", PODC 2001 [LAMPSON01].</li>
+  </ul></div>
+</section>
+
+<!-- 14 -->
+<section class="plate" id="s14">
+  <div class="plate-head"><div><div class="secno">14 · GENERALIZED SOLUTION TO CONSENSUS</div><h2>Paxos as a table of write-once registers</h2></div><span class="chip">pdf p464–467 · Fig 14-9</span></div>
+  <p>Paxos's roles, steps and variants are hard to track. A simpler view achieves single-decree Paxos's guarantees with a small set of concepts and rules. The book treats it briefly because it's recent [HOWARD19]: important to know, but without known implementations yet.</p>
+  <p>There's a client and a set of servers; each server has many <b>registers</b>. A register has an index, can be written <b>once</b>, and is in one of three states: <b>unwritten</b>, <b>holding a value</b>, or <b>holding nil</b> (a special empty value). Registers with the same index on different servers form a <b>register set</b>, which can have one or more quorums. Depending on its registers, a quorum is <b>undecided</b> (<i>Any</i>, <i>Maybe v</i>) or <b>decided</b> (<i>None</i>, <i>Decided v</i>):</p>
+  <ul class="plain">
+    <li><b>Any</b>: depending on future operations, it can still decide any value.</li>
+    <li><b>Maybe v</b>: if it decides, it can only decide v.</li>
+    <li><b>None</b>: it can't decide a value.</li>
+    <li><b>Decided v</b>: it decided v.</li>
+  </ul>
+  <p>The client exchanges messages with servers and keeps a <b>state table</b> of values and registers from which it infers quorum decisions. Rules: <b>reading</b>, the client may output a value only if it read it from a quorum of servers in the same register set. <b>Writing</b>, the client may write a value only if it got it as input or read it from a register (no inventing values); it can't write values that let different quorums of the same register set decide differently; and it can't override decisions in earlier register sets (sets up to r−1 must be None, Maybe v, or Decided v).</p>
+  <p>The resulting generalised Paxos [HOWARD19]: three servers [S0, S1, S2], registers [R0, R1, …], clients [C0, C1, …], each client writing only its assigned registers; majority quorums {S0,S1}, {S0,S2}, {S1,S2}. <b>Phase 1</b>: the client sends <code>P1A(register)</code>. If that register is unwritten, the server sets every register below it to nil (so nobody can write earlier registers) and replies with the registers written so far. With a majority of replies, the client takes the non-empty value from the highest-indexed register, or its own value if there's none; otherwise it restarts phase 1. <b>Phase 2</b>: the client sends <code>P2A(register, value)</code> to all servers; if a majority replies, it outputs the decision, otherwise it restarts from phase 1.</p>
+  <p>In Fig 14-9 client C0 commits V: in step 1 its table is empty and S0, S1 reply that nothing is written; in step 2 it writes V. Then any other client can query state: quorum {S0, S1} is <b>Decided V</b> (the book's text prints "Decided A", which reads as a typo for V), and {S0, S2}, {S1, S2} are <b>Maybe V</b> for R0, so C1 picks V and no client can ever decide anything else. Thinking in terms of last known state instead of remote actors' interactions removes ambiguity; immutable state and message passing are easier to implement correctly. Parallels with Paxos: a client that sees <i>Maybe V</i> in an earlier register set re-commits V, just like a Paxos proposer re-proposing a value one acceptor accepted; and setting unwritten lower registers to nil plays the role of restarting with a higher proposal number.</p>
+  <div class="fig">
+    <h3>Drive the register table yourself</h3>
+    <div class="controls">
+      <label for="cl14">client <select id="cl14"><option value="0">C0 (input V, owns R0, R2)</option><option value="1">C1 (input W, owns R1, R3)</option></select></label>
+      <label for="rg14">register <select id="rg14"><option value="auto">next one it owns</option><option value="0">R0</option><option value="1">R1</option><option value="2">R2</option><option value="3">R3</option></select></label>
+      <label for="sv14">servers reached <select id="sv14"><option value="01">S0, S1</option><option value="02">S0, S2</option><option value="12">S1, S2</option><option value="012">all</option><option value="2">only S2</option></select></label>
+      <button id="p114" type="button">Phase 1</button><button id="p214" type="button">Phase 2</button><button id="bk14" type="button">Play the book's example</button><button id="rs14" type="button">Reset</button>
+    </div>
+    <div class="tablewrap" id="t14"></div>
+    <div class="steplog" id="lg14"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Numbered whiteboards in three rooms. Each board can be written once. Before writing board 3 you visit two rooms and cross out ("nil") every blank board below 3 so nobody can sneak an older decision in, and you note anything already written. If you saw a value, you copy that one instead of yours. A decision exists when the same board number shows the same value in two rooms.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The table classifies each majority quorum of each register set: all registers hold v → Decided v; any holds nil → None (it can never decide); some hold v and the rest are unwritten → Maybe v; all unwritten → Any. Try: C0 phase 1 + phase 2 on {S0,S1} (the book's example), then C1 on {S1,S2}: its phase 1 nils R0 on S2 and reads V from S1, so it must write V into R1. Or do C1's phase 1 before C0's phase 2: S0 and S1's R0 become nil, C0's phase 2 fails and C0 must restart with R2. This is Paxos's "promise" rule in register form.</p></div>
+  <div class="box connect"><b>Connects to</b><ul><li>Sections 7 and 9: P1A/P2A are Prepare/Accept; nil is the promise; adopting the highest register's value is <code>chooseValue</code>.</li><li>Section 10: single-decree Paxos is a write-once register.</li></ul></div>
+  <div class="box papers"><b>Paper behind this plate</b><ul><li>Howard &amp; Mortier, "A Generalised Solution to Distributed Consensus", arXiv 1902.06776, 2019 [HOWARD19]: listed by the book as "recent developments".</li></ul></div>
+</section>
+
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ================= ch14 page helpers =================
+  const need = (id) => { const e = $(id); if (!e) console.error('missing element #' + id); return e; };
+  const TX = (id, t) => { const e = need(id); if (e) e.textContent = t; };
+  const H = (id, h) => { const e = need(id); if (e) e.innerHTML = h; };
+  const on = (id, ev, f) => { const e = need(id); if (e) e.addEventListener(ev, f); };
+  let SEED = 1; let R = rng(SEED); const reseedHooks = [];
+  const rnd = (a, b) => a + (b - a) * R();
+  const pick = (arr) => arr[Math.floor(R() * arr.length)];
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tag = (ok, t) => `<span class="tag ${ok === true ? 'y' : ok === false ? 'n' : 'm'}">${t}</span>`;
+  // show the real source of a function that the simulations run
+  function showSrc(id, fns) { const e = $(id); if (e) e.textContent = fns.map((f) => f.toString()).join('\n\n'); }
+
+  // ---- sequence diagram as an SVG string (lanes = processes, x = time columns) ----
+  // spec: {lanes:[names], cols, phases:[{at,lab}], msgs:[{f,t,a,b,lab,cls}], x:[{lane,at}], dots:[{lane,at,lab,cls}], w}
+  function seqSVG(sp) {
+    const w = sp.w || 760, L = 74, Rm = 16, top = sp.phases && sp.phases.length ? 34 : 14, gap = sp.gap || 36;
+    const h = top + gap * (sp.lanes.length - 1) + 26;
+    const X = (a) => L + a * (w - L - Rm) / sp.cols, Y = (i) => top + 8 + i * gap;
+    let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(sp.aria || 'message sequence diagram')}">`;
+    sp.lanes.forEach((n, i) => { s += `<line class="lane" x1="${L - 6}" y1="${Y(i)}" x2="${w - Rm}" y2="${Y(i)}"/><text class="lb" x="6" y="${Y(i) + 4}">${esc(n)}</text>`; });
+    (sp.phases || []).forEach((p) => { if (p.at > 0) s += `<line class="phase" x1="${X(p.at)}" y1="6" x2="${X(p.at)}" y2="${h - 6}"/>`; s += `<text class="ml" x="${X(p.at) + 4}" y="14">${esc(p.lab)}</text>`; });
+    (sp.msgs || []).forEach((m) => {
+      if (m.f === m.t) return;
+      const x1 = X(m.a), y1 = Y(m.f), x2 = X(m.b), y2 = Y(m.t), c = m.cls || '';
+      const ang = Math.atan2(y2 - y1, x2 - x1), ex = x2 - 3 * Math.cos(ang), ey = y2 - 3 * Math.sin(ang);
+      s += `<line class="msg ${c}" x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}"/>`;
+      if (c !== 'lost') { const a1 = ang + 2.7, a2 = ang - 2.7; s += `<polygon class="ah ${c}" points="${x2},${y2} ${x2 + 8 * Math.cos(a1)},${y2 + 8 * Math.sin(a1)} ${x2 + 8 * Math.cos(a2)},${y2 + 8 * Math.sin(a2)}"/>`; }
+      if (m.lab) { const mx = x1 + (x2 - x1) * (m.lp != null ? m.lp : 0.35), my = y1 + (y2 - y1) * (m.lp != null ? m.lp : 0.35); s += `<text class="ml ${c === 'hl' ? 'hl' : ''}" x="${mx + 3}" y="${my - 3}">${esc(m.lab)}</text>`; }
+    });
+    (sp.x || []).forEach((k) => { const x = X(k.at), y = Y(k.lane); s += `<path class="xmark" d="M${x - 6} ${y - 6}L${x + 6} ${y + 6}M${x + 6} ${y - 6}L${x - 6} ${y + 6}"/>`; });
+    (sp.dots || []).forEach((d) => { const x = X(d.at), y = Y(d.lane); s += `<circle class="dot ${d.cls || ''}" cx="${x}" cy="${y}" r="4.5"/>`; if (d.lab) s += `<text class="ml ${d.cls || ''}" x="${x + 6}" y="${y + 15}">${esc(d.lab)}</text>`; });
+    return s + '</svg>';
+  }
+
+  // ---- step-through: build() returns snapshots [{...}], render(snap, i, n) draws one ----
+  function stepper(p, build, render) {
+    let snaps = build(), i = 0;
+    const show = () => { if (i > snaps.length - 1) i = snaps.length - 1; render(snaps[i], i, snaps.length); TX(p + 'No', i + ' / ' + (snaps.length - 1)); };
+    on(p + 'Next', 'click', () => { if (i < snaps.length - 1) i++; show(); });
+    on(p + 'Prev', 'click', () => { if (i > 0) i--; show(); });
+    on(p + 'Reset', 'click', () => { snaps = build(); i = 0; show(); });
+    reg(show);
+    return { rebuild() { snaps = build(); i = 0; show(); }, last() { snaps = build(); i = snaps.length - 1; show(); } };
+  }
+
+  // ---- small x/y chart with labelled axes (canvas) ----
+  // spec: {xs, series:[{ys,col,label,dash,w}], xlab, ylab, logY, vx, ymin, ymax, pct}
+  function xyChart(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, Hh = cv.clientHeight; if (!W || !Hh) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh);
+    const pl = 54, pr = 14, pt = 12, pb = 38; const xs = sp.xs;
+    const tf = (v) => sp.logY ? Math.log10(Math.max(v, 1e-9)) : v;
+    let lo = Infinity, hi = -Infinity;
+    sp.series.forEach((s) => s.ys.forEach((v) => { if (v != null && isFinite(v)) { lo = Math.min(lo, tf(v)); hi = Math.max(hi, tf(v)); } }));
+    if (sp.ymin != null) lo = tf(sp.ymin); if (sp.ymax != null) hi = tf(sp.ymax);
+    if (!(hi > lo)) { hi = lo + 1; }
+    if (!sp.logY && sp.ymin == null) { lo = Math.min(lo, 0); }
+    const pad = sp.logY ? 0.05 * (hi - lo) : 0; lo -= pad; hi += pad * 2 + (sp.logY ? 0 : (hi - lo) * 0.06);
+    const x0 = xs[0], x1 = xs[xs.length - 1];
+    const X = (x) => pl + (x - x0) / Math.max(1e-9, x1 - x0) * (W - pl - pr), Y = (v) => pt + (hi - tf(v)) / (hi - lo) * (Hh - pt - pb);
+    g.font = '11px ' + css('mono'); g.lineWidth = 1;
+    const lab = (v) => Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : fmt(v);
+    const yt = sp.logY ? (() => { const o = []; for (let e = Math.ceil(lo); e <= Math.floor(hi); e++) o.push(Math.pow(10, e)); return o; })() : niceTicks(lo, hi, 4);
+    yt.forEach((t) => { const y = Y(t); g.strokeStyle = colorOf('rule', 0.9); g.beginPath(); g.moveTo(pl, y); g.lineTo(W - pr, y); g.stroke(); g.fillStyle = colorOf('muted'); const s = sp.pct ? (t * 100).toFixed(t < 0.1 ? 1 : 0) + '%' : (t >= 1e4 ? t.toExponential(0) : lab(t)); g.fillText(s, 4, y + 4); });
+    niceTicks(x0, x1, Math.min(8, xs.length - 1)).forEach((t) => { const x = X(t); g.fillStyle = colorOf('muted'); const s = lab(t); g.fillText(s, Math.min(W - pr - g.measureText(s).width, x - g.measureText(s).width / 2), Hh - pb + 15); g.strokeStyle = colorOf('rule', 0.5); g.beginPath(); g.moveTo(x, Hh - pb); g.lineTo(x, Hh - pb + 4); g.stroke(); });
+    g.strokeStyle = colorOf('muted'); g.beginPath(); g.moveTo(pl, pt); g.lineTo(pl, Hh - pb); g.lineTo(W - pr, Hh - pb); g.stroke();
+    g.fillStyle = colorOf('muted'); if (sp.xlab) g.fillText(sp.xlab, Math.max(pl, W / 2 - g.measureText(sp.xlab).width / 2), Hh - 6);
+    if (sp.vx != null) { const x = X(sp.vx); g.strokeStyle = colorOf('c1', 0.8); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(x, pt); g.lineTo(x, Hh - pb); g.stroke(); g.setLineDash([]); }
+    sp.series.forEach((s) => {
+      g.strokeStyle = colorOf(s.col); g.lineWidth = s.w || 2; g.setLineDash(s.dash || []); g.beginPath(); let pen = false;
+      s.ys.forEach((v, i) => { if (v == null || !isFinite(v)) { pen = false; return; } const x = X(xs[i]), y = Y(v); if (pen) g.lineTo(x, y); else { g.moveTo(x, y); pen = true; } });
+      g.stroke(); g.setLineDash([]);
+      if (s.dots) { g.fillStyle = colorOf(s.col); s.ys.forEach((v, i) => { if (v == null) return; g.beginPath(); g.arc(X(xs[i]), Y(v), 2.6, 0, 7); g.fill(); }); }
+    });
+    if (sp.ylab) { g.save(); g.fillStyle = colorOf('muted'); g.translate(12, pt + 4); g.restore(); }
+    const Lg = $(id + 'L'); if (Lg) Lg.innerHTML = sp.series.filter((s) => s.label).map((s) => `<span style="--sw:${colorOf(s.col)}">${s.label}</span>`).join('') + (sp.ylab ? `<span style="--sw:transparent">y: ${sp.ylab}</span>` : '');
+  }
+
+
+  // ================= 01 · properties checker =================
+  let props1 = [];
+  function newProps1() { props1 = [0, 1, 2, 3, 4].map(() => 1 + Math.floor(R() * 9)); }
+  newProps1();
+  const d1 = reg(() => {
+    const rule = $('sel1').value, crashed = val('n1'), alive = 5 - crashed;
+    const dec = props1.map(() => null);
+    const correct = [0, 1, 2, 3, 4].filter((i) => i < alive);
+    const r = rng(SEED * 31 + crashed * 7 + props1.join('').length);
+    if (rule === 'zero') correct.forEach((i) => { dec[i] = 0; });
+    else if (rule === 'own') correct.forEach((i) => { dec[i] = props1[i]; });
+    else if (rule === 'all') { if (crashed === 0) { const m = Math.min(...props1); correct.forEach((i) => { dec[i] = m; }); } }
+    else if (rule === 'some') {
+      if (alive >= 3) correct.forEach((i) => { const others = correct.filter((j) => j !== i).sort(() => r() - 0.5).slice(0, 2); dec[i] = Math.min(props1[i], ...others.map((j) => props1[j])); });
+    } else if (rule === 'maj') { if (alive >= 3) { const w = correct[Math.floor(r() * correct.length)]; correct.forEach((i) => { dec[i] = props1[w]; }); } }
+    const decided = correct.filter((i) => dec[i] != null);
+    const agree = decided.length === 0 ? null : decided.every((i) => dec[i] === dec[decided[0]]);
+    const valid = decided.every((i) => props1.includes(dec[i]));
+    const term = decided.length === correct.length;
+    let t = '<table class="mini"><tr><th>process</th><th>proposed</th><th>state</th><th>decided</th></tr>';
+    props1.forEach((p, i) => { t += `<tr><td>P${i + 1}</td><td>${p}</td><td>${i < alive ? 'correct' : '<span class="tag n">crashed</span>'}</td><td>${i >= alive ? '—' : dec[i] == null ? '<span class="tag n">waiting forever</span>' : dec[i]}</td></tr>`; });
+    H('t1', t + '</table>');
+    H('r1', `agreement ${agree === null ? tag(null, 'nobody decided') : tag(agree, agree ? 'holds' : 'broken')} · validity ${tag(valid, valid ? 'holds' : 'broken: 0 was never proposed')} · termination ${tag(term, term ? 'holds' : 'broken')}${rule === 'maj' && alive < 3 ? ' · no majority alive: the protocol blocks rather than risk deciding wrongly' : ''}`);
+  });
+  on('sel1', 'change', d1); bindRange('n1', d1); on('btn1', 'click', () => { newProps1(); d1(); });
+
+  // ================= 02 · broadcast =================
+  // The broadcast logic the diagram runs. Each process forwards once, on first receipt (eager)
+  // or once it suspects the sender (lazy); duplicates are dropped by message id.
+  function reliableBroadcast(N, mode, reachBeforeCrash, crashes) {
+    const msgs = [], got = new Array(N).fill(false), firstAt = new Array(N).fill(Infinity); got[0] = true; firstAt[0] = 0;
+    const suspectAt = crashes ? 2 : Infinity;               // failure detector fires at t = 2
+    const sends = crashes ? Math.min(reachBeforeCrash, N - 1) : N - 1;
+    for (let j = 1; j <= sends; j++) { msgs.push({ f: 0, t: j, a: 0.1 + 0.08 * j, b: 1 }); got[j] = true; firstAt[j] = 1; }
+    if (mode !== 'best') {
+      let frontier = [];
+      for (let j = 1; j < N; j++) if (got[j]) frontier.push(j);
+      const forwarded = new Array(N).fill(false);
+      while (frontier.length) {
+        const next = [];
+        for (const p of frontier) {
+          if (forwarded[p]) continue;
+          const start = mode === 'eager' ? firstAt[p] : Math.max(firstAt[p], suspectAt);
+          if (!isFinite(start)) continue;
+          forwarded[p] = true;
+          for (let q = 1; q < N; q++) {
+            if (q === p) continue;                            // skip itself and the original sender (0)
+            const dup = got[q] && firstAt[q] <= start + 1;
+            msgs.push({ f: p, t: q, a: start + 0.05 * p, b: start + 1, cls: dup ? 'dim' : 'ok' });
+            if (!got[q] || firstAt[q] > start + 1) { got[q] = true; firstAt[q] = start + 1; next.push(q); }
+          }
+        }
+        frontier = next;
+      }
+    }
+    return { msgs, got, count: msgs.length };
+  }
+  showSrc('code2', [reliableBroadcast]);
+  const d2 = reg(() => {
+    const N = val('n2'), mode = $('sel2').value, crash = $('chk2').checked;
+    const kEl = $('k2'); kEl.max = String(N - 1); let k = Math.min(val('k2'), N - 1); TX('k2o', String(k));
+    const res = reliableBroadcast(N, mode, k, crash);
+    const lanes = []; for (let i = 0; i < N; i++) lanes.push('P' + (i + 1) + (i === 0 ? ' (sender)' : ''));
+    const maxB = Math.max(2, ...res.msgs.map((m) => m.b));
+    const sp = { lanes, cols: maxB + 0.4, msgs: res.msgs, x: crash ? [{ lane: 0, at: 0.15 + 0.08 * (k + 0.5) }] : [], gap: 30, aria: 'broadcast sequence diagram',
+      phases: [{ at: 0, lab: 'sender' }].concat(mode === 'lazy' && crash ? [{ at: 2, lab: 'sender suspected → forward' }] : mode === 'eager' ? [{ at: 1, lab: 'forwarding' }] : []) };
+    H('q2', seqSVG(sp));
+    const recv = res.got.slice(1).filter(Boolean).length, useful = res.msgs.filter((m) => m.cls !== 'dim').length;
+    const ok = recv === 0 || recv === N - 1;
+    H('r2', `receivers that got it <b>${recv} / ${N - 1}</b> · messages sent <b>${res.count}</b> (useful ${useful}, duplicates ${res.count - useful}) · ${ok ? tag(true, 'all-or-none: consistent') : tag(false, 'some have it, some don’t: inconsistent')}`);
+    const xs = [], be = [], fl = []; for (let n = 2; n <= 40; n++) { xs.push(n); be.push(n - 1); fl.push((n - 1) * (n - 1)); }
+    xyChart('c2', { xs, logY: true, xlab: 'processes N', vx: N, series: [{ ys: be, col: 'c2', label: 'best effort: N−1' }, { ys: fl, col: 'sell', label: 'eager flooding: (N−1)²' }] });
+  });
+  bindRange('n2', d2); bindRange('k2', d2); on('sel2', 'change', d2); on('chk2', 'change', d2);
+
+  // ================= 03 · atomic broadcast =================
+  let net3 = null;
+  function newNet3() { net3 = { d: [], s: [] }; for (let i = 0; i < 2; i++) { net3.d.push([0, 1, 2, 3].map(() => rnd(0.5, 2.6))); net3.s.push(rnd(0.4, 1.4)); } net3.fw = [0, 1, 2, 3].map(() => rnd(0.5, 1.6)); }
+  newNet3();
+  const d3 = reg(() => {
+    const mode = $('sel3').value, ops = [{ n: 'm1: +100', f: (b) => b + 100 }, { n: 'm2: ×1.1', f: (b) => b * 1.1 }], t0 = [0, 0.2];
+    const msgs = [], rows = [];
+    const lanes = ['C1', 'C2'].concat(mode === 'seq' ? ['S (seq)'] : []).concat(['P1', 'P2', 'P3', 'P4']); const base = mode === 'seq' ? 3 : 2;
+    let maxT = 0;
+    if (mode === 'rel') {
+      for (let r = 0; r < 4; r++) {
+        const arr = [0, 1].map((m) => ({ m, t: t0[m] + net3.d[m][r] })).sort((a, b) => a.t - b.t);
+        arr.forEach((x) => { msgs.push({ f: x.m, t: base + r, a: t0[x.m], b: x.t, cls: x.m ? 'hl' : 'ok' }); maxT = Math.max(maxT, x.t); });
+        let bal = 1000; arr.forEach((x) => { bal = ops[x.m].f(bal); });
+        rows.push({ r, order: arr.map((x) => 'm' + (x.m + 1)).join(' → '), bal });
+      }
+    } else {
+      const atS = [0, 1].map((m) => ({ m, t: t0[m] + net3.s[m] })).sort((a, b) => a.t - b.t);
+      atS.forEach((x) => msgs.push({ f: x.m, t: 2, a: t0[x.m], b: x.t, cls: x.m ? 'hl' : 'ok' }));
+      const seqOf = {}; atS.forEach((x, i) => { seqOf[x.m] = i + 1; });
+      for (let r = 0; r < 4; r++) {
+        const arr = atS.map((x, i) => ({ m: x.m, t: x.t + net3.fw[r] + 0.6 * (i === 0 ? net3.d[1][r] / 2.6 : net3.d[0][r] / 2.6) }));
+        arr.forEach((x) => { msgs.push({ f: 2, t: base + r, a: atS.find((y) => y.m === x.m).t, b: x.t, cls: x.m ? 'hl' : 'ok' }); maxT = Math.max(maxT, x.t); });
+        const arrival = arr.slice().sort((a, b) => a.t - b.t).map((x) => 'm' + (x.m + 1) + '#' + seqOf[x.m]).join(', ');
+        let bal = 1000; atS.forEach((x) => { bal = ops[x.m].f(bal); });
+        rows.push({ r, order: 'arrived ' + arrival + ' → applied ' + atS.map((x) => 'm' + (x.m + 1)).join(' → '), bal });
+      }
+    }
+    H('q3', seqSVG({ lanes, cols: maxT + 0.3, msgs, gap: 28, phases: [{ at: 0, lab: 'C1 sends m1, C2 sends m2 (0.2 later)' }], aria: 'two clients broadcasting to four replicas' }));
+    H('t3', '<table class="mini"><tr><th>replica</th><th>order</th><th>balance (start 1000)</th></tr>' + rows.map((x) => `<tr><td>P${x.r + 1}</td><td>${x.order}</td><td class="num">${x.bal.toFixed(2)}</td></tr>`).join('') + '</table>');
+    const same = rows.every((x) => Math.abs(x.bal - rows[0].bal) < 1e-9);
+    H('r3', same ? tag(true, 'all replicas agree') + (mode === 'rel' ? ' (this time the delays happened to line up; press "New random network delays")' : ' · total order: the sequencer’s stamp decides') : tag(false, 'replicas diverged') + ' · same set of messages, different order → different state');
+  });
+  on('btn3', 'click', () => { newNet3(); d3(); }); on('sel3', 'change', d3);
+
+  // ================= 04 · virtual synchrony stepper =================
+  function vsSnaps() {
+    const S = [];
+    const lanes = ['P1', 'P2', 'P3', 'P4'];
+    const st = () => [0, 1, 2, 3].map((i) => ({ view: 1, members: 'P1–P4', pend: [], del: [], down: false }));
+    let s = st(), msgs = [], x = [];
+    const snap = (txt, extra) => S.push(Object.assign({ txt, s: JSON.parse(JSON.stringify(s)), msgs: msgs.map((m) => Object.assign({}, m)), x: x.slice(), phases: [{ at: 0, lab: 'view 1 {P1,P2,P3,P4}' }] }, extra || {}));
+    snap('View 1 is installed: every process agrees the group is {P1, P2, P3, P4}. Every message sent now is tagged "view 1".');
+    [1, 2, 3].forEach((j) => msgs.push({ f: 0, t: j, a: 0.2, b: 1, lab: j === 1 ? 'm1 (v1)' : '', cls: 'hl' }));
+    s.forEach((p) => p.pend.push('m1'));
+    snap('P1 multicasts m1 in view 1. Each member has <b>received</b> m1, but nobody has <b>delivered</b> it yet: delivery waits until all members have it.');
+    msgs.forEach((m) => { m.cls = ''; });
+    s.forEach((p) => { p.pend = []; p.del.push('m1'); });
+    snap('Acknowledgements show all four members received m1 (not drawn), so m1 is delivered everywhere in view 1, in the same position.');
+    msgs.push({ f: 1, t: 0, a: 1.4, b: 2.2, lab: 'm2 (v1)', cls: 'hl' }); msgs.push({ f: 1, t: 2, a: 1.4, b: 2.2, cls: 'hl' }); msgs.push({ f: 1, t: 3, a: 1.4, b: 2.6, cls: 'lost' }); x.push({ lane: 3, at: 2.3 });
+    [0, 1, 2].forEach((i) => s[i].pend.push('m2')); s[3].down = true;
+    snap('P2 multicasts m2. P1 and P3 receive it, but P4 crashes before m2 arrives. m2 sits in the pending queues of P1–P3: received, <b>not delivered</b>, because not every member of view 1 has it.');
+    msgs.forEach((m) => { if (m.cls === 'hl') m.cls = ''; });
+    msgs.push({ f: 0, t: 1, a: 2.8, b: 3.3, lab: 'view change: drop P4', cls: 'ok' }); msgs.push({ f: 0, t: 2, a: 2.8, b: 3.3, cls: 'ok' });
+    [0, 1, 2].forEach((i) => { s[i].pend = []; s[i].del.push('m2'); });
+    snap('P4’s failure is detected and a view change is announced. Before view 2 starts, the survivors make sure each of them holds the same view-1 messages, then deliver m2 <i>in view 1</i>. The view acts as a barrier: m2 cannot leak into view 2.', { phases: [{ at: 0, lab: 'view 1' }, { at: 2.75, lab: 'view change' }] });
+    [0, 1, 2].forEach((i) => { s[i].view = 2; s[i].members = 'P1–P3'; });
+    msgs.push({ f: 2, t: 0, a: 3.6, b: 4.3, lab: 'm3 (v2)', cls: 'hl' }); msgs.push({ f: 2, t: 1, a: 3.6, b: 4.3, cls: 'hl' });
+    [0, 1, 2].forEach((i) => s[i].pend.push('m3'));
+    snap('View 2 = {P1, P2, P3} is installed. P3 sends m3 tagged view 2; it will be delivered once all three current members have it. The crashed P4 is no longer counted.', { phases: [{ at: 0, lab: 'view 1' }, { at: 2.75, lab: 'change' }, { at: 3.5, lab: 'view 2 {P1,P2,P3}' }] });
+    msgs.forEach((m) => { if (m.cls === 'hl') m.cls = ''; });
+    [0, 1, 2].forEach((i) => { s[i].pend = []; s[i].del.push('m3'); });
+    msgs.push({ f: 1, t: 2, a: 4.5, b: 5.0, lab: 'late copy of an old v1 msg', cls: 'bad' });
+    snap('m3 is delivered by all of view 2. A delayed view-1 message that arrives now is discarded: a message can only be delivered in the view it was sent in.', { phases: [{ at: 0, lab: 'view 1' }, { at: 2.75, lab: 'change' }, { at: 3.5, lab: 'view 2' }] });
+    msgs.forEach((m) => { m.cls = m.cls === 'bad' ? 'dim' : m.cls; });
+    msgs.push({ f: 1, t: 0, a: 5.2, b: 5.6, lab: 'm4', cls: 'ok' }); msgs.push({ f: 2, t: 0, a: 5.25, b: 5.65, lab: 'm5', lp: 0.7, cls: 'ok' });
+    msgs.push({ f: 0, t: 1, a: 5.8, b: 6.4, lab: '#4 m4, #5 m5', cls: 'hl' }); msgs.push({ f: 0, t: 2, a: 5.8, b: 6.4, cls: 'hl' });
+    [0, 1, 2].forEach((i) => { s[i].del.push('m4 (#4)', 'm5 (#5)'); });
+    snap('Sequencer variant: P1 acts as the sequencer. Members send to P1, which stamps each message with the next number and broadcasts it. Everyone delivers in stamp order with no per-message consensus. Simpler and faster, but if P1 fails the group needs failure detection and a new sequencer before it can continue.', { phases: [{ at: 0, lab: 'view 1' }, { at: 2.75, lab: 'change' }, { at: 3.5, lab: 'view 2' }, { at: 5.1, lab: 'sequencer P1' }] });
+    S.forEach((z) => { z.lanes = lanes; });
+    return S;
+  }
+  stepper('vs4', vsSnaps, (sn) => {
+    H('q4', seqSVG({ lanes: sn.lanes, cols: 6.6, msgs: sn.msgs, x: sn.x, phases: sn.phases, gap: 30, aria: 'virtual synchrony view change' }));
+    H('nd4', sn.s.map((p, i) => `<div class="nd ${p.down ? 'down' : ''}"><div class="h"><span>P${i + 1}</span><span>${p.down ? 'crashed' : 'view ' + p.view}</span></div><div>members: ${p.down ? '—' : p.members}</div><div>pending: ${p.pend.join(', ') || '∅'}</div><div>delivered: ${p.del.join(', ') || '∅'}</div></div>`).join(''));
+    H('tx4', sn.txt);
+  });
+
+  // ================= 05 · ZAB stepper =================
+  function zabSnaps() {
+    const S = [], lanes = ['P1 (new)', 'P2', 'P3', 'P4', 'P5 (old)'];
+    const z = (e, c) => ({ e, c, cm: true });
+    const st = [
+      { role: 'prospective leader', ep: 1, h: [z(1, 1), z(1, 2)] },
+      { role: 'follower', ep: 1, h: [z(1, 1), z(1, 2)] },
+      { role: 'follower', ep: 1, h: [z(1, 1), z(1, 2), Object.assign(z(1, 3), { cm: false })] },
+      { role: 'follower', ep: 1, h: [z(1, 1)] },
+      { role: 'crashed leader of epoch 1', ep: 1, h: [z(1, 1), z(1, 2), Object.assign(z(1, 3), { cm: false }), Object.assign(z(1, 4), { cm: false })], down: true }];
+    let msgs = [], ph = [{ at: 0, lab: 'Discovery' }], xs = [{ lane: 4, at: 0.1 }];
+    const snap = (txt) => S.push({ txt, lanes, st: JSON.parse(JSON.stringify(st)), msgs: msgs.map((m) => Object.assign({}, m)), ph: ph.slice(), xs: xs.slice() });
+    const dim = () => msgs.forEach((m) => { if (m.cls === 'hl') m.cls = ''; });
+    snap('Start: P5, leader of epoch 1, has crashed. It had proposed 1.3 and 1.4; only P3 acknowledged 1.3, nobody acknowledged 1.4. Some election algorithm picks P1 as the <b>prospective</b> leader. Picking well only helps performance; the next steps provide safety. Transaction IDs are written epoch.counter.');
+    [1, 2, 3].forEach((j) => msgs.push({ f: j, t: 0, a: 0.3, b: 1, lab: j === 1 ? 'my epoch = 1' : '', cls: 'hl' }));
+    snap('<b>Discovery 1.</b> P1 learns the latest epoch each follower knows (all say 1).');
+    dim(); [1, 2, 3].forEach((j) => msgs.push({ f: 0, t: j, a: 1.1, b: 1.8, lab: j === 1 ? 'NEWEPOCH 2' : '', cls: 'hl' }));
+    snap('<b>Discovery 2.</b> P1 proposes epoch 2, larger than any epoch a follower reported.');
+    dim(); [1, 2, 3].forEach((j) => { st[j].ep = 2; msgs.push({ f: j, t: 0, a: 1.9, b: 2.6, lab: j === 1 ? 'ACK + last txn' : '', cls: 'hl' }); }); st[0].ep = 2;
+    snap('<b>Discovery 3.</b> Followers accept epoch 2 and reply with the ID of their latest transaction: P2 → 1.2, P3 → 1.3, P4 → 1.1. From now on they reject any proposal from epoch 1.');
+    dim(); ph.push({ at: 2.8, lab: 'Synchronization' }); msgs.push({ f: 2, t: 0, a: 2.9, b: 3.5, lab: 'copy 1.3', cls: 'hl' }); st[0].h.push(Object.assign(z(1, 3), { cm: false }));
+    snap('<b>Sync 1.</b> Because order is total, the node with the highest transaction ID (P3, 1.3) has a superset of everyone’s history. P1 copies from that <b>one</b> node only.');
+    dim(); [1, 2, 3].forEach((j) => msgs.push({ f: 0, t: j, a: 3.6, b: 4.3, lab: j === 1 ? 'NEWLEADER e2 + history' : '', cls: 'hl' }));
+    st[1].h.push(Object.assign(z(1, 3), { cm: false })); st[3].h.push(z(1, 2)); st[3].h.push(Object.assign(z(1, 3), { cm: false }));
+    snap('<b>Sync 2.</b> P1 proposes itself as leader of epoch 2 and sends the history: P2 receives 1.3, the lagging P4 receives 1.2 and 1.3. Everyone now has the same history.');
+    dim(); [1, 2, 3].forEach((j) => msgs.push({ f: j, t: 0, a: 4.4, b: 5.0, lab: j === 1 ? 'ACK' : '', cls: 'hl' }));
+    [0, 1, 2, 3].forEach((j) => st[j].h.forEach((x) => { x.cm = true; })); st[0].role = 'leader of epoch 2';
+    snap('<b>Sync 3.</b> A quorum acknowledges, so P1 is the established leader of epoch 2 and nobody else can lead this epoch. The old-epoch proposals (up to 1.3) are committed and delivered <b>before</b> anything from epoch 2. Note 1.3 survived because one member of the quorum had it; 1.4 existed only on the dead leader and is gone.');
+    dim(); ph.push({ at: 5.2, lab: 'Broadcast' }); [1, 2, 3].forEach((j) => { msgs.push({ f: 0, t: j, a: 5.3, b: 5.9, lab: j === 1 ? 'PROPOSE 2.1' : '', cls: 'hl' }); st[j].h.push(Object.assign(z(2, 1), { cm: false })); }); st[0].h.push(Object.assign(z(2, 1), { cm: false }));
+    snap('<b>Broadcast 1.</b> A client write arrives. P1 gives it ID 2.1 and proposes it to all followers, who log it.');
+    dim(); msgs.push({ f: 1, t: 0, a: 6.0, b: 6.5, lab: 'ACK', cls: 'hl' }); msgs.push({ f: 2, t: 0, a: 6.0, b: 6.6, cls: 'hl' }); msgs.push({ f: 3, t: 0, a: 6.0, b: 7.3, cls: 'dim' });
+    snap('<b>Broadcast 2.</b> P2 and P3 acknowledge. With P1 itself that is 3 of 5, a quorum. P4’s ACK is slow; the leader does not wait for it. Votes are just acknowledgements: there is no "no" vote.');
+    dim(); [1, 2, 3].forEach((j) => { msgs.push({ f: 0, t: j, a: 6.7, b: 7.2, lab: j === 1 ? 'COMMIT 2.1' : '', cls: 'hl' }); }); [0, 1, 2, 3].forEach((j) => st[j].h.forEach((x) => { x.cm = true; }));
+    snap('<b>Broadcast 3.</b> P1 commits 2.1 and tells followers. Two message rounds per write (propose/ack, then commit), and the next proposal can wait until this one is acknowledged, keeping strict order.');
+    dim(); st[4].down = false; xs = [{ lane: 4, at: 0.1 }]; msgs.push({ f: 4, t: 1, a: 7.4, b: 7.9, lab: 'PROPOSE 1.4 (epoch 1)', cls: 'bad' }); msgs.push({ f: 4, t: 2, a: 7.4, b: 7.9, cls: 'bad' });
+    snap('P5 restarts still believing it leads epoch 1 and proposes 1.4. Followers have accepted epoch 2, so they <b>refuse</b> it. P5 learns about epoch 2, drops its never-acknowledged 1.4, and rejoins as a follower that syncs from P1.');
+    st[4].role = 'follower (rejoined)'; st[4].ep = 2; st[4].h = [z(1, 1), z(1, 2), z(1, 3), z(2, 1)]; msgs.push({ f: 0, t: 4, a: 8.1, b: 8.6, lab: 'sync', cls: 'ok' });
+    snap('P5 is now a follower of epoch 2 with history 1.1, 1.2, 1.3, 2.1, the same as everyone else.');
+    return S;
+  }
+  stepper('zb5', zabSnaps, (sn) => {
+    H('q5', seqSVG({ lanes: sn.lanes, cols: 8.8, msgs: sn.msgs, phases: sn.ph, x: sn.xs, gap: 30, aria: 'ZAB phases' }));
+    H('nd5', sn.st.map((p, i) => `<div class="nd ${p.down ? 'down' : ''} ${/leader of epoch 2/.test(p.role) ? 'leader' : ''}"><div class="h"><span>P${i + 1}</span><span>epoch ${p.ep}</span></div><div>${p.role}</div><div class="lg">${p.h.map((x) => `<span class="${x.cm ? 'cm' : 'un'}">${x.e}.${x.c}</span>`).join('')}</div></div>`).join(''));
+    H('tx5', sn.txt);
+  });
+  reseedHooks.push(() => { newProps1(); newNet3(); });
+
+
+  // ================= 06 · proposal numbers =================
+  const d6 = reg(() => {
+    const a = [val('ta6'), val('ia6')], b = [val('tb6'), val('ib6')];
+    const same = a[0] === b[0] && a[1] === b[1];
+    const cmp = a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1];
+    H('r6', same ? tag(false, 'identical numbers') + ' · two nodes can never share an id, so this can only happen if one node reuses a number: forbidden' :
+      `P-a = (${a[0]}, ${a[1]}) · P-b = (${b[0]}, ${b[1]}) · winner <b>${cmp > 0 ? 'P-a' : 'P-b'}</b> · decided by <b>${a[0] !== b[0] ? 'timestamp' : 'node id (tie-break)'}</b>`);
+  });
+  ['ta6', 'ia6', 'tb6', 'ib6'].forEach((id) => bindRange(id, d6));
+
+  // ================= 07 · Paxos core (used by sections 7 and 9) =================
+  function newAcceptor(name) { return { name, promised: 0, accN: 0, accV: null, up: true }; }
+  function onPrepare(a, n) {
+    if (!a.up) return null;                                   // crashed: no reply
+    if (n > a.promised) { a.promised = n; return { ok: true, n, accN: a.accN, accV: a.accV }; }
+    return { ok: false, highest: a.promised };                // tell the proposer a higher number exists
+  }
+  function onAccept(a, n, v) {
+    if (!a.up) return null;
+    if (n >= a.promised) { a.promised = n; a.accN = n; a.accV = v; return { ok: true, n, v }; }
+    return { ok: false, highest: a.promised };                // rejected: help the proposer catch up
+  }
+  function chooseValue(promises, own) {
+    let best = null;                                          // value of the highest-numbered accepted proposal
+    for (const p of promises) if (p.accV != null && (!best || p.accN > best.accN)) best = p;
+    return best ? best.accV : own;                            // nothing accepted yet: free to use our own value
+  }
+  showSrc('code7', [newAcceptor, onPrepare, onAccept, chooseValue]);
+  const accTable = (A, hl) => '<table class="mini"><tr><th>acceptor</th><th>promised</th><th>accepted n</th><th>accepted value</th><th>state</th></tr>' +
+    A.map((a) => `<tr${hl && hl.includes(a.name) ? ' class="hit"' : ''}><td>${a.name}</td><td>${a.promised || '–'}</td><td>${a.accN || '–'}</td><td>${a.accV || '–'}</td><td>${a.up ? 'up' : '<span class="tag n">down</span>'}</td></tr>`).join('') + '</table>';
+
+  function normalSnaps() {
+    const S = [], A = [newAcceptor('A1'), newAcceptor('A2'), newAcceptor('A3')], msgs = [];
+    const lanes = ['Client', 'Proposer', 'A1', 'A2', 'A3', 'Learner'];
+    const snap = (txt, ph) => S.push({ txt, lanes, msgs: msgs.map((m) => Object.assign({}, m)), tbl: accTable(A), ph });
+    const dim = () => msgs.forEach((m) => { if (m.cls === 'hl') m.cls = ''; });
+    snap('A client sends value V to a proposer. All acceptors are empty.', [{ at: 0, lab: 'Request' }]);
+    msgs.push({ f: 0, t: 1, a: 0.1, b: 0.9, lab: 'V', cls: 'hl' });
+    snap('The proposer picks proposal number 1 (unique: e.g. timestamp 1 + its node id).', [{ at: 0, lab: 'Request' }]);
+    dim(); [2, 3, 4].forEach((j) => msgs.push({ f: 1, t: j, a: 1, b: 1.8, lab: j === 2 ? 'Prepare(1)' : '', cls: 'hl' }));
+    const pr = A.map((a) => onPrepare(a, 1));
+    snap('<b>Propose phase.</b> Prepare(1) goes to the acceptors. Each one has promised nothing higher, so <code>onPrepare</code> records promised = 1.', [{ at: 0, lab: 'Request' }, { at: 1, lab: 'Propose' }]);
+    dim(); [2, 3, 4].forEach((j) => msgs.push({ f: j, t: 1, a: 1.9, b: 2.6, lab: j === 2 ? 'Promise(1, –)' : '', cls: 'hl' }));
+    const v = chooseValue(pr.filter((p) => p && p.ok), 'V');
+    snap(`Promises come back with no previously accepted value, so <code>chooseValue</code> returns the proposer's own value: <b>${v}</b>.`, [{ at: 0, lab: 'Request' }, { at: 1, lab: 'Propose' }]);
+    dim(); [2, 3, 4].forEach((j) => msgs.push({ f: 1, t: j, a: 2.8, b: 3.5, lab: j === 2 ? 'Accept!(1, V)' : '', cls: 'hl' }));
+    A.forEach((a) => onAccept(a, 1, v));
+    snap('<b>Replication phase.</b> Accept!(1, V). Nobody promised a higher number, so each acceptor stores accepted n = 1, value V.', [{ at: 0, lab: 'Request' }, { at: 1, lab: 'Propose' }, { at: 2.75, lab: 'Replication' }]);
+    dim(); [2, 3, 4].forEach((j) => { msgs.push({ f: j, t: 1, a: 3.6, b: 4.3, lab: j === 2 ? 'Accepted(1, V)' : '', cls: 'hl' }); msgs.push({ f: j, t: 5, a: 3.6, b: 4.4, cls: 'ok' }); });
+    snap('Acceptors confirm to the proposer and notify the learner directly, so the learner knows sooner. A majority (2 of 3) is enough; the third is a bonus.', [{ at: 0, lab: 'Request' }, { at: 1, lab: 'Propose' }, { at: 2.75, lab: 'Replication' }]);
+    dim(); msgs.push({ f: 1, t: 0, a: 4.5, b: 5.2, lab: 'decided V', cls: 'hl' });
+    snap('The proposer answers the client. Total: 2 round trips between proposer and acceptors, 4 × 3 = 12 proposer–acceptor messages (plus learner notifications) for one value.', [{ at: 0, lab: 'Request' }, { at: 1, lab: 'Propose' }, { at: 2.75, lab: 'Replication' }, { at: 4.45, lab: 'Response' }]);
+    return S;
+  }
+  stepper('px7', normalSnaps, (sn) => { H('q7', seqSVG({ lanes: sn.lanes, cols: 5.4, msgs: sn.msgs, phases: sn.ph, gap: 30, aria: 'Paxos normal round' })); H('t7', sn.tbl); H('tx7', sn.txt); });
+
+  // ================= 08 · quorum intersection + speculative sends =================
+  function subsets(n, k) { const out = []; const rec = (s, cur) => { if (cur.length === k) { out.push(cur.slice()); return; } for (let i = s; i < n; i++) { cur.push(i); rec(i + 1, cur); cur.pop(); } }; rec(0, []); return out; }
+  function disjointPairs(n, q1, q2) { const A = subsets(n, q1), B = subsets(n, q2); let dis = 0, minOv = Infinity; for (const a of A) for (const b of B) { const ov = b.filter((x) => a.includes(x)).length; if (!ov) dis++; minOv = Math.min(minOv, ov); } return { pairs: A.length * B.length, dis, minOv }; }
+  const d8 = reg(() => {
+    const N = val('n8'); const qEl = $('q8'); qEl.max = String(N); const Q = Math.min(val('q8'), N); TX('q8o', String(Q));
+    const r = disjointPairs(N, Q, Q), maj = Math.floor(N / 2) + 1;
+    H('r8', `N = <b>${N}</b> · quorum <b>${Q}</b> (majority would be ${maj}) · pairs of quorums checked <b>${r.pairs}</b> · disjoint pairs <b class="${r.dis ? 'bad' : 'good'}">${r.dis}</b> · smallest overlap <b>${r.minOv}</b> · survives <b>${N - Q}</b> crashed acceptor${N - Q === 1 ? '' : 's'} · ${r.dis ? tag(false, 'two quorums can decide different values') : tag(true, 'safe: every two quorums share an arbiter')}${N % 2 === 0 && Q === maj ? ' · even N: tolerates no more crashes than N−1' : ''}`);
+  });
+  bindRange('n8', d8); bindRange('q8', d8); on('btn8', 'click', () => { $('q8').value = String(Math.floor(val('n8') / 2) + 1); d8(); });
+  const d8b = reg(() => {
+    const p = val('sl8') / 100, rr = rng(SEED * 13 + 5), xs = [], mQ = [], mA = [], pQ = [], pA = [];
+    for (let N = 3; N <= 9; N++) {
+      const Q = Math.floor(N / 2) + 1, a1 = [], a2 = [];
+      for (let t = 0; t < 4000; t++) {
+        const rt = []; for (let i = 0; i < N; i++) rt.push(1 + 0.3 * (2 * rr() - 1) + (rr() < p ? 20 : 0));
+        a1.push(Math.max(...rt.slice(0, Q))); a2.push(rt.slice().sort((x, y) => x - y)[Q - 1]);
+      }
+      a1.sort((x, y) => x - y); a2.sort((x, y) => x - y);
+      xs.push(N); mQ.push(a1.reduce((s, x) => s + x, 0) / a1.length); mA.push(a2.reduce((s, x) => s + x, 0) / a2.length); pQ.push(a1[Math.floor(a1.length * 0.99)]); pA.push(a2[Math.floor(a2.length * 0.99)]);
+    }
+    xyChart('c8', { xs, xlab: 'acceptors N (quorum = majority)', ylab: 'ms', series: [{ ys: mQ, col: 'sell', label: 'send to exactly Q: mean' }, { ys: pQ, col: 'sell', dash: [5, 4], label: 'send to exactly Q: p99' }, { ys: mA, col: 'c2', label: 'send to all, wait for Q: mean' }, { ys: pA, col: 'c2', dash: [5, 4], label: 'send to all: p99' }] });
+    H('r8b', `N = 5 · send to exactly 3: mean <b>${mQ[2].toFixed(2)} ms</b>, p99 <b>${pQ[2].toFixed(1)} ms</b> · send to all 5, wait for 3: mean <b>${mA[2].toFixed(2)} ms</b>, p99 <b>${pA[2].toFixed(1)} ms</b> · modelled, 4,000 trials per point`);
+  });
+  bindRange('sl8', d8b);
+
+  // ================= 09 · failure scenarios =================
+  function scenarioSnaps() {
+    const sc = $('sel9').value, S = [], A = [newAcceptor('A1'), newAcceptor('A2'), newAcceptor('A3')], msgs = [], xs = [];
+    const lanes = sc === 'acc' ? ['P1', 'P2', 'P3', 'A1', 'A2', 'A3'] : ['P1', 'P2', 'A1', 'A2', 'A3'];
+    const ai = (k) => lanes.indexOf('A' + k);
+    let ph = [{ at: 0, lab: 'round 1 (P1)' }];
+    const snap = (txt) => S.push({ txt, lanes, msgs: msgs.map((m) => Object.assign({}, m)), xs: xs.slice(), ph: ph.slice(), tbl: accTable(A) });
+    const dim = () => msgs.forEach((m) => { if (m.cls === 'hl' || m.cls === 'bad') m.cls = ''; });
+    const prepare = (p, n, ks, t) => { const res = []; ks.forEach((k, j) => { const r = onPrepare(A[k - 1], n); msgs.push({ f: p, t: ai(k), a: t, b: t + 0.6, lab: j === 0 ? `Prepare(${n})` : '', cls: 'hl' }); if (r) { msgs.push({ f: ai(k), t: p, a: t + 0.7, b: t + 1.3, lab: j === 0 ? (r.ok ? 'Promise' : 'NACK') : '', cls: r.ok ? 'hl' : 'bad' }); res.push(r); } }); return res; };
+    const accept = (p, n, v, ks, t, noReply) => { let okc = 0; ks.forEach((k, j) => { const r = onAccept(A[k - 1], n, v); msgs.push({ f: p, t: ai(k), a: t, b: t + 0.6, lab: j === 0 ? `Accept!(${n}, ${v})` : '', cls: 'hl' }); if (r && !noReply) { msgs.push({ f: ai(k), t: p, a: t + 0.7, b: t + 1.3, lab: j === 0 ? (r.ok ? 'Accepted' : 'Rejected') : '', cls: r.ok ? 'hl' : 'bad' }); } if (r && r.ok) okc++; }); return okc; };
+    if (sc === 'duel') {
+      snap('Two proposers, P1 and P2, want different values (V1, V2). All acceptors empty.');
+      prepare(0, 1, [1, 2, 3], 0.1); snap('P1 sends Prepare(1); all acceptors promise 1.');
+      dim(); prepare(1, 2, [1, 2, 3], 0.5); snap('Before P1 can send Accept!, P2 sends Prepare(2). Acceptors may answer a later prepare with a higher number, so they now promise 2.');
+      dim(); accept(0, 1, 'V1', [1, 2, 3], 1.9); snap('P1 sends Accept!(1, V1): <b>rejected</b> everywhere (promised 2 &gt; 1). Rejections carry the highest number seen, so P1 retries with 3.');
+      dim(); prepare(0, 3, [1, 2, 3], 3.3); snap('P1 immediately sends Prepare(3); acceptors promise 3 …');
+      dim(); accept(1, 2, 'V2', [1, 2, 3], 3.5); snap('… just as P2’s Accept!(2, V2) arrives: <b>rejected</b> (promised 3). P2 retries with Prepare(4).');
+      dim(); prepare(1, 4, [1, 2, 3], 4.9); accept(0, 3, 'V1', [1, 2, 3], 5.0); snap('And P1’s Accept!(3) is rejected by Prepare(4). Nothing is ever accepted: the safety rules hold, but there is no progress. A random backoff before retrying breaks the symmetry (chart below).');
+      return S;
+    }
+    snap('P1 and P2 are proposers; A1–A3 acceptors. P1 wants V1, P2 wants V2.');
+    let pr = prepare(0, 1, [1, 2, 3], 0.1); snap('P1 runs the propose phase with number 1. All three acceptors promise.');
+    dim(); accept(0, 1, 'V1', [1], 1.6, true); xs.push({ lane: 0, at: 1.75 });
+    snap('P1 sends Accept!(1, V1) but crashes after reaching only A1. A1 has accepted (1, V1); A2 and A3 have not. V1 is <i>not</i> decided: it is on one acceptor, not a majority.');
+    if (sc === 'acc') { A[0].up = false; xs.push({ lane: ai(1), at: 2.0 }); snap('A1 crashes too, before anyone learns about its value.'); }
+    dim(); ph.push({ at: 2.2, lab: 'round 2 (P2)' });
+    const ks = sc === 'old' ? [1, 2] : [2, 3];
+    pr = prepare(1, 2, ks, 2.3).filter((p) => p.ok);
+    const v = chooseValue(pr, 'V2');
+    snap(sc === 'old' ? `P2 starts round 2 and its quorum is A1, A2. A1’s Promise carries (1, V1), so <code>chooseValue</code> returns <b>${v}</b>: P2 must finish P1’s value, not its own.` : `P2 starts round 2 with quorum A2, A3. Neither accepted anything, so <code>chooseValue</code> returns P2’s own <b>${v}</b>, even though A1 holds V1.`);
+    dim(); const okc = accept(1, 2, v, ks, 3.8);
+    snap(`P2 sends Accept!(2, ${v}) to its quorum; ${okc} acceptors accept. <b>${v} is decided</b> (a majority accepted it under number 2).${sc === 'old' ? ' P1 never learns its value won; a client waiting on P1 sees no answer.' : ' A1 still holds (1, V1), which is harmless: number 1 lost.'}`);
+    if (sc === 'acc') {
+      dim(); A[0].up = true; ph.push({ at: 5.3, lab: 'round 3 (P3)' });
+      pr = prepare(2, 3, [1, 2], 5.4).filter((p) => p.ok); const v3 = chooseValue(pr, 'V3');
+      snap(`Later A1 recovers and a third proposer P3 reaches A1 and A2. Promises carry (1, V1) from A1 and (2, V2) from A2. <code>chooseValue</code> takes the higher number: <b>${v3}</b>. A1’s stale V1 is ignored, so agreement holds.`);
+      dim(); accept(2, 3, v3, [1, 2], 6.9); snap(`P3 re-commits ${v3}; now every acceptor that is up agrees.`);
+    }
+    return S;
+  }
+  const st9 = stepper('fs9', scenarioSnaps, (sn) => { H('q9', seqSVG({ lanes: sn.lanes, cols: sn.lanes.length === 6 ? 8.4 : 6.6, msgs: sn.msgs, x: sn.xs, phases: sn.ph, gap: 28, aria: 'Paxos failure scenario' })); H('t9', sn.tbl); H('tx9', sn.txt); });
+  on('sel9', 'change', () => st9.rebuild());
+
+  // dueling proposers, modelled
+  function duel(B, pause, r) {
+    const d = () => 0.5 * (1 + 0.1 * (2 * r() - 1));      // one-way delay, RTT = 1
+    const P = [], Acc = [];
+    const start = (i, s) => { P[i] = s + d(); Acc[i] = P[i] + d() + pause + d(); };
+    start(0, 0); start(1, r());
+    for (let attempt = 1; attempt <= 40; attempt++) {
+      const i = Acc[0] <= Acc[1] ? 0 : 1, j = 1 - i;
+      if (!(P[j] > P[i] && P[j] < Acc[i])) return attempt;  // no higher prepare landed in my window: accepted
+      start(i, Acc[i] + d() + (B > 0 ? r() * B : 0));         // rejected: learn it, back off, re-prepare
+    }
+    return 41;
+  }
+  let duelRes = null;
+  function runDuels() {
+    const pause = val('j9') / 10, rr = rng(SEED * 101 + 7), Bs = [0, 0.5, 1, 2], out = [];
+    Bs.forEach((B) => { const hist = new Array(42).fill(0); for (let t = 0; t < 1000; t++) hist[duel(B, pause, rr)]++; out.push({ B, hist }); });
+    duelRes = out;
+  }
+  const d9 = reg(() => {
+    if (!duelRes) runDuels();
+    const xs = []; for (let k = 1; k <= 15; k++) xs.push(k);
+    const cols = ['sell', 'c1', 'c3', 'c2'];
+    const series = duelRes.map((o, ix) => { let c = 0; return { ys: xs.map((k) => { c = 0; for (let q = 1; q <= k; q++) c += o.hist[q]; return c / 1000; }), col: cols[ix], label: o.B === 0 ? 'no backoff' : `backoff U[0, ${o.B}] RTT`, dots: true }; });
+    xyChart('c9', { xs, pct: true, ymin: 0, ymax: 1, xlab: 'attempts (both proposers together)', series });
+    H('r9', duelRes.map((o) => { let c = 0, s = 0; for (let q = 1; q <= 40; q++) { c += o.hist[q]; s += q * o.hist[q]; } return `${o.B === 0 ? 'no backoff' : 'B = ' + o.B}: decided in ≤ 40 attempts <b>${(c / 10).toFixed(1)}%</b>${c ? ` · mean attempts <b>${(s / c).toFixed(1)}</b>` : ''}`; }).join(' · ') + ' · modelled, 1,000 duels each');
+  });
+  bindRange('j9', () => { duelRes = null; d9(); }); on('btn9', 'click', () => { duelRes = null; d9(); });
+  reseedHooks.push(() => { duelRes = null; });
+
+  // ================= 10 · Multi-Paxos =================
+  const d10 = reg(() => {
+    const k = val('k10'), N = val('n10'), xs = [], cl = [], mu = [];
+    for (let i = 1; i <= 50; i++) { xs.push(i); cl.push(4 * i); mu.push(2 + 2 * i); }
+    xyChart('c10', { xs, vx: k, xlab: 'commands committed', ylab: 'message delays', series: [{ ys: cl, col: 'sell', label: 'classic Paxos: 4 per command' }, { ys: mu, col: 'c2', label: 'Multi-Paxos: 2 once + 2 per command' }] });
+    H('r10', `${k} commands, ${N} acceptors · classic: <b>${4 * k}</b> message delays, <b>${4 * (N - 1) * k}</b> messages · Multi-Paxos: <b>${2 + 2 * k}</b> delays, <b>${2 * (N - 1) * (k + 1)}</b> messages · saving <b>${(100 * (1 - (2 + 2 * k) / (4 * k))).toFixed(0)}%</b> latency (sequential commands, no batching; acceptors co-located with learners)`);
+  });
+  bindRange('k10', d10); bindRange('n10', d10);
+  let log10 = { entries: [], snapUpTo: 0, state: {}, next: 1 };
+  const d10b = reg(() => {
+    H('lg10', (log10.snapUpTo ? `<span class="cell blue">snapshot ≤ ${log10.snapUpTo}: ${Object.keys(log10.state).map((k) => k + '=' + log10.state[k]).join(', ')}</span>` : '') + log10.entries.map((e) => `<span class="cell">${e.i}: ${e.k}=${e.v}</span>`).join('') || '<span class="cell">empty log</span>');
+    H('r10b', `log entries kept <b>${log10.entries.length}</b> · applied into snapshot <b>${log10.snapUpTo}</b> · a restarting replica loads the snapshot and replays only the remaining entries`);
+  });
+  on('ap10', 'click', () => { log10.entries.push({ i: log10.next++, k: pick(['x', 'y', 'z']), v: 1 + Math.floor(R() * 9) }); d10b(); });
+  on('sn10', 'click', () => { log10.entries.forEach((e) => { log10.state[e.k] = e.v; }); if (log10.entries.length) log10.snapUpTo = log10.entries[log10.entries.length - 1].i; log10.entries = []; d10b(); });
+  on('rs10', 'click', () => { log10 = { entries: [], snapUpTo: 0, state: {}, next: 1 }; d10b(); });
+  const d10c = reg(() => {
+    const L = val('ls10'), eps = val('dr10') / 1000, margin = $('chk10').checked;
+    const followerEnd = L / (1 + eps), leaderStop = margin ? L * (1 - eps) : L, unsafe = Math.max(0, leaderStop - followerEnd);
+    H('r10c', `leader serves lease reads until <b>${leaderStop.toFixed(3)} s</b> (its clock) · a fast-clock follower may promise a new leader after <b>${followerEnd.toFixed(3)} s</b> · stale-read window <b class="${unsafe > 1e-9 ? 'bad' : 'good'}">${(unsafe * 1000).toFixed(0)} ms</b> ${unsafe > 1e-9 ? tag(false, 'linearizability can break') : tag(true, 'safe if drift stays within the bound')}`);
+  });
+  bindRange('ls10', d10c); bindRange('dr10', d10c); on('chk10', 'change', d10c);
+
+  // ================= 11 · Fast Paxos =================
+  const d11 = reg(() => {
+    const f = val('f11'), gap = val('g11'), Nc = 2 * f + 1, Nf = 3 * f + 1, Qf = 2 * f + 1, rr = rng(SEED * 17 + f);
+    H('t11', `<table class="mini"><tr><th></th><th>acceptors</th><th>quorum</th><th>message delays (no conflict)</th><th>messages per value</th></tr><tr><td>classic (via coordinator)</td><td>${Nc}</td><td>${f + 1}</td><td>3 (client→coord→acceptors→learner)</td><td>${1 + 2 * Nc}</td></tr><tr><td>Fast Paxos fast round</td><td>${Nf}</td><td>${Qf}</td><td>2 (proposer→acceptors→learner)</td><td>${2 * Nf}</td></tr></table>`);
+    const collide = (g) => { let c = 0; const T = 2000; for (let t = 0; t < T; t++) { let a = 0; for (let i = 0; i < Nf; i++) { const t1 = 5 + 3 * (2 * rr() - 1), t2 = g + 5 + 3 * (2 * rr() - 1); if (t1 <= t2) a++; } if (a < Qf && Nf - a < Qf) c++; } return c / T; };
+    const xs = [], fast = [], cls = [], pc = []; for (let g = 0; g <= 20; g++) { const p = collide(g); xs.push(g); pc.push(p); fast.push(10 * (1 - p) + 30 * p); cls.push(15); }
+    xyChart('c11', { xs, vx: gap, xlab: 'spacing between two competing requests (ms)', ylab: 'expected latency, ms', ymin: 0, series: [{ ys: fast, col: 'c1', label: 'Fast Paxos (with collisions)' }, { ys: cls, col: 'c2', dash: [5, 4], label: 'classic via coordinator' }] });
+    const p = pc[gap];
+    H('r11', `f = ${f}: Fast Paxos needs <b>${Nf}</b> acceptors and fast quorum <b>${Qf}</b> vs classic <b>${Nc}</b> / <b>${f + 1}</b> · at ${gap} ms spacing: collision chance <b>${(p * 100).toFixed(1)}%</b> · expected latency fast <b>${fast[gap].toFixed(1)} ms</b> vs classic <b>15.0 ms</b> · modelled (5 ± 3 ms one-way, 2,000 trials per point)`);
+  });
+  bindRange('f11', d11); bindRange('g11', d11);
+
+  // ================= 12 · EPaxos =================
+  function epSnaps() {
+    const S = [], lanes = ['P1', 'P2', 'P3', 'P4', 'P5'], log = [[], [], [], [], []], msgs = [], cm = [];
+    const snap = (txt, ph) => S.push({ txt, lanes, msgs: msgs.map((m) => Object.assign({}, m)), log: log.map((l) => l.slice()), cm: cm.slice(), ph });
+    const dim = () => msgs.forEach((m) => { if (m.cls === 'hl' || m.cls === 'bad') m.cls = ''; });
+    snap('All command logs are empty. Any replica can lead a command; there is no global leader.', [{ at: 0, lab: 'start' }]);
+    msgs.push({ f: 0, t: 1, a: 0.1, b: 0.8, lab: 'PreAccept(1, ∅)', cls: 'hl' }); msgs.push({ f: 0, t: 2, a: 0.1, b: 0.8, cls: 'hl' }); log[0].push('1');
+    snap('P1 receives a command and becomes its leader: sequence 1, no known dependencies. It sends PreAccept(1, ∅) to a fast quorum (P2, P3 in the figure).', [{ at: 0, lab: 'P1: fast path' }]);
+    dim(); log[1].push('1'); log[2].push('1'); msgs.push({ f: 1, t: 0, a: 0.9, b: 1.5, lab: 'OK(1)', cls: 'hl' }); msgs.push({ f: 2, t: 0, a: 0.9, b: 1.5, cls: 'hl' });
+    snap('P2 and P3 have empty logs, so they see no interfering command and reply OK with the same (empty) dependency list. They record command 1.', [{ at: 0, lab: 'P1: fast path' }]);
+    dim(); cm.push('1'); msgs.push({ f: 0, t: 0, a: 1.6, b: 1.6 });
+    snap('Replies agree with each other and with P1, so P1 <b>commits on the fast path</b>: one round trip. It answers the client and sends Commit asynchronously.', [{ at: 0, lab: 'P1: fast path' }, { at: 1.6, lab: 'Commit(1)' }]);
+    dim(); log[4].push('2'); msgs.push({ f: 4, t: 3, a: 1.0, b: 1.9, lab: 'PreAccept(2, ∅)', cls: 'hl' }); msgs.push({ f: 4, t: 2, a: 1.0, b: 1.9, cls: 'hl' });
+    snap('Meanwhile P5 leads another command, sequence 2. Its own log is empty, so it declares no dependencies and sends PreAccept(2, ∅) to P3 and P4.', [{ at: 0, lab: 'P1: fast path' }, { at: 1.0, lab: 'P5: slow path' }]);
+    dim(); log[3].push('2'); log[2].push('2'); msgs.push({ f: 3, t: 4, a: 2.0, b: 2.7, lab: 'OK, deps ∅', cls: 'hl' }); msgs.push({ f: 2, t: 4, a: 2.0, b: 2.8, lab: 'Conflict({1})', lp: 0.6, cls: 'bad' });
+    snap('P4 has not heard of command 1 and agrees: deps ∅. But P3 has command 1 in its log and it interferes, so P3 replies <b>Conflict({1})</b>. The replies disagree.', [{ at: 0, lab: 'P1: fast path' }, { at: 1.0, lab: 'P5: slow path' }]);
+    dim(); msgs.push({ f: 4, t: 3, a: 2.9, b: 3.6, lab: 'Accept(2, {1})', cls: 'hl' }); msgs.push({ f: 4, t: 2, a: 2.9, b: 3.6, cls: 'hl' });
+    snap('<b>Slow path.</b> P5 merges dependencies ({1}), keeps a sequence number above everything it saw, and sends Accept(2, {1}) so replicas store the same dependency list.', [{ at: 0, lab: 'P1: fast path' }, { at: 1.0, lab: 'P5: slow path' }]);
+    dim(); msgs.push({ f: 3, t: 4, a: 3.7, b: 4.4, lab: 'ACK', cls: 'hl' }); msgs.push({ f: 2, t: 4, a: 3.7, b: 4.4, cls: 'hl' }); cm.push('2 (after 1)');
+    snap('With the acknowledgements P5 <b>commits command 2 with dependency {1}</b>: two round trips. Every replica will execute 1 before 2, because 2 depends on 1.', [{ at: 0, lab: 'P1: fast path' }, { at: 1.0, lab: 'P5: slow path' }, { at: 4.4, lab: 'Commit(2)' }]);
+    return S;
+  }
+  stepper('ep12', epSnaps, (sn) => {
+    H('q12', seqSVG({ lanes: sn.lanes, cols: 4.8, msgs: sn.msgs, phases: sn.ph, gap: 28, aria: 'EPaxos run' }));
+    H('nd12', sn.log.map((l, i) => `<div class="nd"><div class="h"><span>P${i + 1}</span><span>log</span></div><div class="lg">${l.map((x) => `<span class="${sn.cm.some((c) => c[0] === x) ? 'cm' : 'un'}">cmd ${x}</span>`).join('') || '∅'}</div></div>`).join(''));
+    H('tx12', sn.txt + (sn.cm.length ? ' · committed: ' + sn.cm.join(', ') : ''));
+  });
+  // execution: strongly connected components (Tarjan), dependencies first, cycles broken by (seq, replica)
+  function epaxosExecutionOrder(cmds) {
+    const idx = {}, low = {}, on = {}, st = [], comps = []; let k = 0;
+    const byId = Object.fromEntries(cmds.map((c) => [c.id, c]));
+    function visit(v) {
+      idx[v] = low[v] = k++; st.push(v); on[v] = true;
+      for (const w of byId[v].deps) {
+        if (idx[w] === undefined) { visit(w); low[v] = Math.min(low[v], low[w]); }
+        else if (on[w]) low[v] = Math.min(low[v], idx[w]);
+      }
+      if (low[v] === idx[v]) { const comp = []; let w; do { w = st.pop(); on[w] = false; comp.push(byId[w]); } while (w !== v); comps.push(comp); }
+    }
+    cmds.forEach((c) => { if (idx[c.id] === undefined) visit(c.id); });
+    // Tarjan emits components with dependencies first; inside a cycle sort by sequence number, then replica
+    return comps.map((comp) => comp.sort((a, b) => a.seq - b.seq || a.rep - b.rep));
+  }
+  showSrc('code12', [epaxosExecutionOrder]);
+  const presets12 = {
+    mix: [{ id: 'a', op: 'x := 1', seq: 1, rep: 1, deps: [] }, { id: 'b', op: 'y := 5', seq: 1, rep: 2, deps: [] }, { id: 'c', op: 'x := x + 1', seq: 2, rep: 5, deps: ['a'] }, { id: 'd', op: 'read y', seq: 2, rep: 3, deps: ['b'] }, { id: 'e', op: 'z := 9', seq: 1, rep: 4, deps: [] }],
+    none: [{ id: 'a', op: 'x := 1', seq: 1, rep: 1, deps: [] }, { id: 'b', op: 'y := 2', seq: 1, rep: 2, deps: [] }, { id: 'c', op: 'z := 3', seq: 1, rep: 3, deps: [] }, { id: 'd', op: 'w := 4', seq: 1, rep: 4, deps: [] }],
+    cycle: [{ id: 'a', op: 'x := 1', seq: 3, rep: 1, deps: ['b'] }, { id: 'b', op: 'x := 2', seq: 3, rep: 4, deps: ['a'] }, { id: 'c', op: 'x := x × 10', seq: 4, rep: 2, deps: ['a', 'b'] }, { id: 'd', op: 'y := 7', seq: 1, rep: 3, deps: [] }]
+  };
+  const d12 = reg(() => {
+    const cmds = presets12[$('sel12').value], N = val('n12'), f = (N - 1) / 2;
+    const order = epaxosExecutionOrder(cmds.map((c) => Object.assign({}, c, { deps: c.deps.slice() })));
+    const st = {}; order.flat().forEach((c) => { const m = /^(\w) := (.*)$/.exec(c.op); if (!m) return; const e = /^(\w) ([+×]) (\d+)$/.exec(m[2]); st[m[1]] = e ? (e[2] === '+' ? (st[e[1]] || 0) + +e[3] : (st[e[1]] || 0) * +e[3]) : +m[2]; });
+    H('t12', '<table class="mini"><tr><th>cmd</th><th>operation</th><th>seq</th><th>leader</th><th>deps</th></tr>' + cmds.map((c) => `<tr><td>${c.id}</td><td>${c.op}</td><td>${c.seq}</td><td>P${c.rep}</td><td>${c.deps.length ? '{' + c.deps.join(', ') + '}' : '∅'}</td></tr>`).join('') + '</table>');
+    H('r12', `execution order on every replica: <b>${order.map((comp) => comp.length > 1 ? '[cycle: ' + comp.map((c) => c.id).join(' → ') + ']' : comp[0].id).join(' → ')}</b> · final state ${Object.keys(st).sort().map((k) => k + ' = ' + st[k]).join(', ')} · N = ${N}: fast quorum ⌈3N/4⌉ = <b>${Math.ceil(3 * N / 4)}</b>, slow path ⌊N/2⌋+1 = <b>${Math.floor(N / 2) + 1}</b> (book's f-based formulas with f = ${f}: ⌈3f/4⌉ = ${Math.ceil(3 * f / 4)}, ⌊f/2⌋+1 = ${Math.floor(f / 2) + 1})`);
+  });
+  on('sel12', 'change', d12); bindRange('n12', d12);
+
+  // ================= 13 · Flexible Paxos =================
+  function binomAtLeast(n, k, pUp) { let s = 0; for (let i = k; i <= n; i++) { let c = 1; for (let j = 0; j < i; j++) c = c * (n - j) / (j + 1); s += c * Math.pow(pUp, i) * Math.pow(1 - pUp, n - i); } return s; }
+  const d13 = reg(() => {
+    const N = val('n13'); const qe = $('q213'); qe.max = String(N); const Q2 = Math.min(val('q213'), N); TX('q213o', String(Q2));
+    const unsafe = $('chk13').checked, Q1 = Math.max(1, N - Q2 + 1 - (unsafe ? 1 : 0)), p = val('p13') / 100;
+    const r = disjointPairs(N, Q1, Q2);
+    H('t13', `<table class="mini"><tr><th></th><th>quorum</th><th>survives failures</th><th>P(quorum available)</th></tr><tr><td>phase 1 (elect leader)</td><td>Q₁ = ${Q1}</td><td>${N - Q1}</td><td>${(binomAtLeast(N, Q1, 1 - p) * 100).toFixed(3)}%</td></tr><tr><td>phase 2 (replicate)</td><td>Q₂ = ${Q2}</td><td>${N - Q2}</td><td>${(binomAtLeast(N, Q2, 1 - p) * 100).toFixed(3)}%</td></tr></table>`);
+    const xs = [], e = [], rep = []; for (let q = 1; q <= N; q++) { xs.push(q); e.push(binomAtLeast(N, N - q + 1, 1 - p)); rep.push(binomAtLeast(N, q, 1 - p)); }
+    xyChart('c13', { xs, vx: Q2, pct: true, ymin: 0, ymax: 1, xlab: 'Q₂ (with Q₁ = N − Q₂ + 1)', series: [{ ys: e, col: 'c1', label: 'election quorum available', dots: true }, { ys: rep, col: 'c2', label: 'replication quorum available', dots: true }] });
+    H('r13', `Q₁ + Q₂ = ${Q1 + Q2} ${Q1 + Q2 > N ? '&gt;' : '≤'} N = ${N} · pairs checked <b>${r.pairs}</b> · disjoint phase-1/phase-2 pairs <b class="${r.dis ? 'bad' : 'good'}">${r.dis}</b> · ${r.dis ? tag(false, 'unsafe: a new leader may miss an accepted value') : tag(true, 'safe')} · replication waits for the ${Q2}${Q2 === 1 ? 'st' : Q2 === 2 ? 'nd' : Q2 === 3 ? 'rd' : 'th'} reply instead of the ${Math.floor(N / 2) + 1}${Math.floor(N / 2) + 1 === 2 ? 'nd' : Math.floor(N / 2) + 1 === 3 ? 'rd' : 'th'}`);
+  });
+  bindRange('n13', d13); bindRange('q213', d13); bindRange('p13', d13); on('chk13', 'change', d13);
+
+  // ================= 14 · generalised (register) Paxos =================
+  let G14;
+  function reset14() { G14 = { S: [0, 1, 2].map(() => [undefined, undefined, undefined, undefined]), C: [{ own: 'V', regs: [0, 2], cur: 0, val: null, p1: false }, { own: 'W', regs: [1, 3], cur: 1, val: null, p1: false }], log: [] }; }
+  reset14();
+  function p1a(server, r) {                    // server side of phase 1
+    if (server[r] !== undefined) return null;   // already written: cannot promise this register
+    for (let i = 0; i < r; i++) if (server[i] === undefined) server[i] = 'nil';
+    return server.slice();                      // registers written so far
+  }
+  function p2a(server, r, v) { if (server[r] !== undefined) return false; server[r] = v; return true; }
+  function quorumState(regs) {                  // regs: values of one register set on a quorum
+    if (regs.some((x) => x === 'nil')) return 'None';
+    const vals = regs.filter((x) => x !== undefined);
+    if (!vals.length) return 'Any';
+    if (vals.length === regs.length && vals.every((x) => x === vals[0])) return 'Decided ' + vals[0];
+    return 'Maybe ' + vals[0];
+  }
+  function phase1(ci, set, rOverride) {
+    const c = G14.C[ci]; if (rOverride != null) c.cur = rOverride;
+    const replies = set.map((s) => p1a(G14.S[s], c.cur)).filter(Boolean);
+    if (replies.length >= 2) {
+      let v = null; for (let i = 3; i >= 0; i--) { const got = replies.map((x) => x[i]).find((x) => x !== undefined && x !== 'nil'); if (got) { v = got; break; } }
+      c.val = v || c.own; c.p1 = true;
+      G14.log.push(`C${ci} P1A(R${c.cur}) to {${set.map((s) => 'S' + s).join(',')}}: ${replies.length} replies → will write <b>${c.val}</b>${v ? ' (read from a register: must adopt it)' : ' (nothing written: own value)'}`);
+    } else { c.p1 = false; G14.log.push(`<span class="bad">C${ci} P1A(R${c.cur}): only ${replies.length} replies → restart phase 1 with a higher register</span>`); const nx = c.regs.find((x) => x > c.cur); if (nx != null) c.cur = nx; }
+  }
+  function phase2(ci, set) {
+    const c = G14.C[ci]; if (!c.p1) { G14.log.push(`C${ci}: run phase 1 first`); return; }
+    const acks = set.filter((s) => p2a(G14.S[s], c.cur, c.val)).length;
+    if (acks >= 2) G14.log.push(`<span class="good">C${ci} P2A(R${c.cur}, ${c.val}): ${acks} acks → outputs decision ${c.val}</span>`);
+    else { G14.log.push(`<span class="bad">C${ci} P2A(R${c.cur}, ${c.val}): ${acks} acks (registers already nil/written) → back to phase 1</span>`); const nx = c.regs.find((x) => x > c.cur); if (nx != null) c.cur = nx; }
+    c.p1 = false;
+  }
+  const d14 = reg(() => {
+    const Qs = [[0, 1], [0, 2], [1, 2]], cell = (x) => x === undefined ? '<span style="color:var(--muted)">unwritten</span>' : x === 'nil' ? '<span class="tag n">nil</span>' : `<b>${x}</b>`;
+    let t = '<table class="mini"><tr><th>register</th><th>S0</th><th>S1</th><th>S2</th>' + Qs.map((q) => `<th>{S${q[0]},S${q[1]}}</th>`).join('') + '</tr>';
+    for (let r = 0; r < 4; r++) { t += `<tr><td>R${r} (C${r % 2})</td>` + [0, 1, 2].map((s) => `<td>${cell(G14.S[s][r])}</td>`).join('') + Qs.map((q) => { const st = quorumState(q.map((s) => G14.S[s][r])); return `<td>${tag(st.startsWith('Decided') ? true : st === 'None' ? false : null, st)}</td>`; }).join('') + '</tr>'; }
+    H('t14', t + '</table>');
+    H('lg14', G14.log.map((x) => `<div>${x}</div>`).join('') || '<div>Pick a client and servers, then run phase 1 and phase 2. Each client may only write registers it owns.</div>');
+  });
+  const set14 = () => $('sv14').value.split('').map(Number);
+  const reg14 = () => { const v = $('rg14').value; return v === 'auto' ? null : +v; };
+  on('p114', 'click', () => { const ci = +$('cl14').value, r = reg14(); if (r != null && r % 2 !== ci) { G14.log.push(`C${ci} does not own R${r}`); d14(); return; } phase1(ci, set14(), r); d14(); });
+  on('p214', 'click', () => { phase2(+$('cl14').value, set14()); d14(); });
+  on('rs14', 'click', () => { reset14(); d14(); });
+  on('bk14', 'click', () => { reset14(); phase1(0, [0, 1]); phase2(0, [0, 1]); G14.log.push('Book (Fig 14-9): {S0,S1} is Decided V; {S0,S2}, {S1,S2} are Maybe V. Now C1 arrives:'); phase1(1, [1, 2]); phase2(1, [1, 2]); d14(); });
+
+  // ================= global =================
+  function reseed() { R = rng(SEED); TX('seedOut', String(SEED)); }
+  on('reroll', 'click', () => { SEED = SEED * 7 % 997 + 3; reseed(); if (typeof reseedHooks !== 'undefined') reseedHooks.forEach((f) => f()); redrawAll(); });
+  reseed(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+
+
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

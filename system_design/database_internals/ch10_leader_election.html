@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.10 Leader Election</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* ---- ch10 additions (shared classes copied from the ch06 page for consistency) ---- */
+.flow { display: grid; gap: 8px; }
+.flow .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.flow .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.flow .node { border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; font-size: 14px; background: var(--paper); }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .node.bad { border-color: var(--sell); }
+.flow .arr { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.log { font-family: var(--mono); font-size: 12.5px; color: var(--muted); display: grid; gap: 3px; max-height: 260px; overflow: auto; }
+.log b { color: var(--ink); }
+.good { color: var(--buy); } .bad { color: var(--sell); }
+pre.code { font-variant-ligatures: none; font-family: var(--mono); font-size: 12.5px; line-height: 1.45; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; white-space: pre; max-width: 100%; }
+.box pre.code { background: var(--plate); }
+.beyond { background: var(--tint3); border-left: 3px solid var(--c3); }
+.beyond a, .connect a, footer a { color: var(--ink); }
+.note { font-size: 14px; color: var(--muted); }
+ol.plain { margin: 0; padding-left: 22px; display: grid; gap: 4px; max-width: 68ch; }
+code { font-family: var(--mono); font-size: .88em; }
+/* network diagrams drawn by drawNet() */
+.net { width: 100%; max-width: 560px; justify-self: center; display: block; }
+.net svg { width: 100%; height: auto; display: block; }
+.net .nd circle { fill: var(--plate); stroke: var(--ink); stroke-width: 1.6; }
+.net .nd.dead circle { stroke: var(--muted); stroke-dasharray: 3 3; }
+.net .nd.dead text { fill: var(--muted); }
+.net .nd.lead circle { fill: var(--c1); stroke: var(--c1); }
+.net .nd.lead text.id { fill: var(--plate); font-weight: 600; }
+.net .nd.cand circle { stroke: var(--c2); stroke-width: 2.6; }
+.net .nd.init circle { stroke: var(--c3); stroke-width: 3; }
+.net text.id { font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+.net text.lab { font-size: 12px; fill: var(--muted); text-anchor: middle; }
+.net text.cap { font-size: 11px; fill: var(--muted); }
+.net .cut { stroke: var(--sell); stroke-width: 2; stroke-dasharray: 6 5; }
+.keyrow { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.keyrow span::before { content: ""; display: inline-block; width: 16px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); }
+.steptext { font-size: 15px; min-height: 3.2em; }
+.nodebtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.nodebtns button { min-width: 34px; }
+.nodebtns button.off { text-decoration: line-through; opacity: .6; border-style: dashed; }
+.nodebtns button.on2 { border-color: var(--c2); box-shadow: inset 0 0 0 1px var(--c2); }
+table.cmp td.num { white-space: normal; min-width: 7ch; }
+@media (max-width: 560px) { .flow .tag { min-width: 100%; } .controls input[type=range] { width: 120px; } }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch09_failure_detection.html">← Ch.9 Failure Detection</a><a href="ch11_replication_and_consistency.html">Ch.11 Replication and Consistency →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals · Chapter 10 · pdf p327–339</div>
+  <h1>Leader election: pick one boss, <em>and only one</em></h1>
+  <p class="lede">Asking every node about every step is slow. A single leader makes most decisions cheap, but someone has to choose that leader, and choose a new one when it dies. This chapter walks through the classic ways to do it (bully, next-in-line failover, candidate/ordinary, invitation, ring), shows why every one of them can end up with two leaders when the network splits, and points at the real fix: a majority vote, which is consensus (Ch.14). Each algorithm below runs step by step on the page, and the message counts and timings are computed by the same code. Simulations are models with stated assumptions, not measurements.</p>
+  <div class="topbar"><button id="reroll" type="button">New random seed</button><span class="readout">seed #<b id="seedOut">1</b> · one seed feeds every random simulation on this page (flaky-node timelines, detection jitter, invitation merge order)</span></div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>Read each row as "the problem → the idea → what it still gets wrong". The last row is the punchline of the chapter: none of the algorithms here is safe on its own when the network partitions.</p>
+  <div class="flow" role="img" aria-label="Concept map of the chapter">
+    <div class="row"><span class="tag">Problem</span><span class="node">every step talks to every node → many messages, many round trips</span><span class="arr">→</span><span class="node key">one leader (coordinator) drives the steps</span></div>
+    <div class="row"><span class="tag">Need</span><span class="node">liveness: a leader exists most of the time, elections finish</span><span class="node">safety (wished for): at most one leader → no split brain</span></div>
+    <div class="row"><span class="tag">Rank-based</span><span class="node key">Bully: highest live rank wins</span><span class="arr">→ tweaks:</span><span class="node">next-in-line failover list</span><span class="node">candidate / ordinary sets + delay δ</span></div>
+    <div class="row"><span class="tag">Group-based</span><span class="node key">Invitation: leaders merge groups</span><span class="arr">→</span><span class="node">many leaders allowed by design</span></div>
+    <div class="row"><span class="tag">Topology</span><span class="node key">Ring: pass the live set (or the max) around</span><span class="arr">→</span><span class="node">second lap announces the winner</span></div>
+    <div class="row"><span class="tag">All of them</span><span class="node bad">network partition → each side elects its own leader (split brain)</span><span class="arr">fix →</span><span class="node key">cluster-wide majority = consensus (Ch.14)</span><span class="node">+ failure detection (Ch.9)</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Why a leader, and what election must do</a>
+    <a href="#s2"><span>02</span>Bully algorithm</a>
+    <a href="#s3"><span>03</span>Next-in-line failover</a>
+    <a href="#s4"><span>04</span>Candidate/ordinary optimization</a>
+    <a href="#s5"><span>05</span>Invitation algorithm</a>
+    <a href="#s6"><span>06</span>Ring algorithm</a>
+    <a href="#s7"><span>07</span>Summary: split brain, consensus, terms</a>
+    <a href="#s8"><span>08</span>Choosing between them (numbers, systems, papers)</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER 10 INTRODUCTION</div><h2>Why have a leader, and what an election has to guarantee</h2></div><span class="chip">pdf p327–328</span></div>
+  <p><b>The cost being avoided.</b> Synchronizing is expensive. If every step of an algorithm needs every participant to talk to every other one, the message count and the number of round trips grow quickly, and it is worst in big, geographically spread networks. So many algorithms assume a <b>leader</b> (also called a <b>coordinator</b>): one process that runs or coordinates the steps for everyone.</p>
+  <p><b>Who can lead.</b> Processes are normally all alike, so any of them can take the role. Leadership lasts a long time but is not permanent: usually a process stays leader <b>until it crashes</b>. After a crash, any other process may start a new <b>election round</b>, and if it wins, it takes over and continues the failed leader's work.</p>
+  <ul class="plain">
+    <li><b>Liveness</b> of an election algorithm: most of the time there is a leader, and an election eventually finishes (the system is not stuck "electing" forever).</li>
+    <li><b>Safety</b> (what we would like): <b>at most one leader at a time</b>, so there is never a <b>split brain</b>, where two leaders serving the same purpose are elected and don't know about each other. In practice, <b>many election algorithms break this</b>.</li>
+  </ul>
+  <p><b>What leaders are used for.</b> Getting a <b>total order of messages in a broadcast</b>: the leader collects and holds global state, receives messages and spreads them to the others. Coordinating <b>reorganization</b> after a failure, at start-up, or when important state changes.</p>
+  <p><b>When an election runs.</b> At initialization (the first leader), and when the previous leader crashes or stops communicating. The result must be <b>deterministic</b>: exactly one leader comes out, and the decision must take effect for <b>all</b> participants.</p>
+  <p><b>Election is not the same as a distributed lock</b>, even though both look like "exclusive ownership" in theory:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th></th><th>Distributed lock</th><th>Leader election</th></tr></thead>
+    <tbody>
+      <tr><td>Do others need to know who holds it?</td><td>No. Only that it will eventually be released (liveness).</td><td>Yes. The leader has special duties, so it must <b>announce itself</b> to its peers.</td></tr>
+      <tr><td>Preference for some processes?</td><td>Bad: a lock that prefers some processes will eventually <b>starve</b> the others, which breaks liveness.</td><td>Fine: the leader keeps the role until it stops or crashes, and <b>long-lived leaders are preferred</b>.</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Benefits of a stable leader:</b> no state synchronization between remote participants, fewer messages, and execution driven from one process instead of peer-to-peer coordination. <b>Downside:</b> the leader can become a <b>bottleneck</b>. Many systems answer that by splitting data into non-overlapping, independent <b>replica sets</b>, each with its own leader, instead of one leader for the whole system. Spanner works this way (Ch.13).</p>
+  <p><b>Leaders always fail eventually</b>, so the failure must be detected, reported and acted on by electing a replacement. Some consensus algorithms, <b>ZAB, Multi-Paxos and Raft</b>, use temporary leaders to cut the messages needed to agree, but each has its <b>own</b> way of electing a leader, detecting failure, and settling fights between competing leaders (Ch.14).</p>
+  <div class="box picture"><b>Picture it</b><p>A group of 8 friends planning a trip on a group chat. If every decision needs everyone to agree with everyone, the chat explodes. If one person is "the planner", everyone sends ideas to the planner, the planner decides and posts the plan once. If the planner's phone dies, the group needs to pick a new planner, and it must be <i>one</i> planner: two planners booking two different hotels is split brain.</p></div>
+  <div class="fig">
+    <h3>Measured cost: messages per decision, with and without a leader (modelled)</h3>
+    <canvas id="c1m" class="short" aria-label="Messages per decision versus number of nodes, all-to-all versus leader-based"></canvas>
+    <div class="legend" id="c1mL"></div>
+    <div class="controls"><label for="n1">nodes <input id="n1" type="range" min="3" max="100" value="9"><output id="n1o">9</output></label></div>
+    <div class="readout" id="r1"></div>
+    <p class="note">Model (not from the book): to order one update, an all-to-all scheme has every node send its view to every other node: n(n−1) messages in one round. A leader scheme sends the update to the leader (1 message), the leader sends it to the other n−1 nodes, and they acknowledge (n−1): 2n−1 messages, but two sequential one-way hops plus acks. Real protocols differ in details; the shape (quadratic vs linear) is the point.</p>
+  </div>
+  <div class="fig">
+    <h3>The bottleneck fix: one leader per partition (modelled)</h3>
+    <div class="controls">
+      <label for="p1">partitions <input id="p1" type="range" min="1" max="60" value="12"><output id="p1o">12</output></label>
+      <label for="q1">nodes <input id="q1" type="range" min="3" max="12" value="3"><output id="q1o">3</output></label>
+    </div>
+    <div class="readout" id="r1b"></div>
+    <p class="note">Assumption: each partition is a replica set spread over all nodes, and leaderships are spread evenly (round-robin). The busiest node leads ⌈P/N⌉ of the P partitions.</p>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>A leader turns an "everyone talks to everyone" problem into a "star" problem: the number of messages grows linearly instead of quadratically, and there is one place where order is decided, so there is no need to reconcile conflicting orders. The price is that the whole system now depends on one process being alive and reachable, and on everyone <i>agreeing</i> on who it is. Those two needs set up the rest of the chapter: how to detect that the leader is gone (Ch.9) and how to agree on a replacement without ending up with two.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.9 (failure detection) supplies the "the leader is gone" signal that starts every election in this chapter.</li>
+    <li>Ch.13 (Spanner) uses a leader per replica set; Ch.14 covers ZAB, Multi-Paxos and Raft, whose elections are built into the consensus protocol.</li>
+    <li>Your <code>Notes/syllabus.html</code> lists the Raft paper (Ongaro &amp; Ousterhout) under Academic Papers; Section 8 below quotes the election times that paper measured.</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · BULLY ALGORITHM</div><h2>Bully: the highest live rank wins</h2></div><span class="chip">pdf p329–330 · Fig 10-1 · footnote 1 p339</span></div>
+  <p>Every process gets a <b>unique rank</b>. In an election the process with the <b>highest rank</b> becomes leader [MOLINA82]. It is known for being simple. The name comes from the top-ranked node "bullying" everyone else into accepting it; it is also called <b>monarchial</b> leader election, because the highest-ranked sibling becomes monarch once the previous one is gone.</p>
+  <p>An election starts when a process notices there is <b>no leader</b> (never set up) or the leader <b>stopped answering</b>. The book uses the compact <b>modified bully</b> algorithm [KORDAFSHARI05] (footnote 1), with three steps:</p>
+  <ol class="plain">
+    <li>The process sends <b>Election</b> messages to every process with a <b>higher</b> identifier.</li>
+    <li>It waits for higher-ranked processes to answer. If <b>none</b> answers, it goes to step 3 itself. Otherwise it tells the <b>highest-ranked process it heard from</b>, and lets that one do step 3.</li>
+    <li>The process (now assuming nobody alive outranks it) <b>tells every lower-ranked process</b> that it is the new leader.</li>
+  </ol>
+  <p><b>The book's example (Fig 10-1).</b> Leader 6 crashes; process 3 notices and sends Election to 4, 5 and 6. Processes 4 and 5 answer Alive, since they outrank 3. Process 3 tells the highest one that answered, 5. Process 5 becomes leader and sends Elected to the lower-ranked processes.</p>
+  <div class="fig">
+    <h3>Run it: bully election, one step at a time</h3>
+    <div class="net" id="b2Net" aria-label="Bully election network diagram"></div>
+    <div class="keyrow" id="b2Key"></div>
+    <div class="steptext" id="b2Text"></div>
+    <div class="controls">
+      <button id="b2Back" type="button">◀ Back</button><button id="b2Step" type="button">Next step ▶</button><button id="b2Reset" type="button">Reset</button>
+      <label for="b2N">nodes <input id="b2N" type="range" min="4" max="10" value="6"><output id="b2No">6</output></label>
+      <label for="b2I">initiator <input id="b2I" type="range" min="1" max="10" value="3"><output id="b2Io">3</output></label>
+    </div>
+    <div class="controls"><span class="note">click a node to crash / revive it:</span><div class="nodebtns" id="b2Nodes"></div></div>
+    <div class="readout" id="b2R"></div>
+  </div>
+  <p><b>Problem 1: split brain.</b> Bully breaks safety (at most one leader) when the network <b>partitions</b>. Nodes easily end up in two or more groups that keep working independently, and each group elects its own leader.</p>
+  <div class="fig">
+    <h3>Try it: cut the network and count the leaders</h3>
+    <div class="net" id="pt2Net" aria-label="Partitioned cluster diagram"></div>
+    <div class="controls">
+      <label for="pt2N">nodes <input id="pt2N" type="range" min="3" max="10" value="6"><output id="pt2No">6</output></label>
+      <label for="pt2K">nodes left of the cut <input id="pt2K" type="range" min="0" max="9" value="3"><output id="pt2Ko">3</output></label>
+    </div>
+    <div class="readout" id="pt2R"></div>
+  </div>
+  <p><b>Problem 2: a flaky top-ranked node.</b> Bully strongly prefers high ranks. If a high-ranked node is unstable, the system can be stuck re-electing forever: it proposes itself, wins, crashes soon after, comes back, wins again, crashes again, and so on. The book's fix: <b>share host quality metrics</b> and take them into account during the election.</p>
+  <div class="fig">
+    <h3>Simulate it: who is leader over time, rank-only vs rank + quality (simulated)</h3>
+    <canvas id="fl2" class="short" aria-label="Leader identity over time for two election policies"></canvas>
+    <div class="legend" id="fl2L"></div>
+    <div class="controls">
+      <label for="fl2U">node 5 mean uptime (s) <input id="fl2U" type="range" min="10" max="600" step="10" value="90"><output id="fl2Uo">90</output></label>
+      <label for="fl2D">mean downtime (s) <input id="fl2D" type="range" min="2" max="120" value="20"><output id="fl2Do">20</output></label>
+      <label for="fl2E">leaderless time per election (s) <input id="fl2E" type="range" min="1" max="15" value="2"><output id="fl2Eo">2</output></label>
+    </div>
+    <div class="readout" id="fl2R"></div>
+    <p class="note">Model (mine, not the book's): 5 nodes; nodes 1–4 never fail; node 5 alternates up/down with exponentially distributed durations. Rank-only = bully: whenever node 5 comes back it calls an election and takes over; when it dies, an election picks 4. Rank + quality = a node only stands if it has been up for the whole last 300 s, so node 5 rarely qualifies and 4 keeps the job. Each leader change costs the "leaderless time" you set. The chart shows the first 30 minutes of one run; the readout pools 40 one-hour runs.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A queue at a passport office where the person with the highest ticket number always gets served first. If that person keeps running out to feed the parking meter and coming back, the clerk keeps stopping whatever they were doing to serve them again. Looking at "how reliable is this person?" and not just "what is their number?" stops the churn.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The algorithm leans entirely on two assumptions: <b>ranks are a total order everybody agrees on</b>, and <b>silence means death</b>. The first makes the result deterministic: if everyone sees the same live set, everyone computes the same maximum. The second is where it breaks: "no answer before the timeout" can mean crashed, slow, or on the other side of a broken link. In step 2, if the higher nodes are only unreachable, the initiator happily declares itself leader. Nothing in the protocol asks "do enough of us agree?", so two disconnected halves both finish successfully. Messages: with initiator i out of n nodes and the old leader n dead, step 1 sends n−i Election messages, step 2 gets back up to n−i−1 Alive replies, then one "you're highest" message, then the winner sends Elected to everyone below it. Starting from the lowest rank that is about 3n messages, but only four sequential hops plus one timeout.</p></div>
+  <details><summary>How to build it: the step generator the simulator runs (JavaScript)</summary>
+<pre class="code">// Modified bully (book, footnote 1). Returns the messages of each step.
+// up(x) = "x is alive and reachable"; lost messages still count as sent.
+function bullySteps(n, init, up) {
+  const S = [], higher = range(init + 1, n);           // ranks above me
+  S.push({ msgs: higher.map(t =&gt; ({ f: init, t, k: 'elect', lost: !up(t) })) });
+  const alive = higher.filter(up);                       // who answered before timeout
+  let leader = init;
+  if (alive.length) {
+    S.push({ msgs: alive.map(f =&gt; ({ f, t: init, k: 'alive' })) });
+    leader = Math.max(...alive);                         // highest one I heard from
+    S.push({ msgs: [{ f: init, t: leader, k: 'notify' }] });
+  }
+  S.push({ leader, msgs: range(1, leader - 1)            // step 3: tell lower ranks
+           .map(t =&gt; ({ f: leader, t, k: 'elected', lost: !up(t) })) });
+  return S;
+}</pre></details>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li><b>Classic vs modified bully.</b> In Garcia-Molina's original algorithm, every higher-ranked process that receives an Election message starts its <i>own</i> election up the chain, so several elections cascade at once; in the worst case (lowest rank starts) that costs O(n²) messages. The modified version the book uses lets the initiator pick the highest responder, which keeps it linear. The O(n²) worst case is the standard textbook analysis, not stated in this book.</li>
+    <li><b>Where a bully-like rule still appears.</b> ZooKeeper's leader election votes for the server with the most up-to-date state, comparing (epoch, last transaction id, server id) in that order, so server id acts as a final rank tiebreaker; but a winner still needs a <b>quorum</b> of votes, which is what makes it safe. Elasticsearch before 7.0 had a <code>discovery.zen.minimum_master_nodes</code> setting that operators had to set to a majority of master-eligible nodes, or a partition could elect two masters; 7.0 replaced it with a quorum-based cluster coordination layer that tracks the voting set automatically.</li>
+    <li><b>Quality metrics in real systems.</b> MongoDB replica sets let you give members a <code>priority</code> (default 1; priority 0 can never become primary), which is a human-set version of "don't elect the weak host".</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.9: the "stopped answering" signal is a failure detector; a too-short timeout makes bully elect while the old leader is merely slow.</li>
+    <li>Sections 3 and 4 are two tweaks of this algorithm; Section 7 explains why the book says <i>all</i> of them are exposed to split brain.</li>
+    <li>Papers: Garcia-Molina, "Elections in a Distributed Computing System", IEEE Transactions on Computers 31(1), 1982 [MOLINA82], the origin of bully and of thinking about elections under failures. Kordafshari et al., "Modified bully election algorithm in distributed systems", WSEAS ICCOMP '05 [KORDAFSHARI05], the three-step version used here.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · NEXT-IN-LINE FAILOVER</div><h2>Next-in-line: the old leader names its successors in advance</h2></div><span class="chip">pdf p331–332 · Fig 10-2</span></div>
+  <p>Many versions of bully improve one property or another. One of them keeps a short list of <b>next-in-line alternative</b> processes, so re-elections are shorter [GHOLIPOUR09].</p>
+  <ul class="plain">
+    <li>Every elected leader publishes a <b>list of failover nodes</b>.</li>
+    <li>When a process detects that the leader failed, it starts a new round by messaging the <b>highest-ranked alternative</b> on the list the failed leader gave out.</li>
+    <li>If one of the listed alternatives is up, it becomes leader <b>without a complete election round</b>.</li>
+    <li>If the process that noticed the failure is itself the <b>highest-ranked process on the list</b>, it can announce itself as the new leader immediately.</li>
+  </ul>
+  <p><b>The book's example (Fig 10-2).</b> Leader 6 has alternatives {5, 4} and crashes. Process 3 notices and contacts 5, the highest alternative. Process 5 answers that it is alive, so 3 does not go on to contact anyone else on the list. Process 5 tells the other nodes it is the new leader (and, in the figure, now carries its own list {4, 3}). The result: <b>fewer steps</b> whenever the next-in-line process is alive.</p>
+  <div class="fig">
+    <h3>Run it: failover through the successor list</h3>
+    <div class="net" id="nl3Net" aria-label="Next-in-line failover network diagram"></div>
+    <div class="steptext" id="nl3Text"></div>
+    <div class="controls">
+      <button id="nl3Back" type="button">◀ Back</button><button id="nl3Step" type="button">Next step ▶</button><button id="nl3Reset" type="button">Reset</button>
+      <label for="nl3I">detector <input id="nl3I" type="range" min="1" max="5" value="3"><output id="nl3Io">3</output></label>
+    </div>
+    <div class="controls"><span class="note">6 nodes, leader 6 has crashed, its list is {5, 4}. Click to crash / revive:</span><div class="nodebtns" id="nl3Nodes"></div></div>
+    <div class="readout" id="nl3R"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A team lead going on leave writes "if I'm unreachable, ask Priya; if Priya is out, ask Ravi" on the whiteboard. Nobody has to hold a team-wide vote: the first person who notices calls Priya, Priya says "I've got it", and Priya posts in the team channel.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The leader does the expensive part of the election <i>ahead of time</i>, while everything is calm: it already knows who is alive and highly ranked, so it writes down the answer. At failure time the detector only has to <b>confirm</b> one candidate (one round trip) instead of <b>discovering</b> the maximum (one message to every higher rank and a wait for replies). In Fig 10-2 that is 1 + 1 + 4 = 6 messages against 3 + 2 + 1 + 4 = 10 for plain bully, and three hops instead of four. The list can be stale, though: if every listed alternative is down, the detector wastes a timeout per dead entry. The book doesn't say what happens next; the simulator then falls back to a full bully election (my assumption). And it is still not safe: two detectors on opposite sides of a partition can each reach a different listed alternative.</p></div>
+  <details><summary>How to build it: next-in-line step generator (JavaScript)</summary>
+<pre class="code">// alts: list published by the failed leader, highest rank first, e.g. [5, 4]
+function nextInLineSteps(n, init, alts, failed, up) {
+  const S = [], others = range(1, n).filter(x =&gt; x !== failed);
+  for (const a of alts) {
+    if (a === init) {                                   // I am top of the list
+      S.push({ leader: init, msgs: others.filter(x =&gt; x !== init)
+               .map(t =&gt; ({ f: init, t, k: 'elected', lost: !up(t) })) });
+      return S;
+    }
+    S.push({ msgs: [{ f: init, t: a, k: 'elect', lost: !up(a) }] });
+    if (up(a)) {
+      S.push({ msgs: [{ f: a, t: init, k: 'alive' }] }); // "I'm alive, stop here"
+      S.push({ leader: a, msgs: others.filter(x =&gt; x !== a)
+               .map(t =&gt; ({ f: a, t, k: 'elected', lost: !up(t) })) });
+      return S;
+    }                                                   // dead: timeout, try next
+  }
+  return S.concat(bullySteps(n, init, up));            // list exhausted (my fallback)
+}</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 2: same ranks and same Elected broadcast; only the discovery step is replaced by a pre-computed answer.</li>
+    <li>Ch.11 (replication): primary/replica databases often name a preferred failover replica in configuration, the same idea done by an operator instead of by the leader.</li>
+    <li>Paper: Gholipour, Kordafshari, Jahanshahi, Rahmani, "A New Approach For Election Algorithm in Distributed Systems", 2nd Int. Conf. on Communication Theory, Reliability, and Quality of Service, IEEE, 2009 [GHOLIPOUR09]. The source of the failover-list idea.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · CANDIDATE/ORDINARY OPTIMIZATION</div><h2>Candidate/ordinary: only a few nodes may lead</h2></div><span class="chip">pdf p333 · Fig 10-3</span></div>
+  <p>This variant cuts messages by splitting nodes into two sets: <b>candidates</b> and <b>ordinary</b> nodes. Only a candidate can end up as leader [MURSHED12].</p>
+  <ul class="plain">
+    <li>An <b>ordinary</b> process starts the election by contacting the candidate nodes, collecting their answers, picking the <b>highest-ranked live candidate</b>, and then telling all the other nodes the result.</li>
+    <li><b>Several elections at once</b> are a problem (several ordinary nodes may notice the failure together). The fix is a tiebreaker <b>δ</b>: a <b>per-process delay</b> that differs a lot between nodes, so one node starts its election before the others.</li>
+    <li>δ is generally <b>larger than the message round-trip time</b>. Nodes with <b>higher priority get a smaller δ</b>, and vice versa.</li>
+  </ul>
+  <p><b>The book's example (Fig 10-3).</b> Candidates are {1, 2, 6}; ordinary nodes are {3, 4, 5}. Note that candidate membership has nothing to do with rank: 1 and 2 are candidates while 5 is not. Leader 6 fails; ordinary process 4 notices and contacts the remaining candidates (1 and 2). Both answer that they are alive. Process 4 tells everyone the new leader is <b>2</b>, the highest-ranked live candidate.</p>
+  <div class="fig">
+    <h3>Run it: an ordinary node elects among candidates</h3>
+    <div class="net" id="co4Net" aria-label="Candidate and ordinary sets network diagram"></div>
+    <div class="steptext" id="co4Text"></div>
+    <div class="controls">
+      <button id="co4Back" type="button">◀ Back</button><button id="co4Step" type="button">Next step ▶</button><button id="co4Reset" type="button">Reset</button>
+      <label for="co4I">initiator <input id="co4I" type="range" min="1" max="6" value="4"><output id="co4Io">4</output></label>
+      <label for="co4C">candidate set <select id="co4C"><option value="1,2,6">{1, 2, 6} (book)</option><option value="4,5,6">{4, 5, 6}</option><option value="2,6">{2, 6}</option><option value="1,2,3,4,5,6">everyone (= bully-like)</option></select></label>
+    </div>
+    <div class="controls"><span class="note">leader 6 has crashed. Click to crash / revive:</span><div class="nodebtns" id="co4Nodes"></div></div>
+    <div class="readout" id="co4R"></div>
+  </div>
+  <div class="fig">
+    <h3>Simulate it: how big must δ be to stop duplicate elections? (simulated)</h3>
+    <canvas id="dl4" class="short" aria-label="Share of trials with more than one election versus delta step"></canvas>
+    <div class="legend" id="dl4L"></div>
+    <div class="controls">
+      <label for="dl4Rtt">round trip (ms) <input id="dl4Rtt" type="range" min="2" max="200" value="20"><output id="dl4Rtto">20</output></label>
+      <label for="dl4J">detection spread (ms) <input id="dl4J" type="range" min="0" max="300" value="50"><output id="dl4Jo">50</output></label>
+      <label for="dl4D">δ step (ms) <input id="dl4D" type="range" min="0" max="200" value="30"><output id="dl4Do">30</output></label>
+    </div>
+    <div class="readout" id="dl4R"></div>
+    <p class="note">Model (mine): 3 ordinary nodes notice the leader's death at random times spread uniformly over the "detection spread". The node with priority p (0 = highest) waits δ = p × step before starting. A node that has not started yet stands down once it hears an election is running; I assume that news reaches it one full round trip after the first node starts (its message out to the candidates, and the answer back to anyone who asks). A trial counts as a duplicate if two or more nodes start. 2,000 trials per point, same seed for every point.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A cricket team where only the vice-captain, the senior batsman and the wicket-keeper are allowed to captain. When the captain gets injured, any player can walk over to those three, check who is fit, and announce the stand-in. If three players notice at once, the rule "the most senior player waits least before speaking" stops three announcements colliding.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Two separate savings. <b>Fewer messages</b>: the initiator polls only the candidate set (size c) rather than every higher rank, so discovery costs about 2c messages, not about 2n. <b>Fewer collisions</b>: δ turns "everyone starts at once" into a staggered queue. The gap between neighbours in that queue must exceed the time it takes the first starter's news to reach the next one; otherwise the next node starts before it hears anything. That is why δ is set above the round-trip time, and why it has to be large compared to the jitter in when nodes <i>detect</i> the failure: if detection itself is spread over 200 ms, a 20 ms stagger barely helps. The δ chart shows exactly that: duplicate elections fall to almost zero only when the step clears both the delay and the detection spread. Safety under partition is unchanged: two ordinary nodes on opposite sides can still each crown a different candidate.</p></div>
+  <details><summary>How to build it: candidate/ordinary step generator (JavaScript)</summary>
+<pre class="code">function candidateSteps(n, init, cands, failed, up) {
+  const S = [], ask = cands.filter(c =&gt; c !== failed &amp;&amp; c !== init);
+  S.push({ msgs: ask.map(t =&gt; ({ f: init, t, k: 'elect', lost: !up(t) })) });
+  const alive = ask.filter(up);
+  S.push({ msgs: alive.map(f =&gt; ({ f, t: init, k: 'alive' })) });
+  if (cands.includes(init)) alive.push(init);
+  const leader = alive.length ? Math.max(...alive) : null;   // highest live candidate
+  S.push({ leader, msgs: range(1, n).filter(x =&gt; x !== init &amp;&amp; x !== failed)
+           .map(t =&gt; ({ f: init, t, k: 'elected', lost: !up(t) })) });
+  return S;
+}
+// tiebreaker: wait delta(priority) before starting; stand down if you hear one
+const delta = (priority, step) =&gt; priority * step;   // keep step &gt; RTT</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 2: same "highest rank wins" rule, applied to a smaller set.</li>
+    <li>Section 7 / Ch.14: Raft avoids simultaneous candidates with the same trick in random form: each server waits a <i>randomized</i> election timeout before standing (beyond the book here; numbers in Section 8).</li>
+    <li>Real-world shape (beyond the book): MongoDB members with <code>priority: 0</code> are "ordinary" in this sense (they vote but can never become primary), and ZooKeeper observers never vote or lead.</li>
+    <li>Paper: Murshed &amp; Allen, "Enhanced Bully Algorithm for Leader Node Election in Synchronous Distributed Systems", <i>Computers</i> 1(1):3–23, 2012 [MURSHED12]. Note the title says <i>synchronous</i>: the δ trick assumes bounded message delays.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · INVITATION ALGORITHM</div><h2>Invitation: don't outrank, merge</h2></div><span class="chip">pdf p334–335 · Fig 10-4</span></div>
+  <p>Instead of trying to outrank each other, processes <b>invite</b> others to join their group. The algorithm allows <b>multiple leaders by definition</b>, because every group has its own leader.</p>
+  <ul class="plain">
+    <li>Each process starts as the leader of a new group whose only member is itself.</li>
+    <li>Group leaders contact peers outside their group and invite them to join.</li>
+    <li>If the contacted peer is a <b>leader</b> itself, the two groups <b>merge</b>. If it is not, it replies with its <b>group leader's ID</b>, so the two leaders can talk directly and merge in fewer steps.</li>
+  </ul>
+  <p><b>The book's example (Fig 10-4).</b> (a) Four processes each lead a group of one; 1 invites 2, and 3 invites 4. (b) 2 joins 1's group and 4 joins 3's group. Then 1, leader of the first group, contacts 3, leader of the other, and the remaining member (4) is told about its new leader. (c) The two groups are merged and 1 leads the larger group.</p>
+  <p><b>Who leads a merged group?</b> It does not matter for correctness whether the inviter or the invitee becomes leader. To keep messages low, the leader of the <b>larger</b> group should lead the merged one, so only the members of the <b>smaller</b> group need to be told about the change. Like the other algorithms, processes can settle into several groups with several leaders. Its strength: groups can be created and merged <b>without starting an election from scratch</b>, so finishing an election takes fewer messages.</p>
+  <div class="fig">
+    <h3>Run it: groups invite and merge</h3>
+    <div class="net" id="iv5Net" aria-label="Invitation algorithm groups diagram"></div>
+    <div class="steptext" id="iv5Text"></div>
+    <div class="controls">
+      <button id="iv5Back" type="button">◀ Back</button><button id="iv5Step" type="button">Next step ▶</button><button id="iv5Reset" type="button">Reset</button>
+      <label for="iv5N">nodes <input id="iv5N" type="range" min="4" max="12" value="4"><output id="iv5No">4</output></label>
+      <label for="iv5P">merged group led by <select id="iv5P"><option value="big">leader of the larger group</option><option value="inv">always the inviter</option></select></label>
+    </div>
+    <div class="readout" id="iv5R"></div>
+    <p class="note">With 4 nodes the steps follow Fig 10-4. With more nodes, groups are paired up in random order each round (seed above), and the inviter contacts a random member of the other group, which may or may not be its leader.</p>
+  </div>
+  <div class="fig">
+    <h3>Measured cost: notifications per full merge, larger-leads vs inviter-leads (simulated)</h3>
+    <canvas id="iv5c" class="short" aria-label="Notification messages versus number of nodes for two merge policies"></canvas>
+    <div class="legend" id="iv5cL"></div>
+    <div class="controls"><label for="iv5S">merge order <select id="iv5S"><option value="pairs">random pairs each round</option><option value="chain">one by one: a newcomer invites the big group</option></select></label></div>
+    <div class="readout" id="iv5Calc"></div>
+    <p class="note">Each point averages 60 runs that merge n singleton groups into one group. "Random pairs" pairs up the current groups at random every round, so merged groups tend to be similar in size and the two policies stay close. "One by one" is the bad case for inviter-leads: each newcomer invites the big group and, if the inviter always leads, everyone already in it must be told. Notifications = messages telling members of the absorbed group about their new leader. Invitations, leader-ID replies and accepts are counted separately in the readout.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>Two WhatsApp groups planning the same event. Instead of everyone voting on a single admin, the two admins agree to merge. If one group has 40 people and the other 3, it is cheaper to move the 3 into the big group and post one "welcome, your new admin is X" message to those 3 than to tell all 40 that their admin changed.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The invitation algorithm gives up the goal of "one leader" as a hard rule and treats leadership as something that converges by merging. That makes it naturally partition-tolerant in a <i>liveness</i> sense (each side keeps working with its own leader) and naturally <i>unsafe</i> (there are several leaders, on purpose). The "larger group leads" rule is the same trick as union-by-size in a union-find structure: always relabel the smaller set. Each node can be relabelled only when its group at least doubles in size, so a node is notified at most log₂ n times, and the total notification count is O(n log n) in the worst case. If the inviter always leads, a big group joining a small inviter forces many relabels, and the total can grow towards O(n²). On random pairings the two policies stay close; switch the chart to "one by one" to see inviter-leads grow like n²/2 while larger-leads sends none. (The union-find analysis is mine, not the book's.)</p></div>
+  <details><summary>How to build it: one merge (JavaScript)</summary>
+<pre class="code">// group[x] = leader id of x. Inviter leader a contacts some member m of another group.
+function merge(group, a, m, policy, count) {
+  let b = group[m];
+  if (b !== m) { count.reply++; }                 // m is not a leader: replies "my leader is b"
+  count.invite++; count.accept++;                 // a invites b, b accepts
+  const A = members(group, a), B = members(group, b);
+  const keep = policy === 'big' &amp;&amp; B.length &gt; A.length ? b : a;
+  const moved = keep === a ? B : A;               // the group whose leader changes
+  for (const x of moved) {
+    group[x] = keep;
+    if (x !== (keep === a ? b : a)) count.notify++; // old leader already knows
+  }
+}</pre></details>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Section 7: the book's summary says all these algorithms can end with several leaders; here it is the explicit design.</li>
+    <li>Ch.12 (gossip and group membership) uses similar "merge views when you meet" ideas.</li>
+    <li>Beyond the book (from memory, not re-checked): the invitation algorithm is usually credited to Garcia-Molina's same 1982 paper [MOLINA82], presented there for asynchronous systems where bully's timing assumptions fail. Union-by-size is the classic union-find heuristic (Tarjan's analysis, any algorithms textbook).</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · RING ALGORITHM</div><h2>Ring: pass the live set around, then announce the max</h2></div><span class="chip">pdf p336–337 · Fig 10-5</span></div>
+  <p>In the ring algorithm [CHANG79], all nodes form a ring and know its layout: each one knows its predecessor and successor.</p>
+  <ul class="plain">
+    <li>A process that detects the leader's failure starts an election. The election message travels around the ring: each process sends it to its <b>successor</b>, the next node in the ring.</li>
+    <li>If the successor is unavailable, the process <b>skips</b> it and tries the next one after it, and so on, until one answers.</li>
+    <li>Each node <b>adds itself</b> to the collected <b>live node set</b> before passing it on, like the timeout-free failure detector in Ch.9, where nodes append their ID to a path.</li>
+    <li>The message makes a <b>full lap</b>. When it returns to the initiator, the <b>highest-ranked node in the live set</b> is the leader, and the initiator sends a second round of messages around the ring to announce it.</li>
+  </ul>
+  <p><b>The book's example (Fig 10-5).</b> Leader 6 failed; each process has its own view of the ring. Process 3 starts: 3 → 4 → 5 with the set growing {3}, {3,4}, {3,4,5}. Process 5 cannot reach 6, so it skips to 1, then 2, and the full set {3,4,5,1,2} returns to 3. Since 5 is the highest rank, 3 sends a second lap announcing "5".</p>
+  <p><b>Variant.</b> Carry only the <b>highest identifier seen so far</b> instead of the whole set, to save space. Because <code>max</code> is commutative (the order you see the IDs in doesn't change the result), the current maximum is all you need. When the message gets back to the initiator, that maximum goes round the ring once more.</p>
+  <p><b>Still unsafe.</b> The ring can be partitioned into two or more parts, and each may elect its own leader.</p>
+  <p><b>The closing point.</b> For a leader-based system to work, everyone must know whether the current leader is alive, because it must be alive and reachable to do its job. To notice leader crashes we use failure-detection algorithms (Ch.9).</p>
+  <div class="fig">
+    <h3>Run it: one lap to collect, one lap to announce</h3>
+    <div class="net" id="rg6Net" aria-label="Ring election diagram"></div>
+    <div class="steptext" id="rg6Text"></div>
+    <div class="controls">
+      <button id="rg6Back" type="button">◀ Back</button><button id="rg6Step" type="button">Next step ▶</button><button id="rg6Reset" type="button">Reset</button>
+      <label for="rg6I">initiator <input id="rg6I" type="range" min="1" max="6" value="3"><output id="rg6Io">3</output></label>
+      <label for="rg6V">message carries <select id="rg6V"><option value="set">the live set (book)</option><option value="max">only the max (variant)</option></select></label>
+    </div>
+    <div class="controls"><span class="note">6 nodes in ring order 1→2→…→6→1. Click to crash / revive:</span><div class="nodebtns" id="rg6Nodes"></div></div>
+    <div class="readout" id="rg6R"></div>
+  </div>
+  <div class="fig">
+    <h3>Measured cost: payload of the collecting lap, set vs max (modelled)</h3>
+    <div class="controls"><label for="rg6M">live nodes <input id="rg6M" type="range" min="3" max="500" value="50"><output id="rg6Mo">50</output></label>
+      <label for="rg6B">bytes per id <input id="rg6B" type="range" min="2" max="16" value="8"><output id="rg6Bo">8</output></label></div>
+    <div class="readout" id="rg6C"></div>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A class passing a sign-up sheet along the rows. Each student writes their name and passes it on; if someone is absent, you hand it to the next person. When the sheet comes back to whoever started it, they read off the tallest-ranked name and send a second note round: "it's Kiran". The variant is a sticky note that just says "highest so far: Kiran", crossed out and rewritten whenever someone outranks it.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>The ring trades <b>latency</b> for <b>simplicity</b>. Every step is a single point-to-point message, so the total is small (about one message per live node per lap, ≈ 2n, plus one wasted try per dead node). But the steps are strictly <b>sequential</b>: an election takes about 2n one-way delays, plus a timeout each time a dead successor has to be skipped. Bully finishes in four hops whatever n is. Carrying the whole set costs 1 + 2 + … + n ids on the first lap (≈ n²/2), carrying the max costs n ids: the variant works because max is associative and commutative, so it can be computed incrementally. The set has one advantage: every node on the second lap could learn the full membership (handy for skipping dead nodes without new timeouts); the simulator uses that for the set version only (my modelling choice, not stated in the book).</p></div>
+  <details><summary>How to build it: ring election step generator (JavaScript)</summary>
+<pre class="code">function ringSteps(n, init, dead, carryMax) {
+  const S = [], next = x =&gt; x % n + 1;
+  let cur = init, set = [init];
+  while (true) {                                          // lap 1: collect
+    const msgs = []; let t = next(cur);
+    while (dead.has(t)) { msgs.push({ f: cur, t, k: 'elect', lost: true }); t = next(t); }
+    msgs.push({ f: cur, t, k: 'elect', pay: carryMax ? Math.max(...set) : [...set] });
+    S.push({ msgs });
+    if (t === init) break;
+    set.push(t); cur = t;
+  }
+  const leader = Math.max(...set);
+  cur = init;                                             // lap 2: announce
+  do {
+    const msgs = []; let t = next(cur);
+    while (dead.has(t)) {                                 // max-only: must probe again
+      if (carryMax) msgs.push({ f: cur, t, k: 'elected', lost: true });
+      t = next(t);
+    }
+    msgs.push({ f: cur, t, k: 'elected', pay: leader });
+    S.push({ leader, msgs }); cur = t;
+  } while (cur !== init);
+  return S;
+}</pre></details>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>The book describes a single initiator. The classic ring election problem lets <i>every</i> node start at once. Chang &amp; Roberts' algorithm drops any message carrying an ID smaller than the receiver's own, which gives O(n log n) messages on average but O(n²) in the worst case. Hirschberg &amp; Sinclair (CACM 23(11), 1980) send probes both ways around the ring at doubling distances and get O(n log n) worst case.</li>
+    <li>The ring idea survives in structured overlays and consistent-hash rings (Amazon's Dynamo paper, Cassandra), but those use the ring for <i>data placement</i>, not for leader election.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.9: the timeout-free failure detector passes an accumulating path the same way.</li>
+    <li>Ch.12: anti-entropy and gossip spread information by repeated point-to-point messages too, but in random order rather than around a fixed ring.</li>
+    <li>Paper: Chang &amp; Roberts, "An improved algorithm for decentralized extrema-finding in circular configurations of processes", CACM 22(5):281–283, 1979 [CHANG79]. Two pages long; a good first distributed-algorithms paper to read in full.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · SUMMARY &amp; FURTHER READING</div><h2>Every algorithm here can split-brain; a majority vote is the fix</h2></div><span class="chip">pdf p338–339</span></div>
+  <ul class="plain">
+    <li><b>Why bother:</b> a designated leader lowers coordination overhead and speeds algorithms up. Election rounds can be expensive, but they are <b>rare</b>, so they don't hurt overall performance.</li>
+    <li><b>Bottleneck:</b> a single leader can become one, usually solved by <b>partitioning data with per-partition leaders</b>, or by using <b>different leaders for different actions</b>.</li>
+    <li><b>The flaw shared by all of them:</b> every algorithm in this chapter is prone to <b>split brain</b>: two leaders in separate subnets that don't know about each other. To avoid it, an election must win a <b>cluster-wide majority of votes</b>.</li>
+    <li><b>Election = consensus.</b> Multi-Paxos and Raft use a leader for coordination. But to elect a leader we must reach consensus on its identity, and if we can reach consensus on that, the same method can reach consensus on anything [ABRAHAM13].</li>
+    <li><b>Stale knowledge.</b> The leader can change without a process knowing, so a process must ask whether its local idea of "who leads" is still valid. That means combining election with <b>failure detection</b>. Example: the <b>stable leader election</b> algorithm uses rounds with a unique stable leader and timeout-based failure detection, so a leader keeps its place as long as it doesn't crash and stays reachable [AGUILERA01].</li>
+    <li><b>Allowing several leaders on purpose.</b> Algorithms built on election often <i>allow</i> multiple leaders and resolve conflicts quickly. In <b>Multi-Paxos</b>, of two conflicting leaders (proposers) only one can proceed: conflicts are resolved by collecting a <b>second quorum</b>, which guarantees values from two different proposers won't both be accepted. In <b>Raft</b>, a leader can find out its <b>term</b> is out of date, which means another leader exists, and it updates its term to the newer one.</li>
+    <li><b>The design stance:</b> in both cases a leader exists to give <b>liveness</b> (a failed leader must be replaced, and processes shouldn't take forever to decide whether it really failed). Lacking safety and allowing several leaders is a <b>performance optimization</b>: the algorithm can go ahead with replication, and safety comes from <b>detecting and resolving conflicts</b>. Ch.14 covers election inside consensus in detail.</li>
+  </ul>
+  <div class="fig">
+    <h3>Try it: the same partition, with and without a majority rule</h3>
+    <div class="net" id="q7Net" aria-label="Partition with majority quorum diagram"></div>
+    <div class="controls">
+      <label for="q7N">nodes <input id="q7N" type="range" min="3" max="10" value="5"><output id="q7No">5</output></label>
+      <label for="q7K">nodes left of the cut <input id="q7K" type="range" min="0" max="9" value="2"><output id="q7Ko">2</output></label>
+      <label for="q7M"><input id="q7M" type="checkbox" checked> require a majority of all N</label>
+    </div>
+    <div class="readout" id="q7R"></div>
+    <p class="note">The old leader is the highest-ranked node and sits on the right of the cut. Each side elects the highest rank it can reach (as bully or ring would). With the majority rule, a side can only have an <i>effective</i> leader (one that can get anything committed) if it holds more than N/2 nodes. Two majorities of the same N always share a node, so two effective leaders are impossible. A stranded old leader on the minority side may still <i>think</i> it leads; whether it notices and stops by itself depends on leases or a "check quorum" rule (not in the book). The term demo below shows what happens otherwise.</p>
+  </div>
+  <div class="fig">
+    <h3>Run it: how a term number unmasks a stale leader (Raft-style)</h3>
+    <div class="net" id="tm7Net" aria-label="Term numbers and stale leader diagram"></div>
+    <div class="steptext" id="tm7Text"></div>
+    <div class="controls"><button id="tm7Back" type="button">◀ Back</button><button id="tm7Step" type="button">Next step ▶</button><button id="tm7Reset" type="button">Reset</button></div>
+    <p class="note">The book states only that a Raft leader discovers its term is out of date and updates it. The vote and message details in this walk-through follow the Raft paper (beyond the book); Ch.14 covers them properly.</p>
+  </div>
+  <div class="box picture"><b>Picture it</b><p>A society of 5 flats picks a secretary. If the building's intercom breaks and 2 flats can't reach the other 3, the 2 flats could "elect" a secretary among themselves, and now there are two secretaries signing cheques. The rule "a secretary needs 3 of the 5 signatures" makes that impossible: the 2-flat side can't collect 3. Term numbers are the dated appointment letters: when the old secretary shows a letter from term 3 and everyone else holds one from term 4, the old letter is void.</p></div>
+  <div class="box behind"><b>What's happening behind it</b><p>Every algorithm in Sections 2–6 decides from <b>local evidence</b>: "the nodes I can reach say X". A partition makes that evidence differ on each side, so each side reaches a different, locally correct conclusion. A <b>majority</b> fixes this by geometry, not by better timeouts: any two subsets bigger than N/2 must overlap in at least one node, and that node won't vote twice in the same round (term). So at most one candidate per term can collect a majority. But a stale leader can still <i>believe</i> it leads (it was elected in an older term and hasn't heard the news). Terms (Raft) or ballot numbers (Paxos) make that harmless: every message carries the number, any receiver with a newer number rejects it, and the sender steps down. Safety comes from the quorum overlap; liveness comes from failure detection and timeouts. That is why the book calls "multiple leaders allowed" a performance choice: the protocol lets a would-be leader start work immediately, and the quorum check catches it if it was wrong.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.9: failure detection gives the timeout half (the stable leader election paper builds on the same failure-detector theory as Ch.9's [CHANDRA96]).</li>
+    <li>Ch.11: quorums (R + W &gt; N) use the same "two majorities overlap" argument for reads and writes.</li>
+    <li>Ch.14: Multi-Paxos (second quorum resolves dueling proposers), Raft (terms, randomized timeouts), ZAB (epochs).</li>
+    <li>Papers: Abraham, Dolev, Halpern, "Distributed Protocols for Leader Election: A Game-Theoretic Perspective", DISC 2013 (in <i>Distributed Computing</i>, Springer, pp. 61–75) [ABRAHAM13]: the book cites it for "election is consensus"; it studies election when processes are rational agents with their own preferences about who should lead. Aguilera, Delporte-Gallet, Fauconnier, Toueg, "Stable Leader Election", DISC '01, pp. 108–122 [AGUILERA01]: shows how to keep a leader stable (no needless changes) while still replacing a crashed one.</li>
+    <li>Further reading the book lists (pdf p339): Lynch &amp; Patt-Shamir, "Distributed algorithms", MIT 6.852 lecture notes, 1993; Attiya &amp; Welch, <i>Distributed Computing: Fundamentals, Simulations and Advanced Topics</i>, Wiley, 2004; Tanenbaum &amp; van Steen, <i>Distributed Systems: Principles and Paradigms</i>, 2nd ed., Prentice-Hall, 2006.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · CHOOSING BETWEEN THEM</div><h2>Before → after, with counted numbers, real systems and papers</h2></div><span class="chip">my synthesis · beyond the book</span></div>
+  <p>The book presents the algorithms one by one. This plate puts them side by side. All counts below are produced by the same step generators that run the diagrams above, for the scenario "the top-ranked node (the leader) has crashed, every other node is alive, the lowest-ranked node notices first".</p>
+  <div class="fig">
+    <h3>Messages per election vs cluster size (counted in the simulator)</h3>
+    <canvas id="cmp8" class="short" aria-label="Messages per election versus number of nodes for each algorithm"></canvas>
+    <div class="legend" id="cmp8L"></div>
+    <h3>Sequential hops per election (one-way delays on the critical path)</h3>
+    <canvas id="cmp8b" class="short" aria-label="Sequential message hops per election versus number of nodes"></canvas>
+    <div class="legend" id="cmp8bL"></div>
+    <div class="controls"><label for="cmp8C">candidate set size <input id="cmp8C" type="range" min="2" max="10" value="3"><output id="cmp8Co">3</output></label>
+      <label for="cmp8N">read off at n = <input id="cmp8N" type="range" min="4" max="64" value="16"><output id="cmp8No">16</output></label></div>
+    <div class="readout" id="cmp8R"></div>
+    <p class="note">The bully and majority-vote lines nearly coincide (3n−4 vs 3n−3). Hops are rounds of messages that must happen one after another; they ignore the timeouts each algorithm also needs (bully waits once for answers; ring waits once per dead successor). Candidate set = the c highest ranks including the dead leader. Invitation is left out: it doesn't elect "after a crash" but merges groups, see Section 5.</p>
+  </div>
+  <div class="tablewrap"><table class="cmp">
+    <thead><tr><th>Algorithm</th><th>Fixes (vs previous)</th><th>Messages</th><th>Critical path</th><th>Needs to know</th><th>Safe under partition?</th></tr></thead>
+    <tbody>
+      <tr><td>Bully (modified)</td><td>baseline: simple, deterministic</td><td class="num">≈ 3n</td><td class="num">4 hops + 1 timeout</td><td>all ranks</td><td class="bad">No</td></tr>
+      <tr><td>Next-in-line</td><td>skips discovery when the successor is alive</td><td class="num">≈ n</td><td class="num">3 hops</td><td>leader's published list</td><td class="bad">No</td></tr>
+      <tr><td>Candidate/ordinary</td><td>polls only c candidates; δ stops duplicate elections</td><td class="num">≈ n + 2c</td><td class="num">3 hops + δ wait</td><td>candidate set, priorities</td><td class="bad">No</td></tr>
+      <tr><td>Invitation</td><td>no restart from scratch; groups merge</td><td class="num">O(n log n) notifications (larger leads)</td><td class="num">depends on merge order</td><td>peers outside the group</td><td class="bad">No (multiple leaders by design)</td></tr>
+      <tr><td>Ring</td><td>only neighbour-to-neighbour messages</td><td class="num">≈ 2n</td><td class="num">≈ 2n hops</td><td>ring order</td><td class="bad">No</td></tr>
+      <tr><td>Majority-vote election (Raft/ZAB/Paxos, Ch.14)</td><td>split brain: needs &gt; N/2 votes, terms reject stale leaders</td><td class="num">≈ 3(n−1) incl. first heartbeat</td><td class="num">3 hops + random timeout</td><td>cluster membership</td><td class="good">Yes</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box beyond"><b>Beyond the book: measured numbers from real systems</b><ul>
+    <li><b>Raft paper, measured</b> (Ongaro &amp; Ousterhout, "In Search of an Understandable Consensus Algorithm", USENIX ATC 2014; numbers from §9.3 of the extended version, 5 servers, ~15 ms broadcast time): with <b>no randomness</b> in election timeouts, elections took <b>over 10 seconds</b> because of repeated split votes; adding just <b>5 ms</b> of randomness gave a <b>median downtime of 287 ms</b>; with 50 ms of randomness the worst case over 1,000 trials was <b>513 ms</b>; with 12–24 ms timeouts a leader was elected in <b>35 ms on average</b> (worst 152 ms), but timeouts that low cause needless leader changes, so the authors recommend <b>150–300 ms</b>. This is the measured version of the δ tiebreaker in Section 4. <a href="https://raft.github.io/raft.pdf">raft.github.io/raft.pdf</a></li>
+    <li><b>etcd</b> (Raft): default heartbeat interval <b>100 ms</b>, default election timeout <b>1000 ms</b>. <a href="https://etcd.io/docs/v3.5/tuning/">etcd tuning docs</a></li>
+    <li><b>MongoDB</b> replica sets (Raft-like protocol version 1): <code>electionTimeoutMillis</code> defaults to <b>10,000 ms</b>; lower means faster failover but more elections caused by slowness or network blips. <code>priority</code> defaults to 1; priority 0 members can never become primary. <a href="https://www.mongodb.com/docs/manual/reference/replica-configuration/">MongoDB replica set configuration</a></li>
+    <li><b>Spanner</b>: each Paxos group (replica set) has its own long-lived leader holding a timed <b>leader lease</b>, <b>10 seconds by default</b> (Corbett et al., "Spanner: Google's Globally-Distributed Database", OSDI 2012, §4.1.1). Measured trade-off from the same paper (§5.2, Availability): after killing the zone holding the leaders, new leaders were elected as the old leases expired, and about 10 s after the kill every group had a leader and throughput had recovered; shorter leases would cut that gap but cost more lease-renewal traffic. <a href="https://research.google.com/archive/spanner-osdi2012.pdf">Spanner paper</a> This is the "per-partition leader" fix from Section 1.</li>
+    <li><b>Kubernetes</b>: <code>kube-controller-manager</code> and <code>kube-scheduler</code> in HA setups use a Lease object so only one instance is active and the rest stand by. <a href="https://kubernetes.io/docs/concepts/architecture/leases/">Kubernetes Leases</a></li>
+    <li><b>Raft in production</b>: etcd, Consul and Kafka's KRaft controller quorum use Raft; ZooKeeper uses ZAB. All of them elect with a majority, which is the book's split-brain fix.</li>
+  </ul></div>
+  <div class="box beyond"><b>Beyond the book: two safety tools the chapter doesn't name</b><ul>
+    <li><b>Leases</b> (Gray &amp; Cheriton, "Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache Consistency", SOSP 1989): leadership that expires after a fixed time unless renewed, so an old leader knows to stop by itself, assuming clocks drift within a bound.</li>
+    <li><b>Fencing tokens</b>: a number that goes up with every new leader (like Raft's term), sent with every write so storage can reject writes from an old leader. Martin Kleppmann's <i>Designing Data-Intensive Applications</i> (on your syllabus) explains this in its chapter on distributed-systems trouble.</li>
+    <li><b>Lock services</b>: Burrows, "The Chubby lock service for loosely-coupled distributed systems", OSDI 2006: Google systems elect leaders by grabbing a lock in a Paxos-backed service, so election is outsourced to consensus.</li>
+  </ul></div>
+  <div class="box connect"><b>Reference papers for this chapter (from the book's bibliography, pdf p489–516)</b><ul>
+    <li>[MOLINA82] Garcia-Molina, "Elections in a Distributed Computing System", IEEE Trans. Computers 31(1):48–59, 1982. Bully (and, as usually credited, invitation). Defines the election problem for systems where processes and links fail.</li>
+    <li>[KORDAFSHARI05] Kordafshari, Gholipour, Mosakhani, Haghighat, Dehghan, "Modified bully election algorithm in distributed systems", WSEAS ICCOMP '05. The three-step version in Section 2.</li>
+    <li>[GHOLIPOUR09] Gholipour, Kordafshari, Jahanshahi, Rahmani, "A New Approach For Election Algorithm in Distributed Systems", CTRQ 2009, IEEE, pp. 70–74. Next-in-line failover.</li>
+    <li>[MURSHED12] Murshed &amp; Allen, "Enhanced Bully Algorithm for Leader Node Election in Synchronous Distributed Systems", <i>Computers</i> 1(1):3–23, 2012. Candidate/ordinary sets and δ.</li>
+    <li>[CHANG79] Chang &amp; Roberts, "An improved algorithm for decentralized extrema-finding in circular configurations of processes", CACM 22(5):281–283, 1979. Ring election.</li>
+    <li>[ABRAHAM13] Abraham, Dolev, Halpern, "Distributed Protocols for Leader Election: A Game-Theoretic Perspective", DISC 2013, Springer, pp. 61–75. Election as consensus.</li>
+    <li>[AGUILERA01] Aguilera, Delporte-Gallet, Fauconnier, Toueg, "Stable Leader Election", DISC '01, Springer, pp. 108–122. Combining election with failure detection.</li>
+    <li>Not in the bibliography (added): Ongaro &amp; Ousterhout, USENIX ATC 2014 (Raft); Hirschberg &amp; Sinclair, CACM 23(11), 1980 (O(n log n) ring election); Gray &amp; Cheriton, SOSP 1989 (leases); Burrows, OSDI 2006 (Chubby); Corbett et al., OSDI 2012 (Spanner).</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Why does a leader reduce messages, and what new risk does it create?</summary><p>Coordination becomes a star (everyone ↔ leader) instead of a mesh (everyone ↔ everyone), so messages grow linearly rather than quadratically, and order is decided in one place. The risks: the leader is a bottleneck (fix: per-partition leaders, as in Spanner) and everyone must agree on who it is, which brings in failure detection and the danger of split brain (Section 1).</p></details>
+  <details><summary>2. A lock and a leader both mean "exactly one owner". Name two ways they differ.</summary><p>Others don't need to know who holds a lock, but every process must know the leader, so a new leader must announce itself. A lock that prefers some processes starves the others and breaks liveness; a leader is <i>supposed</i> to stay put, and long-lived leaders are preferred (Section 1).</p></details>
+  <details><summary>3. In Fig 10-1, list every message the modified bully sends and the total.</summary><p>3→4, 3→5, 3→6 (Election, 6 is lost); 4→3, 5→3 (Alive); 3→5 (you're the highest I heard); 5→1, 5→2, 5→3, 5→4 (Elected). 10 messages in four sequential hops plus one timeout (Section 2).</p></details>
+  <details><summary>4. Why can bully elect two leaders even with a perfect failure detector inside each half of a partition?</summary><p>Bully treats "no answer from a higher rank" as "no higher rank is alive". Across a partition the higher ranks are alive but unreachable, so the lower side correctly follows the protocol and crowns its own maximum. Nothing checks that a winner is backed by more than half the cluster (Sections 2 and 7).</p></details>
+  <details><summary>5. A flaky node has the highest rank. What goes wrong and what does the book suggest?</summary><p>It keeps winning, crashing and winning again, so the cluster spends its time re-electing. The book suggests spreading host quality metrics and using them in the election, so an unreliable node stops winning (Section 2).</p></details>
+  <details><summary>6. Next-in-line: when does the detector skip even the one round trip, and what is still unsafe?</summary><p>If the detector is itself the highest-ranked process on the failed leader's list, it announces itself straight away. It is still unsafe: detectors in different partitions may reach different listed alternatives and both announce (Section 3).</p></details>
+  <details><summary>7. In Fig 10-3 the new leader is 2, not 5, even though 5 is alive. Why?</summary><p>Only candidates can lead. The candidate set is {1, 2, 6}; 6 is dead, so the highest live candidate is 2. Process 5 is ordinary (Section 4).</p></details>
+  <details><summary>8. Why must the δ tiebreaker be larger than the round-trip time, and why isn't that always enough?</summary><p>The next node in the δ queue must hear that someone already started before its own timer fires; if the gap is smaller than the time for that news to arrive, both start. It isn't always enough because nodes also <i>detect</i> the failure at different moments: if detection jitter is larger than the δ gap, a low-priority node can still start before a high-priority node has even noticed (Section 4 simulation).</p></details>
+  <details><summary>9. In the invitation algorithm, why should the larger group's leader lead the merged group?</summary><p>Only the absorbed group's members must be told about their new leader, so absorbing the smaller group sends fewer notifications. Repeated over many merges this bounds each node's relabels by log₂ n (union-by-size), giving O(n log n) total instead of up to O(n²) (Section 5; the bound is my analysis).</p></details>
+  <details><summary>10. Why is it correct for the ring variant to carry only the current maximum?</summary><p>The winner is max(live set), and max is commutative and associative, so it can be folded in one ID at a time in any order. You lose the membership list (useful for routing the second lap) but save payload: n IDs instead of about n²/2 on the first lap (Section 6).</p></details>
+  <details><summary>11. Bully needs ≈ 3n messages, ring ≈ 2n. Why might bully still finish faster?</summary><p>Bully's messages go out in parallel in four rounds regardless of n; ring's go strictly one after another, about 2n sequential hops plus a timeout per dead successor. For latency, critical path beats message count (Section 8).</p></details>
+  <details><summary>12. What single rule does the book give for avoiding split brain, and why does it work?</summary><p>Win a cluster-wide majority of votes. Any two majorities of the same N overlap in at least one node, and a node votes once per term, so two leaders can't both be backed in the same term (Section 7).</p></details>
+  <details><summary>13. If you can elect a leader safely, why have you "solved consensus"?</summary><p>Electing a leader means all processes agree on one value (the leader's ID) despite failures. A mechanism that achieves that agreement can be used to agree on any value [ABRAHAM13] (Section 7).</p></details>
+  <details><summary>14. What does Raft's term give you that bully's rank doesn't?</summary><p>A rank is fixed and says who <i>should</i> win; a term is a counter that says which election is <i>newest</i>. Every message carries it, so a leader from an old term is rejected the moment it talks to anyone who has seen a newer term, and it steps down. Ranks can't tell an old leader from a new one (Section 7).</p></details>
+  <details><summary>15. The book calls "allowing multiple leaders" a performance optimization. Explain.</summary><p>Waiting until you are <i>sure</i> there is exactly one leader would stall progress, since failure detection can't be both fast and certain. Multi-Paxos and Raft let a would-be leader start replicating at once, and safety comes from quorum checks that reject the loser (second quorum in Paxos, stale term in Raft). Liveness from the leader, safety from conflict detection (Section 7).</p></details>
+</section>
+
+<footer>Built from Alex Petrov, <i>Database Internals</i> (O'Reilly, 2019), Chapter 10 "Leader Election" (PDF pages 327–339, including the summary and further reading on p338–339 and footnote 1 on p339; bibliography entries from pdf p489–516), explained in my own words with my own diagrams and examples. The figures are re-drawn from scratch as live simulations. Message and hop counts come from the step generators on this page under the stated scenario (modelled, not measured on real hardware); the flaky-node, δ and invitation charts are simulations with stated assumptions. Numbers marked "Beyond the book" come from the linked papers and official documentation.</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+
+  // ---------- chapter 10 helpers ----------
+  // =====================================================================
+  let SEED = 7;
+  const range = (a, b) => { const o = []; for (let i = a; i <= b; i++) o.push(i); return o; };
+  const sum = (a) => a.reduce((s, x) => s + x, 0);
+  const KIND = {
+    elect: ['c1', 'Election / probe'],
+    alive: ['c2', 'Alive / reply'],
+    notify: ['c3', '"you are highest" / invite'],
+    elected: ['buy', 'Elected / announce'],
+    reject: ['sell', 'rejected (stale term)']
+  };
+  function keyHTML() {
+    return Object.keys(KIND).map((k) => `<span style="--sw:var(--${KIND[k][0]})">${KIND[k][1]}</span>`).join('') +
+      '<span style="--sw:var(--sell)">dashed = lost (dead or unreachable)</span>';
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  // node positions: circle (ring order 1..n clockwise from the top) or split (left 1..k | right k+1..n)
+  function layout(o) {
+    const W = 420, H = o.h || 300, P = {};
+    if (o.split != null) {
+      const k = o.split, L = range(1, k), R = range(k + 1, o.n);
+      const col = (arr, x) => arr.forEach((id, j) => { P[id] = [x + (j % 2 ? 46 : 0), 40 + (H - 90) * (arr.length === 1 ? 0.5 : j / (arr.length - 1))]; });
+      col(L, 70); col(R, 280);
+      return { W, H, P };
+    }
+    const cx = W / 2, cy = H / 2 - 6, Rr = Math.min(108, H / 2 - 44);
+    for (let i = 1; i <= o.n; i++) { const a = -Math.PI / 2 + (i - 1) * 2 * Math.PI / o.n; P[i] = [cx + Rr * Math.cos(a), cy + Rr * Math.sin(a)]; }
+    return { W, H, P, cx, cy };
+  }
+  // o: {n, dead:Set, leaders:Set, init, cands:Set, labels:{id:text}, msgs:[{f,t,k,lost,pay}], split, cutLabel}
+  function drawNet(id, o) {
+    const el = $(id); if (!el) return;
+    const { W, H, P, cx, cy } = layout(o); const r = 16;
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(el.getAttribute('aria-label') || 'network')}"><defs>`;
+    Object.keys(KIND).forEach((k) => { s += `<marker id="${id}-mk-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--${KIND[k][0]})"/></marker>`; });
+    s += '</defs>';
+    if (o.split != null) s += `<line class="cut" x1="${W / 2 - 4}" y1="8" x2="${W / 2 - 4}" y2="${H - 8}"/><text class="cap" x="${W / 2 + 2}" y="${H - 10}">${esc(o.cutLabel || 'network partition')}</text>`;
+    (o.msgs || []).forEach((m) => {
+      const a = P[m.f], b = P[m.t]; if (!a || !b) return;
+      const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+      const x1 = a[0] + ux * r, y1 = a[1] + uy * r, x2 = b[0] - ux * (r + 2), y2 = b[1] - uy * (r + 2);
+      const col = m.lost ? 'sell' : KIND[m.k][0];
+      s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:var(--${col});stroke-width:2${m.lost ? ';stroke-dasharray:5 4' : ''}" marker-end="url(#${id}-mk-${m.lost ? 'reject' : m.k})"/>`;
+      if (m.pay != null) { const mx = (x1 + x2) / 2 - uy * 12, my = (y1 + y2) / 2 + ux * 12; s += `<text class="lab" x="${mx.toFixed(1)}" y="${my.toFixed(1)}" style="fill:var(--${col})">${esc(m.pay)}</text>`; }
+    });
+    for (let i = 1; i <= o.n; i++) {
+      const [x, y] = P[i];
+      const cls = ['nd', o.dead && o.dead.has(i) ? 'dead' : '', o.leaders && o.leaders.has(i) ? 'lead' : '', o.cands && o.cands.has(i) ? 'cand' : '', o.init === i ? 'init' : ''].join(' ');
+      s += `<g class="${cls}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/><text class="id" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${i}</text>`;
+      if (o.dead && o.dead.has(i)) s += `<line x1="${x - 11}" y1="${y - 11}" x2="${x + 11}" y2="${y + 11}" style="stroke:var(--muted)"/><line x1="${x + 11}" y1="${y - 11}" x2="${x - 11}" y2="${y + 11}" style="stroke:var(--muted)"/>`;
+      const lab = o.labels && o.labels[i];
+      if (lab) {
+        let lx = x, ly = y + r + 13;
+        if (cx != null) { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d; lx = x + ux * (r + 6 + String(lab).length * 4); ly = y + uy * (r + 10) + 4; }
+        s += `<text class="lab" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${esc(lab)}</text>`;
+      }
+      s += '</g>';
+    }
+    el.innerHTML = s + '</svg>';
+  }
+
+  function nodeButtons(id, n, dead, extraCls) {
+    const el = $(id); if (!el) return;
+    el.innerHTML = range(1, n).map((i) => `<button type="button" data-n="${i}" class="${dead.has(i) ? 'off' : ''} ${extraCls && extraCls.has(i) ? 'on2' : ''}" aria-pressed="${dead.has(i)}">${i}</button>`).join('');
+  }
+  function onNodeClick(id, f) {
+    $(id).addEventListener('click', (e) => { const t = e && e.target; const k = t && t.dataset ? +t.dataset.n : 0; if (k) f(k); });
+  }
+  // generic step-through controller: index 0 = starting state, i = after steps[0..i-1]
+  function stepper(p, build, render) {
+    const st = { i: 0, steps: [] };
+    st.go = () => render(st);
+    st.rebuild = () => { st.steps = build(); st.i = 0; st.go(); };
+    $(p + 'Step').addEventListener('click', () => { if (st.i < st.steps.length) st.i++; st.go(); });
+    $(p + 'Back').addEventListener('click', () => { if (st.i > 0) st.i--; st.go(); });
+    $(p + 'Reset').addEventListener('click', () => { st.i = 0; st.go(); });
+    return st;
+  }
+  function tally(steps, i) {
+    let msgs = 0, lost = 0, hops = 0, leader = null;
+    for (let j = 0; j < i; j++) { const s = steps[j]; msgs += s.msgs.length; lost += s.msgs.filter((m) => m.lost).length; if (s.msgs.length) hops++; if (s.leader !== undefined) leader = s.leader; }
+    return { msgs, lost, hops, leader };
+  }
+  function stepNote(st, start) { return st.i === 0 ? start : `<b>Step ${st.i}/${st.steps.length}.</b> ${st.steps[st.i - 1].note}`; }
+
+  // ---------- the algorithms (same logic as the code blocks on the page) ----------
+  function bullySteps(n, init, up) {
+    const S = [], higher = range(init + 1, n);
+    S.push({ msgs: higher.map((t) => ({ f: init, t, k: 'elect', lost: !up(t) })),
+      note: higher.length ? `${init} sends Election to every higher rank (${higher.join(', ')}) and starts a timeout.` : `${init} has the highest rank there is: nobody to ask.` });
+    const alive = higher.filter(up);
+    let leader = init;
+    if (alive.length) {
+      S.push({ msgs: alive.map((f) => ({ f, t: init, k: 'alive' })), note: `${alive.join(', ')} answer${alive.length > 1 ? '' : 's'} Alive (they outrank ${init}).${higher.length > alive.length ? ' ' + higher.filter((x) => !up(x)).join(', ') + (higher.length - alive.length > 1 ? ' stay' : ' stays') + ' silent: the timeout treats ' + (higher.length - alive.length > 1 ? 'them' : 'it') + ' as dead.' : ''}` });
+      leader = Math.max(...alive);
+      S.push({ msgs: [{ f: init, t: leader, k: 'notify' }], note: `${init} tells ${leader}, the highest rank it heard from, to take over step 3.` });
+    } else if (higher.length) {
+      S.push({ msgs: [], note: `Timeout: no higher rank answered, so ${init} assumes it is the highest live process.` });
+    }
+    const lower = range(1, leader - 1);
+    S.push({ leader, msgs: lower.map((t) => ({ f: leader, t, k: 'elected', lost: !up(t) })), note: `${leader} sends Elected to every lower rank${lower.length ? ' (' + lower.join(', ') + ')' : ''}. ${leader} is the new leader.` });
+    return S;
+  }
+  function nextInLineSteps(n, init, alts, failed, up) {
+    const S = [], others = range(1, n).filter((x) => x !== failed);
+    for (const a of alts) {
+      if (a === init) {
+        const to = others.filter((x) => x !== init);
+        S.push({ leader: init, msgs: to.map((t) => ({ f: init, t, k: 'elected', lost: !up(t) })), note: `${init} is itself the highest live process on the list, so it announces itself right away. New list: {${nextAlts(n, init, up).join(', ')}}.` });
+        return S;
+      }
+      S.push({ msgs: [{ f: init, t: a, k: 'elect', lost: !up(a) }], note: `${init} contacts ${a}, the highest remaining alternative on ${failed}'s list.` });
+      if (up(a)) {
+        S.push({ msgs: [{ f: a, t: init, k: 'alive' }], note: `${a} answers "alive", so ${init} doesn't contact anyone else on the list.` });
+        const to = others.filter((x) => x !== a);
+        S.push({ leader: a, msgs: to.map((t) => ({ f: a, t, k: 'elected', lost: !up(t) })), note: `${a} tells every other node it is the new leader and publishes its own list {${nextAlts(n, a, up).join(', ')}}.` });
+        return S;
+      }
+      S.push({ msgs: [], note: `${a} is down: the timeout expires and ${init} moves to the next name on the list.` });
+    }
+    const fb = bullySteps(n, init, up);
+    fb[0] = Object.assign({}, fb[0], { note: 'Every listed alternative is down. Falling back to a full bully election (my assumption; the book does not say). ' + fb[0].note });
+    return S.concat(fb);
+  }
+  function nextAlts(n, lead, up) { return range(1, lead - 1).filter(up).reverse().slice(0, 2); }
+  function candidateSteps(n, init, cands, failed, up) {
+    const S = [], ask = cands.filter((c) => c !== failed && c !== init);
+    S.push({ msgs: ask.map((t) => ({ f: init, t, k: 'elect', lost: !up(t) })), note: `${init} (${cands.includes(init) ? 'a candidate' : 'ordinary'}) contacts the remaining candidates: ${ask.join(', ') || 'none'}.` });
+    const alive = ask.filter(up);
+    S.push({ msgs: alive.map((f) => ({ f, t: init, k: 'alive' })), note: alive.length ? `${alive.join(', ')} answer that they are alive.` : 'No candidate answers before the timeout.' });
+    if (cands.includes(init)) alive.push(init);
+    const leader = alive.length ? Math.max(...alive) : null;
+    const to = range(1, n).filter((x) => x !== init && x !== failed);
+    S.push({ leader, msgs: leader == null ? [] : to.map((t) => ({ f: init, t, k: 'elected', lost: !up(t), pay: leader })),
+      note: leader == null ? 'No live candidate: this variant cannot elect anyone until a candidate comes back.' : `${init} picks the highest live candidate, ${leader}, and tells every other node.` });
+    return S;
+  }
+  function ringSteps(n, init, dead, carryMax) {
+    const S = [], next = (x) => x % n + 1;
+    let cur = init; const set = [init];
+    for (let guard = 0; guard < 4 * n; guard++) {
+      const msgs = []; let t = next(cur);
+      while (dead.has(t) && t !== init) { msgs.push({ f: cur, t, k: 'elect', lost: true }); t = next(t); }
+      const pay = carryMax ? 'max ' + Math.max(...set) : '{' + set.join(',') + '}';
+      msgs.push({ f: cur, t, k: 'elect', pay });
+      const skipped = msgs.length > 1 ? ` ${cur} can't reach ${msgs.filter((m) => m.lost).map((m) => m.t).join(', ')}, so it skips to ${t}.` : '';
+      S.push({ msgs, note: `${cur} passes ${pay} to ${t}.${skipped}${t === init ? ' The message is back at the initiator: lap 1 done.' : ''}`, recv: [t, pay] });
+      if (t === init) break;
+      set.push(t); cur = t;
+    }
+    const leader = Math.max(...set);
+    cur = init;
+    for (let guard = 0; guard < 4 * n; guard++) {
+      const msgs = []; let t = next(cur);
+      while (dead.has(t) && t !== init) { if (carryMax) msgs.push({ f: cur, t, k: 'elected', lost: true }); t = next(t); }
+      msgs.push({ f: cur, t, k: 'elected', pay: leader + '!' });
+      S.push({ leader, msgs, note: `Lap 2: ${cur} passes "${leader} is leader" to ${t}.${carryMax && msgs.length > 1 ? ' With only the max, nobody knows who is dead, so the skip costs another failed try.' : ''}`, recv: [t, leader + '!'] });
+      cur = t; if (cur === init) break;
+    }
+    return S;
+  }
+
+  // ---------- 01 messages with/without a leader ----------
+  const d1 = reg(() => {
+    const n = val('n1'); const N = 101; const all = nulls(N), led = nulls(N);
+    for (let k = 3; k < N; k++) { all[k] = k * (k - 1); led[k] = 2 * k - 1; }
+    plot('c1m', { n: N, x0: 3, x1: Math.max(5, n), ymin: 0, lines: [{ d: all, col: 'sell', w: 2.2, label: 'all-to-all: n(n−1)' }, { d: led, col: 'c2', w: 2.4, label: 'via a leader: 2n−1' }], vlines: [{ i: n, label: 'n = ' + n }] });
+    $('r1').innerHTML = `n = <b>${n}</b> · all-to-all <b>${n * (n - 1)}</b> messages · leader <b>${2 * n - 1}</b> messages · ratio <b>${(n * (n - 1) / (2 * n - 1)).toFixed(1)}×</b> fewer with a leader`;
+  });
+  bindRange('n1', d1);
+  const d1b = reg(() => {
+    const P = val('p1'), N = val('q1'); const busy = Math.ceil(P / N);
+    $('r1b').innerHTML = `single leader handles <b>${P}</b> of ${P} partitions (100%) · per-partition leaders: busiest node handles <b>${busy}</b> (${(100 * busy / P).toFixed(0)}%) · load cut by <b>${(P / busy).toFixed(1)}×</b>`;
+  });
+  bindRange('p1', d1b); bindRange('q1', d1b);
+
+  // ---------- 02 bully ----------
+  const B2 = { dead: new Set([6]) };
+  function b2up(x) { return !B2.dead.has(x); }
+  const b2 = stepper('b2', () => {
+    const n = val('b2N'), init = Math.min(val('b2I'), n);
+    if (B2.dead.has(init)) return [{ msgs: [], note: `Process ${init} is down, so it can't start an election. Revive it or pick another initiator.` }];
+    return bullySteps(n, init, b2up);
+  }, (st) => {
+    const n = val('b2N'), init = Math.min(val('b2I'), n); const t = tally(st.steps, st.i);
+    const s = st.steps[st.i - 1];
+    drawNet('b2Net', { n, dead: B2.dead, init, leaders: new Set(t.leader ? [t.leader] : []), msgs: s ? s.msgs : [], labels: t.leader ? { [t.leader]: 'leader' } : { [n]: B2.dead.has(n) ? 'old leader' : '' } });
+    $('b2Text').innerHTML = stepNote(st, `Leader ${n} ${B2.dead.has(n) ? 'has crashed' : 'is alive (crash it to make the election interesting)'}. Process ${init} (purple ring) notices and starts an election. Press Next.`);
+    $('b2R').innerHTML = `messages sent <b>${t.msgs}</b> (lost <b>${t.lost}</b>) · sequential hops <b>${t.hops}</b>${t.leader ? ' · leader <b>' + t.leader + '</b>' : ''} · full election: <b>${sum(st.steps.map((x) => x.msgs.length))}</b> messages`;
+    nodeButtons('b2Nodes', n, B2.dead);
+  });
+  function b2sync() { const n = val('b2N'); $('b2I').max = n; if (val('b2I') > n) { $('b2I').value = n; $('b2Io').textContent = n; } b2.rebuild(); }
+  bindRange('b2N', () => { B2.dead = new Set([val('b2N')]); b2sync(); });
+  bindRange('b2I', b2sync);
+  onNodeClick('b2Nodes', (k) => { B2.dead.has(k) ? B2.dead.delete(k) : B2.dead.add(k); b2.rebuild(); });
+  $('b2Key').innerHTML = keyHTML();
+
+  // ---------- partition views (02 without, 07 with majority) ----------
+  function partition(p, majorityOn) {
+    const n = val(p + 'N'); $(p + 'K').max = n; let k = Math.min(val(p + 'K'), n);
+    if (val(p + 'K') > n) { $(p + 'K').value = k; $(p + 'Ko').textContent = k; }
+    const L = range(1, k), R = range(k + 1, n), need = Math.floor(n / 2) + 1;
+    const leaders = new Set(), labels = {}, msgs = [];
+    const side = (arr, name) => {
+      const hadLeader = arr.includes(n);
+      if (!arr.length) return `${name}: empty`;
+      const top = Math.max(...arr);
+      if (majorityOn && arr.length < need) { labels[top] = hadLeader ? 'can’t commit' : 'no quorum'; return `${name}: ${arr.length}/${n} nodes < majority ${need} → <span class="good">no effective leader</span>${hadLeader ? ' (old leader ' + top + ' can’t commit anything)' : ''}`; }
+      leaders.add(top); labels[top] = hadLeader ? 'old leader' : 'elected';
+      arr.filter((x) => x !== top).forEach((x) => msgs.push({ f: top, t: x, k: 'elected' }));
+      return `${name}: ${arr.length}/${n} nodes → leader <b>${top}</b>${hadLeader ? ' (keeps the job)' : ' (elected: can’t hear ' + n + ')'}`;
+    };
+    const a = side(L, 'left'), b = side(R, 'right');
+    drawNet(p + 'Net', { n, split: k, leaders, labels, msgs, h: 260, cutLabel: k === 0 || k === n ? 'no cut' : 'partition' });
+    const verdict = leaders.size > 1 ? `<span class="bad">SPLIT BRAIN: ${leaders.size} leaders</span>` : leaders.size === 1 ? '<span class="good">one leader</span>' : '<span class="bad">no leader anywhere (unavailable, but safe)</span>';
+    $(p + 'R').innerHTML = `${a} · ${b} · ${verdict}`;
+  }
+  const dpt = reg(() => partition('pt2', false));
+  bindRange('pt2N', dpt); bindRange('pt2K', dpt);
+
+  // ---------- 02 flaky high-ranked node ----------
+  function simFlap(seed, U, Dn, E, T) {
+    const r = rng(seed); const ex = (m) => -m * Math.log(1 - r() * 0.999999);
+    let up5 = true, nextFlip = ex(U), upSince = -1e9;
+    const A = new Array(T), B = new Array(T); let chA = 0, chB = 0, prevA = 5, prevB = 5, upTime = 0;
+    for (let t = 0; t < T; t++) {
+      while (t >= nextFlip) { up5 = !up5; if (up5) upSince = nextFlip; nextFlip += up5 ? ex(U) : ex(Dn); }
+      if (up5) upTime++;
+      const a = up5 ? 5 : 4; const b = up5 && t - upSince >= 300 ? 5 : 4;
+      if (a !== prevA) chA++; if (b !== prevB) chB++;
+      A[t] = a; B[t] = b; prevA = a; prevB = b;
+    }
+    return { A, B, chA, chB, up: upTime / T };
+  }
+  const dfl = reg(() => {
+    const U = val('fl2U'), Dn = val('fl2D'), E = val('fl2E');
+    const one = simFlap(SEED * 31 + 1, U, Dn, E, 1800);
+    plot('fl2', { n: 1800, ymin: 3.5, ymax: 5.5, label: 'rank only: leader id (top)', lines: [{ d: one.A, col: 'sell', w: 1.8, step: true, label: 'rank only (bully)' }],
+      sub: { ymin: 3.5, ymax: 5.5, label: 'rank + quality', lines: [{ d: one.B, col: 'buy', w: 1.8, step: true, label: 'rank + quality metric' }] } });
+    let cA = 0, cB = 0, up = 0; const runs = 40;
+    for (let j = 0; j < runs; j++) { const s = simFlap(SEED * 1000 + j * 17 + 3, U, Dn, E, 3600); cA += s.chA; cB += s.chB; up += s.up; }
+    cA /= runs; cB /= runs; up /= runs;
+    $('fl2R').innerHTML = `pooled over ${runs} simulated hours · node 5 up <b>${(100 * up).toFixed(0)}%</b> of the time · leader changes per hour: rank only <b class="bad">${cA.toFixed(1)}</b>, rank + quality <b class="good">${cB.toFixed(1)}</b> · leaderless seconds per hour: <b class="bad">${(cA * E).toFixed(0)}</b> vs <b class="good">${(cB * E).toFixed(0)}</b>`;
+  });
+  bindRange('fl2U', dfl); bindRange('fl2D', dfl); bindRange('fl2E', dfl);
+
+  // ---------- 03 next-in-line ----------
+  const NL3 = { dead: new Set([6]) };
+  const nl3up = (x) => !NL3.dead.has(x);
+  const nl3 = stepper('nl3', () => {
+    const init = val('nl3I');
+    if (NL3.dead.has(init)) return [{ msgs: [], note: `Process ${init} is down and can't detect anything. Pick another detector.` }];
+    return nextInLineSteps(6, init, [5, 4], 6, nl3up);
+  }, (st) => {
+    const init = val('nl3I'); const t = tally(st.steps, st.i); const s = st.steps[st.i - 1];
+    const labels = { 6: '{5,4}' }; if (t.leader) labels[t.leader] = '{' + nextAlts(6, t.leader, nl3up).join(',') + '}';
+    drawNet('nl3Net', { n: 6, dead: NL3.dead, init, leaders: new Set(t.leader ? [t.leader] : []), msgs: s ? s.msgs : [], labels });
+    $('nl3Text').innerHTML = stepNote(st, `Leader 6 (alternatives {5, 4}) has crashed. Process ${init} notices. Press Next.`);
+    const bully = sum(bullySteps(6, init, nl3up).map((x) => x.msgs.length));
+    $('nl3R').innerHTML = `messages <b>${t.msgs}</b> · sequential hops <b>${t.hops}</b>${t.leader ? ' · leader <b>' + t.leader + '</b>' : ''} · whole run <b>${sum(st.steps.map((x) => x.msgs.length))}</b> vs plain bully from the same detector <b>${bully}</b>`;
+    nodeButtons('nl3Nodes', 6, NL3.dead);
+  });
+  bindRange('nl3I', () => nl3.rebuild());
+  onNodeClick('nl3Nodes', (k) => { NL3.dead.has(k) ? NL3.dead.delete(k) : NL3.dead.add(k); nl3.rebuild(); });
+
+  // ---------- 04 candidate / ordinary ----------
+  const CO4 = { dead: new Set([6]) };
+  const co4up = (x) => !CO4.dead.has(x);
+  const co4cands = () => String($('co4C').value || '1,2,6').split(',').map(Number);
+  const co4 = stepper('co4', () => {
+    const init = val('co4I');
+    if (CO4.dead.has(init)) return [{ msgs: [], note: `Process ${init} is down. Pick another initiator.` }];
+    return candidateSteps(6, init, co4cands(), 6, co4up);
+  }, (st) => {
+    const init = val('co4I'); const t = tally(st.steps, st.i); const s = st.steps[st.i - 1]; const C = co4cands();
+    const labels = {}; C.forEach((c) => { labels[c] = 'candidate'; }); if (t.leader) labels[t.leader] = 'leader';
+    drawNet('co4Net', { n: 6, dead: CO4.dead, init, cands: new Set(C), leaders: new Set(t.leader ? [t.leader] : []), msgs: s ? s.msgs : [], labels });
+    $('co4Text').innerHTML = stepNote(st, `Candidates (teal ring): {${C.join(', ')}}. Leader 6 has crashed; process ${init} notices. Press Next.`);
+    $('co4R').innerHTML = `messages <b>${t.msgs}</b> · hops <b>${t.hops}</b>${t.leader ? ' · leader <b>' + t.leader + '</b>' : ''} · whole run <b>${sum(st.steps.map((x) => x.msgs.length))}</b> vs bully from the same node <b>${sum(bullySteps(6, init, co4up).map((x) => x.msgs.length))}</b>`;
+    nodeButtons('co4Nodes', 6, CO4.dead, new Set(C));
+  });
+  bindRange('co4I', () => co4.rebuild());
+  $('co4C').addEventListener('change', () => co4.rebuild());
+  onNodeClick('co4Nodes', (k) => { CO4.dead.has(k) ? CO4.dead.delete(k) : CO4.dead.add(k); co4.rebuild(); });
+
+  // δ tiebreaker simulation
+  function dupRate(rtt, J, D, trials, seed) {
+    const r = rng(seed); let dup = 0;
+    for (let t = 0; t < trials; t++) {
+      const st = [0, 1, 2].map((p) => J * r() + p * D);
+      const s0 = Math.min(...st);
+      if (st.filter((x) => x < s0 + rtt).length > 1) dup++;
+    }
+    return dup / trials;
+  }
+  const ddl = reg(() => {
+    const rtt = val('dl4Rtt'), J = val('dl4J'), D = val('dl4D'); const N = 201;
+    const a = nulls(N), b = nulls(N);
+    for (let d = 0; d < N; d += 2) { a[d] = 100 * dupRate(rtt, J, d, 2000, SEED * 7 + 11); b[d] = 100 * dupRate(rtt, 0, d, 200, SEED * 7 + 11); }
+    for (let d = 1; d < N; d += 2) { a[d] = (a[d - 1] + (a[d + 1] != null ? a[d + 1] : a[d - 1])) / 2; b[d] = (b[d - 1] + (b[d + 1] != null ? b[d + 1] : b[d - 1])) / 2; }
+    plot('dl4', { n: N, ymin: 0, ymax: 100, lines: [{ d: a, col: 'c1', w: 2.2, label: '% trials with ≥2 elections (your detection spread)' }, { d: b, col: 'c2', w: 1.6, dash: [5, 4], label: 'same, if all nodes detected at the same instant' }],
+      vlines: [{ i: Math.min(rtt, 200), col: 'muted', label: 'δ step = RTT' }, { i: D, col: 'c1', label: 'your δ', row: 1 }] });
+    $('dl4R').innerHTML = `x axis: δ step 0–200 ms · at δ step <b>${D} ms</b>: duplicate elections in <b>${(100 * dupRate(rtt, J, D, 2000, SEED * 7 + 11)).toFixed(1)}%</b> of trials · with no δ (0 ms): <b>${(100 * dupRate(rtt, J, 0, 2000, SEED * 7 + 11)).toFixed(1)}%</b> · simulated, 3 ordinary nodes`;
+  });
+  bindRange('dl4Rtt', ddl); bindRange('dl4J', ddl); bindRange('dl4D', ddl);
+
+  // ---------- 05 invitation ----------
+  function invitationRun(n, policy, seed, record, chain) {
+    const r = rng(seed); const g = {}; range(1, n).forEach((x) => { g[x] = x; });
+    const members = (l) => range(1, n).filter((x) => g[x] === l);
+    const cnt = { invite: 0, reply: 0, accept: 0, notify: 0 }; const steps = [];
+    const snap = () => Object.assign({}, g);
+    let round = 0;
+    for (;;) {
+      let leaders = range(1, n).filter((x) => g[x] === x); if (leaders.length < 2) break;
+      round++;
+      let pairs = [];
+      if (record && n === 4 && round === 1) pairs = [[1, 2, 2], [3, 4, 4]];
+      else if (record && n === 4 && round === 2) pairs = [[1, 3, 3]];
+      else if (chain) {
+        const big = leaders.reduce((a, b) => (members(b).length > members(a).length ? b : a));
+        const s = leaders.find((x) => x !== big); const B = members(big);
+        pairs = [[s, big, B[Math.floor(r() * B.length)]]];
+      } else {
+        for (let i = leaders.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [leaders[i], leaders[j]] = [leaders[j], leaders[i]]; }
+        for (let i = 0; i + 1 < leaders.length; i += 2) { const B = members(leaders[i + 1]); pairs.push([leaders[i], leaders[i + 1], B[Math.floor(r() * B.length)]]); }
+      }
+      const m1 = [], m2 = [], m3 = [];
+      for (const [a, b, m] of pairs) {
+        m1.push({ f: a, t: m, k: 'notify' }); cnt.invite++;
+        if (m !== b) { m2.push({ f: m, t: a, k: 'alive', pay: 'leader ' + b }); m2.push({ f: a, t: b, k: 'notify' }); cnt.reply++; cnt.invite++; }
+      }
+      if (record) steps.push({ msgs: m1, g: snap(), note: `Round ${round}: ` + pairs.map(([a, b, m]) => `${a} invites ${m}${m !== b ? ' (a member of ' + b + '’s group)' : ''}`).join('; ') + '.' });
+      if (record && m2.length) steps.push({ msgs: m2, g: snap(), note: 'Invited non-leaders answer with their group leader’s ID, and the inviter contacts that leader directly.' });
+      const notes = [];
+      for (const [a, b] of pairs) {
+        const A = members(a), B = members(b);
+        const keep = policy === 'big' && B.length > A.length ? b : a, lose = keep === a ? b : a;
+        const moved = keep === a ? B : A;
+        m3.push({ f: b, t: a, k: 'alive', pay: 'join' }); cnt.accept++;
+        moved.forEach((x) => { g[x] = keep; if (x !== lose) { m3.push({ f: keep, t: x, k: 'elected', pay: 'lead ' + keep }); cnt.notify++; } });
+        notes.push(`${b} accepts; groups of ${A.length} and ${B.length} merge under ${keep}${moved.length > 1 ? ', ' + (moved.length - 1) + ' member' + (moved.length > 2 ? 's' : '') + ' notified' : ''}`);
+      }
+      if (record) steps.push({ msgs: m3, g: snap(), note: notes.join('; ') + '.' });
+    }
+    return { cnt, steps };
+  }
+  const IV5 = { steps: [] };
+  const iv5 = stepper('iv5', () => invitationRun(val('iv5N'), $('iv5P').value || 'big', SEED * 13 + val('iv5N'), true).steps, (st) => {
+    const n = val('iv5N'); const s = st.steps[st.i - 1]; const g = s ? s.g : Object.fromEntries(range(1, n).map((x) => [x, x]));
+    const leaders = new Set(range(1, n).filter((x) => g[x] === x)); const labels = {}; range(1, n).forEach((x) => { labels[x] = 'g' + g[x]; });
+    drawNet('iv5Net', { n, leaders, labels, msgs: s ? s.msgs : [] });
+    $('iv5Text').innerHTML = stepNote(st, `${n} processes, each the leader of a group of one (orange = group leader, label = its group). Press Next.`);
+    let c = { invite: 0, reply: 0, accept: 0, notify: 0 };
+    st.steps.slice(0, st.i).forEach((x) => x.msgs.forEach((m) => { if (m.k === 'notify') c.invite++; else if (m.pay === 'join') c.accept++; else if (m.k === 'alive') c.reply++; else c.notify++; }));
+    $('iv5R').innerHTML = `groups now <b>${leaders.size}</b> · invites <b>${c.invite}</b> · leader-ID replies <b>${c.reply}</b> · accepts <b>${c.accept}</b> · leader-change notifications <b>${c.notify}</b>`;
+  });
+  bindRange('iv5N', () => iv5.rebuild());
+  $('iv5P').addEventListener('change', () => iv5.rebuild());
+  const div5 = reg(() => {
+    const chain = ($('iv5S').value || 'pairs') === 'chain';
+    const N = 49, big = nulls(N), inv = nulls(N), ref = nulls(N); const trials = 60;
+    for (let n = 2; n < N; n++) {
+      let sb = 0, si = 0;
+      for (let t = 0; t < trials; t++) { const sd = SEED * 101 + n * 997 + t; sb += invitationRun(n, 'big', sd, false, chain).cnt.notify; si += invitationRun(n, 'inv', sd, false, chain).cnt.notify; }
+      big[n] = sb / trials; inv[n] = si / trials; ref[n] = n / 2 * Math.log2(n);
+    }
+    plot('iv5c', { n: N, x0: 2, ymin: 0, lines: [{ d: inv, col: 'sell', w: 2, label: 'inviter always leads' }, { d: big, col: 'buy', w: 2.2, label: 'larger group leads' }, { d: ref, col: 'muted', w: 1.2, dash: [4, 4], label: '(n/2)·log₂n bound' }] });
+    $('iv5Calc').innerHTML = `x axis: n = 2…48 · at n = 48: inviter-leads <b>${inv[48].toFixed(0)}</b> notifications, larger-leads <b>${big[48].toFixed(0)}</b>${inv[48] > 0 ? ' (' + (100 * (1 - big[48] / inv[48])).toFixed(0) + '% fewer)' : ''}, average over ${trials} ${chain ? 'runs where a newcomer keeps inviting the big group' : 'random pairings'}`;
+  });
+  $('iv5S').addEventListener('change', div5);
+
+  // ---------- 06 ring ----------
+  const RG6 = { dead: new Set([6]) };
+  const rg6 = stepper('rg6', () => {
+    const init = val('rg6I');
+    if (RG6.dead.has(init)) return [{ msgs: [], note: `Process ${init} is down. Pick another initiator.` }];
+    if (RG6.dead.size >= 5) return [{ msgs: [], note: 'Only one node is alive: it is trivially the leader.' }];
+    return ringSteps(6, init, RG6.dead, ($('rg6V').value || 'set') === 'max');
+  }, (st) => {
+    const init = val('rg6I'); const t = tally(st.steps, st.i); const s = st.steps[st.i - 1];
+    const labels = {}; st.steps.slice(0, st.i).forEach((x) => { if (x.recv) labels[x.recv[0]] = x.recv[1]; });
+    drawNet('rg6Net', { n: 6, dead: RG6.dead, init, leaders: new Set(t.leader ? [t.leader] : []), msgs: s ? s.msgs : [], labels });
+    $('rg6Text').innerHTML = stepNote(st, `Leader 6 has crashed. Process ${init} starts the election around the ring 1→2→3→4→5→6→1. Press Next.`);
+    let ids = 0; st.steps.slice(0, st.i).forEach((x) => x.msgs.forEach((m) => { if (!m.lost && m.k === 'elect') ids += String(m.pay).startsWith('{') ? String(m.pay).split(',').length : 1; }));
+    $('rg6R').innerHTML = `messages <b>${t.msgs}</b> (failed tries <b>${t.lost}</b>) · sequential hops <b>${t.hops}</b> · ids carried in lap 1 so far <b>${ids}</b>${t.leader ? ' · leader <b>' + t.leader + '</b>' : ''}`;
+    nodeButtons('rg6Nodes', 6, RG6.dead);
+  });
+  bindRange('rg6I', () => rg6.rebuild());
+  $('rg6V').addEventListener('change', () => rg6.rebuild());
+  onNodeClick('rg6Nodes', (k) => { RG6.dead.has(k) ? RG6.dead.delete(k) : RG6.dead.add(k); rg6.rebuild(); });
+  const drg = reg(() => {
+    const m = val('rg6M'), b = val('rg6B'); const setIds = m * (m + 1) / 2;
+    const kb = (x) => x >= 1e6 ? (x / 1e6).toFixed(2) + ' MB' : x >= 1e3 ? (x / 1e3).toFixed(1) + ' KB' : x + ' B';
+    $('rg6C').innerHTML = `lap 1 has <b>${m}</b> messages · carrying the set: <b>${setIds.toLocaleString()}</b> ids = <b>${kb(setIds * b)}</b> · carrying the max: <b>${m}</b> ids = <b>${kb(m * b)}</b> · <b>${(setIds / m).toFixed(1)}×</b> less with the max · both laps take ≈ <b>${2 * m}</b> sequential hops`;
+  });
+  bindRange('rg6M', drg); bindRange('rg6B', drg);
+
+  // ---------- 07 majority + terms ----------
+  const dq7 = reg(() => partition('q7', $('q7M').checked));
+  bindRange('q7N', dq7); bindRange('q7K', dq7);
+  $('q7M').addEventListener('change', dq7);
+  const TM = [
+    { term: [3, 3, 3, 3, 3], lead: [5], cut: false, msgs: [], note: '' },
+    { term: [3, 3, 3, 3, 3], lead: [5], cut: true, msgs: [], note: 'The network splits {1,2,3} | {4,5}. Leader 5 (term 3) still believes it leads, but it can now reach only 2 of 5 nodes.' },
+    { term: [3, 3, 4, 3, 3], lead: [5], cut: true, msgs: [{ f: 3, t: 1, k: 'elect', pay: 'vote t4?' }, { f: 3, t: 2, k: 'elect' }, { f: 3, t: 4, k: 'elect', lost: true }, { f: 3, t: 5, k: 'elect', lost: true }], note: 'Node 3 hears no heartbeat before its (randomized) timeout, raises its term to 4 and asks everyone for a vote.' },
+    { term: [4, 4, 4, 3, 3], lead: [5, 3], cut: true, msgs: [{ f: 1, t: 3, k: 'alive', pay: 'yes' }, { f: 2, t: 3, k: 'alive', pay: 'yes' }], note: 'Nodes 1 and 2 vote for 3. With its own vote that is 3 of 5, a majority: 3 leads term 4. Two nodes now think they lead, but only one has a majority behind it.' },
+    { term: [4, 4, 4, 3, 3], lead: [5, 3], cut: true, msgs: [{ f: 5, t: 4, k: 'elect', pay: 'append t3' }, { f: 4, t: 5, k: 'alive', pay: 'ok' }], note: 'Old leader 5 keeps sending appends (term 3) to 4. It gets 2 of 5 acknowledgements, never a majority, so nothing it does can be committed. Harmless.' },
+    { term: [4, 4, 4, 3, 3], lead: [5, 3], cut: false, msgs: [{ f: 5, t: 1, k: 'elect', pay: 'append t3' }, { f: 1, t: 5, k: 'reject', pay: 'my term is 4' }], note: 'The partition heals. 5 sends a term-3 append to 1; 1 has seen term 4, rejects it and replies with its term.' },
+    { term: [4, 4, 4, 4, 4], lead: [3], cut: false, msgs: [{ f: 3, t: 1, k: 'elected', pay: 't4' }, { f: 3, t: 2, k: 'elected' }, { f: 3, t: 4, k: 'elected' }, { f: 3, t: 5, k: 'elected' }], note: '5 sees a newer term, updates to term 4 and steps down to follower. Leader 3’s heartbeats now reach everyone: one leader again.' }
+  ];
+  const tm7 = stepper('tm7', () => TM.slice(1), (st) => {
+    const s = TM[st.i]; const labels = {}; s.term.forEach((x, j) => { labels[j + 1] = 'term ' + x; });
+    drawNet('tm7Net', { n: 5, split: s.cut ? 3 : null, leaders: new Set(s.lead), msgs: s.msgs, labels, h: 260, cutLabel: 'partition' });
+    $('tm7Text').innerHTML = st.i === 0 ? 'Five nodes, all in term 3, leader 5. Press Next.' : `<b>Step ${st.i}/${TM.length - 1}.</b> ${s.note}`;
+  });
+
+  // ---------- 08 comparison ----------
+  function counts(n, c) {
+    const up = (x) => x !== n; const f = (S) => ({ m: sum(S.map((s) => s.msgs.length)), h: S.filter((s) => s.msgs.length).length });
+    return {
+      bully: f(bullySteps(n, 1, up)),
+      nil: f(nextInLineSteps(n, 1, [n - 1, n - 2], n, up)),
+      cand: f(candidateSteps(n, 1, range(Math.max(1, n - c + 1), n), n, up)),
+      ring: f(ringSteps(n, 1, new Set([n]), false)),
+      maj: { m: 3 * (n - 1), h: 3 }
+    };
+  }
+  const d8 = reg(() => {
+    const c = val('cmp8C'), at = val('cmp8N'); const N = 65; const K = ['bully', 'nil', 'cand', 'ring', 'maj'];
+    const M = {}, H = {}; K.forEach((k) => { M[k] = nulls(N); H[k] = nulls(N); });
+    for (let n = Math.max(4, c + 1); n < N; n++) { const r = counts(n, c); K.forEach((k) => { M[k][n] = r[k].m; H[k][n] = r[k].h; }); }
+    const lab = { bully: ['c1', 'bully (modified)'], nil: ['c2', 'next-in-line'], cand: ['c3', 'candidate/ordinary'], ring: ['sell', 'ring'], maj: ['buy', 'majority vote (Raft-like)'] };
+    const lines = (D) => K.map((k) => ({ d: D[k], col: lab[k][0], w: 2, label: lab[k][1], dash: k === 'maj' ? [5, 4] : null }));
+    plot('cmp8', { n: N, x0: 4, ymin: 0, lines: lines(M), vlines: [{ i: at, label: 'n = ' + at }] });
+    plot('cmp8b', { n: N, x0: 4, ymin: 0, lines: lines(H), vlines: [{ i: at, label: 'n = ' + at }] });
+    const r = at > c ? counts(at, c) : null;
+    $('cmp8R').innerHTML = r ? `x axis: n = 4…64 · at n = <b>${at}</b>: ` + K.map((k) => `${lab[k][1]} <b>${r[k].m}</b> msgs / <b>${r[k].h}</b> hops`).join(' · ') : 'pick n larger than the candidate set';
+  });
+  bindRange('cmp8C', d8); bindRange('cmp8N', d8);
+
+  // ---------- global ----------
+  // =====================================================================
+  function resetAll() {
+    $('seedOut').textContent = SEED;
+    b2.rebuild(); nl3.rebuild(); co4.rebuild(); iv5.rebuild(); rg6.rebuild(); tm7.rebuild();
+  }
+  $('reroll').addEventListener('click', () => { SEED = SEED * 7 % 997 + 3; resetAll(); redrawAll(); });
+  resetAll(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

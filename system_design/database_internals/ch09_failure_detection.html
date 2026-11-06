@@ -1,0 +1,1314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ch.9 Failure Detection</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* reset that the artifact skeleton would normally add (chapter pages are standalone documents) */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+nav.crumbs { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+nav.crumbs a { color: var(--ink); }
+
+/* Layout: one reading column of chart-paper "plates"; each plate = explain → picture it → live chart → behind it → connects to */
+:root {
+  --paper: #eef2f5;      /* cool chart-paper ground */
+  --plate: #ffffff;      /* chart plates */
+  --ink: #17212c;
+  --muted: #586777;
+  --rule: #cfd8e1;
+  --grid: #e3e9ef;
+  --price: #1f2b38;
+  --c1: #d06f12;         /* fast / SMA  (amber) */
+  --c2: #1f7f8f;         /* slow / EMA  (teal)  */
+  --c3: #8a4bb3;         /* third line  (plum)  */
+  --buy: #1c9450;
+  --sell: #cf3b3b;
+  --tint: #fff3cf;       /* "picture it" boxes */
+  --tint2: #e6f3f5;      /* "behind it" boxes */
+  --tint3: #f1eaf7;      /* "connects to" boxes */
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+    --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+    --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1318; --plate: #151c24; --ink: #e5ecf2; --muted: #95a3b1; --rule: #2a3541; --grid: #1f2832;
+  --price: #dbe4ec; --c1: #f2a04e; --c2: #4cc4d6; --c3: #c592ea; --buy: #3fcf7c; --sell: #ff6f6f;
+  --tint: #2a2412; --tint2: #10282c; --tint3: #241a2e; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: grid; gap: 28px; }
+header.hero { display: grid; gap: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h1 em { font-style: normal; color: var(--c1); }
+.lede { font-size: 19px; max-width: 64ch; margin: 0; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 27px; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+.plate { background: var(--plate); border: 1px solid var(--rule); border-radius: 6px; padding: 22px clamp(14px, 3vw, 28px); display: grid; gap: 14px; min-width: 0; }
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.chip { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; white-space: nowrap; }
+.secno { font-family: var(--mono); color: var(--c1); font-size: 13px; letter-spacing: .06em; }
+.box { border-radius: 4px; padding: 12px 14px; display: grid; gap: 6px; }
+.box > b { font-family: var(--display); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.picture { background: var(--tint); }
+.behind { background: var(--tint2); }
+.connect { background: var(--tint3); }
+.box p, .box li { font-size: 16px; }
+.box ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 68ch; }
+.fig { display: grid; gap: 8px; min-width: 0; }
+canvas { width: 100%; height: 300px; display: block; background: var(--plate); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+canvas.tall { height: 360px; }
+canvas.short { height: 220px; }
+@media (max-width: 560px) { canvas { height: 240px; } canvas.tall { height: 290px; } canvas.short { height: 190px; } }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--sw); border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-family: var(--mono); font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; }
+.controls input[type=range] { width: 150px; accent-color: var(--c1); }
+.controls output { min-width: 3.2ch; font-weight: 600; color: var(--ink); }
+button { font-family: var(--mono); font-size: 13px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover { border-color: var(--c1); }
+button.on { background: var(--c1); color: var(--plate); border-color: var(--c1); }
+:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+select { font-family: var(--mono); font-size: 13px; padding: 4px; background: var(--plate); color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; }
+.readout { font-family: var(--mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .good { color: var(--buy); } .readout .bad { color: var(--sell); }
+.formula { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.win { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.win div { border: 1px solid var(--rule); border-radius: 3px; padding: 4px 6px; min-width: 52px; text-align: center; background: var(--paper); font-variant-numeric: tabular-nums; }
+.win div.in { background: var(--tint); border-color: var(--c1); }
+.win div.new { outline: 2px solid var(--buy); }
+.win div.out { opacity: .35; text-decoration: line-through; }
+.win small { display: block; font-size: 10px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 15px; width: 100%; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 14px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+nav.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 18px; font-family: var(--mono); font-size: 13px; }
+nav.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--rule); padding: 3px 0; }
+nav.toc a:hover { color: var(--c1); }
+nav.toc a span { color: var(--c1); margin-right: 6px; }
+details { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 12px; background: var(--paper); }
+details summary { cursor: pointer; font-family: var(--display); font-weight: 600; }
+details p { margin-top: 8px; font-size: 16px; }
+.map { overflow-x: auto; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+.two > * { min-width: 0; }
+footer { font-size: 14px; color: var(--muted); max-width: 70ch; }
+.topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+svg text { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+/* Phone width: grid columns may shrink, so wide diagrams and tables scroll inside their own box instead of widening the page. */
+.wrap, .plate, .fig, .comp { grid-template-columns: minmax(0, 1fr); }
+.box { grid-template-columns: minmax(0, 1fr); }
+.box li, .box p { overflow-wrap: anywhere; }
+.controls label { max-width: 100%; min-width: 0; flex-wrap: wrap; }
+.controls select { min-width: 0; max-width: 100%; }
+.plate-head .chip, .ni { white-space: normal; max-width: 100%; }
+.stage { grid-template-columns: minmax(0, 1fr); }
+.cells .cell { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
+.plate p, .plate li { overflow-wrap: anywhere; }
+</style>
+<style>
+/* page-specific additions (template style above is kept verbatim) */
+.flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+.flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow .tag { color: var(--muted); min-width: 7.5em; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+.flow .node { border: 1px solid var(--rule); background: var(--paper); border-radius: 4px; padding: 4px 8px; }
+.flow .node.key { border-color: var(--c1); background: var(--tint); }
+.flow .arr { color: var(--c1); }
+.beyond { background: var(--paper); border: 1px dashed var(--c2); }
+.papers { background: var(--paper); border: 1px solid var(--rule); }
+.papers li { font-size: 15px; }
+pre.code { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; overflow-x: auto; margin: 0; white-space: pre; }
+.steptxt { font-family: var(--body); font-size: 16px; border-left: 3px solid var(--c1); padding: 4px 10px; background: var(--paper); min-height: 2.2em; }
+.comp { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; display: grid; gap: 6px; background: var(--plate); min-width: 0; }
+.comp > .t { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.comp.off { opacity: .5; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.svgwrap { overflow-x: auto; }
+.svgwrap svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.svgwrap.small svg { min-width: 300px; }
+svg .ln { stroke: var(--muted); fill: none; }
+svg .lane { stroke: var(--rule); stroke-width: 1.5; }
+svg .nd { fill: var(--paper); stroke: var(--ink); stroke-width: 1.5; }
+svg .nd.dead { fill: var(--plate); stroke: var(--sell); }
+svg .nd.sus { fill: var(--tint); stroke: var(--c1); stroke-width: 2.5; }
+svg .nd.silent { fill: var(--plate); stroke: var(--muted); stroke-dasharray: 4 3; }
+svg text.sm { font-size: 10px; fill: var(--muted); }
+svg text.bad { fill: var(--sell); }
+svg text.good { fill: var(--buy); }
+svg text.hl { fill: var(--c1); }
+table.mini { font-size: 13px; font-family: var(--mono); }
+table.mini th, table.mini td { padding: 4px 7px; }
+table.mini td.sus { color: var(--sell); font-weight: 600; }
+table.mini td.ok { color: var(--buy); }
+table.mini td.dim { color: var(--muted); }
+.fig .readout.blockro { display: block; line-height: 1.75; }
+code { font-family: var(--mono); font-size: .9em; }
+</style>
+<!-- theme:start --><script>
+(function(){ try { var t = localStorage.getItem('llm-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script><!-- theme:end -->
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumbs" aria-label="Course navigation"><a href="index.html">← All chapters</a><a href="ch08_distributed_systems_introduction_and_ove.html">← Ch.8 Introduction and Overview</a><a href="ch10_leader_election.html">Ch.10 Leader Election →</a></nav>
+
+<header class="hero">
+  <div class="kicker">Alex Petrov · Database Internals (2019) · Chapter 9 · pdf p314–326</div>
+  <h1>Failure detection: <em>dead or just slow?</em></h1>
+  <p class="lede">The whole chapter in plain words and in the book's order: why you can never be sure a remote process is dead, what "complete", "efficient" and "accurate" mean for a detector, and six ways to build one: pings with deadlines, Aguilera's timeout-free heartbeat counters, SWIM's outsourced pings, the φ-accrual detector, gossip-style heartbeat tables, and FUSE's group failure. Every simulator runs the code shown next to it. Numbers marked <b>modelled</b> come from those simulations or formulas, not from real clusters; numbers marked <b>documented</b> come from the official docs cited at the bottom.</p>
+  <div class="topbar">
+    <button id="reroll" type="button">Re-seed all simulations</button>
+    <span class="readout">seed <b id="seedOut">1</b> · used by the jitter, φ, SWIM and gossip simulations</span>
+  </div>
+</header>
+
+<section class="plate" id="map">
+  <div class="plate-head"><h2>How the chapter fits together</h2><span class="chip">read this first</span></div>
+  <p>One problem drives the chapter: a process stops answering, and you can't tell whether it crashed, is slow, or the network between you is broken. Each detector below is a different answer to "who collects the evidence, and how is the verdict reached?"</p>
+  <div class="flow" role="img" aria-label="Concept chain of the chapter">
+    <div class="row"><span class="tag">Problem</span><span class="node key">Crashed or slow? (no timing bound → can't know)</span><span class="arr">→</span><span class="node">false positives vs false negatives</span></div>
+    <div class="row"><span class="tag">Yardsticks</span><span class="node">liveness · safety</span><span class="node">completeness</span><span class="node">efficiency</span><span class="node">accuracy</span></div>
+    <div class="row"><span class="tag">One observer</span><span class="node key">Ping / heartbeat + deadline</span><span class="arr">→</span><span class="node">φ-accrual (continuous suspicion)</span></div>
+    <div class="row"><span class="tag">Many observers</span><span class="node">Heartbeat counters on paths (timeout-free)</span><span class="node key">SWIM outsourced pings</span><span class="node">Gossip heartbeat tables</span></div>
+    <div class="row"><span class="tag">Reverse it</span><span class="node key">FUSE: silence spreads one failure to the whole group</span></div>
+    <div class="row"><span class="tag">Why it matters</span><span class="node">FLP: consensus needs an "augmented" model</span><span class="arr">→</span><span class="node">failure detectors make consensus solvable</span><span class="arr">→</span><span class="node">Ch.10 leader election, Ch.14 consensus</span></div>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#s1"><span>01</span>Crashed or slow? The yardsticks</a>
+    <a href="#s2"><span>02</span>Heartbeats and pings</a>
+    <a href="#s3"><span>03</span>Timeout-free failure detector</a>
+    <a href="#s4"><span>04</span>Outsourced heartbeats (SWIM)</a>
+    <a href="#s5"><span>05</span>φ-accrual failure detector</a>
+    <a href="#s6"><span>06</span>Gossip and failure detection</a>
+    <a href="#s7"><span>07</span>Reversing the problem: FUSE</a>
+    <a href="#s8"><span>08</span>Summary &amp; further reading</a>
+    <a href="#s9"><span>09</span>Choosing a detector (beyond the book)</a>
+    <a href="#quiz"><span>✓</span>Check yourself</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="plate" id="s1">
+  <div class="plate-head"><div><div class="secno">01 · CHAPTER OPENING</div><h2>Crashed or slow? The yardsticks of a detector</h2></div><span class="chip">pdf p314–315</span></div>
+  <p>The chapter opens with the old riddle about a tree falling in an empty forest: if nobody is there to observe it, did anything happen? That is the failure-detection problem in one line. A system can only react to a failure it has noticed, and it should notice in time: until it does, clients and peers keep sending work to a process that will never answer, which adds latency and lowers availability.</p>
+  <ul class="plain">
+    <li><b>Why it's hard:</b> in an <b>asynchronous</b> system (no assumptions about how long steps or messages take) you can't tell a crashed process from one that is just very slow. Ch.8's FLP impossibility result is the related, formal version of this problem.</li>
+    <li><b>Words:</b> <i>dead</i>, <i>failed</i>, <i>crashed</i> mean the process has stopped executing steps completely. <i>Unresponsive</i>, <i>faulty</i>, <i>slow</i> describe a <b>suspected</b> process: it might be dead, it might not.</li>
+    <li><b>Where failures happen:</b> at the <b>link</b> level (messages lost or delivered slowly) or the <b>process</b> level (crash, or running slowly). From outside, slowness may look exactly like failure.</li>
+    <li><b>The unavoidable trade-off:</b> suspect too early and you declare live processes dead (<b>false positives</b>); wait too long, giving the process the benefit of the doubt, and real failures stay undetected for longer (<b>false negatives</b>).</li>
+    <li><b>Definition:</b> a failure detector is a <b>local subsystem</b> of each process that identifies failed or unreachable processes so the algorithm can exclude them, which guarantees <b>liveness</b> while preserving <b>safety</b>.</li>
+    <li><b>Liveness</b> = something intended must eventually happen (if a process fails, the detector must detect it). <b>Safety</b> = nothing unintended happens (if the detector says a process is dead, it really was dead) [LAMPORT77] [RAYNAL99] [FREILING11].</li>
+    <li><b>Practical payoff and cost:</b> excluding failed processes avoids wasted work and stops errors propagating into cascading failures; but excluding a process that is only <em>suspected</em> (and maybe alive) reduces availability.</li>
+    <li><b>Completeness:</b> every non-faulty member eventually notices the failure, and the algorithm can make progress and reach its final result.</li>
+    <li><b>Efficiency:</b> how fast the failure is identified. <b>Accuracy:</b> whether it was identified precisely; a detector is inaccurate if it accuses a live process or misses an existing failure.</li>
+    <li>Efficiency and accuracy behave like a <b>tunable knob</b>: faster usually means less precise, more precise usually means slower. It is provably impossible to have a detector that is both accurate and efficient, and detectors are <em>allowed</em> to make mistakes (false positives) [CHANDRA96].</li>
+    <li>Failure detectors are a prerequisite and integral part of many <b>consensus</b> and <b>atomic broadcast</b> algorithms (later chapters).</li>
+    <li>Most systems build detectors on <b>heartbeats</b>: simple, and with <b>strong completeness</b>. All algorithms in the chapter assume <b>no Byzantine failures</b>: nobody lies about its own state or its neighbours'.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>You phone a friend who always picks up. After 10 rings you start to worry; after 30 you call their family. Hang up after 3 rings and you'll "lose" friends who were in the shower (false positive). Wait an hour and you're useless if something really happened (false negative). Every detector in this chapter is a smarter way of choosing when to stop ringing, or a way to ask other people to ring too.</p></div>
+  <div class="fig">
+    <h3>The timeout knob: wrong suspicions vs time to detect a real crash (modelled)</h3>
+    <canvas id="c1" aria-label="Log of false suspicion probability and mean detection delay as the timeout grows"></canvas>
+    <div class="legend" id="c1L"></div>
+    <div class="controls">
+      <label for="int1">heartbeat every (ms) <input id="int1" type="range" min="200" max="3000" step="100" value="1000"><output id="int1o">1000</output></label>
+      <label for="sd1">network jitter σ (ms) <input id="sd1" type="range" min="5" max="400" step="5" value="100"><output id="sd1o">100</output></label>
+      <label for="to1">timeout (× interval) <input id="to1" type="range" min="1.1" max="10" step="0.1" value="3"><output id="to1o">3</output></label>
+      <label for="gc1">pause chance % <input id="gc1" type="range" min="0" max="5" step="0.1" value="0.5"><output id="gc1o">0.5</output></label>
+      <label for="gcm1">mean pause (ms) <input id="gcm1" type="range" min="100" max="5000" step="100" value="1000"><output id="gcm1o">1000</output></label>
+    </div>
+    <div class="readout blockro" id="r1"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The model (mine, not the book's): a live process sends a heartbeat every <i>I</i> ms; each one is delayed by normal jitter σ, so the gap between two arrivals is about Normal(<i>I</i>, √2·σ). With a small probability a heartbeat is also held up by a long pause (garbage collection, a full queue), drawn from an exponential distribution. The top panel shows log<sub>10</sub> of the chance that one gap exceeds the timeout, which is a wrong suspicion. The bottom panel shows how long a real crash goes unnoticed: the crash lands somewhere in a heartbeat cycle, so on average the detector fires <i>T</i> − <i>I</i>/2 after it, and at worst <i>T</i>. Pure jitter makes false positives vanish fast as you raise <i>T</i>; the rare long pauses create a long tail that only a much bigger timeout covers. That tail is why real deployments use the adaptive detectors later in the chapter.</p></div>
+  <div class="box beyond"><b>Beyond the book: the classic classification</b><ul>
+    <li>Chandra and Toueg [CHANDRA96] split each property in two. <b>Strong completeness</b>: every crashed process is eventually suspected by <em>every</em> correct process; <b>weak</b>: by <em>some</em> correct process. <b>Strong accuracy</b>: no correct process is ever suspected; <b>weak</b>: some correct process is never suspected. "Eventual" versions only require accuracy after some unknown time.</li>
+    <li>Combinations give the named classes: <b>P</b> (perfect: strong completeness + strong accuracy), <b>◇P</b> (eventually perfect), <b>S</b>, <b>◇S</b>, <b>W</b>, <b>◇W</b>. In a truly asynchronous system you can't implement P; a timeout detector whose timeout keeps growing after each mistake is the usual way to approximate ◇P in a partially synchronous one.</li>
+    <li>The book's "efficiency" is what the research literature calls detection time; its "accuracy" maps to how often and how long a correct process is wrongly suspected. The summary (plate 8) calls the same trade-off "accuracy vs completeness": completeness in finite time is exactly what a short timeout buys.</li>
+  </ul></div>
+  <pre class="code">// The decision every heartbeat-based detector makes, in one function
+function suspect(now: number, lastHeard: number, timeoutMs: number): boolean {
+  return now - lastHeard &gt; timeoutMs;   // short timeout → fast but wrong more often
+}</pre>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.8 (previous page): FLP impossibility, crash vs omission vs Byzantine failures, fair-loss links. This chapter only deals with crash failures and lossy or slow links.</li>
+    <li>Ch.10 Leader Election and Ch.14 Consensus: every election starts with "the leader is suspected", so the detector's timeout sets how fast a cluster fails over and how often it holds a pointless election.</li>
+    <li>Your <code>Notes/syllabus.html</code> (Phase 3, Docker) lists container "health checks": Docker's <code>HEALTHCHECK</code> is exactly this ping-with-a-deadline detector (plate 9 has its defaults).</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Chandra &amp; Toueg, "Unreliable failure detectors for reliable distributed systems", JACM 43(2), 1996 [CHANDRA96]: defines completeness/accuracy and the detector classes; shows consensus is solvable with unreliable detectors. The foundation of the whole field.</li>
+    <li>Freiling, Guerraoui &amp; Kuznetsov, "The failure detector abstraction", ACM Computing Surveys 43(2), 2011 [FREILING11]: a survey of the abstraction and what each class can solve; the best second read.</li>
+    <li>Lamport, "Proving the Correctness of Multiprocess Programs", IEEE TSE 3(2), 1977 [LAMPORT77]: where the safety/liveness split comes from.</li>
+    <li>Raynal &amp; Tronel, "Group membership failure detection: a simple protocol and its probabilistic analysis", Distributed Systems Engineering 6(3), 1999 [RAYNAL99].</li>
+  </ul></div>
+</section>
+
+<!-- 2 -->
+<section class="plate" id="s2">
+  <div class="plate-head"><div><div class="secno">02 · HEARTBEATS AND PINGS</div><h2>Ask "are you alive?" and start a clock</h2></div><span class="chip">pdf p316–317 · Fig 9-1, 9-2</span></div>
+  <p>There are two periodic ways to learn about a remote process:</p>
+  <ul class="plain">
+    <li><b>Ping</b>: you send it a message and expect a response within a set time.</li>
+    <li><b>Heartbeat</b>: the process itself keeps telling its peers "I'm still running".</li>
+  </ul>
+  <p>The book uses pings for its examples and notes heartbeats give similar results. Each process keeps a <b>list of the other processes</b> (alive, dead and suspected) with the <b>last response time</b> of each. A process that doesn't answer a ping for too long is marked <b>suspected</b>. Figure 9-1 is the healthy case: P1 asks P2 "alive?", P2 acknowledges, and each ack arrives before the next question. Figure 9-2 is the troubling case: the acks are delayed and arrive after the <em>next</em> ping has already gone out, so P1 may mark a perfectly active P2 as down.</p>
+  <p>Many detectors are just heartbeats plus timeouts. Example: Akka has a <b>deadline failure detector</b>, which reports a failure when a process hasn't registered a heartbeat within a fixed interval. Two downsides: its precision depends on choosing the ping frequency and timeout carefully, and it only sees the process <em>from one place</em>, not how other processes see it (that's what plate 4 fixes).</p>
+  <div class="box picture"><b>Picture it</b><p>A teacher calling the register. Silence after a name doesn't tell you whether the pupil is absent or just didn't hear; if the teacher moves on to the next name while the first pupil's late "here!" is still on its way, the late answer gets credited to nothing and the pupil is marked absent.</p></div>
+  <div class="fig">
+    <h3>Step through Fig 9-1 / 9-2 with a deadline detector</h3>
+    <div class="svgwrap" id="seq2"></div>
+    <div class="steptxt" id="txt2"></div>
+    <div class="controls">
+      <button id="next2" type="button">Next event ▶</button><button id="reset2" type="button">Reset</button><button id="all2" type="button">Show all</button>
+      <span class="readout">event <b id="no2">0</b></span>
+    </div>
+    <div class="controls">
+      <label for="pat2">scenario <select id="pat2"><option value="normal">Fig 9-1: normal</option><option value="slow">Fig 9-2: acks slower than the ping interval</option><option value="spike">one ack delayed 4×</option><option value="crash">P2 crashes</option></select></label>
+      <label for="int2">ping every (ms) <input id="int2" type="range" min="200" max="2000" step="100" value="1000"><output id="int2o">1000</output></label>
+      <label for="dl2">round trip (ms) <input id="dl2" type="range" min="50" max="1800" step="50" value="400"><output id="dl2o">400</output></label>
+      <label for="to2">deadline (ms) <input id="to2" type="range" min="200" max="5000" step="100" value="1500"><output id="to2o">1500</output></label>
+    </div>
+    <div class="tablewrap" id="mem2"></div>
+    <div class="readout" id="r2"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The detector only stores "when did I last hear from P2?". Any ack, even one answering an older ping, resets that time. Suspicion fires the moment <code>now − lastHeard</code> passes the deadline. So in the slow-ack scenario (which pins the round trip to at least 1.4× the interval) nothing is wrong as long as acks keep arriving at the ping rate, except at startup if the deadline is shorter than the first round trip; the deadline only bites when a gap between two acks is longer than it. The "one ack delayed 4×" scenario shows a live process wrongly suspected and then cleared when its late ack lands; the crash scenario shows the detection delay: time of last ack + deadline. Precision depends entirely on picking interval and deadline well, which is the book's first downside.</p></div>
+  <pre class="code">class DeadlineDetector {
+  private last = new Map&lt;string, number&gt;();        // process → last response time
+  constructor(private deadlineMs: number) {}
+  heard(p: string, now: number) { this.last.set(p, now); }       // ack or heartbeat
+  state(p: string, now: number): 'alive' | 'suspected' {
+    const t = this.last.get(p) ?? 0;
+    return now - t &gt; this.deadlineMs ? 'suspected' : 'alive';
+  }
+}</pre>
+  <div class="box beyond"><b>Beyond the book: documented defaults</b><ul>
+    <li>Docker <code>HEALTHCHECK</code>: <code>--interval=30s</code>, <code>--timeout=30s</code>, <code>--retries=3</code>, <code>--start-period=0s</code>. A container becomes unhealthy after 3 consecutive failed checks: a deadline detector with "3 strikes" built in.</li>
+    <li>etcd (Raft): followers expect a leader heartbeat every <b>100 ms</b> and start an election after <b>1000 ms</b> of silence; the docs say the election timeout should be at least 10× the round-trip time. Raft's election timeout is a deadline failure detector for the leader.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Plate 1's chart: the deadline here is the "timeout" knob there.</li>
+    <li>Plate 5: φ-accrual keeps the same "last heard" input but replaces the fixed deadline with a threshold that adapts to observed arrival times. Akka ships both.</li>
+  </ul></div>
+</section>
+
+<!-- 3 -->
+<section class="plate" id="s3">
+  <div class="plate-head"><div><div class="secno">03 · TIMEOUT-FREE FAILURE DETECTOR</div><h2>Count heartbeats along paths, never start a clock</h2></div><span class="chip">pdf p318</span></div>
+  <p>Some algorithms don't use timeouts at all. <b>Heartbeat</b>, a timeout-free failure detector [AGUILERA97], only <b>counts</b> heartbeats; the application decides who has failed by looking at its <b>vector of heartbeat counters</b>. Because there are no timeouts, it works under asynchronous-system assumptions.</p>
+  <ul class="plain">
+    <li><b>Assumptions:</b> any two correct processes are connected by a <b>fair path</b>, made only of <b>fair links</b> (a message sent infinitely often over the link is received infinitely often); and every process knows all the other processes.</li>
+    <li><b>State:</b> each process has a list of neighbours and a counter for each process.</li>
+    <li><b>Sending:</b> processes send heartbeat messages to their neighbours. Each message carries the <b>path</b> it has travelled. The first message holds the original sender plus a <b>unique identifier</b> so the same message isn't broadcast twice.</li>
+    <li><b>Receiving:</b> increment the counter for <em>every</em> process in the path, then forward the heartbeat to every neighbour <em>not</em> in the path, appending yourself. Propagation stops once every known process is already in the path.</li>
+    <li><b>Benefit:</b> heartbeats travel through different processes and the paths aggregate neighbours' information, so a process can (correctly) be seen as alive even when the <b>direct link</b> to it is broken.</li>
+    <li>The counters form a <b>global, normalised view</b>: they show how heartbeats propagate relative to each other, so processes can be compared.</li>
+    <li><b>Shortcoming:</b> interpreting the counters is tricky. You need a threshold that gives reliable results; pick it badly and live processes get falsely suspected.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A chain letter that everyone signs before passing it on. You never wait for anyone; you just tally how many letters you've seen with each person's signature on them. Someone whose tally keeps rising is alive, even if they never write to you directly. Someone whose tally froze has stopped signing. The hard part is saying how far behind a tally has to fall before you give up on that person.</p></div>
+  <div class="fig">
+    <h3>Step through rounds of path-carrying heartbeats</h3>
+    <div class="two">
+      <div class="svgwrap small" id="g3"></div>
+      <div class="tablewrap" id="tbl3"></div>
+    </div>
+    <div class="steptxt" id="txt3"></div>
+    <div class="controls">
+      <button id="next3" type="button">Next round ▶</button><button id="run3" type="button">+10 rounds</button><button id="reset3" type="button">Reset</button>
+      <span class="readout">round <b id="round3">0</b></span>
+    </div>
+    <div class="controls">
+      <label for="cut3"><input id="cut3" type="checkbox" checked> cut link P1–P3</label>
+      <label for="crash3"><input id="crash3" type="checkbox"> crash P4</label>
+      <label for="thr3">suspect if no increase for (rounds) <input id="thr3" type="range" min="1" max="6" value="2"><output id="thr3o">2</output></label>
+    </div>
+    <div class="readout" id="r3"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each round every live process starts a heartbeat with path [itself] to each neighbour, and every message received last round is counted and forwarded. Table cell (row P, column Q) is P's counter for Q. With the P1–P3 link cut, P1's counter for P3 still climbs because P3's heartbeats reach P1 via P2, P4 and P5. Crash P4 (tick the box mid-run) and every row's P4 column freezes while the others keep growing. Notice the counters for different processes grow at different speeds (more paths = more increments), which is why a raw "counter difference" threshold is hard to choose. Here the interpretation is "no increase for N rounds", and that quietly reintroduces a timeout: the book's warning made concrete. Note the message count: every heartbeat floods along every simple path, which is expensive on large graphs.</p></div>
+  <pre class="code">type Msg = { id: string; path: number[]; to: number };
+function onHeartbeat(p: number, m: Msg, cnt: number[][], send: (m: Msg) =&gt; void) {
+  for (const q of m.path) cnt[p][q]++;                 // everyone on the path is alive
+  for (const n of neighbours(p))
+    if (linkUp(p, n) &amp;&amp; !m.path.includes(n))           // stop when all are on the path
+      send({ id: m.id, path: [...m.path, p], to: n });
+}
+function originate(p: number, send: (m: Msg) =&gt; void) {
+  for (const n of neighbours(p)) if (linkUp(p, n)) send({ id: uid(), path: [p], to: n });
+}</pre>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.8 "fair-loss link": the fair-path assumption is that link model, applied hop by hop.</li>
+    <li>Plate 6: gossip heartbeat tables keep a counter <em>per process</em> too, but spread whole tables to one random peer instead of flooding paths, and add a local timestamp so a timeout can be applied.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Aguilera, Chen &amp; Toueg, "Heartbeat: a Timeout-Free Failure Detector for Quiescent Reliable Communication", in <i>Distributed Algorithms</i> (WDAG), Springer, 1997 [AGUILERA97]: the algorithm here; its goal is reliable communication over lossy links that eventually stops sending (quiescence) once everything is delivered.</li>
+  </ul></div>
+</section>
+
+<!-- 4 -->
+<section class="plate" id="s4">
+  <div class="plate-head"><div><div class="secno">04 · OUTSOURCED HEARTBEATS</div><h2>Ask your neighbours to ping for you (SWIM)</h2></div><span class="chip">pdf p319 · Fig 9-3</span></div>
+  <p>SWIM, the Scalable Weakly Consistent Infection-style Process Group Membership Protocol [GUPTA01], uses <b>outsourced heartbeats</b>: it improves reliability by also using what the process's <em>neighbours</em> can see. A process doesn't need to know every other process, only a subset of connected peers.</p>
+  <p>Figure 9-3: P1 pings P2. P2 doesn't answer, so P1 picks several <b>random members</b> (P3 and P4). They each send a heartbeat to P2 and, if P2 answers, forward the acknowledgement back to P1. This covers both <b>direct</b> and <b>indirect</b> reachability: with P1, P2 and P3 you can check P3 from the point of view of both P1 and P2.</p>
+  <ul class="plain">
+    <li>Responsibility for the verdict is spread across the group, which makes detection more reliable.</li>
+    <li>No broadcast to a wide group of peers is needed.</li>
+    <li>The outsourced requests can be sent <b>in parallel</b>, so more evidence about a suspect is gathered quickly and the decision is more accurate.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>Your call to a colleague doesn't connect. Before reporting them missing you ask two other people in different buildings to try. If either gets through, the problem was your phone line, not your colleague.</p></div>
+  <div class="fig">
+    <h3>Step through Fig 9-3: direct ping, then ping-req through k helpers</h3>
+    <div class="svgwrap" id="seq4"></div>
+    <div class="steptxt" id="txt4"></div>
+    <div class="controls">
+      <button id="next4" type="button">Next step ▶</button><button id="reset4" type="button">Reset</button>
+      <span class="readout">step <b id="no4">0</b></span>
+      <label for="sc4">scenario <select id="sc4"><option value="link">P1–P2 link broken, P2 alive</option><option value="crash">P2 crashed</option><option value="ok">all healthy</option></select></label>
+      <label for="k4">helpers k <input id="k4" type="range" min="1" max="3" value="2"><output id="k4o">2</output></label>
+    </div>
+  </div>
+  <div class="fig">
+    <h3>How much do helpers cut wrong suspicions? (modelled)</h3>
+    <canvas id="c4" aria-label="Log probability of falsely suspecting a live process vs message loss rate for 0 to 4 helpers"></canvas>
+    <div class="legend" id="c4L"></div>
+    <div class="controls">
+      <label for="p4">message loss % <input id="p4" type="range" min="0.1" max="20" step="0.1" value="1"><output id="p4o">1</output></label>
+      <label for="kk4">helpers k <input id="kk4" type="range" min="0" max="5" value="3"><output id="kk4o">3</output></label>
+      <label for="n4">group size N <input id="n4" type="range" min="4" max="1000" step="1" value="100"><output id="n4o">100</output></label>
+    </div>
+    <div class="readout blockro" id="r4"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>The model (mine): every message is lost independently with probability <i>p</i>; the target is alive. The direct check fails if the ping or the ack is lost: 1 − (1−p)². Each helper path needs four messages (ping-req, ping, ack, forwarded ack), so it fails with 1 − (1−p)⁴, and the process is wrongly suspected only if the direct check <em>and</em> all <i>k</i> helper paths fail: [1 − (1−p)²]·[1 − (1−p)⁴]<sup>k</sup>. At 1% loss that is about 2·10⁻² with no helpers, 7.8·10⁻⁴ with one, and 1.2·10⁻⁶ with three. Cost per probe: 2 messages when the target answers, at most 2 + 4k when it doesn't, no matter how big the group is. The model ignores correlated loss (a congested rack drops many messages at once), which is the main reason real systems add a suspicion phase before declaring death.</p></div>
+  <pre class="code">async function probe(target: Node, members: Node[], k: number): Promise&lt;'alive' | 'suspect'&gt; {
+  if (await ping(target, PROTOCOL_TIMEOUT)) return 'alive';            // direct
+  const helpers = randomSample(members.filter(m =&gt; m !== target), k);
+  const acks = helpers.map(h =&gt; pingReq(h, target, PROTOCOL_TIMEOUT)); // in parallel
+  return (await anyTrue(acks)) ? 'alive' : 'suspect';                  // indirect
+}</pre>
+  <div class="box beyond"><b>Beyond the book</b><ul>
+    <li>The bibliography key [GUPTA01] points to Gupta, Chandra &amp; Goldszmidt, "On scalable and efficient distributed failure detectors" (PODC 2001), which analyses randomised pinging. The protocol named SWIM is in a separate paper: Das, Gupta &amp; Motivala, "SWIM: Scalable Weakly-consistent Infection-style Process Group Membership Protocol", DSN 2002 (not in the book's bibliography). That paper adds a <b>suspect</b> state (a suspected member can refute it before being declared dead) and spreads membership changes by piggybacking them on ping traffic.</li>
+    <li>In SWIM each member pings one random member per period, so a crashed member is first pinged by <em>somebody</em> within a period with probability 1 − (1 − 1/(N−1))<sup>N−1</sup>, which tends to 1 − 1/e ≈ 63%; expected time to first detection is about e/(e−1) ≈ 1.58 periods, independent of N. The readout computes it for your N.</li>
+    <li>HashiCorp <b>memberlist</b> (used by Consul and Serf) is documented as based on SWIM, with extensions called <b>Lifeguard</b> to make it more robust when the local node itself is slow.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Plate 2's second downside ("doesn't capture visibility from other processes") is exactly what this fixes.</li>
+    <li>Ch.12 Anti-Entropy and Dissemination: "infection-style" means gossip; SWIM piggybacks membership updates on its pings.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Gupta, Chandra &amp; Goldszmidt, "On scalable and efficient distributed failure detectors", PODC 2001 [GUPTA01]: why all-to-all heartbeating doesn't scale and how random probing gives constant per-member load.</li>
+    <li>Das, Gupta &amp; Motivala, "SWIM", DSN 2002 (not in the book): the full membership protocol, with suspicion and infection-style dissemination. Short and very readable.</li>
+  </ul></div>
+</section>
+
+<!-- 5 -->
+<section class="plate" id="s5">
+  <div class="plate-head"><div><div class="secno">05 · PHI-ACCRUAL FAILURE DETECTOR</div><h2>Not "up or down" but "how sure am I?"</h2></div><span class="chip">pdf p320–321</span></div>
+  <p>Instead of a binary up/down verdict, the <b>φ-accrual</b> detector [HAYASHIBARA04] outputs a value on a <b>continuous scale</b> that captures how likely it is that the monitored process has crashed. It keeps a <b>sliding window</b> of the arrival times of the most recent heartbeats from each peer, uses them to estimate when the next heartbeat should arrive, compares that estimate with what actually happens, and computes the <b>suspicion level φ</b>: how certain it is about the failure, given current network conditions. When φ reaches a <b>threshold</b>, the node is marked down. Because the window tracks recent behaviour, the scale adapts to changing network conditions.</p>
+  <p>The book splits the detector into three subsystems:</p>
+  <div class="flow" role="img" aria-label="Monitoring to interpretation to action">
+    <div class="row"><span class="node key">Monitoring</span><span class="arr">→</span><span class="node key">Interpretation</span><span class="arr">→</span><span class="node key">Action</span></div>
+    <div class="row"><span class="node">collect liveness data: pings, heartbeats or sampled request/response</span><span class="node">decide whether to mark the process suspected</span><span class="node">a callback run when the process is marked suspected</span></div>
+  </div>
+  <ul class="plain">
+    <li>The samples are assumed to follow a <b>normal distribution</b> and kept in a <b>fixed-size window</b>: new arrivals go in, the oldest fall out.</li>
+    <li>The <b>mean and variance</b> of the window give the distribution; from it you get the probability that the next message arrives within <i>t</i> time units of the previous one.</li>
+    <li>From that, φ expresses how likely a correct decision is; put the other way, how likely it is that a heartbeat will still arrive and contradict the verdict.</li>
+    <li>Developed by researchers at the Japan Advanced Institute of Science and Technology; used in many systems, for example <b>Cassandra</b> and <b>Akka</b> (which also has the deadline detector of plate 2).</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A friend who texts "home safe" about 20 minutes after leaving, give or take 2. At minute 22 you're not worried; at 26 you're uneasy; at 35 you're nearly certain something's wrong. Your unease is φ, and it rises much faster for a punctual friend than for one who arrives anywhere between 10 and 60 minutes. The threshold is when you pick up the phone.</p></div>
+  <div class="fig">
+    <h3>φ over one minute of simulated heartbeats (1 per second)</h3>
+    <canvas id="c5" class="tall" aria-label="Phi suspicion level over time with threshold, heartbeat arrivals and a crash"></canvas>
+    <div class="legend" id="c5L"></div>
+    <div class="controls">
+      <label for="j5">jitter σ (ms) <input id="j5" type="range" min="10" max="400" step="10" value="100"><output id="j5o">100</output></label>
+      <label for="w5">window (samples) <input id="w5" type="range" min="5" max="200" step="5" value="50"><output id="w5o">50</output></label>
+      <label for="th5">threshold φ <input id="th5" type="range" min="1" max="16" step="0.5" value="8"><output id="th5o">8</output></label>
+      <label for="ms5">min σ (ms) <input id="ms5" type="range" min="0" max="300" step="10" value="100"><output id="ms5o">100</output></label>
+      <label for="cr5">crash at (s) <input id="cr5" type="range" min="10" max="58" step="1" value="35"><output id="cr5o">35</output></label>
+      <label for="hic5"><input id="hic5" type="checkbox" checked> 1.8 s network hiccup near 20 s</label>
+      <label for="dist5">model <select id="dist5"><option value="normal">normal (paper, Akka)</option><option value="exp">exponential (Cassandra-style)</option></select></label>
+    </div>
+    <div class="readout blockro" id="r5"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>For the time Δ since the last heartbeat, the normal model computes P<sub>later</sub>(Δ) = 1 − F(Δ), the chance a live process's next heartbeat would arrive even later than this, using the window's mean μ and standard deviation σ. Then φ = −log<sub>10</sub> P<sub>later</sub> (formula from the paper; the book gives no formula). φ = 1 means a 10% chance the verdict "dead" is a mistake, φ = 2 means 1%, φ = 8 means one in 10⁸. Because σ comes from the window, a calm network (small σ) makes φ shoot up within a few hundred ms of a missed beat, while a jittery one stretches the scale: that's the adaptivity. The hiccup shows the price: one long gap spikes φ (maybe above threshold, a false positive) and also widens σ for the next <i>window</i> samples. The exponential model only uses the mean, φ = Δ / (μ · ln 10), so it rises slowly and linearly: much more tolerant, much slower to convict.</p></div>
+  <div class="fig">
+    <h3>Worked example: compute φ yourself</h3>
+    <div class="controls">
+      <label for="mu5">mean gap μ (ms) <input id="mu5" type="range" min="100" max="5000" step="50" value="1000"><output id="mu5o">1000</output></label>
+      <label for="sd5">σ (ms) <input id="sd5" type="range" min="10" max="1000" step="10" value="100"><output id="sd5o">100</output></label>
+      <label for="t5">time since last beat (ms) <input id="t5" type="range" min="0" max="20000" step="10" value="1500"><output id="t5o">1500</output></label>
+    </div>
+    <div class="readout blockro" id="r5b"></div>
+  </div>
+  <p>By hand, with μ = 1000 ms and σ = 100 ms: after 1300 ms of silence, z = (1300 − 1000)/100 = 3, P<sub>later</sub> ≈ 0.00135, φ ≈ 2.87. After 1500 ms, z = 5, P<sub>later</sub> ≈ 2.9·10⁻⁷, φ ≈ 6.54. φ crosses 8 at about 1562 ms. With the exponential model and μ = 1000 ms, φ = 8 needs about 18.4 s of silence.</p>
+  <pre class="code">function phi(deltaMs: number, window: number[], minStd = 100, model: 'normal' | 'exp' = 'normal') {
+  const mean = avg(window);
+  if (model === 'exp') return deltaMs / (mean * Math.LN10);           // = −log10(e^(−Δ/μ))
+  const std = Math.max(stdDev(window), minStd);
+  const pLater = 1 - normalCdf((deltaMs - mean) / std);              // chance a live node is still this late
+  return -Math.log10(pLater);
+}
+// interpretation + action
+if (phi(now - lastArrival, window) &gt;= threshold) onSuspect(peer);</pre>
+  <div class="box beyond"><b>Beyond the book: documented and source-code numbers</b><ul>
+    <li><b>Akka Cluster</b> (reference.conf): <code>threshold = 8.0</code>, <code>heartbeat-interval = 1 s</code>, <code>acceptable-heartbeat-pause = 3 s</code>, <code>min-std-deviation = 100 ms</code>, <code>max-sample-size = 1000</code>. Akka's docs give φ = −log10(1 − F(timeSinceLastHeartbeat)) with F the normal CDF. Its implementation also adds the acceptable pause to the expected interval, so short GC pauses don't raise φ much.</li>
+    <li><b>Cassandra</b>: <code>phi_convict_threshold</code> defaults to <b>8</b> ("most users should never need to adjust this"). Its source (<code>FailureDetector.java</code>, <code>ArrivalWindow.phi()</code>) computes t / mean and multiplies by 1/ln 10 before comparing to the threshold, which is the same as assuming exponentially distributed gaps. That's why this page has the "exponential" switch.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Plate 2: same input (last arrival), but the fixed deadline becomes a threshold on a probability scale that self-tunes to the network.</li>
+    <li>Plate 1's knob doesn't go away: the threshold still trades false positives for detection time; φ just makes the knob mean the same thing on every network.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Hayashibara, Défago, Yared &amp; Katayama, "The φ Accrual Failure Detector", IEEE SRDS 2004 [HAYASHIBARA04]: introduces accrual detectors (output a suspicion level, let each application pick its threshold) and evaluates φ on a transcontinental link.</li>
+  </ul></div>
+</section>
+
+<!-- 6 -->
+<section class="plate" id="s6">
+  <div class="plate-head"><div><div class="secno">06 · GOSSIP AND FAILURE DETECTION</div><h2>Everyone keeps a heartbeat table and passes it on</h2></div><span class="chip">pdf p322–323 · Fig 9-4</span></div>
+  <p>Another way to avoid trusting a single node's view is a <b>gossip-style failure detection service</b> [VANRENESSE98], which uses gossip (Ch.12) to collect and spread the state of neighbouring processes.</p>
+  <ul class="plain">
+    <li>Each member keeps a list of other members with their <b>heartbeat counters</b> and a <b>timestamp</b> of when each counter last went up.</li>
+    <li>Periodically each member <b>increments its own counter</b> and sends its list to a <b>random neighbour</b>. The receiver <b>merges</b> it with its own list, updating other members' counters.</li>
+    <li>Members also periodically scan the list; if a counter hasn't been updated for long enough, that member is considered <b>failed</b>. Choose this timeout carefully to keep false positives unlikely.</li>
+    <li>How often members must talk to each other (the worst-case bandwidth) is <b>capped</b> and grows <b>at most linearly</b> with the number of processes.</li>
+  </ul>
+  <p>Figure 9-4 has three processes: (a) all three talk and update timestamps; (b) P3 can't reach P1, but its timestamp t6 still reaches P1 through P2; (c) P3 crashes, stops sending updates, and the others detect it as failed. So the scheme catches both crashed nodes and nodes that <em>no</em> member can reach. The verdict is reliable because it aggregates many nodes' views; a broken link between two hosts doesn't matter because heartbeats flow around it. The cost is more messages; the benefit is more reliable spreading of information.</p>
+  <div class="box picture"><b>Picture it</b><p>An office noticeboard copied by hand: every few minutes you tick your own name and swap boards with a random colleague, keeping the higher tick count for each name. Anyone whose tick count hasn't moved on <em>your</em> board for a long while is presumably gone, even if you never spoke to them.</p></div>
+  <div class="fig">
+    <h3>Step through Fig 9-4 (3 processes, one gossip per tick)</h3>
+    <div class="svgwrap small" id="net6"></div>
+    <div class="grid3" id="tabs6"></div>
+    <div class="steptxt" id="txt6"></div>
+    <div class="controls">
+      <button id="next6" type="button">Next tick ▶</button><button id="reset6" type="button">Reset</button>
+      <span class="readout">tick <b id="tick6">0</b></span>
+      <label for="sc6">scenario <select id="sc6"><option value="a">(a) all links up</option><option value="b">(b) P1–P3 link down</option><option value="c">(c) P3 crashes at tick 3</option></select></label>
+      <label for="tf6">T_fail (ticks) <input id="tf6" type="range" min="2" max="10" value="4"><output id="tf6o">4</output></label>
+    </div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each row holds (counter, local time it last increased). Merge rule: for each member keep the larger counter; if yours went up, stamp it with <em>your</em> current time. Clocks are never compared across machines, only local "how long since this number moved", which is why no clock sync is needed. In (b) the P3 row on P1's table keeps advancing via P2. In (c) P3's counter freezes everywhere and, T_fail ticks later, each survivor greys it out on its own. Van Renesse et al. also keep a failed member in the list for a further cleanup period, so a stale copy arriving via gossip doesn't bring it back to life (not in the book).</p></div>
+  <pre class="code">type Row = { hb: number; ts: number };               // counter + local time it last grew
+function tick(self: string, table: Map&lt;string, Row&gt;, now: number) {
+  const me = table.get(self)!; me.hb++; me.ts = now;
+  sendTo(randomNeighbour(), snapshot(table));         // whole table, one peer
+}
+function merge(table: Map&lt;string, Row&gt;, incoming: Map&lt;string, number&gt;, now: number) {
+  for (const [p, hb] of incoming) {
+    const r = table.get(p);
+    if (!r || hb &gt; r.hb) table.set(p, { hb, ts: now });   // newer evidence of life
+  }
+}
+const failed = (r: Row, now: number) =&gt; now - r.ts &gt; T_FAIL;</pre>
+  <div class="fig">
+    <h3>How many gossip rounds until everyone hears a new heartbeat? (simulated, pooled)</h3>
+    <canvas id="c6" class="short" aria-label="Average rounds of push gossip to reach all N nodes vs log2 N plus ln N"></canvas>
+    <div class="legend" id="c6L"></div>
+    <div class="readout blockro" id="r6"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Push gossip: every node that already has the new counter sends its table to one random other node per round. The simulation averages 60 runs per group size, for N = 2 to 1024 (x-axis: log<sub>2</sub> N). The rounds grow like log<sub>2</sub> N + ln N (Pittel's 1987 result for random rumour spreading, not in the book), so doubling the cluster costs about 1.7 extra rounds. That is how T_fail is chosen in practice: a few times the expected spreading time, so a live member's counter has almost surely reached everyone before anyone gives up on it.</p></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.12 Gossip Dissemination: the spreading mechanics, rounds ≈ log N, push vs pull.</li>
+    <li>Plate 3: same "counters, not clocks" idea, but with random peers and bounded bandwidth instead of path flooding.</li>
+    <li>Cassandra combines both ideas (beyond the book): its gossiper spreads per-node heartbeat state, and the φ detector (plate 5) watches how often each node's heartbeat version advances.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>van Renesse, Minsky &amp; Hayden, "A Gossip-Style Failure Detection Service", Middleware '98 [VANRENESSE98]: the protocol here, its analysis of mistake probability vs T_fail, and a hierarchical variant for large networks.</li>
+    <li>Pittel, "On spreading a rumor", SIAM J. Applied Mathematics 47(1), 1987 (not in the book): the log<sub>2</sub> N + ln N bound.</li>
+  </ul></div>
+</section>
+
+<!-- 7 -->
+<section class="plate" id="s7">
+  <div class="plate-head"><div><div class="secno">07 · REVERSING FAILURE DETECTION PROBLEM STATEMENT</div><h2>FUSE: one failure becomes everyone's failure</h2></div><span class="chip">pdf p324–325 · Fig 9-5</span></div>
+  <p>Spreading news of a failure isn't always possible, and telling every member can be expensive. <b>FUSE</b> (failure notification service) [DUNAGAN04] focuses on <b>reliable and cheap failure propagation</b> that works even under network partitions.</p>
+  <ul class="plain">
+    <li>All active processes are arranged in <b>groups</b>. If a group becomes unavailable, all participants detect it: every single-process failure is converted into, and spread as, a <b>group failure</b>. This works under any pattern of disconnects, partitions and node failures.</li>
+    <li>Group members periodically ping each other. If a member can't answer (crash, partition or link failure), the member that sent the ping <b>stops answering pings itself</b>.</li>
+    <li>Figure 9-5, four processes: (a) all alive and talking; (b) P2 crashes and stops answering; (c) P4 detects P2's failure and stops answering too; (d) eventually P1 and P3 notice that their peers don't respond, and the failure has spread to the whole group. (The printed text of step d names "P1 and P2" as the silent ones; the figure shows P2 and P4 crossed out, with P1 and P3 noticing, which is what this page follows.)</li>
+    <li>Failures thus travel from their source to every participant, as members one by one stop responding. The <b>absence of communication</b> is the propagation channel.</li>
+    <li><b>Advantage:</b> every member is guaranteed to learn of the group failure and can react. <b>Downside:</b> a link failure that cuts off one process also turns into a group failure, though depending on the use case that can be what you want. Applications can define for themselves what counts as a propagated failure.</li>
+  </ul>
+  <div class="box picture"><b>Picture it</b><p>A rope team of climbers. If one falls and the rope goes slack, the person who feels it stops and tugs the rope too, and soon the whole team has stopped. Nobody needs to shout over the wind: going still is the message.</p></div>
+  <div class="fig">
+    <h3>Step through Fig 9-5 (and a link-failure variant)</h3>
+    <div class="svgwrap small" id="g7"></div>
+    <div class="steptxt" id="txt7"></div>
+    <div class="controls">
+      <button id="next7" type="button">Next step ▶</button><button id="reset7" type="button">Reset</button>
+      <span class="readout">step <b id="no7">0</b></span>
+      <label for="sc7">scenario <select id="sc7"><option value="crash">Fig 9-5: P2 crashes</option><option value="link">only the P1–P3 link fails</option></select></label>
+    </div>
+    <div class="readout" id="r7"></div>
+  </div>
+  <div class="box behind"><b>What's happening behind it</b><p>Each round, every still-responsive member pings one other member (round-robin through the group). If the ping fails for any reason, the pinger turns silent: it keeps living but stops answering pings, so whoever pings it next turns silent too. Silence spreads along the ping graph until the whole group is down, and every member knows it, because each one either saw a failed ping or was the one that went silent. In the link-only variant no process crashed, yet the whole group still fails: the book's "downside, or advantage". The application then rebuilds a new group from the members that are still alive, which is FUSE's model: a group is a contract that is either intact for everyone or broken for everyone.</p></div>
+  <pre class="code">class FuseMember {
+  responsive = true;
+  onPing(): boolean { return this.responsive; }        // silence = "the group has failed"
+  async round(peer: FuseMember) {
+    if (!this.responsive) return;
+    const ok = await pingWithTimeout(peer);
+    if (!ok) { this.responsive = false; this.onGroupFailure(); }   // convert, then propagate by silence
+  }
+  onGroupFailure() { /* app callback: tear down state tied to this group */ }
+}</pre>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Plate 6 spreads failure <em>news</em> by talking more; FUSE spreads it by talking less. The book's summary calls this "quiescence".</li>
+    <li>Ch.13 Distributed Transactions: "abort everyone if anyone is lost" is the same all-or-nothing contract that two-phase commit needs.</li>
+  </ul></div>
+  <div class="box papers"><b>Papers behind this plate</b><ul>
+    <li>Dunagan, Harvey, Jones, Kostić, Theimer &amp; Wolman, "FUSE: lightweight guaranteed distributed failure notification", OSDI 2004 [DUNAGAN04]: groups ride on an overlay's spanning tree so pings are cheap, and the paper argues for "all-or-nothing" failure notification as an application building block.</li>
+  </ul></div>
+</section>
+
+<!-- 8 -->
+<section class="plate" id="s8">
+  <div class="plate-head"><div><div class="secno">08 · SUMMARY · FURTHER READING</div><h2>What to remember</h2></div><span class="chip">pdf p326</span></div>
+  <ul class="plain">
+    <li>Failure detectors are an essential part of any distributed system.</li>
+    <li>FLP says no protocol can guarantee consensus in an asynchronous system. Failure detectors <b>augment the model</b>, making consensus solvable by trading accuracy against completeness.</li>
+    <li>[CHANDRA96] showed that consensus is solvable even with a failure detector that makes an <b>infinite number of mistakes</b>: a key result proving their usefulness.</li>
+    <li>The algorithms differ in how information travels: <b>direct communication</b> (pings, SWIM), <b>broadcast or gossip</b> (timeout-free heartbeat, gossip tables), or <b>quiescence</b>, the absence of communication (FUSE).</li>
+    <li>And in how they decide: heartbeats or pings, <b>hard deadlines</b>, or <b>continuous scales</b> (φ). Each has its own upside: simplicity, accuracy, or precision.</li>
+  </ul>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Detector</th><th>Evidence from</th><th>Decision</th><th>Spreads by</th><th>Strength</th><th>Weakness</th></tr></thead>
+      <tbody>
+        <tr><td>Ping / deadline (plate 2)</td><td>one observer</td><td>fixed timeout</td><td>direct</td><td>simplest</td><td>precision hinges on interval &amp; timeout; one viewpoint</td></tr>
+        <tr><td>Timeout-free Heartbeat (3)</td><td>all paths</td><td>counter threshold (app)</td><td>flooding</td><td>works in async model; survives broken links</td><td>counters hard to interpret; message-heavy</td></tr>
+        <tr><td>SWIM outsourced (4)</td><td>observer + k random helpers</td><td>timeout, then indirect probes</td><td>direct + indirect</td><td>constant load per member; fewer false positives</td><td>correlated loss still fools it</td></tr>
+        <tr><td>φ-accrual (5)</td><td>one observer's arrival history</td><td>threshold on continuous φ</td><td>direct</td><td>adapts to the network; per-app threshold</td><td>assumes a distribution; one viewpoint</td></tr>
+        <tr><td>Gossip tables (6)</td><td>whole cluster, aggregated</td><td>T_fail on local timestamps</td><td>gossip</td><td>reliable, robust to link failures</td><td>more messages; detection ≈ spreading time + T_fail</td></tr>
+        <tr><td>FUSE (7)</td><td>group members</td><td>any failed ping</td><td>silence</td><td>everyone is guaranteed to learn</td><td>a single link failure kills the group</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="box beyond"><b>Beyond the book: what "infinitely many mistakes" means</b><p>[CHANDRA96] solve consensus with a ◇S detector (eventually some correct process is never suspected) when a majority of processes is correct. Such a detector may wrongly suspect processes infinitely often; it only needs one correct process to eventually stop being suspected by everyone. A follow-up paper, Chandra, Hadzilacos &amp; Toueg, "The weakest failure detector for solving consensus" (JACM 43(4), 1996, not in the book), shows ◇W (equivalent to ◇S) is the weakest detector that makes consensus solvable. In Raft and Paxos terms: the leader-election timeout may fire wrongly many times, as long as eventually a leader stays unsuspected long enough to finish.</p></div>
+  <div class="box papers"><b>Further reading named by the book</b><ul>
+    <li>Chandra &amp; Toueg, "Unreliable failure detectors for reliable distributed systems", JACM 43(2), 1996.</li>
+    <li>Freiling, Guerraoui &amp; Kuznetsov, "The failure detector abstraction", ACM Computing Surveys 43(2), 2011.</li>
+    <li>Phan-Ba, "A literature review of failure detection within the context of solving the problem of distributed consensus", MSc essay, UBC, 2015.</li>
+  </ul></div>
+  <div class="box connect"><b>Connects to</b><ul>
+    <li>Ch.10 Leader Election (next page): bully algorithm, ring algorithms and Raft's election all assume a detector telling them the leader is gone.</li>
+    <li>Ch.14 Consensus: Paxos and Raft are safe whatever the detector says; the detector only affects liveness, exactly the safety/liveness split of plate 1.</li>
+  </ul></div>
+</section>
+
+<!-- 9 -->
+<section class="plate" id="s9">
+  <div class="plate-head"><div><div class="secno">09 · BEYOND THE BOOK</div><h2>Choosing a detector, and where they run today</h2></div><span class="chip">synthesis, not in the book</span></div>
+  <p>Everything in this plate is outside the book. Numbers are from the official docs or source code linked below.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>System</th><th>Detector</th><th>Documented defaults</th></tr></thead>
+      <tbody>
+        <tr><td>Akka Cluster</td><td>φ-accrual (normal), plus a deadline detector</td><td class="num">φ ≥ 8 · beat 1 s · pause 3 s · min σ 100 ms · 1000 samples</td></tr>
+        <tr><td>Cassandra</td><td>gossip heartbeats + φ (exponential form)</td><td class="num">phi_convict_threshold 8</td></tr>
+        <tr><td>Consul / Serf (memberlist)</td><td>SWIM + Lifeguard</td><td>see memberlist README</td></tr>
+        <tr><td>etcd (Raft)</td><td>leader heartbeat + election deadline</td><td class="num">beat 100 ms · election 1000 ms (≥ 10× RTT)</td></tr>
+        <tr><td>Docker HEALTHCHECK</td><td>ping + deadline + retries</td><td class="num">every 30 s · timeout 30 s · 3 retries</td></tr>
+        <tr><td>Kubernetes probes</td><td>ping + deadline + failure threshold</td><td class="num">every 10 s · timeout 1 s · 3 failures</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Before</th><th>Problem</th><th>After</th><th>What improved (modelled on this page)</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed deadline, one observer</td><td>one slow ack or broken link → false positive</td><td>SWIM indirect probes</td><td>1% loss: false suspicion 2·10⁻² → 1.2·10⁻⁶ with k = 3, at ≤ 14 messages per probe</td></tr>
+        <tr><td>Fixed deadline</td><td>right timeout differs per network and drifts</td><td>φ-accrual</td><td>same φ = 8 means "1 in 10⁸ mistake"; with μ = 1 s, σ = 100 ms it convicts after ≈ 1.56 s instead of a hand-picked 3–5 s</td></tr>
+        <tr><td>All-to-all heartbeats</td><td>N(N−1) messages per period</td><td>gossip tables</td><td>N messages per period (each carries N rows); spread in ≈ log₂N + ln N rounds</td></tr>
+        <tr><td>Telling everyone about a failure</td><td>can't reach partitioned members</td><td>FUSE</td><td>notification guaranteed under any partition; costs a whole group per link failure</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul class="plain">
+    <li><b>Small cluster, one coordinator (leader-based DB):</b> leader heartbeat + election timeout (Raft). Set the heartbeat near RTT and the timeout ≥ 10× RTT, as etcd advises.</li>
+    <li><b>Large peer-to-peer membership (hundreds to thousands of nodes):</b> SWIM-style probing with suspicion, or gossip tables. Per-node load stays constant or linear in table size.</li>
+    <li><b>Mixed or changing networks (cross-region, cloud VMs with GC pauses):</b> φ-accrual so one threshold works everywhere; add an acceptable-pause allowance for GC.</li>
+    <li><b>Work that must be torn down everywhere together (sessions, distributed locks, a transaction's participants):</b> FUSE-like group failure, or leases with expiry.</li>
+  </ul>
+  <div class="box papers"><b>Sources for this page's "beyond the book" numbers</b><ul>
+    <li>Akka failure detector docs: https://doc.akka.io/libraries/akka-core/current/typed/failure-detector.html · defaults: https://github.com/akka/akka/blob/main/akka-cluster/src/main/resources/reference.conf</li>
+    <li>Cassandra <code>phi_convict_threshold</code>: https://cassandra.apache.org/doc/latest/cassandra/managing/configuration/cass_yaml_file.html · φ code: https://github.com/apache/cassandra/blob/trunk/src/java/org/apache/cassandra/gms/FailureDetector.java</li>
+    <li>HashiCorp memberlist (SWIM + Lifeguard): https://github.com/hashicorp/memberlist</li>
+    <li>etcd tuning (heartbeat, election timeout): https://etcd.io/docs/v3.5/tuning/</li>
+    <li>Docker HEALTHCHECK: https://docs.docker.com/reference/dockerfile/#healthcheck</li>
+    <li>Kubernetes probes: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/</li>
+  </ul></div>
+</section>
+
+<section class="plate" id="quiz">
+  <div class="plate-head"><h2>Check yourself</h2><span class="chip">answer before you open</span></div>
+  <details><summary>1. Why can't an asynchronous system ever be sure a silent process has crashed?</summary><p>With no bound on message delay or processing speed, any silence could still end with a late reply. Crashed and very slow look identical from outside (plate 1; FLP in Ch.8).</p></details>
+  <details><summary>2. State liveness and safety for a failure detector, in one line each.</summary><p>Liveness: a failed process will eventually be detected. Safety: a process marked dead really was dead. A practical detector gives up strict safety (false positives are allowed) to keep liveness (plate 1).</p></details>
+  <details><summary>3. You halve the timeout of a deadline detector. Which property improves and which gets worse?</summary><p>Efficiency (faster detection) improves; accuracy gets worse (more live processes wrongly suspected). The book says you can't have both at once (plate 1).</p></details>
+  <details><summary>4. In Fig 9-2 the acks arrive after the next ping is sent. Does a deadline detector necessarily suspect P2?</summary><p>No. It only tracks the last time it heard anything; if acks keep arriving at the ping rate, every gap is still under the deadline. It suspects only when one gap between acks exceeds the deadline (plate 2 simulator).</p></details>
+  <details><summary>5. The P1–P3 link is down. How can the timeout-free Heartbeat algorithm still show P3 as alive at P1?</summary><p>P3's heartbeats travel along other paths (P3→P2→P1, etc.); P1 increments the counters of every process named in each path it receives (plate 3).</p></details>
+  <details><summary>6. What is the weakness of the timeout-free detector the book points out?</summary><p>Turning counter vectors into a verdict needs a threshold, and a poor one falsely suspects live processes. In practice "hasn't grown for a while" brings a timeout back (plate 3).</p></details>
+  <details><summary>7. In SWIM, P1's ping to P2 fails but P3 gets an ack from P2. What should P1 conclude, and what did it learn?</summary><p>P2 is alive; the problem is on the P1–P2 path. That's indirect reachability: the verdict uses neighbours' views, not just P1's (plate 4).</p></details>
+  <details><summary>8. With 5% independent message loss, roughly how much does going from 0 to 2 helpers cut SWIM's false-suspicion probability (in this page's model)?</summary><p>From about 9.8·10⁻² to 3.4·10⁻³, roughly 30× fewer wrong suspicions, for at most 8 extra messages per failed probe (plate 4 calculator).</p></details>
+  <details><summary>9. What does φ = 3 mean, and why does the same threshold behave differently on a calm and a jittery network?</summary><p>About a 1-in-1000 chance that a live process's heartbeat would still be this late, so declaring it dead would be wrong once in a thousand times. φ is computed from the window's mean and spread, so on a calm network (small σ) it climbs much faster after a missed beat than on a jittery one (plate 5).</p></details>
+  <details><summary>10. Name the three subsystems of a φ-accrual detector.</summary><p>Monitoring (collect heartbeats, pings or request/response samples), Interpretation (decide whether to suspect), Action (callback when suspected) (plate 5).</p></details>
+  <details><summary>11. In gossip failure detection, why is it safe that nodes' clocks are not synchronised?</summary><p>Each node only stamps rows with its own local time when a counter grows, and compares against its own clock. Counters, not timestamps, are what's exchanged (plate 6).</p></details>
+  <details><summary>12. Gossip bandwidth "grows at most linearly". Linearly in what, and why?</summary><p>In the number of processes: each period a member sends one message to one neighbour, and that message carries one row per member (plate 6).</p></details>
+  <details><summary>13. FUSE turns a single broken link into a whole-group failure. When is that a feature?</summary><p>When the group represents something that must be all-or-nothing, like a session or the participants of one operation: everyone is guaranteed to learn it's gone and can clean up, even across a partition (plate 7).</p></details>
+  <details><summary>14. How can consensus be solvable with a detector that makes infinitely many mistakes?</summary><p>The algorithm stays safe whatever the detector says; it only needs the detector, eventually, to stop suspecting at least one correct process so that process can lead to a decision ([CHANDRA96], plate 8).</p></details>
+</section>
+
+<footer>Built from Alex Petrov, <i>Database Internals</i> (O'Reilly, 2019), Chapter 9 "Failure Detection" (PDF pages 314–326), explained in my own words with recreated figures. Simulations and calculators are modelled, not measured; numbers marked "Beyond the book" come from the cited papers, official docs and source code. Bibliography keys like [CHANDRA96] refer to the book's Appendix A (pdf p489–516).</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const css = (name) => getComputedStyle(root).getPropertyValue('--' + name).trim();
+  function rgba(hex, a) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+  const colorOf = (name, a = 1) => rgba(css(name) || '#888888', a);
+
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  // segments: {n, drift, vol, revert, kind}
+  function genMarket(segs, seed, start = 100) {
+    const r = rng(seed); const c = [], h = [], l = [], kind = []; let p = start;
+    for (const s of segs) {
+      const center = p;
+      for (let i = 0; i < s.n; i++) {
+        let ret = s.drift + s.vol * gauss(r);
+        if (s.revert) ret += s.revert * (center - p) / p;
+        p = Math.max(1, p * (1 + ret));
+        const range = p * (s.vol * 0.9 + 0.003);
+        c.push(p); h.push(p + range * r()); l.push(p - range * r()); kind.push(s.kind || 'trend');
+      }
+    }
+    return { c, h, l, kind };
+  }
+
+  const nulls = (n) => new Array(n).fill(null);
+  function sma(a, n) { const o = nulls(a.length); let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= n) s -= a[i - n]; if (i >= n - 1) o[i] = s / n; } return o; }
+  function wma(a, n) { const o = nulls(a.length); const d = n * (n + 1) / 2; for (let i = n - 1; i < a.length; i++) { let s = 0; for (let k = 0; k < n; k++) s += a[i - k] * (n - k); o[i] = s / d; } return o; }
+  function ema(a, n, alpha) {
+    const al = alpha != null ? alpha : 2 / (n + 1); const o = nulls(a.length); let e = null;
+    for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; e = e == null ? a[i] : al * a[i] + (1 - al) * e; o[i] = e; }
+    for (let i = 0; i < Math.min(n - 1, a.length); i++) o[i] = null; // hide warm-up
+    return o;
+  }
+  function rollStd(a, n) { const o = nulls(a.length); for (let i = n - 1; i < a.length; i++) { let m = 0; for (let k = 0; k < n; k++) m += a[i - k]; m /= n; let v = 0; for (let k = 0; k < n; k++) v += (a[i - k] - m) ** 2; o[i] = Math.sqrt(v / n); } return o; }
+  function chanHi(h, n) { const o = nulls(h.length); for (let i = n; i < h.length; i++) { let m = -Infinity; for (let k = 1; k <= n; k++) m = Math.max(m, h[i - k]); o[i] = m; } return o; }
+  function chanLo(l, n) { const o = nulls(l.length); for (let i = n; i < l.length; i++) { let m = Infinity; for (let k = 1; k <= n; k++) m = Math.min(m, l[i - k]); o[i] = m; } return o; }
+  function effRatio(c, n) { const o = nulls(c.length); for (let i = n; i < c.length; i++) { let path = 0; for (let k = i - n + 1; k <= i; k++) path += Math.abs(c[k] - c[k - 1]); o[i] = path ? Math.abs(c[i] - c[i - n]) / path : 0; } return o; }
+  function kama(c, n = 10, f = 2, s = 30) {
+    const er = effRatio(c, n); const o = nulls(c.length); const fa = 2 / (f + 1), sa = 2 / (s + 1); let a = null;
+    for (let i = n; i < c.length; i++) { const sc = (er[i] * (fa - sa) + sa) ** 2; a = a == null ? c[i] : a + sc * (c[i] - a); o[i] = a; }
+    return { ama: o, er };
+  }
+
+  // positions -> trades; pos[i] is the position held after the close of bar i
+  function backtest(c, pos, costPct, kindArr) {
+    const trades = []; let cur = 0, entry = 0, ei = 0; const eq = nulls(c.length); let realised = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = pos[i] == null ? cur : pos[i];
+      if (p !== cur) {
+        if (cur !== 0) { const pnl = cur * (c[i] / entry - 1) * 100 - costPct; realised += pnl; trades.push({ a: ei, b: i, dir: cur, pnl, kind: kindArr ? kindArr[ei] : null }); }
+        if (p !== 0) { entry = c[i]; ei = i; }
+        cur = p;
+      }
+      eq[i] = realised + (cur !== 0 ? cur * (c[i] / entry - 1) * 100 : 0);
+    }
+    const open = cur !== 0 ? cur * (c[c.length - 1] / entry - 1) * 100 : 0;
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const whips = trades.filter((t) => t.pnl <= 0 && t.b - t.a <= 10).length;
+    return { trades, eq, net: realised + open, wins, losses: trades.length - wins, whips };
+  }
+
+  function niceTicks(lo, hi, n) {
+    const span = hi - lo; if (!(span > 0)) return [lo];
+    const raw = span / n; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / mag;
+    const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag; const out = [];
+    for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+    return out;
+  }
+  const fmt = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(2);
+
+  function strokeSeries(g, d, X, Y, x0, x1, color, w, dash, step) {
+    g.strokeStyle = color; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let pen = false, py = 0;
+    for (let i = x0; i <= x1; i++) {
+      const v = d[i]; if (v == null || !isFinite(v)) { pen = false; continue; }
+      const x = X(i), y = Y(v);
+      if (!pen) { g.moveTo(x, y); pen = true; } else if (step) { g.lineTo(x, py); g.lineTo(x, y); } else g.lineTo(x, y);
+      py = y;
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+
+  // spec: {lines:[{d,col,w,dash,label,alpha,step}], bands:[{up,lo,col,label}], bars:[{d,col}], marks:[{i,v,kind}], vlines:[{i,col,label}],
+  //        shade:[{a,b,col,alpha}], sub:{lines, zero, bars, ymin, ymax, label}, ymin, ymax, x0, x1, n}
+  function plot(id, sp) {
+    const cv = $(id); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1; const W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = sp.n; const x0 = sp.x0 != null ? sp.x0 : 0, x1 = sp.x1 != null ? sp.x1 : n - 1;
+    const padL = 6, padR = 48, padT = 10, padB = 8;
+    const subH = sp.sub ? Math.round((H - padT - padB) * 0.28) : 0; const gap = sp.sub ? 16 : 0;
+    const mainH = H - padT - padB - subH - gap;
+    const X = (i) => padL + (i - x0) / Math.max(1, x1 - x0) * (W - padL - padR);
+    function range(lines, bands, bars, ymin, ymax) {
+      let lo = Infinity, hi = -Infinity;
+      const take = (arr) => { for (let i = x0; i <= x1; i++) { const v = arr[i]; if (v != null && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } };
+      (lines || []).forEach((l) => { if (!l.noScale) take(l.d); }); (bands || []).forEach((b) => { take(b.up); take(b.lo); }); (bars || []).forEach((b) => take(b.d));
+      if (ymin != null) lo = ymin; if (ymax != null) hi = ymax;
+      if (!isFinite(lo)) { lo = 0; hi = 1; }
+      const pad = (hi - lo) * 0.07 || 1; return [ymin != null ? lo : lo - pad, ymax != null ? hi : hi + pad];
+    }
+    const font = '11px ' + css('mono');
+    function panel(top, height, lines, bands, bars, ymin, ymax, zero, label) {
+      const [lo, hi] = range(lines, bands, bars, ymin, ymax);
+      const Y = (v) => top + (hi - v) / (hi - lo) * height;
+      g.font = font; g.fillStyle = colorOf('muted'); g.strokeStyle = colorOf('rule', 0.9); g.lineWidth = 1;
+      niceTicks(lo, hi, height > 120 ? 4 : 2).forEach((t) => { const y = Y(t); if (y < top - 1 || y > top + height + 1) return; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(fmt(t), W - padR + 5, y + 4); });
+      if (zero && lo < 0 && hi > 0) { g.strokeStyle = colorOf('muted', 0.8); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]); }
+      (bars || []).forEach((b) => { const bw = Math.max(1, (W - padL - padR) / (x1 - x0 + 1) * 0.7); for (let i = x0; i <= x1; i++) { const v = b.d[i]; if (v == null) continue; g.fillStyle = typeof b.col === 'function' ? b.col(i, v) : colorOf(b.col, b.alpha || 0.55); const base = Y(lo < 0 && hi > 0 ? 0 : lo); const yv = Y(v); g.fillRect(X(i) - bw / 2, Math.min(yv, base), bw, Math.abs(base - yv)); } });
+      (bands || []).forEach((b) => {
+        g.fillStyle = colorOf(b.col, b.alpha != null ? b.alpha : 0.13); g.beginPath(); let started = false;
+        for (let i = x0; i <= x1; i++) { if (b.up[i] == null) continue; const x = X(i), y = Y(b.up[i]); if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; } }
+        for (let i = x1; i >= x0; i--) { if (b.lo[i] == null) continue; g.lineTo(X(i), Y(b.lo[i])); }
+        g.closePath(); g.fill();
+        strokeSeries(g, b.up, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step); strokeSeries(g, b.lo, X, Y, x0, x1, colorOf(b.col, 0.85), 1.1, b.dash, b.step);
+      });
+      (lines || []).forEach((l) => strokeSeries(g, l.d, X, Y, x0, x1, colorOf(l.col, l.alpha != null ? l.alpha : 1), l.w || 1.7, l.dash, l.step));
+      if (label) { g.fillStyle = colorOf('muted'); g.font = font; g.fillText(label, padL + 4, top + 12); }
+      return Y;
+    }
+    // shading behind main panel
+    (sp.shade || []).forEach((s) => { g.fillStyle = colorOf(s.col, s.alpha != null ? s.alpha : 0.1); g.fillRect(X(s.a) - 0.5, padT, X(s.b) - X(s.a) + 1, mainH); });
+    const Y = panel(padT, mainH, sp.lines, sp.bands, sp.bars, sp.ymin, sp.ymax, sp.zero, sp.label);
+    (sp.vlines || []).forEach((v) => { if (v.i < x0 || v.i > x1) return; g.strokeStyle = colorOf(v.col || 'muted', 0.9); g.setLineDash([4, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v.i), padT); g.lineTo(X(v.i), padT + mainH); g.stroke(); g.setLineDash([]); if (v.label) { g.fillStyle = colorOf(v.col || 'muted'); g.font = font; const tw = g.measureText(v.label).width; let tx = X(v.i) + 4; if (tx + tw > W - padR) tx = X(v.i) - tw - 4; g.fillText(v.label, tx, padT + 12 + (v.row || 0) * 14); } });
+    (sp.marks || []).forEach((m) => {
+      if (m.i < x0 || m.i > x1 || m.v == null) return; const x = X(m.i), y = Y(m.v); const s = m.size || 6;
+      if (m.kind === 'buy' || m.kind === 'alertUp') { g.fillStyle = colorOf('buy'); g.strokeStyle = colorOf('buy'); g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x - s, y + 4 + s * 1.5); g.lineTo(x + s, y + 4 + s * 1.5); g.closePath(); m.kind === 'alertUp' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else if (m.kind === 'sell' || m.kind === 'alertDown') { g.fillStyle = colorOf('sell'); g.strokeStyle = colorOf('sell'); g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x - s, y - 4 - s * 1.5); g.lineTo(x + s, y - 4 - s * 1.5); g.closePath(); m.kind === 'alertDown' ? (g.lineWidth = 1.4, g.stroke()) : g.fill(); }
+      else { g.fillStyle = colorOf(m.col || 'c1'); g.beginPath(); g.arc(x, y, m.r || 3, 0, Math.PI * 2); g.fill(); }
+    });
+    if (sp.sub) { const top = padT + mainH + gap; g.strokeStyle = colorOf('rule'); g.beginPath(); g.moveTo(padL, top - gap / 2); g.lineTo(W - padR, top - gap / 2); g.stroke(); panel(top, subH, sp.sub.lines, sp.sub.bands, sp.sub.bars, sp.sub.ymin, sp.sub.ymax, sp.sub.zero, sp.sub.label); }
+    // legend
+    const L = $(id + 'L');
+    if (L) {
+      const items = [];
+      (sp.lines || []).forEach((l) => l.label && items.push([l.label, l.col]));
+      (sp.bands || []).forEach((b) => b.label && items.push([b.label, b.col]));
+      (sp.legend || []).forEach((x) => items.push(x));
+      if (sp.sub) (sp.sub.lines || []).concat(sp.sub.bars || []).forEach((l) => l.label && items.push([l.label, typeof l.col === 'string' ? l.col : 'muted']));
+      L.innerHTML = items.map(([t, c]) => `<span style="--sw:${colorOf(c)}">${t}</span>`).join('');
+    }
+  }
+
+
+  // ---------- data ----------
+  let seed = 7;
+  let M;
+  function buildData() {
+    M = genMarket([
+      { n: 70, drift: 0.0042, vol: 0.010, kind: 'trend' },
+      { n: 70, drift: 0, vol: 0.012, revert: 0.09, kind: 'range' },
+      { n: 70, drift: -0.0046, vol: 0.011, kind: 'trend' }
+    ], seed);
+    $('seedOut').textContent = seed;
+  }
+
+  const draws = [];
+  const reg = (f) => { draws.push(f); return f; };
+  const redrawAll = () => draws.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
+  function bindRange(id, f) { const el = $(id), out = $(id + 'o'); const upd = () => { if (out) out.textContent = el.value; f(); }; el.addEventListener('input', upd); if (out) out.textContent = el.value; }
+  const val = (id) => +$(id).value;
+
+
+  // ---------- system helpers ----------
+  function crossMarks(c, pos) { const m = []; let prev = 0; for (let i = 0; i < c.length; i++) { const p = pos[i]; if (p != null && p !== prev) { if (p > 0) m.push({ i, v: c[i], kind: 'buy' }); else if (p < 0 || prev > 0) m.push({ i, v: c[i], kind: 'sell' }); prev = p; } } return m; }
+  function statLine(bt, extra) {
+    const net = bt.net; const cls = net >= 0 ? 'good' : 'bad';
+    return `trades <b>${bt.trades.length}</b> · winners <b>${bt.wins}</b> · losers <b>${bt.losses}</b> · quick losers (≤10 days) <b>${bt.whips}</b> · net <b class="${cls}">${net >= 0 ? '+' : ''}${net.toFixed(1)}%</b>${extra || ''}`;
+  }
+  function bhLine(c) { const r = (c[c.length - 1] / c[0] - 1) * 100; return ` · buy &amp; hold <b>${r >= 0 ? '+' : ''}${r.toFixed(1)}%</b>`; }
+
+  // ---------- page helpers (chapter 9) ----------
+  function normTail(z) { // P(Z > z) for a standard normal, Simpson integration (accurate far into the tail)
+    if (z < 0) return 1 - normTail(-z);
+    if (z > 38) return 0;
+    const n = 400, h = 10 / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const x = z + i * h; s += Math.exp(-x * x / 2) * (i === 0 || i === n ? 1 : (i % 2 ? 4 : 2)); }
+    return s * h / 3 / Math.sqrt(2 * Math.PI);
+  }
+  const sci = (p) => (p <= 0 ? '&lt;10⁻¹⁶' : p >= 0.001 ? (p * 100).toPrecision(3) + '%' : p.toExponential(2));
+  const MK = { k: 'muted', o: 'c1', r: 'sell', g: 'buy', t: 'c2' };
+  function defs(pre) {
+    let s = '<defs>';
+    for (const key in MK) { const mid = pre + key; s += `<marker id="${mid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--${MK[key]})"></path></marker>`; }
+    return s + '</defs>';
+  }
+  function arrow(pre, x1, y1, x2, y2, col, dash) {
+    const c = col || 'k';
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" style="stroke:var(--${MK[c]});stroke-width:1.7${dash ? ';stroke-dasharray:5 4' : ''}" marker-end="url(#${pre + c})"></line>`;
+  }
+  const cross = (x, y, r, col) => `<path d="M${x - r},${y - r} L${x + r},${y + r} M${x + r},${y - r} L${x - r},${y + r}" style="stroke:var(--${col || 'sell'});stroke-width:2;fill:none"></path>`;
+  const txt = (x, y, s, cls, anchor) => `<text x="${x}" y="${y}"${cls ? ` class="${cls}"` : ''}${anchor ? ` text-anchor="${anchor}"` : ''}>${s}</text>`;
+  function shuffleFrom(r, arr) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+  // ---------- 1 · timeout trade-off ----------
+  function pLate(T, I, sd, q, m) {
+    const s = Math.SQRT2 * sd;
+    const pn = normTail((T - I) / s);
+    if (q <= 0) return pn;
+    // P(N + X > T), X ~ Exp(mean m), N ~ Normal(I, s)
+    const a = I - 8 * s, b = I + 8 * s, n = 400, h = (b - a) / n; let acc = 0;
+    for (let i = 0; i <= n; i++) {
+      const x = a + i * h; const f = Math.exp(-((x - I) ** 2) / (2 * s * s)) / (s * Math.sqrt(2 * Math.PI));
+      const tail = T - x <= 0 ? 1 : Math.exp(-(T - x) / m);
+      acc += f * tail * (i === 0 || i === n ? 1 : (i % 2 ? 4 : 2));
+    }
+    return (1 - q) * pn + q * acc * h / 3;
+  }
+  const d1 = reg(() => {
+    const I = val('int1'), sd = val('sd1'), mult = val('to1'), q = val('gc1') / 100, m = val('gcm1');
+    const n = 200, lo = 1.1, hi = 10; const lp = [], det = [], worst = [];
+    for (let i = 0; i < n; i++) { const T = I * (lo + (hi - lo) * i / (n - 1)); const p = pLate(T, I, sd, q, m); lp.push(Math.max(-14, Math.log10(Math.max(p, 1e-16)))); det.push((T - I / 2) / 1000); worst.push(T / 1000); }
+    const idx = Math.round((mult - lo) / (hi - lo) * (n - 1));
+    const at = (k) => Math.round((k - lo) / (hi - lo) * (n - 1));
+    plot('c1', { n, ymin: -14, ymax: 0, lines: [{ d: lp, col: 'sell', w: 2.2, label: 'log₁₀ P(live process wrongly suspected per heartbeat)' }],
+      vlines: [{ i: at(2), label: '2×' }, { i: at(5), label: '5×' }, { i: idx, col: 'c1', label: 'timeout ' + mult + '× interval', row: 1 }],
+      marks: [{ i: idx, v: lp[idx], col: 'c1', r: 4 }],
+      sub: { lines: [{ d: det, col: 'c2', label: 'mean detection delay of a real crash (s)' }, { d: worst, col: 'c2', alpha: 0.45, dash: [4, 3], label: 'worst case (s)' }] } });
+    const T = I * mult, p = pLate(T, I, sd, q, m); const perDay = p * 86400000 / I;
+    $('r1').innerHTML = `x-axis: timeout from 1.1× to 10× the interval · at <b>${T.toFixed(0)} ms</b>: P(wrong suspicion per heartbeat) <b>${sci(p)}</b> · expected wrong suspicions per monitored node per day <b>${perDay < 0.01 ? perDay.toExponential(1) : perDay.toFixed(2)}</b><br>real crash noticed after <b>${((T - I / 2) / 1000).toFixed(2)} s</b> on average, <b>${(T / 1000).toFixed(2)} s</b> at worst · modelled: Normal jitter + ${(q * 100).toFixed(1)}% chance of an exponential pause (mean ${m} ms)`;
+  });
+  ['int1', 'sd1', 'to1', 'gc1', 'gcm1'].forEach((id) => bindRange(id, d1));
+
+  // ---------- 2 · ping timeline with a deadline detector ----------
+  let step2 = 0, M2 = null;
+  function pingModel(I, rt, T, pat) {
+    const N = 6, ev = [], heardTimes = []; const crashT = 2.5 * I;
+    for (let k = 0; k < N; k++) {
+      const ts = k * I; let d = pat === 'slow' ? Math.max(rt, I * 1.4) : rt; if (pat === 'spike' && k === 2) d = rt * 4;
+      ev.push({ t: ts, kind: 'ping', k, txt: `t = ${ts} ms · P1 sends ping #${k + 1} ("alive?") to P2.` });
+      if (pat === 'crash' && ts >= crashT) { ev.push({ t: ts + d / 2, kind: 'lost', k, from: ts, txt: `Ping #${k + 1} reaches a crashed P2: no reply will ever come.` }); continue; }
+      ev.push({ t: ts + d / 2, kind: 'recv', k, from: ts, txt: `t = ${(ts + d / 2).toFixed(0)} ms · P2 receives ping #${k + 1} and replies.` });
+      ev.push({ t: ts + d, kind: 'ack', k, from: ts + d / 2, txt: `t = ${(ts + d).toFixed(0)} ms · P1 receives the ack for ping #${k + 1}${d > I ? ', after ping #' + (k + 2) + ' already went out (Fig 9-2)' : ''}. lastHeard = ${(ts + d).toFixed(0)} ms.` });
+      heardTimes.push(ts + d);
+    }
+    if (pat === 'crash') ev.push({ t: crashT, kind: 'crash', txt: `t = ${crashT} ms · P2 crashes. P1 doesn't know yet.` });
+    const heard = [0].concat(heardTimes.sort((a, b) => a - b));
+    for (let j = 0; j < heard.length; j++) {
+      const nxt = j + 1 < heard.length ? heard[j + 1] : Infinity;
+      if (nxt === Infinity && pat !== 'crash') continue;
+      if (nxt - heard[j] > T) {
+        const st = heard[j] + T;
+        ev.push({ t: st, kind: 'suspect', txt: `t = ${st.toFixed(0)} ms · nothing heard for ${T} ms since ${heard[j].toFixed(0)} ms → P1 marks P2 <b>suspected</b>${nxt === Infinity ? ' (correct: it crashed)' : ' (a false positive: P2 is alive)'}.` });
+        if (nxt !== Infinity) ev.push({ t: nxt + 0.01, kind: 'clear', txt: `t = ${nxt.toFixed(0)} ms · a late ack arrives → P2 back to <b>alive</b>. The suspicion was wrong.` });
+      }
+    }
+    ev.sort((a, b) => a.t - b.t);
+    const end = Math.max(...ev.map((e) => e.t)) * 1.06 + 50;
+    return { ev, end, crashT, I };
+  }
+  function draw2() {
+    const { ev, end } = M2; const W = 760, H = 190, X = (t) => 50 + t / end * 690, y1 = 55, y2 = 145; const pre = 'm2';
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ping sequence diagram">${defs(pre)}`;
+    s += `<line class="lane" x1="40" y1="${y1}" x2="${W - 10}" y2="${y1}"></line><line class="lane" x1="40" y1="${y2}" x2="${W - 10}" y2="${y2}"></line>`;
+    s += txt(8, y1 + 4, 'P1') + txt(8, y2 + 4, 'P2');
+    const shown = ev.slice(0, step2); let state = 'alive', lastHeard = 0, susp = 0;
+    const pingT = {};
+    shown.forEach((e) => {
+      if (e.kind === 'ping') { pingT[e.k] = e.t; s += `<line x1="${X(e.t)}" y1="${y1 - 7}" x2="${X(e.t)}" y2="${y1 + 7}" style="stroke:var(--ink);stroke-width:2"></line>` + txt(X(e.t), y1 - 12, 'Alive?', 'sm', 'middle'); }
+      if (e.kind === 'recv') s += arrow(pre, X(e.from), y1, X(e.t), y2 - 2, 'k');
+      if (e.kind === 'lost') s += arrow(pre, X(e.from), y1, X(e.t), y2 - 2, 'r', true) + cross(X(e.t), y2 - 10, 5);
+      if (e.kind === 'ack') { s += arrow(pre, X(e.from), y2, X(e.t), y1 + 2, 'g') + txt(X(e.t), y1 - 24, 'Ack', 'sm good', 'middle'); lastHeard = e.t; }
+      if (e.kind === 'crash') s += cross(X(e.t), y2, 8) + txt(X(e.t), y2 + 26, 'crash', 'bad', 'middle');
+      if (e.kind === 'suspect') { state = 'suspected'; susp++; s += `<circle cx="${X(e.t)}" cy="${y1}" r="6" style="fill:var(--sell)"></circle>` + txt(X(e.t), y1 + 22, 'suspect', 'bad', 'middle'); }
+      if (e.kind === 'clear') { state = 'alive'; s += `<circle cx="${X(e.t)}" cy="${y1}" r="5" style="fill:var(--buy)"></circle>` + txt(X(e.t), y1 + 34, 'alive', 'good', 'middle'); }
+    });
+    const now = shown.length ? shown[shown.length - 1].t : 0;
+    const T = val('to2');
+    s += `<rect x="${X(lastHeard)}" y="${y1 + 40}" width="${Math.max(1, X(Math.min(end, lastHeard + T)) - X(lastHeard))}" height="5" style="fill:var(--c1);opacity:.35"></rect>` + txt(X(lastHeard) + 2, y1 + 58, 'deadline window', 'sm');
+    s += '</svg>';
+    $('seq2').innerHTML = s;
+    $('no2').textContent = step2 + ' / ' + ev.length;
+    $('txt2').innerHTML = step2 ? ev[step2 - 1].txt : 'Press "Next event". The orange bar under P1 is the deadline window counted from the last ack heard.';
+    $('mem2').innerHTML = `<table class="mini"><thead><tr><th>P1's list</th><th>state</th><th>last response</th><th>now</th><th>silent for</th></tr></thead><tbody><tr><td>P2</td><td class="${state === 'alive' ? 'ok' : 'sus'}">${state}</td><td>${lastHeard.toFixed(0)} ms</td><td>${now.toFixed(0)} ms</td><td>${Math.max(0, now - lastHeard).toFixed(0)} ms</td></tr></tbody></table>`;
+    const total = ev.filter((e) => e.kind === 'suspect').length, wrong = ev.filter((e) => e.kind === 'clear').length;
+    $('r2').innerHTML = `whole run: suspicions <b>${total}</b> · wrong ones <b class="${wrong ? 'bad' : 'good'}">${wrong}</b> · shown so far <b>${susp}</b>`;
+  }
+  const d2 = reg(() => { M2 = pingModel(val('int2'), val('dl2'), val('to2'), $('pat2').value); step2 = Math.min(step2, M2.ev.length); draw2(); });
+  ['int2', 'dl2', 'to2'].forEach((id) => bindRange(id, () => { step2 = 0; d2(); }));
+  $('pat2').addEventListener('change', () => { step2 = 0; d2(); });
+  $('next2').addEventListener('click', () => { if (M2 && step2 < M2.ev.length) step2++; draw2(); });
+  $('reset2').addEventListener('click', () => { step2 = 0; draw2(); });
+  $('all2').addEventListener('click', () => { step2 = M2 ? M2.ev.length : 0; draw2(); });
+
+  // ---------- 3 · timeout-free Heartbeat (Aguilera et al.) ----------
+  const N3 = 5, P3pos = [[200, 34], [345, 120], [290, 270], [110, 270], [55, 120]];
+  const E3 = [[0, 1], [1, 2], [0, 2], [2, 3], [3, 4], [4, 0], [1, 4]];
+  let S3;
+  const grid = (n, v) => Array.from({ length: n }, () => new Array(n).fill(v));
+  const alive3 = (p) => !($('crash3').checked && p === 3);
+  const up3 = (a, b) => !($('cut3').checked && ((a === 0 && b === 2) || (a === 2 && b === 0)));
+  const nbrs3 = (p) => E3.filter((e) => e[0] === p || e[1] === p).map((e) => (e[0] === p ? e[1] : e[0]));
+  function reset3() { S3 = { r: 0, cnt: grid(N3, 0), last: grid(N3, 0), q: [], msgs: 0, total: 0, used: {} }; draw3(); }
+  function round3() {
+    S3.r++; const next = []; let m = 0; const used = {};
+    const send = (path, to) => { const from = path[path.length - 1]; const key = Math.min(from, to) + '-' + Math.max(from, to); used[key] = (used[key] || 0) + 1; next.push({ path, to }); m++; };
+    for (const msg of S3.q) {                                   // deliver last round's messages
+      const p = msg.to; if (!alive3(p)) continue;
+      for (const q of msg.path) { S3.cnt[p][q]++; S3.last[p][q] = S3.r; }
+      for (const n of nbrs3(p)) if (up3(p, n) && !msg.path.includes(n)) send(msg.path.concat(p), n);
+    }
+    for (let p = 0; p < N3; p++) if (alive3(p)) for (const n of nbrs3(p)) if (up3(p, n)) send([p], n);   // originate
+    S3.q = next; S3.msgs = m; S3.total += m; S3.used = used;
+  }
+  function draw3() {
+    const thr = val('thr3'); const pre = 'm3';
+    let s = `<svg viewBox="0 0 400 300" role="img" aria-label="Five processes and their links">${defs(pre)}`;
+    E3.forEach(([a, b]) => {
+      const cut = !up3(a, b); const key = Math.min(a, b) + '-' + Math.max(a, b); const k = S3.used[key] || 0;
+      const [x1, y1] = P3pos[a], [x2, y2] = P3pos[b];
+      s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--${cut ? 'sell' : k ? 'c2' : 'rule'});stroke-width:${cut ? 2 : 1.5 + Math.min(4, k / 3)}${cut ? ';stroke-dasharray:6 5' : ''}"></line>`;
+      if (cut) s += cross((x1 + x2) / 2, (y1 + y2) / 2, 7);
+      else if (k) s += txt((x1 + x2) / 2 + 4, (y1 + y2) / 2 - 4, k, 'sm');
+    });
+    for (let p = 0; p < N3; p++) {
+      const [x, y] = P3pos[p]; const dead = !alive3(p);
+      s += `<circle cx="${x}" cy="${y}" r="20" class="nd${dead ? ' dead' : ''}"></circle>` + txt(x, y + 4, 'P' + (p + 1), dead ? 'bad' : '', 'middle');
+      if (dead) s += cross(x, y, 14);
+    }
+    s += txt(200, 296, 'edge labels = messages this round', 'sm', 'middle') + '</svg>';
+    $('g3').innerHTML = s;
+    let t = '<table class="mini"><thead><tr><th>at ↓ / for →</th>' + [0, 1, 2, 3, 4].map((q) => `<th>P${q + 1}</th>`).join('') + '</tr></thead><tbody>';
+    for (let p = 0; p < N3; p++) {
+      t += `<tr><th>P${p + 1}</th>`;
+      for (let q = 0; q < N3; q++) {
+        if (p === q) { t += '<td class="dim">—</td>'; continue; }
+        if (!alive3(p)) { t += `<td class="dim">${S3.cnt[p][q]}</td>`; continue; }
+        const sus = S3.r > thr && S3.r - S3.last[p][q] >= thr;
+        t += `<td class="${sus ? 'sus' : (p === 0 && q === 2 && $('cut3').checked && S3.cnt[p][q] ? 'ok' : '')}">${S3.cnt[p][q]}${sus ? ' ⚠' : ''}</td>`;
+      }
+      t += '</tr>';
+    }
+    $('tbl3').innerHTML = t + '</tbody></table>';
+    $('round3').textContent = S3.r;
+    $('txt3').innerHTML = S3.r === 0 ? 'Round 0: all counters are zero. Each round, every live process sends a heartbeat with path [itself] to its neighbours, and last round\'s messages are counted and forwarded.'
+      : `Round ${S3.r}: ${S3.msgs} heartbeat messages in flight. ${$('cut3').checked ? `P1's counter for P3 is <b>${S3.cnt[0][2]}</b> although their direct link is cut: every increment came via other processes.` : 'All links up.'} ${$('crash3').checked ? 'P4 is crashed: its column stops growing; ⚠ marks a counter that hasn\'t grown for ' + thr + ' rounds.' : ''}`;
+    $('r3').innerHTML = `messages this round <b>${S3.msgs}</b> · total <b>${S3.total}</b> · cells marked ⚠ are suspected under the rule "no increase for ${thr} rounds"`;
+  }
+  reset3();
+  $('next3').addEventListener('click', () => { round3(); draw3(); });
+  $('run3').addEventListener('click', () => { for (let i = 0; i < 10; i++) round3(); draw3(); });
+  $('reset3').addEventListener('click', reset3);
+  $('cut3').addEventListener('change', draw3);
+  $('crash3').addEventListener('change', draw3);
+  bindRange('thr3', draw3);
+
+  // ---------- 4 · SWIM outsourced heartbeats ----------
+  let step4 = 0;
+  function swimSteps(sc, k) {
+    const helpers = [2, 3, 4].slice(0, k); const hn = helpers.map((h) => 'P' + (h + 1)).join(', ');
+    const st = [];
+    st.push({ arrows: [[0, 1, 0, sc === 'ok' ? 'k' : 'r', sc !== 'ok']], txt: sc === 'ok' ? 'P1 pings P2 ("alive?").' : `P1 pings P2. ${sc === 'crash' ? 'P2 has crashed' : 'The P1–P2 link is broken'}, so the ping is lost.` });
+    if (sc === 'ok') { st.push({ arrows: [[1, 0, 1, 'g']], txt: 'P2 answers directly. Verdict: alive. Cost: 2 messages; no helpers needed.', verdict: 'alive' }); return st; }
+    st.push({ arrows: helpers.map((h) => [0, h, 1, 'o']), txt: `No ack before the protocol timeout. P1 picks ${k} random member${k > 1 ? 's' : ''} (${hn}) and asks each, in parallel, to ping P2 for it (ping-req).` });
+    st.push({ arrows: helpers.map((h) => [h, 1, 2, sc === 'crash' ? 'r' : 'k', sc === 'crash']), txt: `${hn} ping P2 from their side of the network.${sc === 'crash' ? ' Nobody answers: P2 is really gone.' : ''}` });
+    if (sc === 'link') {
+      st.push({ arrows: helpers.map((h) => [1, h, 3, 'g']), txt: `P2 is alive and reachable from ${hn}: it acks each of them.` });
+      st.push({ arrows: helpers.map((h) => [h, 0, 4, 'g']), txt: `${hn} forward the ack to P1. Verdict: <b>alive</b> (indirectly reachable). A plain deadline detector would have suspected P2. Messages: ${1 + 4 * k} (the direct ping was lost, so no direct ack).`, verdict: 'alive' });
+    } else {
+      st.push({ arrows: [], txt: `No forwarded ack reaches P1 within the timeout. Verdict: P2 <b>suspected</b>, backed by ${k + 1} independent viewpoints. Messages: ${1 + 2 * k} sent, none answered.`, verdict: 'suspect' });
+    }
+    return st;
+  }
+  const draw4 = reg(() => {
+    const sc = $('sc4').value, k = val('k4'); const st = swimSteps(sc, k); step4 = Math.min(step4, st.length);
+    const W = 760, H = 230, pre = 'm4', Y = (p) => 30 + p * 44, X = (slot) => 70 + slot * 135;
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="SWIM sequence diagram">${defs(pre)}`;
+    for (let p = 0; p < 5; p++) s += `<line class="lane" x1="40" y1="${Y(p)}" x2="${W - 10}" y2="${Y(p)}"></line>` + txt(8, Y(p) + 4, 'P' + (p + 1), p === 1 && sc === 'crash' ? 'bad' : '');
+    if (sc === 'link') s += txt(X(0) + 60, Y(1) + 18, 'link P1–P2 broken', 'sm bad', 'middle');
+    if (sc === 'crash') s += cross(X(0) - 20, Y(1), 7);
+    st.slice(0, step4).forEach((stp) => stp.arrows.forEach(([a, b, slot, col, lost]) => {
+      const x1 = X(slot) + (a - b) * 2, x2 = X(slot + 1) - 6;
+      if (lost) s += arrow(pre, X(slot), Y(a), (X(slot) + x2) / 2 + 20, (Y(a) + Y(b)) / 2 + (Y(b) - Y(a)) * 0.25, 'r', true) + cross((X(slot) + x2) / 2 + 26, (Y(a) + Y(b)) / 2 + (Y(b) - Y(a)) * 0.3, 5);
+      else s += arrow(pre, x1, Y(a), x2, Y(b), col);
+    }));
+    const last = step4 ? st[step4 - 1] : null;
+    if (last && last.verdict) s += txt(W - 14, H - 8, last.verdict === 'alive' ? 'P2: alive' : 'P2: suspected', last.verdict === 'alive' ? 'good' : 'bad', 'end');
+    $('seq4').innerHTML = s + '</svg>';
+    $('no4').textContent = step4 + ' / ' + st.length;
+    $('txt4').innerHTML = last ? last.txt : 'Press "Next step". Lanes are processes, arrows are messages left to right in time.';
+  });
+  $('next4').addEventListener('click', () => { step4++; draw4(); });
+  $('reset4').addEventListener('click', () => { step4 = 0; draw4(); });
+  $('sc4').addEventListener('change', () => { step4 = 0; draw4(); });
+  bindRange('k4', () => { step4 = 0; draw4(); });
+  const swimFP = (p, k) => (1 - (1 - p) ** 2) * (1 - (1 - p) ** 4) ** k;
+  const d4 = reg(() => {
+    const n = 200, pmax = 0.2; const lines = []; const cols = ['sell', 'c1', 'c3', 'c2', 'buy'];
+    for (let k = 0; k <= 4; k++) { const d = []; for (let i = 0; i < n; i++) { const p = pmax * (i + 1) / n; d.push(Math.max(-14, Math.log10(swimFP(p, k)))); } lines.push({ d, col: cols[k], w: k === val('kk4') ? 3 : 1.6, label: `k = ${k}` }); }
+    const p = val('p4') / 100, k = val('kk4'), N = val('n4'); const idx = Math.max(0, Math.round(p / pmax * n) - 1);
+    plot('c4', { n, ymin: -14, ymax: 0, lines, vlines: [{ i: idx, col: 'c1', label: 'loss ' + (p * 100).toFixed(1) + '%' }] });
+    const fp = swimFP(p, k); const hit = 1 - (1 - 1 / (N - 1)) ** (N - 1);
+    $('r4').innerHTML = `y-axis: log₁₀ P(live process wrongly suspected in one probe) · x-axis: message loss 0–20%<br>at loss <b>${(p * 100).toFixed(1)}%</b>, k = <b>${k}</b>: false suspicion <b>${sci(fp)}</b> (vs <b>${sci(swimFP(p, 0))}</b> with no helpers) · messages per probe: <b>2</b> if answered, at most <b>${2 + 4 * k}</b> if not, for any N<br>beyond the book: with N = ${N}, a crashed member is pinged by someone within one period with probability <b>${(hit * 100).toFixed(1)}%</b> → first detection after ≈ <b>${(1 / hit).toFixed(2)}</b> periods on average · all-to-all heartbeats would cost <b>${(N * (N - 1)).toLocaleString()}</b> messages per period vs SWIM's ≈ <b>${(2 * N).toLocaleString()}</b>`;
+  });
+  ['p4', 'kk4', 'n4'].forEach((id) => bindRange(id, d4));
+
+  // ---------- 5 · phi accrual ----------
+  function phiSim() {
+    const r = rng(seed * 31 + 5); const I = 1000, j = val('j5'), crash = val('cr5') * 1000, hic = $('hic5').checked;
+    const arr = [0]; let t = 0, hicDone = false;
+    for (;;) {
+      let g = I + j * gauss(r);
+      if (hic && !hicDone && t >= 19000) { g += 1800; hicDone = true; }
+      g = Math.max(50, g); t += g; if (t >= crash || t > 60000) break; arr.push(t);
+    }
+    return arr;
+  }
+  function phiNormal(delta, mean, sd) { const p = normTail((delta - mean) / sd); return p <= 0 ? 20 : Math.min(20, -Math.log10(p)); }
+  const phiExp = (delta, mean) => Math.min(20, delta / (mean * Math.LN10));
+  const d5 = reg(() => {
+    const arr = phiSim(); const w = val('w5'), th = val('th5'), minsd = val('ms5'), crash = val('cr5') * 1000, model = $('dist5').value;
+    const mean = [], sd = [];
+    for (let i = 0; i < arr.length; i++) {
+      const gaps = [1000]; for (let k = Math.max(1, i - w + 1); k <= i; k++) gaps.push(arr[k] - arr[k - 1]);
+      if (gaps.length > 1) gaps.shift();
+      const m = gaps.reduce((a, b) => a + b, 0) / gaps.length; const v = gaps.reduce((a, b) => a + (b - m) ** 2, 0) / gaps.length;
+      mean.push(m); sd.push(Math.max(minsd, Math.sqrt(v), 1));
+    }
+    const step = 50, n = 60000 / step + 1; const pN = [], pE = [], dl = [], thr = [], marks = [];
+    let ai = 0, detN = null, detE = null, fpN = 0, fpE = 0, inN = false, inE = false, maxBefore = 0;
+    for (let g = 0; g < n; g++) {
+      const t = g * step; while (ai + 1 < arr.length && arr[ai + 1] <= t) { ai++; marks.push({ i: g, v: 0, col: 'c2', r: 2.5 }); }
+      const delta = t - arr[ai]; const a = phiNormal(delta, mean[ai], sd[ai]), b = phiExp(delta, mean[ai]);
+      pN.push(a); pE.push(b); dl.push(delta / 1000); thr.push(th);
+      const sel = model === 'normal' ? a : b; if (t < crash) maxBefore = Math.max(maxBefore, sel);
+      if (t < crash) { if (a >= th && !inN) fpN++; if (b >= th && !inE) fpE++; }
+      inN = a >= th; inE = b >= th;
+      if (t >= crash && detN == null && a >= th) detN = t - crash;
+      if (t >= crash && detE == null && b >= th) detE = t - crash;
+    }
+    const gi = Math.round(crash / step);
+    const main = model === 'normal' ? pN : pE, other = model === 'normal' ? pE : pN;
+    plot('c5', { n, ymin: 0, ymax: 20, lines: [{ d: other, col: 'c3', w: 1.2, alpha: 0.45, label: (model === 'normal' ? 'exponential' : 'normal') + ' φ (faint)' }, { d: main, col: 'c1', w: 2.2, label: model + ' φ' }, { d: thr, col: 'sell', w: 1.2, dash: [5, 4], label: 'threshold' }],
+      marks, vlines: [{ i: gi, col: 'sell', label: 'crash' }], legend: [['heartbeat arrival (dot)', 'c2']],
+      sub: { lines: [{ d: dl, col: 'muted', w: 1.4, label: 'seconds since last heartbeat' }], ymin: 0 } });
+    const f = (x) => (x == null ? '<b class="bad">not within the minute</b>' : `<b>${(x / 1000).toFixed(2)} s</b>`);
+    const last = arr.length - 1;
+    $('r5').innerHTML = `simulated: ${arr.length} heartbeats, 1 per second ± ${val('j5')} ms jitter · window mean at crash <b>${mean[last].toFixed(0)} ms</b>, σ <b>${sd[last].toFixed(0)} ms</b><br>crash detected after: normal ${f(detN)} · exponential ${f(detE)} (measured from the crash; the last beat arrived ${((crash - arr[last]) / 1000).toFixed(2)} s before it)<br>false suspicions before the crash: normal <b class="${fpN ? 'bad' : 'good'}">${fpN}</b> · exponential <b class="${fpE ? 'bad' : 'good'}">${fpE}</b> · highest ${model} φ while alive <b>${maxBefore.toFixed(2)}</b>`;
+  });
+  ['j5', 'w5', 'th5', 'ms5', 'cr5'].forEach((id) => bindRange(id, d5));
+  $('hic5').addEventListener('change', d5);
+  $('dist5').addEventListener('change', d5);
+  const d5b = reg(() => {
+    const mu = val('mu5'), s = val('sd5'), t = val('t5'); const z = (t - mu) / s; const p = normTail(z);
+    const a = phiNormal(t, mu, s), b = phiExp(t, mu);
+    let t8 = mu; while (phiNormal(t8, mu, s) < 8 && t8 < mu + 60 * s) t8 += 1;
+    $('r5b').innerHTML = `z = (${t} − ${mu}) / ${s} = <b>${z.toFixed(2)}</b> · P(a live node is still this late) = <b>${sci(p)}</b> · φ<sub>normal</sub> = −log₁₀ of that = <b>${a >= 20 ? '≥ 20' : a.toFixed(2)}</b><br>φ<sub>exponential</sub> = ${t} / (${mu} · ln 10) = <b>${b.toFixed(2)}</b> · φ = 8 is reached after <b>${t8} ms</b> (normal) or <b>${(8 * mu * Math.LN10).toFixed(0)} ms</b> (exponential)`;
+  });
+  ['mu5', 'sd5', 't5'].forEach((id) => bindRange(id, d5b));
+
+  // ---------- 6 · gossip heartbeat tables ----------
+  const P6pos = [[70, 40], [250, 40], [160, 120]];
+  let S6;
+  const link6 = (a, b) => !($('sc6').value === 'b' && ((a === 0 && b === 2) || (a === 2 && b === 0)));
+  const alive6 = (p, t) => !($('sc6').value === 'c' && p === 2 && t >= 3);
+  function reset6() { S6 = { t: 0, tab: [0, 1, 2].map(() => [0, 1, 2].map(() => ({ hb: 0, ts: 0 }))), sends: [], r: rng(seed * 13 + 1) }; draw6(); }
+  function tick6() {
+    S6.t++; const t = S6.t; const sends = [];
+    for (let p = 0; p < 3; p++) if (alive6(p, t)) { S6.tab[p][p].hb++; S6.tab[p][p].ts = t; }
+    const snaps = S6.tab.map((row) => row.map((c) => c.hb));
+    for (let p = 0; p < 3; p++) {
+      if (!alive6(p, t)) continue;
+      const opts = [0, 1, 2].filter((q) => q !== p && link6(p, q)); const to = opts[Math.floor(S6.r() * opts.length)];
+      sends.push([p, to, alive6(to, t)]);
+      if (!alive6(to, t)) continue;
+      for (let q = 0; q < 3; q++) if (snaps[p][q] > S6.tab[to][q].hb) { S6.tab[to][q].hb = snaps[p][q]; S6.tab[to][q].ts = t; }
+    }
+    S6.sends = sends;
+  }
+  function draw6() {
+    const tf = val('tf6'); const pre = 'm6';
+    let s = `<svg viewBox="0 0 320 160" role="img" aria-label="Three gossiping processes">${defs(pre)}`;
+    [[0, 1], [1, 2], [0, 2]].forEach(([a, b]) => { const [x1, y1] = P6pos[a], [x2, y2] = P6pos[b]; const ok = link6(a, b); s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--${ok ? 'rule' : 'sell'});stroke-width:1.5${ok ? '' : ';stroke-dasharray:5 4'}"></line>`; if (!ok) s += cross((x1 + x2) / 2, (y1 + y2) / 2, 6); });
+    S6.sends.forEach(([a, b, ok]) => { const [x1, y1] = P6pos[a], [x2, y2] = P6pos[b]; const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy); const ox = -dy / L * 6, oy = dx / L * 6; s += arrow(pre, x1 + dx / L * 20 + ox, y1 + dy / L * 20 + oy, x2 - dx / L * 22 + ox, y2 - dy / L * 22 + oy, ok ? 'o' : 'r', !ok); });
+    for (let p = 0; p < 3; p++) { const [x, y] = P6pos[p]; const dead = !alive6(p, S6.t); s += `<circle cx="${x}" cy="${y}" r="17" class="nd${dead ? ' dead' : ''}"></circle>` + txt(x, y + 4, 'P' + (p + 1), dead ? 'bad' : '', 'middle'); if (dead) s += cross(x, y, 12); }
+    $('net6').innerHTML = s + txt(160, 154, 'orange arrows = this tick\'s gossip', 'sm', 'middle') + '</svg>';
+    let h = '';
+    for (let p = 0; p < 3; p++) {
+      const dead = !alive6(p, S6.t);
+      h += `<div class="comp${dead ? ' off' : ''}"><div class="t">P${p + 1}'s table${dead ? ' (crashed)' : ''}</div><table class="mini"><thead><tr><th>member</th><th>counter</th><th>t</th><th></th></tr></thead><tbody>`;
+      for (let q = 0; q < 3; q++) {
+        const c = S6.tab[p][q]; const failed = !dead && q !== p && S6.t - c.ts > tf;
+        h += `<tr><td>P${q + 1}</td><td>${c.hb}</td><td>t${c.ts}</td><td class="${failed ? 'sus' : 'dim'}">${failed ? 'failed' : (q === p ? 'self' : 'ok')}</td></tr>`;
+      }
+      h += '</tbody></table></div>';
+    }
+    $('tabs6').innerHTML = h;
+    $('tick6').textContent = S6.t;
+    const desc = S6.sends.map(([a, b, ok]) => `P${a + 1}→P${b + 1}${ok ? '' : ' (lost: P' + (b + 1) + ' is down)'}`).join(', ');
+    const sc = $('sc6').value;
+    let falseRows = 0; for (let p = 0; p < 3; p++) for (let q = 0; q < 3; q++) if (p !== q && alive6(p, S6.t) && alive6(q, S6.t) && S6.t - S6.tab[p][q].ts > tf) falseRows++;
+    $('txt6').innerHTML = S6.t === 0 ? 'Tick 0: every table starts at counter 0, local time t0. Each tick: bump your own counter, send your whole table to one random reachable neighbour, receiver keeps the larger counter and stamps it with its own time.'
+      : `Tick ${S6.t}: gossip ${desc}. ${sc === 'b' ? `P1 can't talk to P3 directly, yet P1's row for P3 shows counter ${S6.tab[0][2].hb} (stamped t${S6.tab[0][2].ts}), relayed by P2.` : sc === 'c' && S6.t >= 3 ? `P3 crashed at tick 3; its counter is frozen. Rows untouched for more than T_fail = ${tf} ticks turn "failed".` : 'All three can talk; every row keeps advancing.'}${falseRows ? ` <b>${falseRows}</b> row(s) of live members are marked failed: a false positive, because random gossip didn't reach that node within T_fail. Raise T_fail.` : ''}`;
+  }
+  reset6();
+  $('next6').addEventListener('click', () => { tick6(); draw6(); });
+  $('reset6').addEventListener('click', reset6);
+  $('sc6').addEventListener('change', reset6);
+  bindRange('tf6', draw6);
+  const d6 = reg(() => {
+    const r = rng(seed * 7 + 3); const Ns = [], sim = [], form = []; const trials = 60;
+    for (let e = 1; e <= 10; e++) {
+      const N = 2 ** e; let tot = 0;
+      for (let tr = 0; tr < trials; tr++) {
+        const know = new Uint8Array(N); know[0] = 1; let cnt = 1, rounds = 0;
+        while (cnt < N) { rounds++; const snap = []; for (let i = 0; i < N; i++) if (know[i]) snap.push(i); for (const i of snap) { let j = Math.floor(r() * (N - 1)); if (j >= i) j++; if (!know[j]) { know[j] = 1; cnt++; } } }
+        tot += rounds;
+      }
+      Ns.push(N); sim.push(tot / trials); form.push(Math.log2(N) + Math.log(N));
+    }
+    plot('c6', { n: 10, ymin: 0, lines: [{ d: sim, col: 'c1', w: 2.4, label: 'simulated mean rounds (60 runs each)' }, { d: form, col: 'c2', dash: [5, 4], label: 'log₂N + ln N' }], marks: sim.map((v, i) => ({ i, v, col: 'c1', r: 3.5 })) });
+    $('r6').innerHTML = 'x-axis: N = 2, 4, 8 … 1024 · ' + Ns.map((N, i) => `N=${N}: <b>${sim[i].toFixed(1)}</b>`).join(' · ') + `<br>messages per gossip period: <b>N</b> (each carrying N rows), vs <b>N(N−1)</b> for everyone heartbeating everyone: at N = 1024 that is ${(1024).toLocaleString()} vs ${(1024 * 1023).toLocaleString()}`;
+  });
+
+  // ---------- 7 · FUSE ----------
+  const P7pos = [[80, 45], [260, 45], [80, 165], [260, 165]];
+  const ORD7 = [[2, 1, 3], [0, 3, 2], [3, 0, 1], [1, 0, 2]];
+  let S7;
+  function reset7() { S7 = { step: 0, round: 0, crashed: [0, 0, 0, 0], silent: [0, 0, 0, 0], cut: false, pings: [], log: 'Step 0 (Fig 9-5 a): all four processes are alive and ping each other.', msgs: 0 }; draw7(); }
+  const linkOK7 = (a, b) => !(S7.cut && ((a === 0 && b === 2) || (a === 2 && b === 0)));
+  function next7() {
+    const sc = $('sc7').value;
+    if (S7.step === 0) {
+      if (sc === 'crash') { S7.crashed[1] = 1; S7.log = 'Step 1 (Fig 9-5 b): P2 crashes and stops answering pings.'; }
+      else { S7.cut = true; S7.log = 'Step 1: only the P1–P3 link fails. Every process is still alive.'; }
+      S7.step++; S7.pings = []; return;
+    }
+    if (S7.silent.every((v, i) => v || S7.crashed[i])) { S7.log = 'Nothing left to do: the whole group has failed, and every member knows it.'; S7.pings = []; return; }
+    const resp = [0, 1, 2, 3].map((i) => !S7.crashed[i] && !S7.silent[i]); const newly = []; S7.pings = [];
+    for (let i = 0; i < 4; i++) {
+      if (!resp[i]) continue;
+      const tgt = ORD7[i][S7.round % 3]; const ok = resp[tgt] && linkOK7(i, tgt); S7.pings.push([i, tgt, ok]); S7.msgs += ok ? 2 : 1;
+      if (!ok) newly.push(i);
+    }
+    newly.forEach((i) => { S7.silent[i] = 1; });
+    S7.round++; S7.step++;
+    const names = newly.map((i) => 'P' + (i + 1)).join(' and ');
+    S7.log = `Step ${S7.step}, ping round ${S7.round}: ` + S7.pings.map(([a, b, ok]) => `P${a + 1}→P${b + 1} ${ok ? 'ok' : 'no answer'}`).join(', ') + '. ' + (newly.length ? `${names} saw a ping fail and now stop${newly.length > 1 ? '' : 's'} answering pings themselves.` : 'No ping failed this round.');
+    if (S7.silent.every((v, i) => v || S7.crashed[i])) S7.log += ' The failure has reached the whole group (Fig 9-5 d).';
+  }
+  function draw7() {
+    const pre = 'm7';
+    let s = `<svg viewBox="0 0 340 215" role="img" aria-label="Four FUSE group members">${defs(pre)}`;
+    const pairs = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]];
+    pairs.forEach(([a, b]) => { const [x1, y1] = P7pos[a], [x2, y2] = P7pos[b]; const ok = linkOK7(a, b); s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--${ok ? 'rule' : 'sell'});stroke-width:1.3${ok ? '' : ';stroke-dasharray:5 4'}"></line>`; if (!ok) s += cross((x1 + x2) / 2, (y1 + y2) / 2, 6); });
+    S7.pings.forEach(([a, b, ok]) => { const [x1, y1] = P7pos[a], [x2, y2] = P7pos[b]; const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy); const ox = -dy / L * 7, oy = dx / L * 7; s += arrow(pre, x1 + dx / L * 22 + ox, y1 + dy / L * 22 + oy, x2 - dx / L * 24 + ox, y2 - dy / L * 24 + oy, ok ? 'g' : 'r', !ok); });
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = P7pos[i]; const cls = S7.crashed[i] ? ' dead' : S7.silent[i] ? ' silent' : '';
+      s += `<circle cx="${x}" cy="${y}" r="19" class="nd${cls}"></circle>` + txt(x + (i % 2 ? 26 : -26), y + 4, 'P' + (i + 1), '', i % 2 ? 'start' : 'end');
+      if (S7.crashed[i]) s += cross(x, y, 13); else if (S7.silent[i]) s += cross(x, y, 13, 'muted') + txt(x, y + 34, 'silent', 'sm', 'middle');
+    }
+    $('g7').innerHTML = s + '</svg>';
+    $('txt7').innerHTML = S7.log; $('no7').textContent = S7.step;
+    const up = [0, 1, 2, 3].filter((i) => !S7.crashed[i] && !S7.silent[i]).length;
+    $('r7').innerHTML = `responsive members <b>${up}</b> / 4 · crashed <b>${S7.crashed.reduce((a, b) => a + b, 0)}</b> · went silent <b>${S7.silent.reduce((a, b) => a + b, 0)}</b> · ping messages so far <b>${S7.msgs}</b>`;
+  }
+  reset7();
+  $('next7').addEventListener('click', () => { next7(); draw7(); });
+  $('reset7').addEventListener('click', reset7);
+  $('sc7').addEventListener('change', reset7);
+
+  // ---------- global ----------
+  $('reroll').addEventListener('click', () => { seed = seed * 7 % 997 + 3; buildData(); reset6(); redrawAll(); });
+  buildData(); redrawAll();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(redrawAll, 120); });
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll); window.addEventListener('themechange', redrawAll); } catch (e) { /* older browsers */ }
+  new MutationObserver(redrawAll).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
+})();
+</script>
+<!-- theme:start --><style>
+.theme-btn { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 50;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--plate); color: var(--ink);
+  font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: grid; place-items: center; }
+.theme-btn:hover { border-color: var(--muted); }
+.theme-btn:focus-visible { outline: 2px solid var(--c2); outline-offset: 2px; }
+@media print { .theme-btn { display: none; } }
+</style>
+<button type="button" class="theme-btn" id="themeBtn"></button>
+<script>
+(function(){
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function current(){
+    var t = root.getAttribute('data-theme');
+    if (t === 'light' || t === 'dark') return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function paint(){
+    var dark = current() === 'dark';
+    btn.textContent = dark ? '\u2600' : '\u263E';
+    btn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  }
+  btn.addEventListener('click', function(){
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('llm-theme', next); } catch (e) {}
+    paint();
+    window.dispatchEvent(new Event('themechange'));   // canvas widgets redraw with the new colours
+  });
+  paint();
+})();
+</script><!-- theme:end -->
+</body>
+</html>

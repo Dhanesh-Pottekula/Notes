@@ -5,9 +5,10 @@ The pages already define light colours on :root and dark ones under
 has to set data-theme on <html> and remember the choice in localStorage.
 build_index.py calls add_theme() too, so rebuilt index pages keep the switch.
 
-Usage: python3 theme_toggle.py   (updates every .html under Notes/llm)
+Usage: python3 theme_toggle.py [folder ...]
+  (updates every .html under the given folders; default Notes/llm)
 """
-import glob, os
+import glob, os, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 START, END = "<!-- theme:start -->", "<!-- theme:end -->"
@@ -53,10 +54,8 @@ BODY_UI = START + """<style>
 
 
 def strip(html):
-    while START in html:
-        a = html.index(START); b = html.index(END, a) + len(END)
-        html = html[:a] + html[b:]
-    return html
+    # Also eat the newlines around a block so repeated runs leave the file unchanged.
+    return re.sub(r"\n*" + re.escape(START) + r".*?" + re.escape(END) + r"\n?", "\n", html, flags=re.S)
 
 
 def add_theme(html):
@@ -67,7 +66,9 @@ def add_theme(html):
 
 
 if __name__ == "__main__":
-    files = sorted(glob.glob(os.path.join(HERE, "**", "*.html"), recursive=True))
+    import sys
+    roots = sys.argv[1:] or [HERE]
+    files = sorted(f for r in roots for f in glob.glob(os.path.join(r, "**", "*.html"), recursive=True))
     for f in files:
         src = open(f, encoding="utf-8").read()
         out = add_theme(src)

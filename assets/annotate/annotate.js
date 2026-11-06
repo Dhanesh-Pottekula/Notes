@@ -410,25 +410,12 @@
     return ((Math.abs(h) % 7) - 3) * 0.45;
   }
 
-  // What a pin's card quotes: the visible words of the paragraph, item or link the pin sits in.
-  function pinLabel(item) {
-    var pin = anchorsOf(item.id)[0];
-    var block = pin && (pin.closest("p,li,a,td,th,h1,h2,h3,h4,figcaption,blockquote,summary,dd,dt") || pin.parentElement);
-    var words = (block ? block.innerText : item.quote.suffix).trim().split(/\s+/).filter(Boolean);
-    return words.length ? words.slice(0, 7).join(" ") + (words.length > 7 ? " …" : "") : "Pinned here";
-  }
-
   function buildCard(item) {
     var c = el("div", "ann-ui ann-card" + (item.kind === "pin" ? " ann-card-pin" : "") + (item.editing ? " ann-editing" : ""));
     c.dataset.color = item.color; c.dataset.ann = item.id; c.dataset.rev = item.rev || 0; c.dataset.editing = item.editing ? 1 : 0;
     c.style.setProperty("--tilt", tiltOf(item.id) + "deg");
     c.appendChild(el("span", "ann-tape"));
-    var head = el("div", "ann-head");
-    head.appendChild(el("span", "ann-badge", item.num || ""));
-    head.appendChild(el("span", "ann-quote", item.kind === "pin"
-      ? esc(pinLabel(item))
-      : "“" + esc(item.quote.exact) + "”"));
-    c.appendChild(head);
+    c.appendChild(el("span", "ann-badge", item.num || ""));
     var foot = el("div", "ann-foot");
     var stamp = el("span", "ann-stamp", new Date(item.updated).toLocaleDateString(undefined, { day: "numeric", month: "short" }));
     var tools = el("span", "ann-icons");
@@ -597,14 +584,17 @@
         c = cards[it.id] = fresh;
       }
       c.querySelector(".ann-badge").textContent = it.num || "";
-      c.style.width = w + "px";
+      // A card hugs its note; only while typing does it open to the full width.
+      c.style.width = it.editing ? w + "px" : "";
+      c.style.maxWidth = w + "px";
+      var cw = c.offsetWidth;
       var pos = it[posKey()];
       if (pos) {
         // A spot chosen on a wide screen can be off a narrow one: keep the card on screen.
-        c.style.left = Math.max(sx + 8, Math.min(boxLeft + pos.ox, sx + vw - w - 8)) + "px";
+        c.style.left = Math.max(sx + 8, Math.min(boxLeft + pos.ox, sx + vw - cw - 8)) + "px";
         c.style.top = row.a.y + pos.oy + "px";
       } else {
-        c.style.left = autoX + "px";
+        c.style.left = (g.side === "left" ? autoX + w - cw : autoX) + "px";
         var top = Math.max(row.a.y - 14, bottom + 16);
         c.style.top = top + "px";
         bottom = top + c.offsetHeight;

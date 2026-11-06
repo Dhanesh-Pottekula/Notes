@@ -2,6 +2,7 @@
 """Builds index.html for each LLM book folder and Notes/llm/index.html. Run: python3 build_index.py"""
 import os, re
 from theme_toggle import add_theme
+from annotate_inject import add_annotate
 HERE = os.path.dirname(os.path.abspath(__file__))
 HEAD = open(os.path.join(HERE, "..", "system_design", "ddia", "index.html"), encoding="utf-8").read()
 STYLE = HEAD[HEAD.index("<style>"):HEAD.index("</style>") + 8]
@@ -86,7 +87,8 @@ for folder, name, kicker, h1, lede, groups in BOOKS:
             num = f.split("_")[0][2:]
             lis.append(f'      <li><a href="{f}"><span class="num">{num}</span><span class="t">{t}</span><span class="d">{d} <span class="meta">{meta}</span></span></a></li>')
         parts.append(f'  <section class="plate">\n    <h2>{gname}</h2>\n    <ol class="chapters">\n' + "\n".join(lis) + "\n    </ol>\n  </section>")
-    open(os.path.join(HERE, folder, "index.html"), "w", encoding="utf-8").write(page(name + " Study Pages", "\n\n".join(parts)))
+    out = os.path.join(HERE, folder, "index.html")
+    open(out, "w", encoding="utf-8").write(add_annotate(page(name + " Study Pages", "\n\n".join(parts)), out))
 
 top = '''  <header>
     <div class="kicker">Interview prep · AI engineering · 3 books · 39 study pages</div>
@@ -103,5 +105,6 @@ top = '''  <header>
     </ol>
     <p class="note">Each page has an "Interview angle" box per section with an answer you can say out loud, and a "Check yourself" quiz. See also <a href="../career/interview-prep-subjects.md">interview-prep-subjects.md</a>.</p>
   </section>'''
-open(os.path.join(HERE, "index.html"), "w", encoding="utf-8").write(page("LLM Bookshelf", top))
+out = os.path.join(HERE, "index.html")
+open(out, "w", encoding="utf-8").write(add_annotate(page("LLM Bookshelf", top), out))
 print("built")

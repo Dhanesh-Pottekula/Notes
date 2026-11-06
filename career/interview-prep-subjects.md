@@ -1,5 +1,7 @@
 # Interview prep: every subject to cover (2026-11-03)
 
+> Broken down topic by topic, with questions and where to learn each: [interview-topics/](interview-topics/00-README.md)
+
 Built from the 64 jobs applied to on 2026-11-02 (backend, AI engineer, full stack; 2–4 years; Bengaluru, Hyderabad,
 remote) and your real work at AiRA, Jigsaw and StreetDine. Two kinds of companies are in the mix:
 - **Service / large companies** (Infosys, TCS, Deloitte, EY, Capgemini): DSA + core CS + one language in depth + SQL.

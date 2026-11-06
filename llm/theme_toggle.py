@@ -60,7 +60,10 @@ def strip(html):
 
 def add_theme(html):
     html = strip(html)
-    html = html.replace("</head>", HEAD_JS + "\n</head>", 1)
+    if "</head>" in html:
+        html = html.replace("</head>", HEAD_JS + "\n</head>", 1)
+    else:   # head-less fragment: still before any content, right after the first stylesheet
+        html = html.replace("</style>", "</style>\n" + HEAD_JS, 1)
     i = html.rfind("</body>")
     if i < 0:   # </body> is optional in HTML; such pages just end, so the switch goes last
         return html.rstrip("\n") + "\n" + BODY_UI + "\n"

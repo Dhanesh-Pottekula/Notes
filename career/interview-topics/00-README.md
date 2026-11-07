@@ -3,6 +3,9 @@
 Target: **~3 years, Backend Engineer / System Design / AI Engineer (agents)** — Bengaluru/Hyderabad/remote,
 startups and product companies (plus service companies that add DSA + core CS rounds).
 
+> The full **question bank** (12,066 questions by topic and sub-topic, with an all-questions page) is in
+> [../interview-questions/](../interview-questions/index.html) — this folder is the topic checklist + sources.
+
 Each file is one category. Inside, every section has:
 - **Topics** as checkboxes (`- [ ]`) — tick them (`- [x]`) when you can explain them out loud without notes.
 - **Questions** asked in real interviews for that section — answer each out loud, in 2 minutes, before ticking.

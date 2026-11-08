@@ -878,6 +878,13 @@ clarifying questions below, estimate, sketch, then survive the deep dives. Conce
 - [ ] `L2` What does a reranker add, and what does it cost?
 - [ ] `L2` How do you enforce per-document permissions so retrieval never leaks? ↳ ACL metadata filter at query time, synced from source
 - [ ] `L2` How do you keep the index fresh when documents are edited or deleted?
+- [ ] `L2` A user uploads a PDF and it must become searchable. Walk through the path. ↳ FastAPI auth + upload → object storage → job row (status) → queue → worker: parse, chunk, embed → Qdrant upsert → status done
+- [ ] `L2` How does the user see processing status, and what states does a document go through? ↳ uploaded → queued → processing → indexed / failed; poll endpoint or SSE
+- [ ] `L2` A worker crashes halfway through a document. What happens, and how is it retried? ↳ ack after success, visibility timeout / lease, retry with backoff, DLQ after N tries
+- [ ] `L2` How do you avoid processing the same document twice (double upload, redelivered job)? ↳ content hash, idempotent job id, deterministic chunk ids so upserts overwrite
+- [ ] `L2` The embedding API fails on chunk 900 of 2,000. Do you restart the document? ↳ checkpoint per batch; resume; idempotent upserts
+- [ ] `L3` One upload has a million pages. What changes? ↳ split into page-range sub-jobs, fan out, stream parse, per-tenant quotas
+- [ ] `L3` How do you scale workers separately from the API servers, and what metric drives it? ↳ queue depth / age of oldest job
 - [ ] `L2` How do you make the model cite sources and refuse when the answer is not in the docs?
 - [ ] `L3` How do you evaluate retrieval and answer quality separately? ↳ recall@k, MRR on labelled set; faithfulness, answer relevance
 - [ ] `L3` Users complain answers are wrong. Walk through how you debug: retrieval, ranking or generation?

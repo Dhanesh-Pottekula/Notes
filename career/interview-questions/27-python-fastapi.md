@@ -3,6 +3,7 @@
 Python rounds for a backend + AI engineer go from "what does `is` do" to "your async endpoint froze the server —
 why?". A 3-year engineer must explain the data model, generators, decorators, the GIL and asyncio without notes,
 and run FastAPI (and know Django) in production with confidence. Syllabus: 4E Performance Engineering for profiling (`../../syllabus.html`).
+**Read:** [My notes: Django vs Flask vs FastAPI vs Starlette](../../python/web-frameworks.html) — WSGI vs ASGI, Starlette, async, when to use which.
 
 ## 27.1 Python data model — names, objects, mutability
 **Learn:** https://nedbatchelder.com/text/names.html · https://docs.python.org/3/reference/datamodel.html ("Objects, values and types") · *Fluent Python* ch1 "The Python Data Model" and ch6 "Object References, Mutability, and Recycling"
@@ -281,7 +282,7 @@ and run FastAPI (and know Django) in production with confidence. Syllabus: 4E Pe
 - [ ] `L3` How do you run sync and async code in one codebase without "function colouring" pain?
 
 ## 27.13 FastAPI basics — ASGI, routing, Pydantic
-**Learn:** https://fastapi.tiangolo.com/tutorial/ · https://asgi.readthedocs.io/en/latest/introduction.html · https://www.starlette.io · https://fastapi.tiangolo.com/deployment/server-workers/ · https://gunicorn.org/design/
+**Learn:** [My notes: Django vs Flask vs FastAPI vs Starlette](../../python/web-frameworks.html) · https://fastapi.tiangolo.com/tutorial/ · https://asgi.readthedocs.io/en/latest/introduction.html · https://www.starlette.io · https://fastapi.tiangolo.com/deployment/server-workers/ · https://gunicorn.org/design/
 - [ ] `L1` What is FastAPI built on? ↳ Starlette (web) + Pydantic (data)
 - [ ] `L1` WSGI vs ASGI: what is the difference?
 - [ ] `L1` What is uvicorn? What is gunicorn? How do they work together?
@@ -295,6 +296,10 @@ and run FastAPI (and know Django) in production with confidence. Syllabus: 4E Pe
 - [ ] `L2` How do you split routes with `APIRouter`, prefixes and tags?
 - [ ] `L2` How many uvicorn workers would you run on a 4-core box, and why?
 - [ ] `L2` What is the ASGI interface (`scope`, `receive`, `send`)?
+- [ ] `L2` Why was ASGI introduced when WSGI already existed? ↳ WSGI is one sync call per request: no WebSockets, no long-lived connections, no async I/O
+- [ ] `L2` Walk through everything that happens when a client calls a FastAPI endpoint, from socket to response. ↳ uvicorn parses HTTP → builds `scope` → middleware stack → router match → dependencies + validation → endpoint → serialise → middleware back out → uvicorn sends
+- [ ] `L2` What does `scope["type"]` hold, and which events flow through `receive` and `send` for one HTTP request? ↳ `http`/`websocket`/`lifespan`; `http.request` in; `http.response.start` + `http.response.body` out
+- [ ] `L3` Write a minimal ASGI app by hand, with no framework, that returns "hello". ↳ `async def app(scope, receive, send)`; send start (status, headers) then body
 - [ ] `L2` Input model vs output model: why have separate `UserCreate` and `UserOut` schemas? ↳ don't leak password hash; different required fields
 - [ ] `L2` How do you upload a file in FastAPI (`UploadFile` vs `bytes`)?
 - [ ] `L3` What does FastAPI do at startup with your function signatures? ↳ inspects them, builds dependency graph and validators once
@@ -320,6 +325,7 @@ and run FastAPI (and know Django) in production with confidence. Syllabus: 4E Pe
 - [ ] `L2` How do you configure CORS in FastAPI?
 - [ ] `L3` Why is `@app.on_event("startup")` deprecated in favour of `lifespan`, and how do you share state from it?
 - [ ] `L3` What is the order of execution: middleware, dependencies, endpoint, response serialisation, background tasks?
+- [ ] `L2` You add three middlewares with `app.add_middleware(A)`, then B, then C. Which sees the request first, and which sees the response last? ↳ onion: the last added is outermost, so C → B → A → endpoint → A → B → C
 - [ ] `L3` Why can `BaseHTTPMiddleware` hurt streaming responses and performance? What is the pure ASGI alternative?
 
 ## 27.15 FastAPI — auth, WebSockets and streaming
@@ -362,7 +368,7 @@ and run FastAPI (and know Django) in production with confidence. Syllabus: 4E Pe
 - [ ] `L3` FastAPI vs Django vs Flask vs NestJS for a new AI product backend: what would you choose and why?
 
 ## 27.17 Django, the ORM and Django REST Framework
-**Learn:** https://docs.djangoproject.com/en/stable/topics/db/queries/ · https://docs.djangoproject.com/en/stable/ref/models/querysets/ · https://docs.djangoproject.com/en/stable/topics/async/ · https://www.django-rest-framework.org/tutorial/quickstart/ · https://docs.djangoproject.com/en/stable/topics/signals/
+**Learn:** [My notes: Django vs Flask vs FastAPI vs Starlette](../../python/web-frameworks.html) · https://docs.djangoproject.com/en/stable/topics/db/queries/ · https://docs.djangoproject.com/en/stable/ref/models/querysets/ · https://docs.djangoproject.com/en/stable/topics/async/ · https://www.django-rest-framework.org/tutorial/quickstart/ · https://docs.djangoproject.com/en/stable/topics/signals/
 - [ ] `L1` What is Django's MTV pattern, and how does it map to MVC?
 - [ ] `L1` What is a QuerySet? What does "QuerySets are lazy" mean?
 - [ ] `L1` What is a migration? `makemigrations` vs `migrate`.

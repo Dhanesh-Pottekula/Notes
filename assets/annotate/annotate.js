@@ -435,6 +435,21 @@
         setTimeout(function () { if (c.isConnected && item.editing && !c.contains(document.activeElement)) commit(item, ta.value); }, 150);
       });
       c.appendChild(ta);
+      // Colour row: recolours the card, its highlight/pin and its line at once. The card is not rebuilt,
+      // so the text being typed and the focus stay where they are.
+      var row = el("div", "ann-colors");
+      COLORS.forEach(function (col) {
+        var s = btn("ann-swatch ann-swatch-sm" + (col === item.color ? " ann-current" : ""), "", cap(col), function () {
+          if (item.color === col) return;
+          item.color = col; lastColor = col; item.updated = Date.now();
+          c.dataset.color = col; restyle(item);
+          each(row.children, function (x) { x.classList.toggle("ann-current", x.dataset.color === col); });
+          save(); drawLines();
+        });
+        s.dataset.color = col; s.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        row.appendChild(s);
+      });
+      c.appendChild(row);
       stamp.textContent = "⌘↵ to save · Esc to cancel";
       tools.appendChild(btn("ann-ibtn", ICON.trash, "Delete", function () { item.editing = false; remove(item.id); }));
       tools.appendChild(btn("ann-ibtn ann-ok", ICON.check, "Save", function () { commit(item, ta.value); }));

@@ -35,8 +35,8 @@ Local study pages (in this repo, `Notes/…`):
 - **AIE chN** — `llm/ai_engineering/chNN_*.html` (Chip Huyen, *AI Engineering*)
 - **HOL chN** — `llm/hands_on_llms/chNN_*.html` (Alammar & Grootendorst, *Hands-On Large Language Models*)
 - **LEH chN** — `llm/llm_engineers_handbook/chNN_*.html` (Iusztin & Labonne, *LLM Engineer's Handbook*)
-- **Syllabus** — `syllabus.html` (your 6-month backend roadmap) · **JS notes** — `javascript/jsNotes.md`
-- **Docker notes** — `Docker/DockerCommands.md`, `Docker/ShellScripting.md` · **Linux** — `Linux Commands/`
+- **Syllabus** — `syllabus.html` (your 6-month backend roadmap) · **JS notes** — `programming/javascript/js_notes.md`
+- **Docker notes** — `programming/docker/docker_commands.md`, `programming/linux/shell_scripting.md` · **Linux** — `programming/linux/command_history/`
 
 Books in `books/` without study pages yet: *Designing Machine Learning Systems* (Huyen), *NLP with Transformers*.
 

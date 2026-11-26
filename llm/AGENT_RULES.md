@@ -19,7 +19,7 @@
    `</html>`.
 7. Completeness pass: re-read the PDF section by section against your page and add anything missing. Then an
    enrich pass.
-8. Run `cd /Users/dhanesh/Desktop/GFV/Notes/llm && python3 check_page.py <book dir> <file> <chapter no.>` and fix
+8. Run `python3 /Users/dhanesh/Desktop/GFV/Notes/tools/check_page.py <full path of the book folder> <file> <chapter no.>` and fix
    every problem. Also confirm `tail -c 20 <file>` shows `</html>` and the last plate's pdf chip reaches the
    chapter's last pdf page.
 9. **Scratch files:** several agents share one scratchpad. Put every helper script / temp file in your own

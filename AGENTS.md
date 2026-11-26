@@ -1,88 +1,117 @@
-# Notes/ — Personal Study Notes
+# Notes/ — Dhanesh's study pages and notes
 
-Dhanesh's own notes and command cheat-sheets, written while learning. This folder is its **own git
-repo** (`origin: git@github.com:Dhanesh-Pottekula/Notes.git`); commit here only when asked.
-Project code does **not** go here — use `../projects/`. Small scratch snippets live in `practice/`.
+Everything Dhanesh reads or writes while learning. Its **own git repo** (`Dhanesh-Pottekula/Notes`, **public**);
+commit here only when asked. Project code does **not** go here — use `../projects/`.
 
-## Map
+## Layout
+
+```
+Notes/
+├── index.html            HOME PAGE — every page to read, in one place (open via serve_notes.py)
+├── serve_notes.py        the reader: serves this folder and saves highlights + notes
+├── syllabus.html         6-month backend roadmap
+├── AGENTS.md             this map
+│
+│   subjects (pages to read + notes)
+├── llm/                  3 LLM books                           (study pages)
+├── system_design/        DDIA, Database Internals              (study pages)
+├── trading/              3 trading books, forex roadmap, notes → trading/AGENTS.md
+├── product_thinking/     Carnegie study pages + app_ideas/
+├── programming/          python/ javascript/ docker/ linux/ practice/
+├── career/               interview prep pages, profile, job search → career/AGENTS.md
+│
+│   not for reading
+├── assets/annotate/      the highlight + notes feature every page loads
+└── tools/                scripts that build, check and decorate the pages
+```
+
+**Two kinds of file.** *Pages to read* are HTML and are all reachable from `index.html`. *Working files*
+(Markdown sources, `BRIEF.md` specs, `illus/scenes*.json`, `figs/MANIFEST.tsv`, scripts) are for Claude and the build.
+
+## Reading
+
+```bash
+python3 Notes/serve_notes.py      # then open http://127.0.0.1:8780/
+```
 
 | Path | What it is |
 |------|------------|
-| `index.html` + `build_home.py` | **Home page: every study page in one place** (open http://127.0.0.1:8780/ after `python3 serve_notes.py`): shelves (start here, AI/LLMs, system design, programming, trading, people skills, embedded), each book a card that expands to all its chapters (titles from each page's `<h1>`), plus search. Built by `python3 build_home.py`: shelves are listed by hand in its `SECTIONS`; book chapters are found automatically; any `.html` no shelf covers shows under "Other pages"; missing paths are skipped and reported. **Rerun it after adding a book, chapter or page** |
+| `index.html` | **Home page: every study page in one place** (http://127.0.0.1:8780/ after `python3 serve_notes.py`): shelves by subject, each book a card that expands to all its chapters (titles from each page's `<h1>`), plus search. Built by `tools/build_home.py` |
 | `serve_notes.py` | **Read the study pages with your own highlights and notes**: `python3 serve_notes.py` → http://127.0.0.1:8780/. Serves this folder and saves each page's highlights + notes beside it as `<page>.notes.json` |
-| `assets/annotate/` | `annotate.js` + `annotate.css`: the shared highlight/notes feature every page loads. A tool dock on the left edge (bottom-left on phones): pick a colour = highlighter (selected text is highlighted at once, snapped to whole words); pin = click any spot to pin a note there; eraser; eye = show/hide notes. With no tool, selecting text pops up colours + Note. Note cards sit in the side margin joined to their text by a line and can be dragged anywhere (phones and wide screens remember separate spots; ↺ puts a card back). Keys: select text then `1`–`5` (colour) or `H` (last colour); `N` pins a note where the mouse is; with nothing selected `1`–`5`/`P`/`E` pick that tool; `Esc` drops it; in a note `⌘↵` saves. Added to pages by `llm/annotate_inject.py` |
 | `**/*.notes.json` | Your highlights and notes for the page of the same name (written by `serve_notes.py`; public once pushed) |
+| `assets/annotate/` | `annotate.js` + `annotate.css`: the shared highlight/notes feature every page loads. A tool dock on the left edge (bottom-left on phones): pick a colour = highlighter (selected text is highlighted at once, snapped to whole words); pin = click any spot to pin a note there; eraser; eye = show/hide notes. With no tool, selecting text pops up colours + Note. Note cards sit in the side margin joined to their text by a line and can be dragged anywhere (phones and wide screens remember separate spots; ↺ puts a card back). Keys: select text then `1`–`5` (colour) or `H` (last colour); `N` pins a note where the mouse is; with nothing selected `1`–`5`/`P`/`E` pick that tool; `Esc` drops it; in a note `⌘↵` saves. Popups: a page calls `__ann.scope(scrollingBody, key)` after `showModal()` and `__ann.unscope(dialog)` on close; while open, the dock, cards and lines move into the dialog and only items saved with that `scope` key show (same `.notes.json`). Added to pages by `tools/annotate_inject.py` |
 | `syllabus.html` | **6-Month Complete Backend Mastery roadmap** (open in a browser). Sections: DSA ↔ real systems; 1A V8 & memory · 1B event loop/libuv · 1C TypeScript · 1D testing; 2A PostgreSQL · 2B Redis · 2C system design · 2D Kafka · 2E AI infra · 2F networking; 3A Docker · 3B Linux · 3C Kubernetes; 4A CI/CD & GitOps · 4B Terraform · 4C security · 4D observability · 4E performance; capstone checklist; tiered reading list, papers, courses, YouTube, blogs. Best source for "what should I learn/build next". |
-| `Docker/DockerCommands.md` | AWS EC2 SSH + installing Docker; build/run/manage containers; exec; bind mounts & volumes; Docker Compose; MongoDB in Docker |
-| `Docker/ShellScripting.md` | Basic shell commands cheat-sheet (nproc, free, df, top, vi, touch, mkdir…) — starter shell-scripting notes |
-| `Docker/Linux Quickstart V5.pdf` | Reference PDF (Linux quickstart) — read with `../tools/bin/pdftool` |
-| `Linux Commands/1–13. linux commands.txt` | **Raw shell `history` dumps** from a Vagrant CentOS VM (lesson-by-lesson), not written notes — see index below |
-| `cloud_assosiate/vm_setup.md` | Google Cloud (gcloud) VM setup: account/project/region config, create VM, SSH, tags, firewall, logs (Cloud Associate prep) |
-| `career/interview-topics/` | **Interview prep pages — open these** (HTML only): 14 topic pages + `index.html`, ~1,140 tickable topics, ~12,460 L1/L2/L3 questions in popups, spoken answers for your projects, sources per topic. Built from `career/sources/interview-topics/*.md` by `python3 career/sources/interview-topics/build_pages.py`; never hand-edit or move the HTML (highlights are keyed by path) |
-| `career/AGENTS.md` | **Map of everything else in career/**: `profile/` (resume.tex, LinkedIn copy + images, intro-video script), `job-search/` (application brief/answers, tailored applications, portal copy, to-do, interview-prep subjects, `logs/` of every application) |
-| `python/web-frameworks.html` | **Python web frameworks notes**: Django vs Flask vs FastAPI vs Starlette, WSGI vs ASGI, Uvicorn, async/await, Pydantic validation, OpenAPI docs, when to use which, plus interview follow-ups (def vs async def, workers, Flask async, Django async ORM). Linked from interview question page 27 |
-| `app_ideas/100_user_problems.md` | **100 everyday problems people would pay an app to fix (India-first)**, in 10 groups (money, family/parents, phone/attention, career, health, home, documents, students, social, travel): feeling → wish → app idea → existing apps; plus a 5-point scoring method to pick one |
-| `app_ideas/top10_research_2026-11.md` | **Top 10 app ideas checked against real evidence (Nov 2026)**: ranking by pain / willingness to pay / gap (Scam Check first, work-wins journal last), evidence per idea (official numbers, Play Store competitors and complaints, pricing, platform and legal blockers), the pattern (giants give away the biggest pains free), and the parents'-safety bundle recommendation |
+
+**Never move or rename a study page.** Highlights are keyed by the page's path from this folder
+(`ann:<path>` in the browser, `<page>.notes.json` on disk), and `../books/*/AGENTS.md`, the interview pages and the
+home page link to chapters by path. Add new things around the pages instead.
+
+## Study pages (one folder per book)
+
+| Path | What it is |
+|------|------------|
+| `llm/` | **LLM book study pages** (open `llm/index.html` in a browser): one interactive page per chapter, read instead of the book, for three books: `hands_on_llms/` (*Hands-On LLMs*, Alammar & Grootendorst: preface + ch01–12 + afterword), `ai_engineering/` (*AI Engineering*, Chip Huyen: preface + ch01–10 + epilogue), `llm_engineers_handbook/` (*LLM Engineer's Handbook*, Iusztin & Labonne: preface + ch01–11 + MLOps appendix). Each page: chapter map, every section in plain words in book order with the book's figures (`figs/fig-X-Y.png`, list in `figs/MANIFEST.tsv`), analogies, worked examples, step-throughs/simulators, interview angles, summary, quiz, references. `BRIEF.md` + `AGENT_RULES.md` = the spec; the index pages are rebuilt by `tools/build_llm_index.py` |
 | `system_design/ddia/` | **Designing Data-Intensive Applications study pages** (open `index.html` in a browser): one interactive page per chapter of the early-release PDF (About + ch01–11; no Ch.12 in that edition), in book order: chapter map, every section in plain words with the book's figure (`figs/fig-X-Y.png`, cropped from the PDF; list in `figs/MANIFEST.tsv`), analogies, clickable worked examples, summary, real systems, quiz, references. `BRIEF.md` = the spec the pages were written to |
-| `system_design/database_internals/` | **Database Internals (Petrov) study pages**: ch00 preface + ch01–14 as interactive HTML pages (plain words, live simulations, "picture it" analogies, check-yourself quizzes) |
-| `llm/` | **LLM book study pages** (open `llm/index.html` in a browser): one interactive page per chapter, read instead of the book, for three books: `hands_on_llms/` (*Hands-On LLMs*, Alammar & Grootendorst: preface + ch01–12 + afterword), `ai_engineering/` (*AI Engineering*, Chip Huyen: preface + ch01–10 + epilogue), `llm_engineers_handbook/` (*LLM Engineer's Handbook*, Iusztin & Labonne: preface + ch01–11 + MLOps appendix). Each page: chapter map, every section in plain words in book order with the book's figures (`figs/fig-X-Y.png`, list in `figs/MANIFEST.tsv`), analogies, worked examples, step-throughs/simulators, interview angles, summary, quiz, references. `BRIEF.md` + `AGENT_RULES.md` = the spec; `check_page.py` = checker; `build_index.py` rebuilds the index pages |
-| `javascript/jsNotes.md` | JavaScript fundamentals: data types, type conversion & comparisons, boolean conversion, `??`, transpilers & polyfills |
-| `trading/trading_equations.md` | **Trading equation cheat sheet** (19 formulas): expectancy, Sharpe, Sortino, max drawdown, CAPM/Fama–French; Kelly, Merton fraction, position sizing, vol targeting; ATR, annualised vol, GARCH; Black–Scholes + expected move; spread z-score, Ornstein–Uhlenbeck; HMM regimes; Almgren–Chriss, Avellaneda–Stoikov. Each with symbols, ₹ worked example, pitfalls |
-| `trading/trading_equations.html` | Same sheet as an interactive page with Kelly, position-size and Black–Scholes calculators (open in a browser; published copy: https://claude.ai/artifact/4Wp5pK3T9zt3yPuJPeJGCU) |
-| `trading/strategies_from_equations.md` | **5 money-making strategies built on the equations**, each with exact rules, examples and risks: momentum + vol targeting, volatility-managed Nifty allocation (Merton + GARCH), pairs trading (OU), trend following on futures (ATR), selling options when IV > GARCH forecast; plus an HMM regime filter and the order to try them |
-| `trading/backtest_results_summary.md` | **Results of testing the strategies** (Oct 2026): what worked (momentum rotation, weekly pullback), what failed (all intraday — 15-min ORB failed the Nifty 200 re-check, 5-min ORB only a lead — MACD crossover on every timeframe 1m–weekly, 1-hour, pairs, futures intraday momentum), which equations mattered, intraday vs delivery verdict. Full report: `../projects/trading-equation-backtests/reports/REPORT.md` |
-| `trading/price_physics_basics.md` | **Price as a moving object**: physics → price dictionary (distance = return, velocity = momentum, acceleration = MACD histogram, spring = mean reversion/OU, shaking = volatility, friction = costs), the GBM prediction equation, why drift grows with t but noise with √t (drift/noise table per horizon), and how that explains the backtest results |
-| `trading/tori_trendlines_explained.md` | **How Tori's trendline method works**: swing points (5-bar pivots), support/resistance lines and the line equation, Action vs Safety line, Break and Bounce setups, 3-ATR rule, trailing exit, worked ₹ example, test results (Break works on daily, Bounce fails, 15m/1h lose, rarely beats buy-and-hold), how to use it |
-| `trading/index_funds.md` | **Index funds** (the benchmark to beat): what they are, index mutual fund vs ETF, expense ratio and tracking error, Indian indices (Nifty 50, Next 50, 200/500, Midcap, Momentum 30 and other factor indices), why they're hard to beat (SPIVA), tax, how to choose |
-| `trading/trader_returns_reality.md` | **How much traders actually make**: SEBI studies (87.7% of F&O traders lost in FY26, 93% over FY22–24, 71% of intraday traders in FY23), Brazil/Taiwan day-trader studies, SPIVA India (76% of large-cap funds lag the index over 10 years), realistic return ranges, the N × E × r yearly-return equation, a can-I-make-money checklist with Indian tax rates, sources |
-| `trading/breakeven_move_fyers.md` | **How far a ₹4,000 stock must move to cover FYERS charges + slippage**: charge table (intraday vs delivery), break-even move by trade size (intraday ~0.1–0.2%, delivery ~0.3–0.4%, 1.35% for a single share), what that does to the required win rate |
-| `trading/stoch_rsi_macd_strategy.md` | **My Stochastic RSI + MACD strategy**: rules (trend + %K/%D cross + MACD histogram rising), how the indicators work, backtest result on Nifty 50/200 15m–4h buy vs sell, intraday vs delivery (not worth trading; one small 15-min intraday sell lead); re-test with my final rules (no EMA, not-overbought/oversold, steep cross) — still not profitable on Nifty 50 |
-| `trading/strategy5_standard_setup.md` | **Strategy 5 standard setup (one page)**: daily chart, ROC 20 > 7 · close above EMA 50 · MACD 12/26/9 histogram rising · Stoch RSI 3/3/14/14 cross below 50 → buy at close; sell when blue touches orange; optional stop at the buy-day low; ₹1L per stock, ≈ ₹5L capital; test results |
-| `trading/eternal_jun_sep_2026_settings_sweep.md` | **ETERNAL 10 Jun – 10 Sep 2026, no-ROC rules, 864 MACD × Stoch RSI settings on 15m/30m/1h/4h/daily**: daily best MACD 8/17/9 + Stoch 3/5/7/7 (5 trades, +₹20,555, every trade listed), 698/864 daily settings positive; 15m/1h mostly lose; holding ETERNAL (+34%) beat all |
-| `trading/eternal_sep_oct_2026_check.md` | **ETERNAL, standard Strategy 5 check, 16–24 Sep and 22–26 Oct 2026**: day-by-day ROC/EMA/MACD/Stoch values and which rule failed; no buy in either window (17 Sep: only ROC failed; 26 Oct: ROC and blue > 50); what-if without ROC |
-| `trading/strategy5_portfolio_1lakh.md` | **₹1 lakh compounding portfolio, Experiment 2b (buy after 2:15 pm), all Nifty 50, 2023 – Oct 2026**: every trade (company, buy/sell date & time, price, shares, amount, money before/after), indicator values at buy and sell, FYERS charges per trade, profit/loss per company, 1–5 stocks at a time (4 best: ₹1L → ₹1,17,314, +4.3%/yr, total profits ₹1,03,851 / losses −₹86,537), why ₹1L does worse (best signals skipped, charges 0.38%), strongest-ROC-first vs random |
-| `trading/strategy5_experiment_intraday_buy.md` | **EXPERIMENT: the standard daily setup but buy during the day the moment blue crosses orange** (day followed with 1-hour candles; same-day sell as a cautious–favourable range): 626 trades vs 299, net +₹21k to +₹2.44L vs +₹1.53L for buy-at-close; crosses that fail the same day lose ₹1.6–2.4L; not better than the standard. **Experiment 2: check at 1:15 / 2:15 / 3:15 pm and buy then** (exact, no range): **2:15 pm best, +₹1.64L, positive every year incl. 2026 (+₹18k)**; 3:15 pm ≈ close; 1:15 pm +₹1.17L; **2b: buy any time after 2:15 pm when blue crosses = +₹1.94L to +₹2.17L (408 trades), +₹41–63k more than buying at the close, every year positive** |
-| `trading/strategy5_roc_ema_sweep.md` | **Strategy 5 follow-up: ROC length (10–200) × level (0–15%) × EMA length (20–200) × EMA rule (1 or 5 candles), 560 settings × 5 timeframes, Nifty 50, buy at close**: daily is the only robust timeframe (163 settings positive in both periods); **short ROC (10–20 days) works, long ROC (100–200, incl. 100) loses in 2025–26**; best = daily ROC 20 > 7 + EMA 50: +₹1.53L, +47k/+53k/+57k/−4k by year, beats random 97%; also the standard setting on 1h/4h (daily best) and high ROC levels incl. ROC > 25 (smaller profits on daily; 4-hour ROC 150 > 25 +₹1.12L, mostly 2024); and a stop-loss at the buy candle's low (daily standard +₹1.54L ≈ no change, cuts event-day crashes; ROC 20 > 5 + stop +₹1.99L; 4-hour ROC 250 > 30 + stop +₹1.42L) |
-| `trading/strategy5_roc_ema_macd_stoch_sweep.md` | **Strategy 5 (ROC 100 > 2 + close above 100 EMA + MACD histogram rising + Stoch RSI cross below 50; sell on the first blue/orange touch) settings sweep on Nifty 50**, all timeframes, buy at close vs during the candle (cautious/favourable range), FYERS only, train 2023–24 / test 2025–26: your settings lose everywhere; best settings from train fail in test almost always; 15m–1h lose with every setting; daily ROC 20 > 2/3/5 positive in both periods (follow-up in `strategy5_roc_ema_sweep.md`) |
-| `trading/adaniports_apr_jun_2026_strategy2.md` | **ADANIPORTS 1 Apr – 30 Jun 2026, Strategy 2 + B200 + ADX30 (± +DI, ± 200-average slope rising)**, all timeframes, every trade: +₹8,399 on 24 trades vs ≈ +₹30k buy-and-hold (stock +30.7%); slope filter changed nothing, +DI removed good pullback buys |
-| `trading/strategy2_ma_adx_nifty50.md` | **Strategy 2 + 50/100/200 average (A daily / B same timeframe) + ADX 30/40, sell the moment blue crosses below orange inside the candle, all Nifty 50, all timeframes**, FYERS only, 21 versions: every version loses in total (15m–1h); **best = 4-hour + ADX > 30 + average, +₹88–97k on ~700 trades, beats random 97–100%, but only 2023–24**; ADX 30 beats 40; intra-candle vs close-exit comparison; **+DI above −DI** (4-hour/daily): every ADX30 version positive and much steadier in 2025–26 but lower 4-hour totals (B200+ADX30+DI +₹58k, beats random 100%) |
-| `trading/strategy2_ma_adx_adaniports.md` | **Strategy 2 + 50/100/200 average filter (daily A or same-timeframe B) ± ADX(14) > 40, ADANIPORTS only**, delivery buys, all timeframes, FYERS only: no average length wins consistently (all lose in total); **ADX > 40 alone best, +₹39.9k on 87 trades**; average + ADX leaves 36–67 trades; next = run on Nifty 50 |
-| `trading/strategy2_above_200ma.md` | **Strategy 2 delivery buys only when price is above the 200 average for the last 5 candles**, Nifty 50, all timeframes, FYERS only (A: 5 daily closes above 200-day avg; B: 5 candles above the 200-candle avg of the traded timeframe): only daily is positive (+₹73k, but random buys with the same filter +₹57k); 4-hour −₹1.77L / −₹69k; lost in 2025–26; comparison table of every filter tried |
-| `trading/strategy2_in_uptrends.md` | **Strategy 2 delivery buys only inside uptrends, Nifty 50, all timeframes**: MAIN (each stock's main 200-day uptrend, hindsight) vs LIVE (any confirmed 200-day uptrend, tradable), FYERS only, shares and charges, random-buy check: **MAIN 4-hour +₹3.54L, beats 96% of random buys**; MAIN daily +₹4.99L but mostly the uptrend; **LIVE 4-hour −₹2.67L, daily +₹49k ≈ random**; 15m–1h lose either way |
-| `trading/nifty50_uptrends_200dma.md` | **Main uptrend start/peak/end date of every Nifty 50 stock** (rule: start = first of 5 closes in a row above the 200-day average, end = first of 5 below; main = biggest rise peaking since 2023), with prices and gains, BEL check vs my hand-marked window, which stocks are still in an uptrend; charts per stock in `../projects/trading-equation-backtests/reports/uptrends_n50/` |
-| `trading/strategy2_nifty50_delivery.md` | **Strategy 2 (histogram bigger than previous + Stoch blue crosses orange below 50; sell = exact opposite above 50) on all Nifty 50, delivery, 23 Oct 2023 – 26 Oct 2026, every timeframe**, FYERS charges only, shares and charges per trade: **every timeframe and side loses** (buys −₹69L, sells −₹47L over 87,848 trades); 4-hour/daily buys earn gross but less than the 0.28% delivery charge (STT > gross profit); BEL's lead doesn't carry over |
-| `trading/bel_macd_stoch_delivery_buys.md` | **BEL delivery buys, 23 Oct 2023 – 9 Jun 2026, my 4 MACD + Stoch RSI strategies** (all: blue crosses orange + histogram bigger than previous; 1: MACD & signal > 0, blue < 50; 2: blue < 50; 3: as 1 with < 70; 4: as 2 with < 70) on 15m/30m/1h/4h/daily, FYERS charges only: 15m–1h lose with every strategy; 4h/daily all positive but mostly BEL's +210% rise; **best lead = Strategy 2 on 4-hour** (+₹51k / 66 trades, +₹19.8k without best 3, beats 89% of random buys). Every trade in `../projects/trading-equation-backtests/reports/BEL_DELIVERY_BUYS_REPORT.md` |
-| `trading/adaniports_macd_stoch_backtest.md` | **My MACD (both lines above/below 0, gap widening) + Stoch RSI (cross with blue < 50 / > 50, buy at the cross candle's close, exit at the close of the next touch) rules on ADANIPORTS and all Nifty 50**: 15m/30m/1h/4h/daily × intraday/delivery × buy/sell, FYERS charges only (no slippage) with the full rate list; ADANIPORTS sells looked good on 6–18 trades but **all 18 Nifty 50 versions lose** (move per trade ≈ 0 vs 0.08–0.28% charges); closest = daily/4-hour delivery buys. Every trade in `../projects/trading-equation-backtests/reports/ADANIPORTS_STOCH_MACD_REPORT.md` and `STOCH_MACD_ABOVE0_N50_REPORT.md` |
-| `trading/vwap_volume_profile_explained.md` | **VWAP + volume profile** (from the MindMath Money VWAP course and the Currency Pros volume-profile video): VWAP formula, bands, anchors, rolling VWAP, the course's mean-reversion / trend / band-2 reversal rules, POC and the Currency Pros checklist (BOS, sweep, imbalance, 67/75% fib), and backtest results on Nifty 50/200 (VWAP not worth trading; 15-min full-checklist setup a paper-trade lead) |
-| `trading/how_to_sell_stocks.md` | **How to sell stocks on NSE / FYERS**: delivery (CNC) vs intraday (MIS) vs short selling, app steps, order types (market, limit, stop-loss, GTT, AMO), DDPI / CDSL TPIN authorisation, T+1 settlement, charges, tax, common mistakes |
-| `trading/order_flow.md` | **Order flow** (the "force" moving price): limit vs market orders, order book, Kyle's lambda ΔP = λ × net flow, delta / CVD / absorption / imbalance / footprint / volume profile, slow India flow data (delivery %, futures OI build-up, option OI, FII/DII, bulk deals), how to use it as a filter, limits (HFT, spoofing, data), ideas to test |
-| `trading/intraday_swing_playbook.md` | **Rule-by-rule setups**: intraday (ORB on stocks in play, intraday momentum on Nifty futures, VWAP pullback, VWAP mean reversion) and swing (breakout + volume, uptrend pullback, trendline Break, daily MACD, futures pairs) — entry, stop, exit, filters, evidence rating, book pages, comparison table |
-| `trading/strategies_by_timeframe.md` | Which strategies suit **scalping, intraday and delivery/swing** on NSE: real round-trip costs (Fyers model), break-even win-rate formula, ORB / intraday momentum / VWAP / pairs for intraday, momentum / quality / vol-managed / trend breakouts for delivery, verdict per style, sources |
-| `trading/using_equations_to_trade.md` | How the equations turn into profits: which still matter, a 5-step workflow (edge → backtest pass/fail → sizing → trade management → kill switch), a sizing Monte Carlo on my 51.5%/2R setup, and what it means for my backtests |
-| `trading/merton_simons_and_quant_models.md` | What "the Merton equation" and "Jim Simons' theory" mean, whether they're still relevant, other quant models ranked for a retail NSE trader, Kelly applied to my own backtests, book pointers, sources |
-| `trading/murphy_moving_averages.md` | **Murphy's Moving Averages chapter** (pdf p232–264): SMA/WMA/EMA, 1-, 2- and 3-MA crossover rules (5/20, 10/50, 4-9-18), envelopes, Bollinger Bands, cycle/Fibonacci lengths, weekly MAs, pros/cons, 4-week rule (Donchian), optimisation, Kaufman AMA; linked to my backtest results |
-| `trading/indicators/kama_kaufman_adaptive_moving_average.md` | **Kaufman Adaptive Moving Average + Efficiency Ratio**: ER = net move ÷ total path, ER → smoothing constant → KAMA (10, 2, 30) with table, worked examples, Nifty Oct 2026 example, how to tell trend vs sideways (ER, ADX, Choppiness, MA slope, BB width), my test that ER does **not** predict the next period's trendiness (corr ≈ 0, same as a random walk; volatility does persist), how to use it as a filter/trailing exit |
-| `trading/indicators/trend_vs_sideways_tools.md` | **Trend or sideways — which tool for what**: ER vs ADX vs Choppiness vs MA slope vs Bollinger width (what each measures, overlap, settings), my test on 185 Nifty 200 stocks 2014–26: none predicts next-period trendiness, BB width predicts volatility (squeeze → +10% vol), trend filters roughly double a trend-follower's gross edge (Chop < 38 best, ADX > 25 / MA slope close) but amplify good and bad years; use-case table and a practical combo |
-| `trading/murphy_moving_averages_visual.html` | **Visual, interactive version of the same chapter** (open in a browser): 20 sections in book order, each with plain words, a 'picture it' intuition, a live simulated chart (lag, SMA/WMA/EMA weights, drop-off echo, 1/2/3-MA crossover systems with costs, envelopes, Bollinger squeeze, centering, cycle cancelling, weekly 10/40, trend vs chop P&L, 4-week rule, in- vs out-of-sample optimisation, Kaufman AMA + Efficiency Ratio), connections to my backtests, and a 10-question self-check |
-| `web3/solidity/foundry_commands.md` | Foundry cheat-sheet: `forge` (build/create/script/fmt/inspect), `cast` (wallet import, conversions, calls), `anvil` |
-| `web3/solidity/solodity.md` | Empty stub (just an "etherium" heading) |
-| `practice/` | Scratch JS/TS: `javascript.js`, `test.js`, `test.ts` (interfaces), `javascript/proto_example.js` (classes vs prototypes) — untracked in git |
+| `system_design/database_internals/` | **Database Internals (Petrov) study pages**: open `index.html`; ch00 preface + ch01–14 as interactive HTML pages (plain words, live simulations, "picture it" analogies, check-yourself quizzes) |
+| `trading/murphy/` · `grimes/` · `carter/` | **Murphy, Grimes and Carter study pages** — see `trading/AGENTS.md` |
+| `product_thinking/how_to_win_friends/` | **How to Win Friends and Influence People (Dale Carnegie) study pages** (open `index.html`): front matter (ch00) + all 30 chapters of the four Parts (ch01–30) + Lowell Thomas's portrait of Carnegie (ch31), one page each, in book order: the chapter's principle, every story retold in plain words, "Picture it" analogies with SVG pictures (`illus/`), what's happening behind it, "At work" (team, code review, interviews), before/after rewrites, interactives, practice this week, where it can go wrong, check-yourself quiz. `BRIEF.md` = the spec (chapter table with pdf ranges) |
+| `embedded/can_guide/` | **NOT ON DISK (missing since at least 2026-11-26; it was never committed).** **A Comprehensible Guide to Controller Area Network (Wilfried Voss, 2nd ed.) study pages** (open `index.html`): ch00 about the book, ch01–03 overview, ch04a/ch04b message frames (split in two), ch05 broadcasting, ch06 bus arbitration, ch07 bit timing & synchronization, ch08 error detection & fault confinement, ch09 physical layer, ch10 summary. Every section in plain words with the book's 90 figures (`figs/`, cropped from the PDF; `figs/MANIFEST.tsv`), electronics terms explained from zero, bit-level simulators (frame builder, arbitration, stuffing, bit timing, CRC-15, error counters), interview angles with backend parallels, SVG pictures (`illus/`), quizzes. `BRIEF.md` = the spec (chapter table with pdf ranges). The PDF is in ~/Downloads, not in `books/`. To restore: rebuild with the pipeline in `../docs/PIPELINE.md` |
 
-### Linux Commands lesson index (topic of each history dump)
+Inside a book folder: `chNN_*.html` (the pages), `index.html` (where there is one), `illus/` (pictures +
+`scenes*.json` prompts), `figs/` (figures cropped from the PDF + `MANIFEST.tsv`), `BRIEF.md` (the spec the pages were
+written to). How pages are made: `../docs/PIPELINE.md`, `../docs/PAGE_SPEC.md`, `../docs/ILLUSTRATIONS.md`.
 
-1 system info (uptime, free, whoami) · 2 files & dirs (mkdir, cp, mv, rm, touch) · 3 vim, links (`ln`), hostname ·
-4 text filters (grep, head, tail, cut, awk, sed, less) · 5 find/locate, wc, df, output redirection ·
-6 users & processes basics (useradd, passwd, id, lsof, who) · 7 permissions & groups (chmod, chown, groupadd) ·
-8 sudo/visudo · 9 package mgmt (yum, rpm), curl, tree · 10 services (systemctl) · 11 processes (ps, top, kill) ·
-12 archives (tar, zip, unzip) · 13 Ubuntu equivalents (apt, dpkg, adduser, wget)
+## Notes by subject
+
+| Path | What it is |
+|------|------------|
+| `trading/AGENTS.md` | **Map of all trading notes**: `concepts/` (12), `indicators/` (2), `strategies/` (5), `backtests/` (16), the forex roadmap, the equation sheet and the interactive moving-averages page |
+| `career/AGENTS.md` | **Map of career/**: `interview-topics/` (the 15 interview prep pages, HTML only), `sources/` (their Markdown + builder), `profile/` (resume, LinkedIn), `job-search/` (answers, portal copy, logs) |
+| `programming/python/web-frameworks.html` | **Python web frameworks notes**: Django vs Flask vs FastAPI vs Starlette, WSGI vs ASGI, Uvicorn, async/await, Pydantic validation, OpenAPI docs, when to use which, plus interview follow-ups (def vs async def, workers, Flask async, Django async ORM). Linked from interview topics 4.7 (frameworks) |
+| `programming/javascript/js_notes.md` | JavaScript fundamentals: data types, type conversion & comparisons, boolean conversion, `??`, transpilers & polyfills |
+| `programming/docker/docker_commands.md` | AWS EC2 SSH + installing Docker; build/run/manage containers; exec; bind mounts & volumes; Docker Compose; MongoDB in Docker |
+| `programming/linux/shell_scripting.md` | Basic shell commands cheat-sheet (nproc, free, df, top, vi, touch, mkdir…) — starter shell-scripting notes |
+| `programming/linux/linux_quickstart_v5.pdf` | Reference PDF (Linux quickstart) — read with `../tools/bin/pdftool` |
+| `programming/linux/command_history/NN_<topic>.txt` | **Raw shell `history` dumps** from a Vagrant CentOS VM, one per lesson, named by topic: 01 system info · 02 files & dirs · 03 vim, links, hostname · 04 text filters (grep, awk, sed) · 05 find, wc, df, redirection · 06 users & processes · 07 permissions & groups · 08 sudo/visudo · 09 packages (yum, rpm), curl · 10 services (systemctl) · 11 processes (ps, top, kill) · 12 archives (tar, zip) · 13 Ubuntu equivalents (apt, dpkg). Not written notes |
+| `programming/practice/` | Scratch JS/TS: `javascript.js`, `test.js`, `test.ts` (interfaces), `proto_example.js` (classes vs prototypes) |
+| `product_thinking/app_ideas/100_user_problems.md` | **100 everyday problems people would pay an app to fix (India-first)**, in 10 groups (money, family/parents, phone/attention, career, health, home, documents, students, social, travel): feeling → wish → app idea → existing apps; plus a 5-point scoring method to pick one |
+| `product_thinking/app_ideas/top10_research_2026-11.md` | **Top 10 app ideas checked against real evidence (Nov 2026)**: ranking by pain / willingness to pay / gap (Scam Check first, work-wins journal last), evidence per idea (official numbers, Play Store competitors and complaints, pricing, platform and legal blockers), the pattern (giants give away the biggest pains free), and the parents'-safety bundle recommendation |
+
+## tools/ — scripts for the pages
+
+Run them from anywhere; each takes the folder to work on, so they serve every book, not only `llm/`.
+
+| Path | What it is |
+|------|------------|
+| `tools/build_home.py` | Rebuilds `index.html`. Shelves are listed by hand in its `SECTIONS`; book chapters are found automatically; any `.html` no shelf covers shows under "Other pages"; missing paths are skipped and reported. **Rerun after adding a book, chapter or page** |
+| `tools/build_llm_index.py` | Rebuilds `llm/index.html` and each LLM book's `index.html` |
+| `tools/build_book_index.py` | Builds `index.html` for the books with no hand-made one (Database Internals, Murphy, Grimes, Carter; list in its `BOOKS`), so every chapter's "all chapters" link works. Never overwrites a hand-made index (DDIA, Carnegie). **Rerun after adding a chapter to one of them** |
+| `tools/theme_toggle.py <folder>` | Adds the light/dark switch to every page under the folder (choice kept in localStorage `llm-theme`). Safe to rerun, but a rerun moves its block to the end of `<head>` (after the picture CSS) on pages where it sat earlier: a diff with no visible effect, so run it only on the folder you are working on |
+| `tools/annotate_inject.py <folder>` | Adds the highlight + notes script tag to every page under the folder (idempotent) |
+| `tools/check_page.py <book dir> <page> <chapter no.>` | Checks one page: figures used once, images exist, no external scripts, inline JS parses |
+| `tools/illus_insert.py <book dir>` | Puts each picture in `illus/` into its "Picture it" box (idempotent) |
+| `tools/illus_status.py <book dir>` | Shows which "Picture it" boxes have a scene and a picture |
+| `career/sources/interview-topics/build_pages.py` | Rebuilds the interview prep pages from their Markdown (see `career/AGENTS.md`) |
+
+## Where new things go
+
+| You are adding… | It goes in… | Then |
+|---|---|---|
+| A chapter page of a book | that book's folder (`<subject>/<book>/chNN_*.html`) | `python3 tools/build_book_index.py` (or `build_llm_index.py` for an LLM book), then `python3 tools/build_home.py` |
+| A new book | `<subject>/<book>/` (new subject → new top-level folder) | add it to `SECTIONS` in `tools/build_home.py`, rebuild, add a row above |
+| A trading note | `trading/concepts/`, `indicators/`, `strategies/` or `backtests/` (table in `trading/AGENTS.md`) — **never loose in `trading/`** | add a row in `trading/AGENTS.md` |
+| A programming note or cheat-sheet | `programming/<language or tool>/` | add a row above |
+| An app or product idea | `product_thinking/app_ideas/` | add a row above |
+| Career or interview material | see `career/AGENTS.md` | add a row there |
+| A note on a new subject | a new lower_snake_case top-level folder | add it to the layout and a row above |
+| A script for the pages | `tools/` | add a row above |
 
 ## Conventions
 
-- **Every note goes here, in a folder per topic** (`Notes/<topic>/`), including notes and summaries
-  Claude writes from research or explanations — e.g. all trading notes go in `trading/`.
-  Create the topic folder if it doesn't exist.
-- **Indicator explainers** (how one indicator works, settings, my test results) go in `trading/indicators/`, one file per
-  indicator or comparison.
-- Markdown (`.md`) for notes, cheat-sheets as `command -> what it does`.
-- When adding a topic folder or note, add a row to the map above.
+- **Every note goes here, in its subject folder** — including notes and summaries Claude writes from research or
+  explanations. Nothing loose at the top level except the four files in the layout.
+- Folder and file names: `lower_snake_case`, no spaces. Markdown (`.md`) for notes; cheat-sheets as
+  `command -> what it does`.
+- Keep pages to read (HTML) apart from working files; never hand-edit a built page (interview pages, index pages).
 - Linking notes to books: cite as *Book, chapter, pdf p.N* using the indexes in `../books/`.
+- `Notes/` is **public**: no credentials, and nothing personal unless asked.

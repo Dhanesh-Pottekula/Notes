@@ -27,7 +27,7 @@ python3 Notes/serve_notes.py      # then open http://127.0.0.1:8780/career/inter
 Opening through the server keeps highlights and notes (saved as `<page>.notes.json` beside the page).
 **Do not move or rename the HTML pages**: highlights are keyed by the page's path from the Notes root
 (`ann:career/interview-topics/<page>.html`) and topic/question ticks by its file name (`itp:` / `itq:`).
-`../python/web-frameworks.html` and `../llm/index.html` link into this folder too.
+`../programming/python/web-frameworks.html` and `../llm/index.html` link into this folder too.
 
 ## Changing a page
 
@@ -50,7 +50,7 @@ Links the builder makes (book chapters, `annotate.js`, theme) are computed relat
 | `sources/interview-topics/NN-*.md` | Source of each page. Question sub-bullets: `` - `L2` question ↳ hint ``; answers: `  - **Answer:** … ¶ …`; notes link: `[label](notes/<name>.md)` |
 | `sources/interview-topics/00-README.md` | Becomes `index.html`; **question-writing rules** |
 | `sources/interview-topics/notes/` | Long notes for one topic, rendered into the page as a popup with copy buttons |
-| `sources/interview-topics/build_pages.py` | The builder (theme + annotate injected from `../llm/theme_toggle.py`, `../llm/annotate_inject.py`) |
+| `sources/interview-topics/build_pages.py` | The builder (theme + annotate injected from `../tools/theme_toggle.py`, `../tools/annotate_inject.py`) |
 | `profile/resume.tex` | **Resume LaTeX** (copy of the Overleaf project "Dhanesh_FullStack", Nov 2026): every bullet quantified from the audited LinkedIn numbers; unsupported claims removed |
 | `profile/linkedin-live-snapshot.md` | **What is live on LinkedIn now** (read back and audited, Nov 2026): every section's exact text; paste from here |
 | `profile/linkedin/` | LinkedIn banner and profile photo (made from the portfolio art) |

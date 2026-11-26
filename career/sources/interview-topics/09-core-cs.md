@@ -413,4 +413,4 @@ the concurrency parts.
 
 **Learn (all of 9):** *Operating System Concepts* (Galvin) chapters on processes, threads, sync, deadlocks, memory
 · GeeksforGeeks OS/CN/DBMS interview sets (rapid revision) · Neso Academy / Gate Smashers (YouTube) · Linux notes
-(`Linux Commands/`) · DBI ch1–ch5 for DBMS internals · Hussein (epoll, OS for backend engineers)
+(`programming/linux/command_history/`) · DBI ch1–ch5 for DBMS internals · Hussein (epoll, OS for backend engineers)

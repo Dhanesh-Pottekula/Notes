@@ -81,7 +81,7 @@ seen through returns.
 
 | You want to… | Use | Why |
 |---|---|---|
-| **Know which way to trade** | **MA slope** (or price vs 200-DMA) | The only one with direction. My best filter so far is Nifty above its 200-DMA (+0.26 Sharpe in `../backtest_results_summary.md`) |
+| **Know which way to trade** | **MA slope** (or price vs 200-DMA) | The only one with direction. My best filter so far is Nifty above its 200-DMA (+0.26 Sharpe in `../backtests/backtest_results_summary.md`) |
 | **Turn a trend system on or off** | **ADX > 25** (simple, common) or **Choppiness < 38** (stricter, rarer) | Both separated good and bad trend-following days best in Test B. Don't bother with "ADX rising" |
 | **Avoid trading in chop** | **Choppiness > 62** or **\|MA slope\| < 0.25 ATR** | Trend-following made ~0% in these states |
 | **Make an indicator adapt its own speed** | **ER** (inside KAMA) | Fast, no smoothing lag, a clean 0–1 scale. Built to be plugged into a formula |

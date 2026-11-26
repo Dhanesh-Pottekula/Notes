@@ -1,7 +1,7 @@
 # Kaufman's Adaptive Moving Average (KAMA) and the Efficiency Ratio — Trend vs Sideways
 
 From Perry Kaufman, *Smarter Trading* (1995); also in Murphy, *Technical Analysis of the Financial Markets*, Moving Averages,
-pdf p263 (see `../murphy_moving_averages.md` §10). Numbers below measured on my own NSE data (Oct 2026). Education, not investment advice.
+pdf p263 (see `../concepts/murphy_moving_averages.md` §10). Numbers below measured on my own NSE data (Oct 2026). Education, not investment advice.
 
 ## 1. The problem it solves
 
@@ -19,7 +19,7 @@ ER = |Close_t − Close_{t−n}|  ÷  Σ |Close_i − Close_{i−1}|   (over the
 
 - **ER = 1:** every bar moved the same way, a perfectly straight trend.
 - **ER = 0:** price walked a lot but ended where it started, pure chop.
-- Physics picture (`../price_physics_basics.md`): ER = displacement ÷ path length. It compares **drift** (direction) with **noise**.
+- Physics picture (`../concepts/price_physics_basics.md`): ER = displacement ÷ path length. It compares **drift** (direction) with **noise**.
 
 **Example, 10 days.** The stock goes 100 → 110 in daily steps of +1. Net = 10, path = 10, so **ER = 1.0**.
 Another stock goes 100 → 102 → 99 → 103 → 100 → 104 → 101 → 103 → 100 → 102 → 101. Net = 1, path = 2+3+4+3+4+3+2+3+2+1 = 27,
@@ -110,10 +110,10 @@ That is why KAMA is useful as an adaptive tool, not as a forecaster:
    - My **Adaptive SuperTrend** test (`../../../projects/trading experiments/supertrend_di_backtest.py`, `er_len=14, er_thr=0.30`)
      used exactly this filter. It still **lost to costs on short timeframes**.
    - The filter that helped most in my tests was the slow one: **Nifty above its 200-DMA** (+0.26 Sharpe, see
-     `../backtest_results_summary.md`). Slow filters work because they describe the big trend, which lasts longer.
+     `../backtests/backtest_results_summary.md`). Slow filters work because they describe the big trend, which lasts longer.
 2. **As a trailing exit:** KAMA flattens in pauses and speeds up in strong moves, so it suits trailing a position.
 3. **Use daily or weekly bars.** On 15-min or 1-hour bars, ER flips between "trend" and "chop" many times a day, and every flip costs
-   charges (`../breakeven_move_fyers.md`).
+   charges (`../concepts/breakeven_move_fyers.md`).
 4. Not yet tested by me: a full KAMA crossover / KAMA-filter backtest on Nifty 200 daily. Worth a project if I want the number.
 
 ## 7. One-line summary

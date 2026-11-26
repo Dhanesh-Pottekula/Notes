@@ -5,7 +5,7 @@ The .md files (here, in Notes/career/sources/interview-topics/) stay the source;
 The pages are written to Notes/career/interview-topics/ (HTML only; their paths key the saved highlights, so keep them there).
 
 Each NN-name.md becomes NN-name.html (00-README.md becomes index.html) with:
-- the book pages' palette, fonts and light/dark switch (Notes/llm/theme_toggle.py),
+- the book pages' palette, fonts and light/dark switch (Notes/tools/theme_toggle.py),
 - highlights + margin notes (Notes/assets/annotate/, saved by Notes/serve_notes.py),
 - tickable topic checkboxes with progress, kept in this browser's localStorage ("itp:<page>"),
 - "DDIA ch7", "AIE ch6" … linked to the matching study page in Notes/,
@@ -24,7 +24,7 @@ import glob, hashlib, html, json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))                      # sources: the .md files + notes/
 NOTES = os.path.abspath(os.path.join(HERE, "..", "..", ".."))          # the Notes root
 OUT = os.path.join(NOTES, "career", "interview-topics")                # the HTML pages you open
-sys.path.insert(0, os.path.join(NOTES, "llm"))
+sys.path.insert(0, os.path.join(NOTES, "tools"))
 from theme_toggle import add_theme          # noqa: E402
 from annotate_inject import add_annotate    # noqa: E402
 
@@ -198,7 +198,9 @@ def note_link(label, url):
         raw = open(os.path.join(HERE, url), encoding="utf-8").read()
         title, body = render_note(raw)
         USED_NOTES[note_id] = (title or label, raw, body)
-    return f'<a class="note-link" href="{html.escape(url)}" data-note="{note_id}">{inline(label)}</a>'
+    # The click opens the popup; the href is the fallback (no JS), so it must resolve from the page's folder.
+    href = os.path.relpath(os.path.join(HERE, url), OUT).replace(os.sep, "/")
+    return f'<a class="note-link" href="{html.escape(href)}" data-note="{note_id}">{inline(label)}</a>'
 
 
 def render_note(md_text):

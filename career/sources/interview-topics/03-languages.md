@@ -394,7 +394,7 @@ hood" questions on both, because your resume shows both.
   - `L3` Why does `let` in a `for` loop create a new binding per iteration, and what does the spec do to make that work?
   - `L3` What happens with a function declaration inside a block in sloppy vs strict mode?
   - `L3` What is the difference between the global object (`globalThis`) and the global lexical environment (`let` at top level)?
-- [ ] Types, coercion, `==` vs `===`, truthy/falsy, `typeof null` ↳ `javascript/jsNotes.md` "Type Conversions" + "Type Conversion and Comparisons" · https://javascript.info/type-conversions · https://javascript.info/comparison
+- [ ] Types, coercion, `==` vs `===`, truthy/falsy, `typeof null` ↳ `programming/javascript/js_notes.md` "Type Conversions" + "Type Conversion and Comparisons" · https://javascript.info/type-conversions · https://javascript.info/comparison
   - `L1` Name the primitive types in JavaScript. ↳ string, number, bigint, boolean, undefined, null, symbol
   - `L1` Is `Symbol` a primitive or an object? Is a function an object?
   - `L1` `null` vs `undefined`: what does each mean, and when do you get each?
@@ -1093,7 +1093,7 @@ hood" questions on both, because your resume shows both.
   - `L3` What is `AsyncLocalStorage`, and how does it carry a request id through awaits?
   - `L3` What is `async_hooks`, and why is it costly?
 
-**Learn (JS/TS/Node):** JS notes (`javascript/jsNotes.md`) · MDN (closures, event loop, promises) ·
+**Learn (JS/TS/Node):** JS notes (`programming/javascript/js_notes.md`) · MDN (closures, event loop, promises) ·
 javascript.info (best free JS course) · TS Handbook (typescriptlang.org/docs) · type-challenges (GitHub, easy +
 medium) · Node docs "Event loop, timers and nextTick" + "Backpressuring in streams" · Hussein (Node internals) ·
 NestJS docs (docs.nestjs.com: fundamentals)

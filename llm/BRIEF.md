@@ -89,7 +89,7 @@ figure**, as visual as possible, with analogies.
    missing definition, number, example, list item, caveat, figure explanation and code idea.
 3. **Enrich**: add more examples and analogies, put visuals inside examples, simplify any hard sentence, add
    interview angles you missed.
-4. Run `python3 /Users/dhanesh/Desktop/GFV/Notes/llm/check_page.py <book folder> <file> <chapter number>` and fix
+4. Run `python3 /Users/dhanesh/Desktop/GFV/Notes/tools/check_page.py /Users/dhanesh/Desktop/GFV/Notes/llm/<book folder> <file> <chapter number>` and fix
    every problem it reports (it checks figures used exactly once, image paths, external resources, JS syntax).
    For preface/afterword/epilogue/appendix pages use chapter number `0` (they have no figures unless listed).
 

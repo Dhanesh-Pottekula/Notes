@@ -14,6 +14,9 @@
  * ("ann:<path from Notes root>"); on load the newer of the two wins.
  * Anchors are quoted text + 40 characters either side (a pin: just the text either side), so they survive
  * edits elsewhere on the page.
+ * Popups: a page calls __ann.scope(scrollingBody, key) after opening a modal <dialog> and __ann.unscope() when it
+ * closes. While a popup is open the tools, cards and lines live inside it and only items saved with that `scope`
+ * key show; the page's own notes come back when it closes. Same file, each popup item carries its `scope`.
  */
 (function () {
   "use strict";
@@ -35,7 +38,8 @@
   var storeKey = "ann:" + pageId;
   var serverUrl = /^https?:$/.test(root.protocol) ? root.href + "__notes?page=" + encodeURIComponent(pageId) : null;
 
-  var container, state, lastColor = "yellow";
+  var container, pageContainer, state, lastColor = "yellow";
+  var host = null, scopeId = "", ro = null;   // host: the open popup's scrolling body; scopeId: its key
   var tool = null;               // null | "pin" | "erase" | a colour
   var showNotes = true;
   var ui = {}, cards = {};
@@ -62,6 +66,23 @@
   function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
   // Phones and wide screens keep separate dragged positions: a spot in a desktop margin means nothing on a phone.
   function posKey() { return narrow() ? "posNarrow" : "pos"; }
+  function mine(it) { return (it.scope || "") === scopeId; }
+  // Closed popups still hold their text in the page, so the page's index must not read it.
+  function skipSel() { return host ? SKIP : SKIP + ",dialog"; }
+  // Where cards and lines are drawn: the page, or the popup body they scroll with.
+  // Layer coordinates = client coordinates + (sx, sy); the visible area is left..left+width, top.. in client terms.
+  function view() {
+    if (!host) return { sx: window.scrollX, sy: window.scrollY, left: 0, top: 0, width: document.documentElement.clientWidth };
+    var r = host.getBoundingClientRect(), l = r.left + host.clientLeft, t = r.top + host.clientTop;
+    return { sx: host.scrollLeft - l, sy: host.scrollTop - t, left: l, top: t, width: host.clientWidth };
+  }
+  // The text column notes sit beside: the page's container, or the popup body inside its padding.
+  function box() {
+    if (!host) return container.getBoundingClientRect();
+    var v = view(), cs = getComputedStyle(host), r = host.getBoundingClientRect();
+    var l = v.left + parseFloat(cs.paddingLeft), rt = v.left + v.width - parseFloat(cs.paddingRight);
+    return { left: l, right: rt, top: r.top, bottom: r.bottom, width: rt - l };
+  }
 
   var ICON = {
     pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-4 4h4l2-2"/><path d="M14.5 4.5l5 5-8 8-5-5z"/></svg>',
@@ -77,9 +98,9 @@
 
   // ---------- text index: the page's text as one string, mapped back to text nodes ----------
   function buildIndex() {
-    var nodes = [], text = "";
+    var nodes = [], text = "", skip = skipSel();
     var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-      acceptNode: function (n) { return n.parentElement && n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+      acceptNode: function (n) { return n.parentElement && n.parentElement.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
     });
     for (var n = walker.nextNode(); n; n = walker.nextNode()) { nodes.push({ n: n, s: text.length }); text += n.data; }
     return { nodes: nodes, text: text };
@@ -206,6 +227,7 @@
   function snapshot() {
     return { version: 2, page: pageId, saved: state.saved, items: state.items.map(function (it) {
       var out = { id: it.id, kind: it.kind || "highlight", color: it.color, quote: it.quote, note: it.note || "", created: it.created, updated: it.updated };
+      if (it.scope) out.scope = it.scope;
       if (it.pos) out.pos = it.pos;
       if (it.posNarrow) out.posNarrow = it.posNarrow;
       return out;
@@ -287,12 +309,12 @@
 
   function updateDock() {
     if (!ui.dock) return;
-    var n = state.items.length;
+    var n = state.items.filter(mine).length;
     ui.dockToggle.querySelector(".ann-count").textContent = n || "";
     ui.eye.innerHTML = showNotes ? ICON.eye : ICON.eyeOff;
     var where = serverOk ? "saved to " + pageId.split("/").pop().replace(/\.html$/, ".notes.json")
       : "saved in this browser only (open through serve_notes.py to save to a file)";
-    ui.eye.title = (showNotes ? "Hide notes" : "Show notes") + " · " + n + " on this page, " + where;
+    ui.eye.title = (showNotes ? "Hide notes" : "Show notes") + " · " + n + (host ? " in this popup, " : " on this page, ") + where;
     ui.eye.setAttribute("aria-label", ui.eye.title);
   }
 
@@ -303,7 +325,7 @@
     var range = sel.getRangeAt(0);
     if (!container.contains(range.commonAncestorContainer)) return null;
     var anc = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
-    if (anc.closest(SKIP) || !range.toString().trim()) return null;
+    if (anc.closest(skipSel()) || !range.toString().trim()) return null;
     return range;
   }
 
@@ -312,6 +334,7 @@
     if (!q) return null;
     var now = Date.now();
     var item = { id: uid(), kind: "highlight", color: color, quote: q, note: "", created: now, updated: now, rev: 1 };
+    if (scopeId) item.scope = scopeId;
     state.items.push(item);
     place(item);
     var sel = window.getSelection(); if (sel) sel.removeAllRanges();
@@ -329,6 +352,7 @@
     if (!q) return;
     var now = Date.now();
     var item = { id: uid(), kind: "pin", color: lastColor, quote: q, note: "", created: now, updated: now, rev: 1, fresh: true };
+    if (scopeId) item.scope = scopeId;
     state.items.push(item);
     place(item);
     if (item.orphan) { state.items.pop(); return; }
@@ -371,11 +395,11 @@
     ui.popDel.style.display = item ? "" : "none";
     each(t.querySelectorAll(".ann-swatch"), function (b) { b.classList.toggle("ann-current", !!item && b.dataset.color === item.color); });
     t.classList.add("ann-show");
-    var w = t.offsetWidth, h = t.offsetHeight, sx = window.scrollX, sy = window.scrollY;
-    var top = rect.top + sy - h - 10;
-    if (isTouch() || top < sy + 8) top = rect.bottom + sy + 12;
-    var left = rect.left + sx + rect.width / 2 - w / 2;
-    left = Math.max(sx + 8, Math.min(left, sx + document.documentElement.clientWidth - w - 8));
+    var w = t.offsetWidth, h = t.offsetHeight, v = view();
+    var top = rect.top + v.sy - h - 10;
+    if (isTouch() || top < v.top + v.sy + 8) top = rect.bottom + v.sy + 12;
+    var left = rect.left + v.sx + rect.width / 2 - w / 2;
+    left = Math.max(v.left + v.sx + 8, Math.min(left, v.left + v.sx + v.width - w - 8));
     t.style.top = top + "px"; t.style.left = left + "px";
   }
 
@@ -521,8 +545,8 @@
         c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); c.removeEventListener("pointercancel", up);
         c.classList.remove("ann-dragging");
         if (!moved) { var m = anchorsOf(item.id)[0]; if (m && !item.editing) { m.scrollIntoView({ behavior: "smooth", block: "center" }); flash(item.id); } return; }
-        var a = anchorPoint(item), box = container.getBoundingClientRect();
-        if (a) { item[posKey()] = { ox: parseFloat(c.style.left) - (box.left + window.scrollX), oy: parseFloat(c.style.top) - a.y }; save(); }
+        var a = anchorPoint(item);
+        if (a) { item[posKey()] = { ox: parseFloat(c.style.left) - (box().left + view().sx), oy: parseFloat(c.style.top) - a.y }; save(); }
         touch(item); layout();
       }
       c.addEventListener("pointermove", move); c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
@@ -531,18 +555,18 @@
 
   // ---------- layout: cards beside their text, lines between ----------
   function gutter() {
-    var r = container.getBoundingClientRect(), vw = document.documentElement.clientWidth;
-    var right = vw - r.right, left = r.left;
+    var r = box(), v = view();
+    var right = v.left + v.width - r.right, left = r.left - v.left;
     if (right >= MIN_GUTTER) return { side: "right", room: right, r: r };
     if (left >= MIN_GUTTER) return { side: "left", room: left, r: r };
-    return { side: "over", room: vw, r: r };
+    return { side: "over", room: v.width, r: r };
   }
 
   function anchorPoint(item) {
     var first = anchorsOf(item.id)[0];
     if (!first) return null;
     var rect = item.kind === "pin" ? first.getBoundingClientRect() : (first.getClientRects()[0] || first.getBoundingClientRect());
-    var sx = window.scrollX, sy = window.scrollY;
+    var v = view(), sx = v.sx, sy = v.sy;
     // A pin's badge floats just above its text line, so its line runs in the gap above that line.
     if (item.kind === "pin") { var py = rect.top + sy - 13; return { x: rect.left + sx + 9, xl: rect.left + sx - 9, y: py, mid: py, gap: rect.top + sy - 3, under: py + 8 }; }
     // The line starts at the number badge, which sits at the end of the highlight's last piece.
@@ -560,7 +584,7 @@
   // Number every note (pins, and highlights that carry a note) in reading order; the badge on the text
   // and on its card show the same number.
   function renumber() {
-    var noted = state.items.filter(function (it) { return !it.orphan && (it.note || it.kind === "pin") && anchorsOf(it.id)[0]; });
+    var noted = state.items.filter(function (it) { return mine(it) && !it.orphan && (it.note || it.kind === "pin") && anchorsOf(it.id)[0]; });
     noted.sort(function (p, q) { return anchorsOf(p.id)[0].compareDocumentPosition(anchorsOf(q.id)[0]) & 4 ? -1 : 1; });
     state.items.forEach(function (it) { it.num = 0; });
     noted.forEach(function (it, k) { it.num = k + 1; });
@@ -573,14 +597,14 @@
 
   function layout() {
     renumber();
-    var g = gutter(), sx = window.scrollX, vw = document.documentElement.clientWidth;
+    var g = gutter(), v = view(), sx = v.sx, vw = v.width, viewLeft = v.left + sx;
     var w = g.side === "over" ? Math.min(270, vw - 40) : Math.min(290, g.room - 60);
-    var autoX = g.side === "right" ? g.r.right + sx + 36 : g.side === "left" ? g.r.left + sx - 36 - w : sx + vw - w - 14;
+    var autoX = g.side === "right" ? g.r.right + sx + 36 : g.side === "left" ? g.r.left + sx - 36 - w : viewLeft + vw - w - 14;
     var boxLeft = g.r.left + sx;
 
     var rows = [];
     state.items.forEach(function (it) {
-      var wanted = showNotes && !it.orphan && (it.note || it.editing || it.kind === "pin");
+      var wanted = mine(it) && showNotes && !it.orphan && (it.note || it.editing || it.kind === "pin");
       if (!wanted) { if (cards[it.id]) { cards[it.id].remove(); delete cards[it.id]; } return; }
       var a = anchorPoint(it);
       if (a) rows.push({ it: it, a: a });
@@ -606,7 +630,7 @@
       var pos = it[posKey()];
       if (pos) {
         // A spot chosen on a wide screen can be off a narrow one: keep the card on screen.
-        c.style.left = Math.max(sx + 8, Math.min(boxLeft + pos.ox, sx + vw - cw - 8)) + "px";
+        c.style.left = Math.max(viewLeft + 8, Math.min(boxLeft + pos.ox, viewLeft + vw - cw - 8)) + "px";
         c.style.top = row.a.y + pos.oy + "px";
       } else {
         c.style.left = (g.side === "left" ? autoX + w - cw : autoX) + "px";
@@ -628,10 +652,12 @@
   // One smooth curve per note, from its text to its card; a new line draws itself in once.
   var drawn = {};
   function drawLines() {
-    var svg = ui.lines, doc = document.documentElement;
+    var svg = ui.lines, area = host || document.documentElement;
     svg.innerHTML = "";
-    svg.setAttribute("width", doc.scrollWidth); svg.setAttribute("height", doc.scrollHeight);
-    var box = container.getBoundingClientRect(), sx = window.scrollX;
+    // The svg sits inside the area it measures, so its old size would count itself in.
+    svg.setAttribute("width", 0); svg.setAttribute("height", 0);
+    svg.setAttribute("width", area.scrollWidth); svg.setAttribute("height", area.scrollHeight);
+    var col = box(), sx = view().sx;
     Object.keys(cards).forEach(function (id) {
       var it = byId(id), c = cards[id];
       if (!it) return;
@@ -650,7 +676,7 @@
         // page column (never through the words), then one soft curve into the card.
         var toRight = cl + cw / 2 > a.x, dir = toRight ? 1 : -1;
         x1 = toRight ? a.x : a.xl; y1 = a.mid;
-        var gy = a.gap, edge = toRight ? Math.max(box.right + sx + 10, x1 + 14) : Math.min(box.left + sx - 10, x1 - 14);
+        var gy = a.gap, edge = toRight ? Math.max(col.right + sx + 10, x1 + 14) : Math.min(col.left + sx - 10, x1 - 14);
         var tx = toRight ? cl - 2 : cl + cw + 2, ty = ct + 26;
         var r = Math.min(8, Math.abs(gy - y1));
         if ((toRight && tx < edge) || (!toRight && tx > edge)) edge = (x1 + tx) / 2;
@@ -717,6 +743,7 @@
       if (hit && control) { e.preventDefault(); e.stopPropagation(); }
       if (hit && (!sel || sel.isCollapsed)) {
         var id = hit.dataset.ann, it = byId(id);
+        if (!it) return;
         setActive(id);
         if (it.kind === "pin") { if (!showNotes) setShowNotes(true); var c = cards[id]; if (c) c.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
         showPop(hit.getBoundingClientRect(), { kind: "item", id: id });
@@ -724,15 +751,19 @@
       }
       if (popFor && popFor.kind === "item") hidePop();
     }, true);
-    container.addEventListener("mouseover", function (e) { var m = e.target.closest("mark.ann-hl, .ann-pin"); if (m) setActive(m.dataset.ann); });
-    container.addEventListener("mouseout", function (e) { var m = e.target.closest("mark.ann-hl, .ann-pin"); if (m) setActive(null); });
+    document.addEventListener("mouseover", function (e) { var m = e.target.closest && e.target.closest("mark.ann-hl, .ann-pin"); if (m && container.contains(m)) setActive(m.dataset.ann); });
+    document.addEventListener("mouseout", function (e) { var m = e.target.closest && e.target.closest("mark.ann-hl, .ann-pin"); if (m && container.contains(m)) setActive(null); });
     // Shortcuts. N: pin a note where the mouse pointer is. With text selected, 1-5 highlight it in that colour
     // and H in the last colour; with nothing selected, 1-5 / P / E pick that tool (press again to drop it).
     var mouse = null;
     document.addEventListener("mousemove", function (e) { mouse = { x: e.clientX, y: e.clientY }; }, { passive: true });
     document.addEventListener("keydown", function (e) {
       var typing = e.target.closest && e.target.closest("textarea,input,select,[contenteditable],[contenteditable=true]");
-      if (e.key === "Escape" && !typing) { hidePop(); setTool(null); return; }
+      if (e.key === "Escape" && !typing) {
+        // Inside a popup, Esc first drops the tool or the bar; only a second Esc closes the popup.
+        if (host && (tool || popFor)) e.preventDefault();
+        hidePop(); setTool(null); return;
+      }
       if (typing || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       var key = e.key.toLowerCase(), n = "12345".indexOf(key), selected = selectionRange();
       if (key === "n") {
@@ -751,7 +782,38 @@
     window.addEventListener("resize", function () { hidePop(); queueLayout(); });
     window.addEventListener("load", queueLayout);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueLayout);
-    if (window.ResizeObserver) new ResizeObserver(queueLayout).observe(container);
+    if (window.ResizeObserver) { ro = new ResizeObserver(queueLayout); ro.observe(container); }
+  }
+
+  // ---------- popups ----------
+  function clearCards() { cards = {}; ui.layer.textContent = ""; }
+
+  function scope(body, key) {
+    unscope();
+    host = container = body; scopeId = key;
+    body.classList.add("ann-scope");
+    body.appendChild(ui.lines); body.appendChild(ui.layer); body.appendChild(ui.pop);
+    body.closest("dialog").appendChild(ui.dock);
+    if (ro) ro.observe(body);
+    state.items.filter(mine).forEach(place);
+    updateDock(); layout();
+  }
+
+  // `within`: the popup that closed; a late close event from another popup must not take this one's notes away.
+  function unscope(within) {
+    if (!host || (within && !within.contains(host))) return;
+    hidePop(); setTool(null);
+    // A note still being typed is kept, not lost with the popup.
+    state.items.filter(function (it) { return mine(it) && it.editing; })
+      .forEach(function (it) { commit(it, it.draft != null ? it.draft : it.note || ""); });
+    state.items.filter(mine).forEach(function (it) { unplace(it.id); });
+    clearCards();
+    if (ro) ro.unobserve(host);
+    host.classList.remove("ann-scope");
+    host = null; scopeId = ""; container = pageContainer;
+    document.body.appendChild(ui.lines); document.body.appendChild(ui.layer); document.body.appendChild(ui.pop);
+    document.body.appendChild(ui.dock);
+    updateDock(); layout();
   }
 
   // ---------- start ----------
@@ -761,7 +823,7 @@
   }
 
   function start() {
-    container = document.querySelector(".wrap") || document.querySelector("main") || document.body;
+    container = pageContainer = document.querySelector(".wrap") || document.querySelector("main") || document.body;
     adopt(readLocal());
     var pref = null;
     try { pref = localStorage.getItem("ann:show:" + (narrow() ? "narrow" : "wide")); } catch (e) {}
@@ -773,23 +835,23 @@
     ui.lines.setAttribute("class", "ann-lines"); ui.lines.setAttribute("aria-hidden", "true");
     document.body.appendChild(ui.lines);
     buildDock(); buildPop(); bind();
-    state.items.forEach(place);
+    state.items.filter(mine).forEach(place);
     updateDock(); layout();
 
     readServer().then(function (remote) {
       if (remote && (remote.saved || 0) > (state.saved || 0)) {
         state.items.forEach(function (it) { unplace(it.id); });
-        Object.keys(cards).forEach(function (id) { cards[id].remove(); delete cards[id]; });
+        clearCards();
         adopt(remote);
         try { localStorage.setItem(storeKey, JSON.stringify(snapshot())); } catch (e) {}
-        state.items.forEach(place);
+        state.items.filter(mine).forEach(place);
         layout();
       } else if (serverOk && state.items.length && (!remote || (remote.saved || 0) < (state.saved || 0))) {
         pushServer();
       }
       updateDock();
     });
-    window.__ann = { state: function () { return state; }, layout: layout, pageId: pageId, setTool: setTool };
+    window.__ann = { state: function () { return state; }, layout: layout, pageId: pageId, setTool: setTool, scope: scope, unscope: unscope };
   }
 
   // Draw nothing until the stylesheet is in, or the controls flash unstyled on load.

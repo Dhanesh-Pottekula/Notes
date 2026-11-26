@@ -3,7 +3,7 @@
 ---
 
 ## 10.1 Linux and shell
-- [ ] Files and permissions (`chmod`, `chown`, rwx, octal), users and groups ↳ `Linux Commands/7. linux commands.txt` (chown, chmod, groups) · `Docker/ShellScripting.md` (chmod octal 4/2/1) · linuxjourney.com "Permissions" lessons
+- [ ] Files and permissions (`chmod`, `chown`, rwx, octal), users and groups ↳ `programming/linux/command_history/7. linux commands.txt` (chown, chmod, groups) · `programming/linux/shell_scripting.md` (chmod octal 4/2/1) · linuxjourney.com "Permissions" lessons
   - `L1` Read `-rwxr-x--- 1 app web 4096 file`. Who can do what?
   - `L1` What does `chmod 755` mean? `chmod 644`? `chmod 600`? ↳ r=4, w=2, x=1 for user/group/other
   - `L1` What does `chown user:group file` do?
@@ -26,7 +26,7 @@
   - `L3` What are Linux capabilities, and how do they split root's power? ↳ e.g. CAP_NET_BIND_SERVICE for port <1024
   - `L3` How can a non-root process listen on port 80? ↳ capability, authbind, reverse proxy, `ip_unprivileged_port_start`
   - `L3` What are SELinux and AppArmor, and how do you tell they are blocking you?
-- [ ] Processes: `ps`, `top`/`htop`, `kill` and signals (SIGTERM vs SIGKILL), `nohup`, systemd services ↳ `Linux Commands/11. linux commands.txt` (ps, kill, kill -9) + `Linux Commands/10. linux commands.txt` (systemctl) · https://missing.csail.mit.edu/2020/command-line/ (job control, signals) · linuxjourney.com "Processes" lessons
+- [ ] Processes: `ps`, `top`/`htop`, `kill` and signals (SIGTERM vs SIGKILL), `nohup`, systemd services ↳ `programming/linux/command_history/11. linux commands.txt` (ps, kill, kill -9) + `programming/linux/command_history/10. linux commands.txt` (systemctl) · https://missing.csail.mit.edu/2020/command-line/ (job control, signals) · linuxjourney.com "Processes" lessons
   - `L1` SIGTERM vs SIGINT vs SIGKILL. Which can you catch?
   - `L1` Can you catch SIGKILL?
   - `L1` What does `ps aux` show? What do the columns USER, PID, %CPU, %MEM, VSZ, RSS, STAT mean?
@@ -46,7 +46,7 @@
   - `L2` Which signals cannot be caught or ignored? ↳ SIGKILL, SIGSTOP
   - `L2` What do `kill`, `pkill` and `killall` do differently?
   - `L2` What does `kill -0 <pid>` do? ↳ checks process exists and you may signal it
-- [ ] Networking: `curl`, `ss`/`netstat`, `lsof -i`, `dig`, `ping`, `traceroute` ↳ `Linux Commands/6. linux commands.txt` (lsof) · Julia Evans "Bite Size Networking" zine (wizardzines.com) · linuxjourney.com "Network" lessons
+- [ ] Networking: `curl`, `ss`/`netstat`, `lsof -i`, `dig`, `ping`, `traceroute` ↳ `programming/linux/command_history/6. linux commands.txt` (lsof) · Julia Evans "Bite Size Networking" zine (wizardzines.com) · linuxjourney.com "Network" lessons
   - `L1` What does `ping` tell you, and what doesn't it?
   - `L1` What does `traceroute` show? How does it work? ↳ increasing TTL, ICMP time-exceeded per hop
   - `L1` What does `curl -v` show you?
@@ -80,7 +80,7 @@
   - `L2` Scenario: the service won't start because the port is in use. Steps?
   - `L3` What are `sysctl` settings like `net.core.somaxconn` and `net.ipv4.ip_local_port_range` for?
   - `L3` What do `nstat` / `netstat -s` counters tell you about retransmits and listen-queue overflows?
-- [ ] Text: `grep`, `awk`, `sed`, `cut`, `sort | uniq -c`, `tail -f`, `jq` ↳ `Linux Commands/4. linux commands.txt` (grep, sed, awk, cut, tail) · https://missing.csail.mit.edu/2020/data-wrangling/ · jq manual (jqlang.org)
+- [ ] Text: `grep`, `awk`, `sed`, `cut`, `sort | uniq -c`, `tail -f`, `jq` ↳ `programming/linux/command_history/4. linux commands.txt` (grep, sed, awk, cut, tail) · https://missing.csail.mit.edu/2020/data-wrangling/ · jq manual (jqlang.org)
   - `L1` What do `grep`, `sed` and `awk` each do, in one line?
   - `L1` What do `grep -i`, `-v`, `-r`, `-n`, `-c`, `-E` and `-A/-B/-C` do?
   - `L1` `head`, `tail`, `tail -f`, `tail -F`, `less`: when do you use each? ↳ -F survives log rotation
@@ -106,7 +106,7 @@
   - `L3` Parse a multi-GB log quickly. What makes grep/awk fast or slow? ↳ `LC_ALL=C`, fixed strings, avoid UUOC, parallel
   - `L3` Run a command over 10,000 files in parallel. ↳ `xargs -P`, GNU parallel
   - `L3` Write an awk script that prints p50 and p99 latency per endpoint.
-- [ ] Disk and memory: `df`, `du`, `free`; environment variables ↳ `Linux Commands/5. linux commands.txt` (free -m, df -h) · https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55 · `Docker/ShellScripting.md`
+- [ ] Disk and memory: `df`, `du`, `free`; environment variables ↳ `programming/linux/command_history/5. linux commands.txt` (free -m, df -h) · https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55 · `programming/linux/shell_scripting.md`
   - `L1` `df -h` vs `du -sh`.
   - `L1` How do you find the biggest directories under `/var`? ↳ `du -xh --max-depth=1 /var | sort -h`
   - `L1` What is mounting? What does `/etc/fstab` do?
@@ -128,7 +128,7 @@
   - `L3` What is direct I/O (`O_DIRECT`) and who uses it?
   - `L3` How do you grow a disk on a cloud VM without downtime? ↳ resize disk, `growpart`, `resize2fs`/`xfs_growfs`
   - `L3` What is LVM and why would you use it on a server?
-- [ ] SSH, keys, `scp`/`rsync`; cron ↳ https://missing.csail.mit.edu/2020/command-line/ ("Remote machines": SSH, keys, scp/rsync) · `Docker/DockerCommands.md` "AWS SSH Access" · DMLS ch10 "Cron, Schedulers, and Orchestrators" (pdf p331–333)
+- [ ] SSH, keys, `scp`/`rsync`; cron ↳ https://missing.csail.mit.edu/2020/command-line/ ("Remote machines": SSH, keys, scp/rsync) · `programming/docker/docker_commands.md` "AWS SSH Access" · DMLS ch10 "Cron, Schedulers, and Orchestrators" (pdf p331–333)
   - `L1` What is cron? Read this line: `*/5 * * * * /opt/backup.sh`.
   - `L1` How does SSH key authentication work? ↳ server holds public key; client proves it has private key by signing
   - `L1` How do you create an SSH key and put it on a server? ↳ `ssh-keygen -t ed25519`, `ssh-copy-id`
@@ -151,7 +151,7 @@
   - `L3` How do you stop the same cron job running twice on three VMs? ↳ `flock`, distributed lock, single scheduler
   - `L3` How do SSH certificates (signed by a CA) differ from plain keys, and why do big teams use them?
   - `L3` What are cloud alternatives to SSH for VMs? ↳ AWS SSM Session Manager, Azure Bastion, serial console
-- [ ] Shell scripting basics: variables, loops, exit codes, `set -euo pipefail` ↳ https://missing.csail.mit.edu/2020/shell-tools/ · `Docker/ShellScripting.md` (set -e, set -x) · Aaron Maxwell "Use the Unofficial Bash Strict Mode" (redsymbol.net)
+- [ ] Shell scripting basics: variables, loops, exit codes, `set -euo pipefail` ↳ https://missing.csail.mit.edu/2020/shell-tools/ · `programming/linux/shell_scripting.md` (set -e, set -x) · Aaron Maxwell "Use the Unofficial Bash Strict Mode" (redsymbol.net)
   - `L1` What is the shebang line? `#!/bin/bash` vs `#!/usr/bin/env bash`.
   - `L1` How do you make a script executable and run it?
   - `L1` How do you define and use a variable? Why quote `"$var"`?
@@ -369,7 +369,7 @@
   - `L2` Scenario: one API endpoint is slow only on the VM, not locally. How do you narrow it down?
   - `L3` Scenario: latency spikes every few minutes on an otherwise idle VM. List hypotheses and how to test each.
 
-**Learn:** Linux notes (`Linux Commands/`, `Docker/ShellScripting.md`, `Docker/Linux Quickstart V5.pdf`) ·
+**Learn:** Linux notes (`programming/linux/command_history/`, `programming/linux/shell_scripting.md`, `programming/linux/linux_quickstart_v5.pdf`) ·
 linuxjourney.com · "The Missing Semester" (MIT, free)
 
 ## 10.2 Docker
@@ -409,7 +409,7 @@ linuxjourney.com · "The Missing Semester" (MIT, free)
   - `L3` What tools do you use to see what is taking space in an image? ↳ `dive`, `docker history`, `docker image inspect`
   - `L3` Multi-stage target (`--target`) for dev vs prod images from one Dockerfile: how and why?
   - `L3` Your image is 2.5 GB because of PyTorch/CUDA. What can you actually do about it?
-- [ ] Volumes vs bind mounts; networks; port mapping ↳ `Docker/DockerCommands.md` "Docker Volumes & Mounts" + "Docker Networking" · Docker docs "Storage: volumes vs bind mounts" and "Networking overview" (docs.docker.com)
+- [ ] Volumes vs bind mounts; networks; port mapping ↳ `programming/docker/docker_commands.md` "Docker Volumes & Mounts" + "Docker Networking" · Docker docs "Storage: volumes vs bind mounts" and "Networking overview" (docs.docker.com)
   - `L1` Volume vs bind mount vs tmpfs.
   - `L1` What happens to data written inside a container when it is removed?
   - `L1` Where does Docker store named volumes on the host? ↳ `/var/lib/docker/volumes`
@@ -428,7 +428,7 @@ linuxjourney.com · "The Missing Semester" (MIT, free)
   - `L3` Why should you not run a production database in a container on a single VM — or when is it fine?
   - `L3` What happens when you mount a volume over a directory that already has files in the image? ↳ empty named volume copies image content; bind mount hides it
   - `L3` Why do containers writing heavy logs or temp files to the writable layer hurt disk performance?
-- [ ] docker compose for local stacks ↳ `Docker/DockerCommands.md` "Docker Compose" · https://docs.docker.com/compose/ · DMLS ch10 "From Dev to Prod: Containers" (pdf p328–330)
+- [ ] docker compose for local stacks ↳ `programming/docker/docker_commands.md` "Docker Compose" · https://docs.docker.com/compose/ · DMLS ch10 "From Dev to Prod: Containers" (pdf p328–330)
   - `L1` What is Docker Compose and what problem does it solve?
   - `L1` `docker compose up`, `down`, `logs`, `ps`, `exec`, `build`: what does each do?
   - `L1` What network do Compose services share by default, and how do they address each other?
@@ -685,7 +685,7 @@ linuxjourney.com · "The Missing Semester" (MIT, free)
   - `L3` How do you deploy a new version of one Compose service with minimal downtime?
   - `L3` Design zero-downtime deploys for a Dockerised FastAPI + WebSocket service on two VMs behind a load balancer.
 
-**Learn:** Docker notes (`Docker/DockerCommands.md`) · docs.docker.com "Get started" + "Build best practices"
+**Learn:** Docker notes (`programming/docker/docker_commands.md`) · docs.docker.com "Get started" + "Build best practices"
 
 ## 10.3 Kubernetes
 - [ ] Pod, Deployment, ReplicaSet, Service (ClusterIP/NodePort/LoadBalancer), Ingress ↳ https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ · https://kubernetes.io/docs/concepts/services-networking/service/ · https://kubernetes.io/docs/concepts/services-networking/ingress/

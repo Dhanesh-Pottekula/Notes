@@ -83,7 +83,7 @@ hellointerview.com (system design practice), Anthropic's agent articles (agents)
 
 ### 3.6–3.7 JavaScript
 - **Read:** https://javascript.info (Part 1: "Closure", "Object methods, this", "Prototypes", "Promises,
-  async/await", "Event loop: microtasks and macrotasks"); your `Notes/javascript/jsNotes.md`;
+  async/await", "Event loop: microtasks and macrotasks"); your `Notes/programming/javascript/js_notes.md`;
   MDN https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures and
   https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
 - **Watch:** Philip Roberts "What the heck is the event loop anyway?" (JSConf, YouTube); Jake Archibald "In The
@@ -480,10 +480,10 @@ hellointerview.com (system design practice), Anthropic's agent articles (agents)
 ---
 
 ## 10. Cloud and DevOps
-- **10.1 Linux:** your `Notes/Linux Commands/` and `Notes/Docker/ShellScripting.md`, `Notes/Docker/Linux Quickstart V5.pdf`;
+- **10.1 Linux:** your `Notes/programming/linux/command_history/` and `Notes/programming/linux/shell_scripting.md`, `Notes/programming/linux/linux_quickstart_v5.pdf`;
   https://missing.csail.mit.edu (lectures 1–5); https://linuxjourney.com; "Linux performance analysis in 60 s"
   https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55
-- **10.2 Docker:** `Notes/Docker/DockerCommands.md`; https://docs.docker.com/get-started/;
+- **10.2 Docker:** `Notes/programming/docker/docker_commands.md`; https://docs.docker.com/get-started/;
   https://docs.docker.com/build/building/best-practices/; https://docs.docker.com/build/building/multi-stage/
 - **10.3 Kubernetes:** https://kubernetes.io/docs/tutorials/kubernetes-basics/; https://kubernetes.io/docs/concepts/
   (workloads, services, config); TechWorld with Nana "Kubernetes crash course" (YouTube).

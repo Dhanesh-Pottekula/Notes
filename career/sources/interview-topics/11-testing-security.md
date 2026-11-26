@@ -1,0 +1,780 @@
+# 11. Testing and security (P2)
+
+---
+
+## 11.1 Testing
+- [ ] Test pyramid: unit → integration → end-to-end; what belongs at each level ↳ https://martinfowler.com/articles/practical-test-pyramid.html · https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications · LEH appendix "4. Testing" → "Test types" (pdf p493–494)
+  - `L1` Why do we write automated tests? Name three benefits beyond "catching bugs". ↳ safe refactoring, documentation, design feedback, faster releases
+  - `L1` What is a unit test, an integration test and an end-to-end test?
+  - `L1` What is the test pyramid? Draw it.
+  - `L1` What is the testing trophy (Kent C. Dodds)? How is it different from the pyramid? ↳ static checks at base; integration tests are the biggest layer
+  - `L1` What is a regression test?
+  - `L1` Which layer is biggest in the testing trophy?
+  - `L2` Unit vs integration vs end-to-end tests in a FastAPI service: what goes where?
+  - `L2` What belongs at each level of the pyramid for a CRUD REST API?
+  - `L2` Unit vs integration test: which catches more bugs for a CRUD API, and why? ↳ most CRUD bugs live in queries, mapping, wiring — integration
+  - `L2` What should you **not** test? ↳ framework code, trivial getters, third-party libraries, private methods directly
+  - `L2` Why is the pyramid wide at the bottom? What happens with an "ice-cream cone" test suite? ↳ slow, flaky, expensive E2E-heavy suite
+  - `L2` Tests that never fail and tests that fail on every refactor: which is worse and why?
+  - `L2` What is the cost of a test? Why is "more tests" not always better? ↳ maintenance, runtime, false alarms, coupling to implementation
+  - `L2` How do you decide what to test first in a codebase with zero tests?
+  - `L2` Unit vs integration test — which catches more bugs for a CRUD API?
+  - `L3` The pyramid was drawn when integration tests were slow. With Docker and Testcontainers, does it still hold?
+  - `L3` How would you set a testing strategy for a five-person startup shipping weekly? What do you skip?
+  - `L3` Tell me about a time a test suite saved you, and a time tests gave false confidence.
+- [ ] Unit testing with Jest / pytest; arrange-act-assert; fixtures; parametrised tests ↳ https://docs.pytest.org/en/stable/explanation/anatomy.html (arrange-act-assert) · https://docs.pytest.org/en/stable/how-to/fixtures.html · https://docs.pytest.org/en/stable/how-to/parametrize.html
+  - `L1` What is a pytest fixture?
+  - `L1` What does `@pytest.mark.parametrize` do?
+  - `L1` What is `conftest.py` for?
+  - `L1` What is the Arrange–Act–Assert (or Given–When–Then) structure?
+  - `L1` What does `describe`, `it`/`test`, `beforeEach` and `afterAll` do in Jest/Vitest?
+  - `L1` What is a pytest fixture? How does pytest find and inject it? ↳ function by name in test args; `conftest.py` discovery
+  - `L1` AAA stands for?
+  - `L2` What are fixture scopes (function, module, session), and when do you use each?
+  - `L2` What does a `yield` fixture do for setup and teardown?
+  - `L3` What is property-based testing (Hypothesis), and where would it catch a bug a normal test misses?
+  - `L3` How do you test that a function raises the right exception in pytest and in Jest? What is the async trap? ↳ `pytest.raises`; `await expect(...).rejects`
+- [ ] Mocks vs stubs vs fakes vs spies; what not to mock (your own DB in integration tests) ↳ https://martinfowler.com/articles/mocksArentStubs.html · https://jestjs.io/docs/mock-functions · https://docs.python.org/3/library/unittest.mock.html
+  - `L1` What is a test double? Name the five kinds. ↳ dummy, stub, spy, mock, fake
+  - `L1` Mock vs stub: what is the difference? ↳ stub feeds input; mock verifies outgoing interaction
+  - `L1` What is a fake? Give a backend example. ↳ in-memory repository, fakeredis, local S3 (MinIO)
+  - `L1` What is a spy? How does `jest.spyOn` differ from `jest.fn`?
+  - `L1` Stub or mock: which one do you assert calls on?
+  - `L1` Name one fake you have used.
+  - `L2` `unittest.mock.patch`: where do you patch — where it is defined or where it is used? ↳ where it is looked up (used)
+  - `L2` `Mock` vs `MagicMock` vs `AsyncMock`; what is `autospec` and why use it?
+  - `L2` What does `monkeypatch` do? How do you set env vars in a test?
+  - `L2` How do you mock HTTP calls (`respx`, `responses`)?
+  - `L2` Why should you never assert interactions with a stub? ↳ checks implementation detail, not outcome; brittle
+  - `L2` Managed vs unmanaged out-of-process dependencies: which do you mock? ↳ mock only unmanaged (email, payments, LLM); use real DB
+  - `L2` Why not mock your own database in integration tests?
+  - `L2` What goes wrong when you mock everything? Describe a test suite that passed while prod broke.
+  - `L2` "Don't mock what you don't own": what does it mean, and what do you do instead? ↳ wrap third-party API in own adapter; mock adapter
+  - `L2` How do you test code that calls an external API (Stripe, Twilio, an LLM)?
+  - `L2` How do you double Redis in tests: mock, fakeredis / ioredis-mock, or a real Redis container? Trade-offs.
+  - `L2` How do you double Qdrant / a vector database in tests?
+  - `L2` What is HTTP-level stubbing (`nock`, `msw`, `respx`, `responses`, VCR / `pytest-recording`)? When is it better than mocking a client?
+  - `L2` How does dependency injection make code easier to test? Show it in NestJS and in FastAPI (`dependency_overrides`).
+  - `L2` How do you test code that calls an external API/LLM?
+  - `L3` A test uses five mocks to test one service method. What does that tell you about the design?
+  - `L3` Recorded fixtures (cassettes) of a real API go stale. How do you keep them honest? ↳ periodic re-record, contract tests, schema checks
+- [ ] Integration tests with real dependencies (Testcontainers, docker compose) ↳ https://testcontainers.com/getting-started/ · https://fastapi.tiangolo.com/tutorial/testing/ · LEH appendix "4. Testing" → "Test examples" (pdf p494–497)
+  - `L1` What is Testcontainers and what problem does it solve?
+  - `L1` Tool that starts real Postgres in Docker from a test?
+  - `L2` How do you run tests against a real Postgres in CI (testcontainers, docker compose)?
+  - `L2` How do you test with real Postgres, Redis and Qdrant in CI? ↳ Testcontainers
+  - `L2` Testcontainers vs `docker compose` for integration tests vs an in-memory DB like SQLite or H2: trade-offs. ↳ SQLite differs from Postgres: types, JSONB, locking, constraints
+  - `L2` How do you keep tests isolated when they share one database? ↳ transaction rollback per test, truncate, unique data, schema per worker
+  - `L2` Wrapping each test in a transaction and rolling back: when does it not work? ↳ code opens own transactions/connections; commits; background workers
+  - `L2` How do you run migrations for the test database? Should tests use the same migrations as prod?
+  - `L2` How do you integration-test a repository that uses `SELECT … FOR UPDATE` or a unique constraint?
+  - `L2` How do you test a Redis-based rate limiter or cache with real Redis, including TTL expiry?
+  - `L2` How do you test a background worker (BullMQ, Celery, Redis Streams consumer) end to end?
+  - `L2` How do you run integration tests that need Postgres and Redis in CI? ↳ service containers, testcontainers, compose
+  - `L3` Testcontainers start is slow. How do you make the suite fast? ↳ one container per session, reuse, template DBs, parallel schemas
+  - `L3` How do you test a race condition such as two requests booking the same seat? ↳ concurrent requests against real DB; assert one wins
+  - `L3` How would you test the "AI gateway" (auth, rate limit, provider fallback) with Testcontainers? (Syllabus 1D hands-on.)
+  - `L3` How do you test a database migration itself, including a backfill on existing data?
+  - `L3` What should integration tests cover that unit tests can't? Name the failure modes they catch. ↳ wiring, config, ORM mapping, transactions, serialization, constraints
+  - `L3` How do you run integration tests that need Postgres and Redis in CI? ↳ service containers, Testcontainers, Compose
+- [ ] API/contract tests; snapshot tests ↳ https://docs.pact.io · https://martinfowler.com/bliki/ContractTest.html · https://jestjs.io/docs/snapshot-testing
+  - `L1` What is a contract test?
+  - `L1` What is a snapshot test?
+  - `L1` Pact is used for which kind of test?
+  - `L2` Consumer-driven contract testing (Pact): how does it work between two services? ↳ consumer writes expectations; provider verifies against them in CI
+  - `L2` Contract tests vs a shared OpenAPI schema vs running both services together: trade-offs.
+  - `L2` What is schema-based API fuzzing (Schemathesis, Dredd) and what does it catch?
+  - `L2` When are snapshot tests useful, and when do they become noise? ↳ stable serialized output; noise when big and blindly updated
+  - `L2` What is in your API test checklist for one endpoint? ↳ happy path, validation, auth, authz/IDOR, not found, pagination, idempotency
+  - `L2` How do you test authentication and role checks across many endpoints without repeating code?
+  - `L3` How do you test a change that touches 4 services? ↳ contract tests, consumer-driven contracts, staging, feature flags
+  - `L3` Microservices with no shared environment: how do you test that service A's change doesn't break B?
+  - `L3` How do you test a webhook receiver (signature, retries, duplicates, out-of-order events)?
+  - `L3` How would you test backward compatibility of an API or event schema change?
+- [ ] Testing async code, time (fake timers), and randomness ↳ https://jestjs.io/docs/timer-mocks · https://jestjs.io/docs/asynchronous · https://github.com/spulec/freezegun (freeze time in Python)
+  - `L1` How do you test an `async` function in Jest/Vitest and in pytest? ↳ return/await promise; `pytest-asyncio` or `anyio` marker
+  - `L1` What are fake timers?
+  - `L1` Python libraries to freeze time?
+  - `L2` How do you test async code with pytest (`pytest-asyncio`, `anyio`)?
+  - `L2` A test forgets to `await` an assertion. What happens? ↳ test passes before promise settles; failure lost or leaks
+  - `L2` How do you test a retry-with-exponential-backoff function without waiting real seconds?
+  - `L2` `jest.useFakeTimers` with promises: why does `advanceTimersByTime` sometimes not run your callback? ↳ microtasks pending; use `advanceTimersByTimeAsync`
+  - `L2` How do you test code that depends on "now" (expiry, cron, token TTL)? ↳ inject clock; `freezegun`/`time-machine`; `vi.setSystemTime`
+  - `L2` How do you test code that uses randomness? ↳ inject RNG, fixed seed, assert properties not values
+  - `L2` How do you test an event emitter or callback-based API?
+  - `L2` What does "Jest did not exit one second after the test run" mean, and how do you fix it? ↳ open handles: DB pool, server, timers; close in afterAll
+  - `L2` What is the asyncio event-loop scope problem in pytest-asyncio with session-scoped async fixtures?
+  - `L3` Your test suite is flaky. How do you find and fix the causes? ↳ shared state, ordering, time, network, randomness
+  - `L3` Mocking time, randomness and UUIDs: inject a clock/ID provider or patch globals? Why?
+  - `L3` How do you test timeout and cancellation behaviour (e.g. `AbortController`, `asyncio.wait_for`)?
+- [ ] Test coverage — what it does and doesn't tell you ↳ https://martinfowler.com/bliki/TestCoverage.html · https://testing.googleblog.com/2020/08/code-coverage-best-practices.html · https://coverage.readthedocs.io
+  - `L1` What is code coverage? Line vs branch coverage.
+  - `L1` Branch coverage checks what that line coverage does not?
+  - `L2` What does 100% coverage not tell you? ↳ assertions may be missing; untested inputs; no proof of correctness
+  - `L2` Write a test that gives 100% coverage and checks nothing. Why does this happen in real teams?
+  - `L2` Is a coverage target (say 80%) a good idea? How do you make coverage "meaningful" instead of vanity?
+  - `L3` Coverage on new code vs total coverage: why do teams gate PRs on diff coverage?
+  - `L3` "Delete tests that don't catch real bugs." How do you decide which tests to delete?
+- [ ] TDD (red → green → refactor) ↳ https://martinfowler.com/bliki/TestDrivenDevelopment.html · https://martinfowler.com/articles/is-tdd-dead/ (the debate)
+  - `L1` What is TDD? What are the red → green → refactor steps?
+  - `L1` TDD's three steps?
+  - `L2` What are the benefits of TDD? When does it slow you down?
+  - `L2` Do you practise TDD? Show how you would TDD a `parseDuration("1h30m")` function.
+  - `L2` What is BDD and how is it different from TDD?
+  - `L2` Inside-out (classic) vs outside-in (London) TDD.
+  - `L3` How do you use TDD when the design is unclear, or when working with an LLM coding assistant?
+- [ ] Load testing (k6, Locust): what to measure ↳ DDIA ch1 "Describing performance" (pdf p33–37: percentiles, tail latency) · https://grafana.com/docs/k6/latest/ · https://docs.locust.io
+  - `L1` Load test vs stress test vs soak test vs spike test vs breakpoint test: define each.
+  - `L1` Microbenchmark vs end-to-end benchmark: when each?
+  - `L1` Name load-testing tools and when you would pick each. ↳ autocannon, wrk/wrk2, k6, Locust, Gatling, JMeter
+  - `L1` What is coordinated omission?
+  - `L1` Soak test finds what kind of bug?
+  - `L1` Load test vs stress test vs soak test vs spike test.
+  - `L1` What is k6? What is Locust? ↳ k6: JS scripts, Go runtime; Locust: Python users
+  - `L1` What do you measure in a load test? ↳ throughput, p50/p95/p99 latency, error rate, saturation
+  - `L1` Two load-testing tools?
+  - `L1` Soak test checks for what? ↳ leaks and degradation over hours
+  - `L2` What do you measure during a load test? ↳ RPS, p50/p95/p99, error rate, saturation of CPU, memory, pools, DB
+  - `L2` Open vs closed workload model: what is the difference, and which matches real users? ↳ open = arrival rate independent of response; closed waits
+  - `L2` What is coordinated omission, and which tools correct for it? ↳ wrk2, k6 arrival-rate executors
+  - `L2` Why do benchmarks need a warm-up period? ↳ JIT, caches, connection pools, lazy init
+  - `L2` Why should the load generator run on a different machine than the service?
+  - `L2` How do you build realistic test data and traffic mixes?
+  - `L2` What is a k6 threshold, and how do you fail a CI build on a p95 regression?
+  - `L2` What is a soak test likely to find that a 5-minute test won't? ↳ memory leaks, connection leaks, log disk fill, GC drift
+  - `L2` How do you find the maximum throughput of a service? What is the "knee"?
+  - `L2` How do you load-test a WebSocket or SSE endpoint? ↳ k6 websockets, Artillery; measure connect time, message latency, concurrent connections
+  - `L2` How would you load-test the AiRA voice WebSocket, including audio streaming and barge-in?
+  - `L2` Why do you look at p95/p99 instead of average latency?
+  - `L2` Open vs closed workload model (arrival rate vs virtual users). Why does it matter? ↳ closed model hides latency when server slows (coordinated omission)
+  - `L2` What are k6 thresholds, and how do you fail a CI job on them?
+  - `L2` How do you build a realistic load profile from production traffic?
+  - `L2` A load test shows p99 jumping from 200 ms to 3 s at 500 RPS. How do you find the bottleneck? ↳ CPU, DB pool, locks, GC, event loop lag, downstream
+  - `L2` Why should you not load-test against a third-party LLM API, and what do you do instead? ↳ cost, rate limits; stub with latency-shaped fake
+  - `L3` Microbenchmark pitfalls in JS: dead-code elimination, inlining, timer resolution. How does `benchmark.js` / `mitata` handle them?
+  - `L3` Your load test passes at 5,000 RPS in staging, but prod falls over at 2,000. What could differ? ↳ data size, cache hit rate, real query mix, network, noisy neighbours
+  - `L3` How do you load-test something that calls a paid LLM API without paying thousands? ↳ mock provider with realistic latency/streaming, replay recorded responses
+  - `L3` How do you run continuous performance testing so regressions are caught per PR?
+  - `L3` Load test plan: 10K → 50K → 100K users. What do you change between steps, and what do you watch?
+  - `L3` How do you load-test WebSocket servers? What do you measure?
+  - `L3` How would you load-test the AiRA voice WebSocket? What do you measure? ↳ concurrent sessions, time-to-first-audio, jitter, drops, memory per connection
+  - `L3` What is coordinated omission, and which tools correct for it?
+  - `L3` How do you catch performance regressions in CI without flaky timing tests? ↳ benchmarks with budgets, relative comparisons, dedicated runners
+  - `L3` How would you load-test the voice WebSocket?
+  - `L3` How would you load-test the AiRA voice WebSocket and what would you watch while doing it?
+- [ ] Testing LLM features (see 08-ai 8.6: evals, deterministic checks, recorded fixtures) ↳ AIE ch4 "Design Your Evaluation Pipeline" (pdf p224–234) · AIE ch3 "Exact Evaluation" (pdf p149–159: deterministic checks) · LEH ch7 "RAG evaluation" (pdf p300–304)
+  - `L1` What is an eval? How is it different from a unit test? ↳ scores quality over a dataset; tests assert pass/fail on deterministic behaviour
+  - `L1` Temperature for the most repeatable LLM output?
+  - `L2` How do you test code that calls an LLM? Split it into what you can test deterministically and what needs evals.
+  - `L2` What deterministic checks can you run on LLM output? ↳ JSON schema, required fields, length, regex, allowed labels, no PII
+  - `L2` How do you mock an LLM client in unit tests, including streaming and tool-call responses?
+  - `L2` What are recorded fixtures for LLM calls, and when do they mislead you?
+  - `L2` LLM output is non-deterministic. How do you write stable tests anyway? ↳ temperature 0, seeds, assert properties, tolerance, multiple runs
+  - `L2` What is prompt snapshot testing, and what does it catch? ↳ unintended prompt changes from template/code edits; reviewed diff
+  - `L2` How do you test an LLM feature in CI when outputs are non-deterministic? ↳ eval set, thresholds, mocked providers, recorded responses
+  - `L3` How do you test code that calls an LLM — what can you assert on?
+  - `L3` Should LLM-as-judge evals run in CI on every PR? How do you handle cost, time and flakiness? ↳ small smoke set per PR; full set nightly; thresholds with margin
+  - `L3` How do you test guardrails: prompt injection, jailbreaks, refusal behaviour, PII leakage?
+  - `L3` How did you (or would you) test LLM features at AiRA? Name the checks per layer.
+- [ ] What makes a good unit test: Khorikov's four pillars, classical vs London school, behaviour vs implementation detail
+  - `L1` What are Khorikov's four pillars of a good unit test? ↳ protection against regressions, resistance to refactoring, fast feedback, maintainability
+  - `L1` What does "unit" mean in the classical school vs the London (mockist) school? ↳ unit of behaviour vs a single class
+  - `L1` What is the system under test (SUT)? What is a collaborator?
+  - `L1` Four pillars of a good unit test?
+  - `L1` Classical school isolates ___ from each other? ↳ tests
+  - `L1` London school mocks ___? ↳ all collaborators (mutable dependencies)
+  - `L2` Classical vs London school: how does each isolate tests, and what does each mock? ↳ classical isolates tests from each other; London isolates classes
+  - `L2` Which school do you follow, and why? Give an example from your own code.
+  - `L2` What is a false positive in testing? Why does it hurt more than people think? ↳ test fails but code works; team stops trusting tests
+  - `L2` What is "observable behaviour" vs "implementation detail"? Why should tests only check the first?
+  - `L2` Output-based vs state-based vs communication-based tests: give an example of each.
+  - `L2` Why are output-based tests on pure functions the most valuable kind? ↳ no side effects; refactor-proof; cheapest to maintain
+  - `L2` What is the "humble object" pattern, and how does it make a controller or handler easier to test?
+  - `L2` Functional core, imperative shell: how does it change what you test with unit vs integration tests?
+  - `L2` Should you test private methods? What do you do when you feel you must?
+  - `L2` What is wrong with asserting the exact SQL string a repository generates?
+  - `L3` Name Khorikov's unit testing anti-patterns. ↳ testing privates, exposing state, leaking domain knowledge, mocking concrete classes, ambient time
+  - `L3` What does "leaking domain knowledge into tests" mean? Show an example with a price calculation.
+  - `L3` Why is "resistance to refactoring" the pillar you can never trade away, while the others can be traded?
+  - `L3` How do you split code into domain model, controllers, overcomplicated code and trivial code — and test each?
+- [ ] Jest/Vitest and Supertest: jest.fn/mock/spyOn, mock hoisting, matchers, NestJS testing module, per-worker databases
+  - `L1` What is Supertest and what does it let you test without starting a real server port?
+  - `L1` Jest function to watch an existing method?
+  - `L1` Library to test an Express or NestJS app over HTTP?
+  - `L2` Jest vs Vitest: why are many TypeScript projects moving to Vitest? ↳ native ESM/TS via Vite, faster, Jest-compatible API
+  - `L2` `jest.fn` vs `jest.mock` vs `jest.spyOn`: when do you use each?
+  - `L2` What do `mockReturnValue`, `mockResolvedValue`, `mockImplementation` and `mockReset` vs `mockRestore` do?
+  - `L2` How does `jest.mock` hoisting work, and what bug does it cause? ↳ hoisted above imports; outer variables undefined in factory
+  - `L2` What is `toEqual` vs `toBe` vs `toStrictEqual`?
+  - `L2` How do you test a NestJS service with `Test.createTestingModule` and override a provider?
+  - `L2` Write a Supertest test for `POST /orders` that checks status, body and the database row.
+  - `L3` Jest runs test files in parallel workers. How do you give each worker its own database or schema?
+- [ ] pytest in depth: conftest, fixture scopes, yield and factory fixtures, monkeypatch vs mock.patch, markers, xdist
+  - `L1` pytest file that holds shared fixtures?
+  - `L1` pytest fixture scope that lives for the whole run?
+  - `L2` pytest fixture scopes: function, class, module, package, session. When do you use session scope?
+  - `L2` What is a `yield` fixture and why is it better than setup/teardown methods?
+  - `L2` What do `monkeypatch.setattr`, `monkeypatch.setenv` and `monkeypatch.delenv` do? When do you prefer `unittest.mock.patch`?
+  - `L2` "Patch where it is used, not where it is defined": explain with an example. ↳ patch `app.service.requests`, not `requests`
+  - `L2` What are `tmp_path`, `capsys` and `caplog` fixtures?
+  - `L2` How do you test a FastAPI app with `TestClient` vs `httpx.AsyncClient` with `ASGITransport`?
+  - `L2` How do you skip, xfail and mark slow tests in pytest, and run only some of them? ↳ `skip`, `skipif`, `xfail`, custom markers, `-m`, `-k`
+  - `L2` What is `autouse=True` and why is it dangerous when overused?
+  - `L3` Factory fixtures ("fixture that returns a function"): when do you need one?
+  - `L3` How does `pytest-xdist` run tests in parallel, and what breaks when you turn it on? ↳ shared DB/ports/files; need per-worker DB
+  - `L3` Indirect parametrization and `pytest_generate_tests`: when have you needed them?
+- [ ] Test data: fixtures vs seed data, test data builders, object mothers, factory libraries (factory_boy, faker)
+  - `L1` What is a test fixture vs test data vs seed data?
+  - `L2` What are test data builders and object mothers? Which do you prefer?
+  - `L2` What are factory libraries (`factory_boy`, `@faker-js/faker`, `fishery`) and what problem do they solve?
+  - `L2` Why are shared, hand-written SQL fixtures a maintenance problem as the schema grows?
+- [ ] End-to-end tests: picking the flows, Playwright/Cypress, flakiness, testing in production (synthetics, canaries)
+  - `L1` What is an end-to-end test? What does it cost compared to an integration test?
+  - `L2` How many E2E tests should a product have, and which flows do you pick?
+  - `L2` What makes E2E tests flaky, and how do Playwright/Cypress reduce it? ↳ auto-waiting, retries, isolated data, no fixed sleeps
+  - `L3` Testing in production: synthetic checks, canaries, feature flags. When is it acceptable?
+- [ ] Flaky tests: common causes, investigating intermittent failures, test-order dependence, retries and quarantine
+  - `L1` What is a flaky test?
+  - `L2` List the common causes of flaky tests. ↳ timing/sleeps, shared state, test order, real network, time zones, concurrency
+  - `L2` "This test fails intermittently — find out why." Walk me through it. ↳ rerun many times, random order, isolate, logs, seed
+  - `L2` Should you auto-retry flaky tests in CI? What is the risk?
+  - `L3` How do you detect test-order dependence? ↳ `pytest-randomly`, `--randomize`, run single test alone
+  - `L3` How do you quarantine flaky tests without losing the signal forever?
+- [ ] Property-based testing: properties, strategies, shrinking, stateful model-based tests (Hypothesis, fast-check)
+  - `L1` What is property-based testing? How is it different from example-based testing?
+  - `L1` What is shrinking?
+  - `L1` What are Hypothesis and fast-check?
+  - `L1` Property-based libraries for Python and TypeScript?
+  - `L1` What does shrinking give you?
+  - `L2` What is a property? Give three properties of a sort function. ↳ ordered, same length, same multiset of elements
+  - `L2` What are common property patterns? ↳ round-trip, invariants, idempotence, oracle/reference model, commutativity
+  - `L2` Write a round-trip property for JSON encode/decode or a URL shortener encode/decode.
+  - `L2` What are strategies/arbitraries? How do you generate a valid domain object (an order with line items)?
+  - `L2` How do you reproduce a failure that Hypothesis or fast-check found? ↳ printed seed / example database; add as regular test
+  - `L2` What kind of bugs does property-based testing find that example tests miss? ↳ empty, unicode, huge numbers, boundaries, odd orderings
+  - `L2` When is property-based testing not worth it?
+  - `L3` What is stateful / model-based testing? How would you test an LRU cache against a simple model? ↳ random command sequences; compare to reference dict+list
+  - `L3` How do you keep property-based tests fast and deterministic in CI?
+  - `L3` How would you property-test a money-splitting function (Splitwise) so totals always add up?
+  - `L3` Fuzzing vs property-based testing: how do they relate?
+  - `L3` Where would property-based testing have caught a real bug in your projects?
+- [ ] Mutation testing: how mutants work, what a surviving mutant means, keeping it affordable
+  - `L1` What is mutation testing?
+  - `L1` A surviving mutant means ___? ↳ tests miss that change
+  - `L2` How does mutation testing work, and what does a surviving mutant tell you? ↳ change code (flip operators); tests still pass = weak assertions
+  - `L2` Why is mutation testing slow, and how do you use it in practice? ↳ run on changed files or critical modules only
+- [ ] Testing WebSockets and streaming endpoints: real clients, SSE token streams, disconnects, reconnect, multi-node fan-out
+  - `L2` How do you write a test for a WebSocket server? ↳ real client in test, await messages, assert order, close cleanly
+  - `L2` How do you test a Server-Sent Events / streaming HTTP endpoint (token streaming from an LLM)?
+  - `L2` How do you test a NestJS gateway or a FastAPI WebSocket route?
+  - `L3` How do you test reconnect, backpressure and slow-consumer behaviour on a WebSocket?
+  - `L3` How do you test that a stream handles client disconnect mid-response and cancels the upstream LLM call?
+  - `L3` How do you test a horizontally scaled WebSocket service where clients land on different nodes (Redis pub/sub fan-out)?
+- [ ] Testing agents: unit-testing tools, scripted fake models, trajectory assertions, stop conditions, replaying failures
+  - `L1` What makes testing an agent harder than testing a single LLM call?
+  - `L2` How do you unit-test a tool (function) that an agent calls, independent of the LLM?
+  - `L2` How do you test the agent loop itself with a scripted fake model? ↳ fake returns fixed tool-call sequence; assert tools run, state, termination
+  - `L2` How do you test tool-call argument validation and what the agent does with a malformed call?
+  - `L2` What do you assert in an agent trajectory test? ↳ right tools, right order where needed, args, step count, final answer
+  - `L2` How do you test that the agent stops (max steps, loops, repeated identical calls)?
+  - `L2` How do you test tool errors and timeouts: does the agent retry, recover or give up cleanly?
+  - `L2` How do you test a tool registry: registration, schema export, permissions per user?
+  - `L3` How do you sandbox side-effecting tools (send email, write DB, pay) in tests and evals?
+  - `L3` How do you replay a production agent failure as a regression test? ↳ save trace; replay recorded model responses; assert fixed behaviour
+  - `L3` How do you test prompt-injection through tool results (a web page that says "ignore previous instructions")?
+  - `L3` How do you test an MCP server or tool server contract?
+  - `L3` Multi-agent or sub-agent setups: how do you isolate which agent caused a failure?
+- [ ] Test architecture and CI: file layout, shared helpers, PR vs nightly runs, service containers, sharding, test pollution
+  - `L1` What should run on every pull request, and what can run nightly?
+  - `L2` How do you run tests that need Postgres and Redis in GitHub Actions? ↳ service containers or Testcontainers; health checks; env vars
+  - `L2` The test suite takes 25 minutes. How do you make it fast? ↳ profile slow tests, parallel shards, fewer E2E, reuse containers, caching
+  - `L2` How do you organise test files: next to code or in a separate `tests/` folder? Unit vs integration folders?
+  - `L2` How do you share test helpers without building a second, untested framework?
+  - `L2` What is test pollution between files, and how do you prevent it? ↳ global state, env vars, module caches, DB rows, mocks not restored
+  - `L3` Test sharding and test impact analysis: how do they cut CI time?
+  - `L3` How do you design the test architecture for a monorepo with a NestJS API, a FastAPI AI service and shared types?
+- [ ] Legacy code without tests: characterization tests, seams, sprout and wrap methods (Feathers)
+  - `L1` What is a characterization (golden master) test?
+  - `L2` What is a test-only seam, and how does Feathers define a seam? ↳ place to change behaviour without editing that code
+  - `L2` You must change a 2,000-line function with no tests. What is your first step?
+  - `L2` What are "sprout method" and "wrap method" techniques?
+  - `L2` How do you add tests to code that calls `datetime.now()`, global singletons and `requests.get` directly?
+
+**Learn:** pytest docs ("Getting started", fixtures) · Jest docs · Kent C. Dodds "Testing Trophy" ·
+testcontainers.com · k6.io docs
+
+## 11.2 Web security (OWASP Top 10)
+- [ ] Injection (SQL, NoSQL, command) → parameterised queries, ORMs, input validation ↳ https://portswigger.net/web-security/sql-injection · https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html · https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html
+  - `L1` What is SQL injection? Show a vulnerable query and the payload.
+  - `L1` How do you prevent SQL injection? ↳ parameterised queries / prepared statements; never string-concatenate input
+  - `L1` Why does a parameterised query stop injection — what does the database do differently?
+  - `L1` Fix for SQL injection in one phrase?
+  - `L1` What is SQL injection and how do you prevent it?
+  - `L2` Does an ORM make you safe from SQL injection? Where can it still happen? ↳ raw queries, `whereRaw`, dynamic column/ORDER BY names
+  - `L2` You need a dynamic `ORDER BY` column from the query string. How do you do it safely? ↳ allowlist map of column names
+  - `L2` What is blind SQL injection? Boolean-based vs time-based.
+  - `L2` What is second-order SQL injection?
+  - `L2` What is NoSQL injection in MongoDB? Show the `{"$ne": null}` login bypass. ↳ operator objects in JSON body; validate types, sanitize `$` keys
+  - `L2` What is OS command injection? How do you call a shell tool safely from Node or Python? ↳ execFile/spawn with arg array, no shell=True
+  - `L2` What is server-side template injection (SSTI)? Which template engines are prone to it?
+  - `L2` What is LDAP / XPath / header (CRLF) injection, in one line each?
+  - `L2` Is input sanitization (escaping quotes) a good defence against SQL injection? Why not?
+  - `L2` What is the least-privilege database user, and how does it limit the damage of an injection?
+  - `L3` How would you find SQL injection in a large codebase you just joined? ↳ grep raw queries, SAST (Semgrep), sqlmap on staging
+  - `L3` Can you inject into a `LIKE` pattern or a full-text search query even with parameters? ↳ wildcard abuse `%`, DoS; escape wildcards
+  - `L3` An LLM writes SQL for a "chat with your data" feature. How do you stop it from dropping tables or reading other tenants? ↳ read-only role, RLS, allowlisted views, statement timeout
+  - `L3` How can `eval`, `new Function`, `pickle.loads` or `yaml.load` turn into code injection?
+- [ ] Broken authentication / session management ↳ https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/ · https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html · https://portswigger.net/web-security/authentication
+  - `L2` How do you build "forgot password" safely? ↳ random single-use token, hashed in DB, short expiry, same response for unknown emails
+  - `L2` A07 Identification and Authentication Failures: give three examples.
+  - `L2` What should the login error message say, and why? ↳ same message for wrong user/password; avoid user enumeration
+  - `L2` How do you build a secure "forgot password" flow? ↳ random single-use token, hashed in DB, short expiry, invalidate sessions
+  - `L2` What do current NIST rules say about password complexity and forced rotation?
+  - `L3` What is a timing attack on login, and how do you compare secrets in constant time? ↳ `crypto.timingSafeEqual`, `hmac.compare_digest`; hash even for unknown users
+- [ ] Broken access control / IDOR (checking ownership on every request) ↳ https://portswigger.net/web-security/access-control (IDOR labs) · https://owasp.org/Top10/A01_2021-Broken_Access_Control/ · https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html
+  - `L1` What is IDOR (insecure direct object reference)? Give the `/invoices/1234` example.
+  - `L1` What is vertical vs horizontal privilege escalation?
+  - `L1` What is IDOR?
+  - `L2` What is IDOR (broken object-level authorization), and how do you prevent it? ↳ always scope queries by owner/tenant, not just by id
+  - `L2` A01 Broken Access Control: give two real examples and the fix.
+  - `L2` How do you prevent IDOR on every endpoint? ↳ scope every query by owner/tenant; authorization check per object, not per route
+  - `L2` Do UUIDs instead of sequential ids fix IDOR? ↳ no; they only make guessing harder — still check ownership
+  - `L2` What is BOLA vs BFLA in the OWASP API Top 10?
+  - `L2` Hiding the admin button in the UI: is that access control?
+  - `L2` What is "broken object property level authorization"? Example: user can read `salary` field via the API.
+  - `L2` How do you test for IDOR systematically? ↳ two test users, swap ids across every endpoint, automated authz tests
+  - `L2` A GraphQL API: where does IDOR hide? ↳ nested resolvers, node(id) lookups, introspection
+  - `L3` What is a confused deputy? How does it show up with signed URLs and with LLM agents calling tools?
+  - `L3` A user's access is revoked but they still have a cached token and a presigned URL. What can they still do, and for how long?
+- [ ] XSS (stored, reflected, DOM) → output encoding, CSP ↳ https://portswigger.net/web-security/cross-site-scripting · https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html · https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+  - `L1` What is XSS? What can an attacker do with it?
+  - `L1` Stored vs reflected vs DOM-based XSS: define each with an example.
+  - `L1` What is output encoding, and why is it context-dependent (HTML body, attribute, JS, URL, CSS)?
+  - `L2` Why does React mostly protect you from XSS? Where does it not? ↳ dangerouslySetInnerHTML, `href="javascript:"`, SSR injection, third-party HTML
+  - `L2` You must render user-written Markdown or HTML. How? ↳ sanitize with DOMPurify/bleach allowlist after rendering
+  - `L2` How does an `HttpOnly` cookie limit what XSS can steal? What can XSS still do?
+  - `L2` What DOM sinks are dangerous? ↳ innerHTML, outerHTML, document.write, eval, setTimeout(string), location
+  - `L2` Can JSON returned by an API cause XSS? ↳ wrong Content-Type, JSON embedded in HTML script tag
+  - `L3` LLM output is rendered as Markdown in your chat UI. How can a prompt-injected model cause XSS or data exfiltration? ↳ image URLs with data in query; sanitize, block remote images
+  - `L3` What is mutation XSS (mXSS) and why do sanitizers have to parse like a browser?
+  - `L3` An SVG upload is shown on your site. What can go wrong?
+- [ ] CSRF → SameSite cookies, CSRF tokens ↳ https://portswigger.net/web-security/csrf · https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html · https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies (SameSite)
+  - `L1` What is CSRF? Why does it only work when the browser sends credentials automatically?
+  - `L1` XSS vs CSRF: what is the difference? ↳ XSS runs attacker code in your origin; CSRF borrows the user's cookies cross-site
+  - `L1` XSS vs CSRF?
+  - `L2` What is CSRF, and how do `SameSite` and CSRF tokens prevent it?
+  - `L2` What is CSRF and how do SameSite cookies and CSRF tokens stop it?
+  - `L2` Is `SameSite=Lax` enough to stop CSRF? What gaps remain? ↳ GET with side effects, same-site subdomains, top-level navigations
+  - `L2` Synchronizer token vs double-submit cookie: how does each work?
+  - `L2` Does an API that uses `Authorization: Bearer` headers need CSRF protection? Why or why not?
+  - `L3` Same-site vs same-origin: why does a subdomain takeover break SameSite protection?
+  - `L3` Login CSRF: what is it and why does it matter?
+  - `L3` A WebSocket endpoint authenticates with cookies. What is cross-site WebSocket hijacking and how do you stop it? ↳ check Origin on upgrade, token in first message
+- [ ] SSRF (very relevant to agents/crawlers fetching URLs) → allowlists, block internal IPs/metadata endpoints ↳ https://portswigger.net/web-security/ssrf · https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html (allowlists, cloud metadata endpoints)
+  - `L1` What is SSRF? Give a feature that is naturally exposed to it. ↳ URL preview, webhooks, image fetch, PDF render, agent browsing
+  - `L1` What is the cloud metadata endpoint `169.254.169.254` and why is it the first SSRF target?
+  - `L1` What IP is the cloud metadata service?
+  - `L2` A10 SSRF: why did it get its own category?
+  - `L2` Why does SSRF matter so much for an AI browser agent or a crawler that fetches user-given URLs?
+  - `L2` Allowlist vs denylist for outbound URLs: which and why?
+  - `L2` Name the classic bypasses of a naive "block private IPs" check. ↳ decimal/octal IPs, IPv6 `::ffff:`, DNS to 127.0.0.1, redirects
+  - `L2` What is DNS rebinding, and why do you check the IP after resolution, not the hostname?
+  - `L2` A URL passes your check, then the server returns a 302 to `http://10.0.0.5`. What happens? ↳ re-validate every redirect hop or disable redirects
+  - `L2` What is blind SSRF and how is it detected?
+  - `L2` How does AWS IMDSv2 (or Azure's `Metadata: true` header) reduce SSRF impact?
+  - `L2` Which URL schemes must you block besides http? ↳ file://, gopher://, ftp://, dict://, data:
+  - `L2` What is SSRF and why does it matter for an AI browser/crawler?
+  - `L3` How do you protect a webhook sender from SSRF when customers give you URLs? ↳ block private IPs, resolve DNS once, egress proxy
+  - `L3` Design an egress proxy for all outbound fetches. What does it enforce? ↳ resolved-IP checks, allowlist, size/time limits, logging, no internal routes
+  - `L3` Network-level defence: how do security groups / network policies / a separate VPC limit SSRF blast radius?
+  - `L3` How did (or would) AiRA's cloud browser stop the agent from opening `http://localhost:8080/admin` or the metadata URL?
+  - `L3` A headless Chrome renders user HTML to PDF. List every SSRF and file-read risk. ↳ iframes, `<img src=file:>`, fetch to internal hosts, redirects
+  - `L3` How do you test your own API for SSRF safely? ↳ Burp Collaborator / interactsh callback, internal canary hosts
+- [ ] Security misconfiguration; verbose errors; default credentials ↳ https://owasp.org/Top10/A05_2021-Security_Misconfiguration/ · https://portswigger.net/web-security/information-disclosure · https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html
+  - `L2` A05 Security Misconfiguration: list five misconfigurations you have seen or could see in a Node/FastAPI deploy.
+  - `L2` Why remove the `X-Powered-By` and `Server` headers? Does it actually stop attacks?
+  - `L2` What should a 500 response body contain in production? ↳ generic message + request id; stack traces only in logs
+  - `L2` Name common misconfigurations in a cloud deploy. ↳ public buckets, open DB ports, debug mode, default creds, wildcard CORS, admin panels exposed
+  - `L2` Swagger / GraphQL introspection / `/metrics` / `/debug` exposed in production: what is the risk?
+  - `L3` How would you continuously check for misconfiguration across environments? ↳ CSPM, IaC scanning (tfsec/checkov), drift detection
+- [ ] Sensitive data exposure → TLS, encryption at rest, hashing, secrets management ↳ https://owasp.org/Top10/A02_2021-Cryptographic_Failures/ · https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html · https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html
+  - `L2` A02 Cryptographic Failures: why was "Sensitive Data Exposure" renamed? Give two examples. ↳ focus on root cause: weak/no crypto, not the symptom
+- [ ] Vulnerable dependencies → `npm audit`, Dependabot, lockfiles ↳ https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/ · https://docs.github.com/en/code-security/dependabot · https://docs.npmjs.com (CLI commands → "npm audit")
+  - `L1` What does `npm audit` / `pip-audit` do?
+  - `L1` What is Dependabot? What is Snyk?
+  - `L1` Why commit the lockfile (`package-lock.json`, `poetry.lock`, `uv.lock`)?
+  - `L1` What file makes installs reproducible?
+  - `L1` What is an SBOM?
+  - `L2` A06 Vulnerable and Outdated Components: how do you know you are affected by a new CVE?
+  - `L2` What is typosquatting? What is dependency confusion? ↳ lookalike names; public package shadows internal name with higher version
+  - `L2` What do install scripts (`postinstall`) have to do with supply-chain attacks? How do you limit them?
+  - `L2` `npm install` vs `npm ci`: why does CI use `ci`?
+  - `L2` A critical CVE lands in a transitive dependency and upstream has no fix. What do you do? ↳ check reachability, overrides/resolutions, patch-package, WAF, replace
+  - `L2` How do you avoid drowning in Dependabot PRs?
+  - `L2` What is an SBOM, and why do enterprise customers ask for one?
+  - `L2` How do you scan container images (Trivy, Grype) and what do you do with the findings?
+  - `L2` Why pin GitHub Actions to a commit SHA instead of a tag?
+  - `L2` What should you check before adding a new npm or PyPI package?
+  - `L3` Walk me through a famous supply-chain attack (event-stream, ua-parser-js, xz-utils, SolarWinds). What would have caught it?
+  - `L3` What is SLSA and what does build provenance prove? What is Sigstore/cosign?
+  - `L3` What are the supply-chain risks of model weights and AI tooling? ↳ pickle in model files, malicious HF repos, poisoned MCP servers
+  - `L3` How do you secure the CI/CD pipeline itself? ↳ least-privilege tokens, protected branches, pull_request_target dangers, review for workflow edits
+- [ ] Mass assignment; insecure deserialization; file upload risks ↳ https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html · https://portswigger.net/web-security/deserialization · https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
+  - `L1` What is insecure deserialization?
+  - `L1` What is mass assignment? Give the `isAdmin: true` example.
+  - `L2` Why is Python `pickle` (or Java native serialization) on untrusted data remote code execution?
+  - `L2` `yaml.load` vs `yaml.safe_load`: what is the difference?
+  - `L2` List the checks for a secure file upload endpoint. ↳ size limit, magic-byte type check, rename, store outside web root, scan, no execute
+  - `L2` Why is checking the file extension or the `Content-Type` header not enough?
+  - `L2` Why serve user-uploaded files from a separate domain (e.g. `usercontent.example.com`)?
+  - `L2` How do you prevent mass assignment in Express, NestJS (DTOs + `whitelist`) and FastAPI (Pydantic)?
+  - `L3` Users upload PDFs that an LLM summarises. What security risks does that add? ↳ hidden prompt injection text, parser exploits, huge page counts
+- [ ] Rate limiting and brute-force protection ↳ https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html (section "Protect Against Automated Attacks") · https://portswigger.net/web-security/authentication/password-based · https://stripe.com/blog/rate-limiters
+  - `L1` Why rate limit an API? List four reasons.
+  - `L2` Rate limit by IP, by user, by API key or by tenant: when each? What breaks with IP-only limits?
+  - `L2` Where do you rate limit: CDN/WAF, API gateway, app, or all three?
+  - `L2` Which endpoints need stricter limits? ↳ login, signup, password reset, OTP send, expensive search, LLM calls
+  - `L2` How do you stop SMS / OTP pumping fraud? ↳ per-number and per-IP caps, country allowlist, CAPTCHA, cost alerts
+  - `L3` What is a "denial of wallet" attack on an AI product, and how do you defend against it?
+  - `L3` How do you detect bots and scrapers without hurting real users?
+- [ ] CORS misconfiguration ↳ https://portswigger.net/web-security/cors · https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+  - `L1` Does CORS protect your server from requests?
+  - `L2` What is CORS? Does CORS protect your server? ↳ no; it relaxes the browser's SOP for reads; server still gets the request
+  - `L2` Explain a CORS preflight. Which requests trigger one?
+  - `L2` Why is reflecting the `Origin` header with `Access-Control-Allow-Credentials: true` dangerous?
+- [ ] Logging without leaking PII/secrets ↳ https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html · https://owasp.org/Top10/A09_2021-Security_Logging_and_Monitoring_Failures/
+  - `L1` What should never be logged?
+  - `L2` How do you keep secrets out of logs, error messages, stack traces and LLM traces?
+  - `L2` How do you redact PII and secrets in logs automatically? ↳ Pino redact paths, structlog processors, deny-by-default field lists
+  - `L2` What is log injection (forged log lines via newlines) and how do structured logs help?
+- [ ] Security fundamentals: CIA triad, authn vs authz, least privilege, defence in depth, trust boundaries, fail open vs closed
+  - `L1` What do confidentiality, integrity and availability (the CIA triad) mean? Give one attack on each.
+  - `L1` What is the difference between authentication and authorization?
+  - `L1` What is least privilege? What is defence in depth?
+  - `L1` What is the attack surface of a web API?
+  - `L1` What is a vulnerability vs an exploit vs a threat vs a risk?
+  - `L2` Where are the trust boundaries in a typical web app (browser, API, DB, third-party APIs, LLM)?
+  - `L2` Why should you never trust the client, even your own mobile app?
+  - `L2` "Fail open" vs "fail closed": which for an auth check, which for a rate limiter? ↳ auth fails closed; rate limiter often fails open — say why
+  - `L2` What is security through obscurity and why is it not enough on its own?
+  - `L2` What is the principle of secure defaults? Give an example from a framework you use.
+- [ ] Threat modelling (STRIDE), prioritising security fixes, zero trust, security culture in a fast team
+  - `L2` What is threat modelling? Walk me through STRIDE. ↳ spoofing, tampering, repudiation, info disclosure, DoS, elevation of privilege
+  - `L2` How do you prioritise security fixes? ↳ severity (CVSS) × exploitability × exposure; reachable code first
+  - `L3` Threat-model AiRA's agentic browser in five minutes: assets, actors, entry points, top three threats.
+  - `L3` What is zero trust, and what does it change for service-to-service calls inside a VPC?
+  - `L3` How do you get a team that ships fast to care about security without slowing it to a crawl?
+- [ ] OWASP Top 10 (2021) categories, the OWASP API Security Top 10 and ASVS
+  - `L1` What is the OWASP Top 10? Who publishes it and how often?
+  - `L1` Name the 2021 OWASP Top 10 categories in order.
+  - `L1` Why did Broken Access Control move to #1 in 2021?
+  - `L1` What does OWASP stand for?
+  - `L1` #1 in the OWASP Top 10 (2021)?
+  - `L2` A03 Injection: why is XSS now listed under injection?
+  - `L2` A04 Insecure Design: how is a design flaw different from an implementation bug? Example.
+  - `L2` A08 Software and Data Integrity Failures: what does it cover? ↳ unsigned updates, CI/CD tampering, insecure deserialization
+  - `L2` Which three Top 10 categories are most relevant to an LLM agent backend, and why?
+  - `L3` Pick one of your APIs and walk through all ten categories: where is it exposed, where is it covered?
+  - `L3` What is the OWASP API Security Top 10 and how is it different from the web Top 10? ↳ BOLA, BOPLA, unrestricted resource consumption, BFLA
+  - `L3` The Top 10 is an awareness list, not a standard. What would you use as an actual checklist? ↳ OWASP ASVS
+- [ ] Content Security Policy: script-src, nonces and hashes, strict-dynamic, report-only rollout, Trusted Types
+  - `L1` Name one CSP directive.
+  - `L2` What is a Content Security Policy? What does `script-src 'self'` block?
+  - `L2` Why is `'unsafe-inline'` bad, and what are nonces and hashes in CSP?
+  - `L2` What is `strict-dynamic` and why do modern CSPs use it?
+  - `L2` How do you roll out CSP without breaking production? ↳ `Content-Security-Policy-Report-Only` + report endpoint first
+  - `L3` What is Trusted Types and how does it kill DOM XSS?
+- [ ] Clickjacking (X-Frame-Options, frame-ancestors) and open redirects (safe next= handling)
+  - `L2` What is clickjacking? How do `X-Frame-Options` and CSP `frame-ancestors` stop it?
+  - `L2` What is an open redirect, and why do attackers love it for phishing and OAuth token theft?
+  - `L2` How do you implement a safe `?next=` redirect after login? ↳ relative paths only or allowlisted hosts; parse, don't regex
+- [ ] Path traversal, XXE and billion laughs; zip slip and zip bombs
+  - `L1` What is path traversal? Show the `../../etc/passwd` example.
+  - `L1` What is XXE (XML external entity) injection?
+  - `L2` How do you serve user files by name without path traversal? ↳ map ids to paths; `path.resolve` then check prefix; never raw names
+  - `L2` How do you disable XXE in common XML parsers? Do DOCX/SVG/SAML uploads count as XML?
+  - `L2` What is the "billion laughs" attack?
+  - `L2` What is a zip bomb and a zip slip? How do you defend?
+- [ ] Node.js attacks: prototype pollution, ReDoS and event-loop blocking, eval/vm, parameter pollution, body size limits
+  - `L1` What is prototype pollution?
+  - `L1` Which JS property name causes prototype pollution?
+  - `L1` What blocks Node's event loop in ReDoS?
+  - `L2` Show how a deep-merge of a JSON body with `__proto__` pollutes every object.
+  - `L2` How do you prevent prototype pollution? ↳ block `__proto__`/`constructor`/`prototype` keys, `Object.create(null)`, Map, schema validation, freeze
+  - `L2` Server-side prototype pollution can become RCE or auth bypass. How? ↳ polluted options reach child_process, template engines, `isAdmin` defaults
+  - `L2` Why does one catastrophic regex take down a whole Node.js server but maybe not a Java server? ↳ single event loop thread blocked
+  - `L2` Which regex patterns cause catastrophic backtracking? How do you find and fix them? ↳ nested quantifiers `(a+)+`; safe-regex, RE2, input length caps
+  - `L2` Why are `eval`, `new Function`, `vm` and `setTimeout("string")` dangerous? Is `vm` a sandbox?
+  - `L2` What does `JSON.parse` on a 50 MB body do to your Node server? How do you limit it?
+  - `L2` What is HTTP parameter pollution (`?role=user&role=admin`) and how does Express parse it?
+  - `L3` What is the `qs` / `body-parser` extended mode risk with nested objects?
+  - `L3` What does the Node.js permission model (`--permission`) give you?
+  - `L3` How would you sandbox untrusted user JavaScript (e.g. user-defined transforms)? ↳ isolated-vm, separate process/container, Wasm, time and memory limits
+  - `L3` Event-loop blocking as a DoS vector: give three ways an attacker can make your Node API stall.
+- [ ] Security headers: helmet, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, COOP/COEP/CORP
+  - `L1` What does helmet.js do?
+  - `L1` Name five security headers and what each does. ↳ CSP, HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors / X-Frame-Options
+  - `L1` What does `X-Content-Type-Options: nosniff` stop?
+  - `L1` What does HSTS force?
+  - `L2` What is HSTS and what attack does it stop? What is the preload list?
+  - `L2` What is `Referrer-Policy` and how can tokens leak through the Referer header?
+  - `L2` What is `Permissions-Policy` for?
+  - `L2` What are COOP / COEP / CORP, in one line each?
+  - `L2` Which headers matter for a pure JSON API and which only matter for HTML pages?
+  - `L3` What is HSTS and how does it change the first request to a site?
+- [ ] Secrets management: env vars vs files vs a secrets manager, rotation, CI OIDC, preventing and responding to leaks
+  - `L1` What counts as a secret? ↳ API keys, DB passwords, signing keys, OAuth client secrets, webhook secrets, private keys
+  - `L1` Where do you store API keys? Why never in git?
+  - `L1` What is wrong with a `.env` file in production?
+  - `L1` Where should secrets live instead of git?
+  - `L1` First action when a secret leaks? ↳ revoke/rotate it
+  - `L1` Where do you store API keys?
+  - `L2` Environment variables vs mounted files vs a secrets manager: trade-offs.
+  - `L2` What are dynamic secrets (Vault database secrets engine) and why are they better than static passwords?
+  - `L2` How do you rotate a database password with zero downtime? ↳ two valid credentials overlap; deploy new; revoke old
+  - `L2` How do you give CI (GitHub Actions) cloud access without long-lived keys? ↳ OIDC federation to AWS/Azure/GCP
+  - `L2` How do you stop secrets from being committed in the first place? ↳ pre-commit gitleaks/trufflehog, push protection, secret scanning
+  - `L3` A developer pushed an OpenAI key to a public repo 10 minutes ago. Walk me through your response. ↳ revoke first, rotate, check usage, purge history, postmortem
+  - `L3` Deleting the commit: does it remove the secret? What about forks and caches?
+  - `L3` How would you design secrets for 3 environments so dev can never read prod secrets?
+- [ ] Input validation: allowlists, schema validation (Zod, Pydantic, class-validator), parse don't validate, size limits, Unicode
+  - `L1` Validation vs sanitization vs encoding: what is each for?
+  - `L1` Allowlist vs denylist validation: which and why?
+  - `L2` Where do you validate: client, gateway, controller, service, database constraints? Why more than one?
+  - `L2` How do you validate a request body with Zod in Express? With Pydantic in FastAPI? With class-validator in NestJS?
+  - `L2` What does "parse, don't validate" mean, and how do Zod and Pydantic enforce it? ↳ output is a typed value; no unvalidated object passes on
+  - `L2` What does `strict()` / `extra = "forbid"` / `whitelist: true` do, and why does it matter for security?
+  - `L2` What limits should every endpoint have? ↳ body size, string length, array length, nesting depth, number ranges, pagination max
+  - `L2` How do you validate URLs, emails and file names correctly?
+  - `L2` What is Unicode normalisation and how can homoglyphs or case folding break uniqueness checks?
+  - `L2` Why validate responses from third-party APIs and LLMs too?
+  - `L3` Why is input validation not a defence against XSS or SQL injection on its own?
+  - `L3` Integer overflow, negative quantities, floats for money: which business-logic bugs does type validation miss?
+- [ ] Security logging and audit trails: which events to log, tamper-evident audit logs, retention, detecting a breach
+  - `L2` A09 Security Logging and Monitoring Failures: how would you know you were breached?
+  - `L2` What security events should you log? ↳ logins, failures, permission denials, admin actions, key access, config changes
+  - `L2` How do you make audit logs tamper-evident? ↳ append-only store, separate account, hash chaining, WORM storage
+  - `L2` How long should you keep logs, and who decides?
+  - `L2` How do you log agent actions for audit and for incident review?
+- [ ] Security testing and secure SDLC: SAST/DAST/SCA, ZAP and Burp, pen-testing your API, fuzzing, bug bounties
+  - `L1` SAST vs DAST vs SCA vs IAST: what is each?
+  - `L1` What is OWASP ZAP / Burp Suite used for?
+  - `L1` DAST tool you would run against your API?
+  - `L2` How would you pen-test your own API? Walk me through your plan. ↳ map endpoints, auth matrix, injection, IDOR, SSRF, rate limits, ZAP scan
+  - `L2` ZAP baseline scan vs full active scan: which runs in CI and which on staging?
+  - `L2` What do security unit tests look like? Give three you would write for an auth endpoint.
+  - `L2` How do you triage scanner findings? What is a false positive and how do you suppress it safely?
+  - `L2` What is fuzzing, and where would it pay off in a backend?
+  - `L2` What is a bug bounty, and when is a company ready for one?
+  - `L3` Design a secure SDLC for a 5-engineer startup without a security team. ↳ threat model per feature, SAST + SCA + secrets in CI, ZAP nightly, quarterly review
+  - `L3` What is ASVS level 1 vs 2 vs 3, and which should a B2B SaaS target?
+  - `L3` What did a ZAP or Snyk scan find in your code, and how did you fix it?
+
+**Learn:** OWASP Top 10 + OWASP Cheat Sheet Series · PortSwigger Web Security Academy (free, hands-on labs) ·
+OWASP Top 10 for LLM (see 08-ai 8.8)
+
+## 11.3 Cryptography basics
+- [ ] Hashing vs encryption vs encoding ↳ https://www.cloudflare.com/learning/ssl/what-is-encryption/ · https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html · DBI ch3 "Checksumming" (pdf p108–109: checksum vs cryptographic hash)
+  - `L1` Hashing vs encryption vs encoding: what is the difference? Is base64 encryption?
+  - `L1` What is a cryptographic hash function? Name its three properties. ↳ preimage resistance, second preimage, collision resistance
+  - `L1` Is base64 encryption?
+  - `L1` Hashing vs encryption?
+  - `L2` What is a checksum vs a cryptographic hash? When is CRC32 fine?
+- [ ] Symmetric (AES, modes; GCM = authenticated) vs asymmetric (RSA, ECC) ↳ https://www.cloudflare.com/learning/ssl/what-is-asymmetric-encryption/ · https://soatok.blog/2020/05/13/why-aes-gcm-sucks/ (GCM, nonce reuse)
+  - `L1` Symmetric vs asymmetric encryption: give an algorithm and a use for each.
+  - `L1` AES-GCM gives confidentiality plus what?
+  - `L1` What must never repeat with the same AES-GCM key?
+  - `L2` Why AES-GCM over AES-CBC? ↳ authenticated encryption: integrity + confidentiality; no padding oracle
+  - `L2` What is AES-ECB and why is it broken? (The penguin picture.)
+  - `L2` What is a nonce / IV? What happens if you reuse a nonce with the same key in AES-GCM? ↳ XOR of plaintexts leaks; auth key recoverable → forgeries
+  - `L2` What is associated data (AAD) in AEAD, and what would you put there? ↳ user id / record id binds ciphertext to its owner
+  - `L2` RSA vs elliptic curve (ECDSA / Ed25519): why is ECC preferred today?
+  - `L2` Why AES-GCM over AES-CBC?
+  - `L2` How does HTTPS use both symmetric and asymmetric crypto?
+  - `L2` Why AES-256-GCM? What do the nonce and auth tag do, and what happens if you reuse a nonce? ↳ unique nonce per encryption; reuse breaks confidentiality and integrity
+  - `L3` Why GCM? What happens if you ever reuse a nonce with the same key? ↳ breaks confidentiality and lets attackers forge tags
+  - `L3` What is the GCM nonce limit (2^32 random nonces per key) and how do you design around it? ↳ rotate keys, counter nonces, XChaCha20-Poly1305
+- [ ] Digital signatures and certificates; HMAC ↳ https://www.cloudflare.com/learning/ssl/how-does-ssl-work/ · https://en.wikipedia.org/wiki/HMAC · https://docs.stripe.com/webhooks (signatures section: HMAC in practice)
+  - `L1` What is HMAC and how is it different from a plain hash?
+  - `L1` What is a digital signature? Which key signs, which verifies?
+  - `L1` HMAC needs what that a plain hash does not?
+  - `L2` What is a MAC-then-encrypt vs encrypt-then-MAC, and why does order matter?
+  - `L2` What is a length-extension attack, and why is `sha256(secret + message)` not a MAC?
+- [ ] Password hashing (bcrypt/argon2) vs general hashing (SHA-256) ↳ https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html (argon2id, bcrypt, salts, work factors)
+  - `L1` Why not store passwords with SHA-256 or MD5? ↳ fast hashes; GPUs try billions/sec; need slow, memory-hard KDF
+  - `L2` What is a key derivation function (HKDF vs PBKDF2/argon2) and when do you use each?
+- [ ] Key management: KMS/Key Vault, rotation, envelope encryption (your AiRA vault) ↳ https://cloud.google.com/kms/docs/envelope-encryption · https://learn.microsoft.com/en-us/azure/key-vault/general/basic-concepts · https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html
+  - `L1` What is a KMS / Azure Key Vault / AWS KMS / HSM?
+  - `L1` What is envelope encryption? ↳ data key encrypts data; master key in KMS encrypts the data key
+  - `L1` Envelope encryption: what encrypts the data key?
+  - `L2` What is envelope encryption? Why wrap per-user data keys with a key in a KMS?
+  - `L2` Why envelope encryption instead of sending every record to Key Vault to encrypt?
+  - `L2` How does key rotation work with envelope encryption? Do you re-encrypt all data? ↳ rotate KEK, re-wrap DEKs; re-encrypt data lazily if needed
+  - `L2` How does your app authenticate to Key Vault without a secret in config? ↳ managed identity / workload identity
+  - `L2` How do you search or deduplicate on an encrypted field? ↳ blind index: HMAC of value with a separate key
+  - `L2` What is the blast radius if one data key leaks vs if the master key leaks?
+  - `L3` Where do you store third-party refresh tokens (Google, LinkedIn) for thousands of users? ↳ encrypted at rest, envelope encryption, per-user key ids
+- [ ] Crypto hygiene: CSPRNGs for tokens, vetted libraries instead of your own crypto, post-quantum readiness
+  - `L2` What is a CSPRNG? Why is `Math.random()` wrong for tokens? ↳ predictable; use `crypto.randomBytes` / `secrets.token_urlsafe`
+  - `L2` Why should you never roll your own crypto? What do you use instead? ↳ libsodium, Web Crypto, `cryptography` library, KMS
+  - `L3` What is post-quantum cryptography and what should an app team do about it today?
+
+**Learn:** Cloudflare Learning Center (TLS, encryption) · *Serious Cryptography* (Aumasson) ch1–ch4 optional
+
+## 11.4 Engineering practices
+- [ ] Git: merge vs rebase, squash, resolving conflicts, `revert` vs `reset`, `cherry-pick`, `bisect`, `reflog` ↳ https://git-scm.com/book/en/v2/Git-Branching-Rebasing · https://git-scm.com/book/en/v2/Git-Tools-Reset-Demystified · https://git-scm.com/book/en/v2/Git-Tools-Debugging-with-Git (bisect)
+  - `L1` Merge vs rebase: what does each do to history?
+  - `L1` What is a merge conflict and when does it happen?
+  - `L1` What does `git cherry-pick` do?
+  - `L1` Merge vs rebase in one line?
+  - `L1` Which flag forces a merge commit even when fast-forward is possible? ↳ `--no-ff`
+  - `L2` Merge vs rebase — what does your team use and why?
+  - `L2` You pushed a bad commit to main — what do you do?
+  - `L2` Squash merge vs merge commit vs rebase merge for PRs: which do you prefer and why?
+  - `L2` When do you merge and when do you rebase? ↳ rebase your local branch; never rebase shared/public history
+  - `L2` What is the "golden rule of rebasing"?
+  - `L2` What does interactive rebase let you do? ↳ squash, fixup, reword, reorder, drop
+  - `L2` Walk me through resolving a merge conflict, step by step.
+  - `L2` Resolving a conflict during a rebase vs during a merge: what's different? ↳ per replayed commit; `--continue`, `--abort`, "ours/theirs" swapped
+  - `L2` What do "ours" and "theirs" mean in a merge, and why are they reversed in a rebase?
+  - `L2` What is a three-way merge and what is the merge base?
+  - `L2` When is cherry-pick the right tool, and when does it cause trouble? ↳ hotfix to release branch; duplicate commits, later conflicts
+  - `L2` What is `git rerere` and when does it save time?
+  - `L2` What does `git pull --rebase` do and why do some teams make it the default?
+  - `L2` How do you squash 12 messy commits into one before opening a PR?
+  - `L3` You rebased a branch your teammate also works on and force-pushed. What happens to them and how do they recover?
+  - `L3` How do you avoid conflicts on generated files like lockfiles and migration heads?
+  - `L3` What is `git revert` of a merge commit and why is reverting it tricky later? ↳ `-m 1`; re-merging needs revert of revert
+- [ ] Branching: trunk-based vs GitFlow; feature flags instead of long branches ↳ https://trunkbaseddevelopment.com · https://martinfowler.com/articles/feature-toggles.html · https://martinfowler.com/articles/branching-patterns.html
+  - `L1` What is trunk-based development?
+  - `L1` What is GitFlow? Name its branches. ↳ main, develop, feature/*, release/*, hotfix/*
+  - `L1` Trunk-based or GitFlow for a team that deploys daily?
+  - `L2` Trunk-based vs GitFlow: when is each the right choice?
+  - `L2` Why do long-lived feature branches hurt? ↳ painful merges, late integration, hidden conflicts
+  - `L2` What is a merge queue and what problem does it solve? ↳ main breaks from two green PRs combined
+  - `L3` Release branches with hotfix cherry-picks vs fix-forward on trunk: trade-offs.
+- [ ] Code review: what you look for, how you give feedback, PR size ↳ https://google.github.io/eng-practices/review/ · https://google.github.io/eng-practices/review/developer/small-cls.html · https://conventionalcomments.org
+  - `L2` How do you review a 2,000-line PR?
+  - `L2` What do you look for when you review a PR?
+  - `L2` How big should a PR be? What do you do with a 3,000-line PR?
+  - `L2` As team lead, how did you set review rules at AiRA (owners, approvals, turnaround)?
+  - `L2` What is a CODEOWNERS file?
+  - `L3` Code review: what do you look for in a PR's tests?
+- [ ] Design docs / ADRs (architecture decision records); writing an RFC before a big change ↳ https://www.industrialempathy.com/posts/design-docs-at-google/ · https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions · https://adr.github.io
+  - `L3` You wrote 34 design documents, some for implementer agents. How do you write a design doc that an AI coding agent can execute well?
+- [ ] Documentation and onboarding (AGENTS.md / README habits) ↳ https://agents.md · https://www.makeareadme.com · https://diataxis.fr
+- [ ] Working with AI coding tools responsibly: reviewing generated code, tests, security ↳ https://www.anthropic.com/engineering/claude-code-best-practices · https://google.github.io/eng-practices/review/reviewer/looking-for.html · https://owasp.org/www-project-top-10-for-large-language-model-applications/
+  - `L2` How do you review AI-generated code for security issues?
+  - `L3` Which parts of the runtime did you write by hand, and which did coding agents write? How did you review them?
+  - `L3` How do you keep tests honest when using AI coding tools that write both code and tests?
+- [ ] Git internals: blobs/trees/commits, content addressing, branches and HEAD, the index, fetch vs pull, shallow/partial clones
+  - `L1` What is Git? How is it different from SVN?
+  - `L1` Working tree vs staging area (index) vs repository.
+  - `L1` What is a commit? What does a commit hash identify?
+  - `L1` What is a branch, really? What is `HEAD`? ↳ a movable pointer to a commit; HEAD points to current branch
+  - `L1` What is a detached HEAD?
+  - `L1` `git fetch` vs `git pull`.
+  - `L1` What is a remote? What is `origin`? What is `upstream` in a fork?
+  - `L1` When do you end up in detached HEAD state?
+  - `L1` `git fetch` vs `git pull`?
+  - `L2` What are Git's object types? ↳ blob, tree, commit, tag
+  - `L2` Why is Git content-addressable, and what does that give you?
+  - `L2` Does Git store diffs or snapshots? What are packfiles?
+  - `L2` What is a fast-forward merge?
+  - `L2` What does `git stash` do and when does it bite you?
+  - `L2` What does `.gitignore` do, and why doesn't it remove a file you already committed? ↳ untracked only; `git rm --cached`
+  - `L2` What is a tracking branch? What does "your branch is ahead by 2, behind by 3" mean?
+  - `L2` `git diff` vs `git diff --staged` vs `git diff main...feature`.
+  - `L2` What do `git log --oneline --graph`, `git blame` and `git show` help you find?
+  - `L3` What is a shallow clone, a partial clone and a sparse checkout? When would CI use them?
+  - `L3` Git moved from SHA-1 toward SHA-256. Why?
+- [ ] Undoing in Git: reset modes, revert, reflog recovery, bisect, force-with-lease, purging secrets from history
+  - `L1` `git reset` vs `git revert`: when do you use each?
+  - `L1` What do `git reset --soft`, `--mixed` and `--hard` do?
+  - `L1` What is `git reflog`?
+  - `L1` What does `git bisect` do?
+  - `L1` Revert vs reset in one line?
+  - `L1` Command to find lost commits?
+  - `L1` Command to find the commit that introduced a bug?
+  - `L1` Safer alternative to `git push --force`?
+  - `L2` You committed to `main` instead of a feature branch (not pushed). How do you fix it?
+  - `L2` You ran `git reset --hard` and lost commits. How do you get them back? ↳ reflog, then reset/branch to the old SHA
+  - `L2` You need to undo a commit that is already on the shared `main`. What do you do? ↳ revert, not reset + force-push
+  - `L2` How do you change the last commit message, or add a forgotten file to the last commit?
+  - `L2` `git push --force` vs `git push --force-with-lease`: why is the second safer?
+  - `L2` When is force-pushing acceptable, and how do you protect `main` from it?
+  - `L2` A bug appeared somewhere in the last 200 commits. How does `git bisect` find it, and how many steps? ↳ binary search, about 8 steps; `bisect run` with a test
+  - `L2` How do you restore a single file to how it was 3 commits ago? ↳ `git restore --source=HEAD~3 file`
+  - `L2` How do you undo `git add` and discard local changes to one file?
+  - `L2` You deleted a branch that wasn't merged. Can you recover it?
+  - `L3` A password was committed 50 commits ago and pushed. How do you remove it from history, and why is that not enough? ↳ filter-repo/BFG, force-push, forks/clones keep it; rotate
+  - `L3` How long does the reflog keep entries, and when is a commit truly gone? ↳ ~90 days reachable, 30 unreachable; gc
+- [ ] Git submodules, hooks (pre-commit framework), Git LFS, fixing huge repos, good commit messages
+  - `L1` What is a Git submodule?
+  - `L1` What is a Git hook? Client-side vs server-side.
+  - `L1` What is Git LFS?
+  - `L1` Command to clone a repo with its submodules?
+  - `L2` What does the parent repo actually store for a submodule? ↳ a gitlink: the submodule's commit SHA, plus .gitmodules
+  - `L2` You cloned a repo and the submodule folders are empty. Why, and how do you fix it? ↳ `--recursive` / `submodule update --init`
+  - `L2` You committed inside a submodule. What else must you commit, and in what order do you push? ↳ parent pointer; push child first
+  - `L2` Submodules vs subtrees vs a package registry vs a monorepo: trade-offs.
+  - `L2` What are common submodule pain points? ↳ detached HEAD, forgotten pointer bumps, private access in CI
+  - `L2` How do you check out private submodules in GitHub Actions?
+  - `L2` What would you put in a pre-commit hook, and what belongs in CI instead?
+  - `L2` What is the `pre-commit` framework and why use it over raw `.git/hooks`?
+  - `L2` Hooks can be skipped with `--no-verify`. So why have them?
+  - `L2` Why should you not commit large binaries, model weights or PDFs to Git? What do you do instead?
+  - `L2` What makes a good commit message?
+  - `L3` Your learning workspace keeps books, notes and projects as submodules. Why that design, and what would you change?
+  - `L3` A repo is 4 GB and clones take 10 minutes. How do you fix it?
+
+## 11.5 Production incidents
+- [ ] Triage: impact, severity, communicate early, mitigate first (rollback / feature flag off) then debug ↳ https://sre.google/sre-book/managing-incidents/ · https://response.pagerduty.com · DDIA ch1 "Human errors" (pdf p29–30: quick rollback)
+  - `L1` What is an incident? What is a severity level (SEV1–SEV4)?
+  - `L1` What is MTTD, MTTA, MTTR and MTBF?
+  - `L1` What does MTTR stand for?
+  - `L2` Walk me through your first 15 minutes when production breaks. ↳ impact, tell people, mitigate or roll back, then root cause
+  - `L2` Tell me about a production incident you handled
+  - `L2` Error rate jumped to 20% right after a deploy — walk me through the next 15 minutes
+  - `L2` Error rate jumped to 20 % right after a deploy. Walk me through the next 15 minutes. ↳ declare, roll back first, communicate, then investigate
+  - `L2` Why mitigate first and debug later?
+  - `L2` What are the incident roles? ↳ incident commander, ops/tech lead, communications lead, scribe
+  - `L2` What goes in a status update, how often, and to whom?
+  - `L3` You can't roll back because the deploy included a DB migration. Now what? ↳ expand/contract migrations, forward fix, feature flags
+  - `L3` How do you run an incident when the cause is a third-party (LLM provider) outage you can't fix?
+- [ ] Using dashboards, logs and traces to find the cause ↳ https://sre.google/sre-book/monitoring-distributed-systems/ · https://opentelemetry.io/docs/concepts/observability-primer/ · https://grafana.com/blog/2018/08/02/the-red-method-how-to-instrument-your-services/
+  - `L2` p99 latency doubled but p50 is flat. What do you suspect and how do you check? ↳ GC, lock contention, one slow dependency, noisy neighbour, cold cache
+  - `L2` Error rate is 2 % but only for one customer. How do you find out why?
+  - `L2` A request is slow but every service says its own span was fast. Where did the time go? ↳ queueing, network, connection pool wait, uninstrumented gaps
+  - `L2` Memory grows slowly over a day until the pod is OOM-killed. How do you investigate?
+  - `L2` CPU is at 20 % but the API is slow. What do you look at? ↳ I/O waits, pool saturation, event-loop lag, locks, downstream latency
+  - `L2` Logs show nothing wrong, metrics look normal, but users say the app is broken. What now?
+  - `L2` Your Grafana graph shows a gap of 10 minutes. Was the service down?
+  - `L2` Latency spikes every hour on the hour. What would you check? ↳ cron jobs, cache TTL expiry, backups, batch jobs, log rotation
+  - `L2` A background job stopped running three days ago and nobody noticed. What monitoring was missing?
+  - `L3` The LLM feature got 30 % slower overnight with no deploy. How do you find out why?
+  - `L3` One Kafka/Redis consumer is lagging but CPU and memory look fine. What next?
+- [ ] Blameless postmortems: timeline, root cause (5 whys), action items ↳ https://sre.google/sre-book/postmortem-culture/ · https://sre.google/workbook/postmortem-culture/ · https://www.atlassian.com/incident-management/postmortem/blameless
+  - `L1` What is a blameless postmortem?
+  - `L2` How do you write a postmortem? What makes it blameless?
+  - `L2` What sections does a good postmortem have? ↳ summary, impact, timeline, root causes, what went well, action items with owners
+  - `L2` What is "5 whys", and what is its weakness? What do people use instead?
+  - `L2` Why "contributing factors" instead of a single root cause?
+  - `L2` How do you make sure postmortem action items actually get done?
+- [ ] Runbooks and on-call; alert fatigue ↳ https://sre.google/sre-book/being-on-call/ · https://sre.google/workbook/on-call/ · DDIA ch1 "Operability: making life easy for operations" (pdf p39–40)
+  - `L1` What is a runbook?
+  - `L2` What is alert fatigue, and how do you fix a noisy on-call?
+  - `L2` What is a runbook? What goes in a good one?
+  - `L2` What makes an on-call rotation healthy? ↳ few pages/shift, runbooks, handoffs, compensation, follow-up on noise
+  - `L3` How do you review and prune alerts? What metrics on alerting itself do you track?
+  - `L3` How do you avoid hero culture on a small startup team where you are the only one who knows the system?
+- [ ] Security incident response: containment, key rotation, blast radius, data-leak triage, disclosure, security postmortems
+  - `L2` A researcher emails you an IDOR in your API. Walk me through the next 48 hours.
+  - `L2` Your cloud bill jumps 10× overnight from LLM calls. Is it an attack? How do you find out?
+  - `L2` A customer says another customer's data appeared in their dashboard. First five steps.
+  - `L2` Your JWT signing key may have leaked. What do you do? ↳ rotate key, invalidate tokens, force re-login, check logs for forged tokens
+  - `L2` You find SQL built with string concatenation in a 3-year-old endpoint. How do you fix it and check if it was exploited?
+  - `L2` What goes into a security incident postmortem that a normal outage postmortem doesn't have?
+  - `L3` A malicious npm package version was installed in CI last week. What is the blast radius and how do you respond?
+  - `L3` An employee leaves on bad terms. What access do you revoke and how do you check nothing was taken?
+  - `L3` You are the first security-minded engineer at a startup. What are the first ten things you fix?

@@ -1,0 +1,1536 @@
+# 6. System design — high level (P0)
+
+At 3 years you are expected to **drive** a 45-minute design: requirements → estimates → API → data model →
+high-level diagram → deep dive on 2 parts → bottlenecks and trade-offs. Practise out loud with a timer, drawing on
+excalidraw.com.
+
+---
+
+## 6.1 The interview framework
+- [ ] Functional requirements (3–5 core features; say what's out of scope) ↳ https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery ("Requirements") · Xu vol1 ch3 "A Framework for System Design Interviews" (book, not in library) · https://github.com/donnemartin/system-design-primer ("How to approach a system design interview question")
+  - `L1` Walk me through the steps you follow in a system design interview. ↳ requirements, estimates, API, data model, high-level, deep dives, trade-offs
+  - `L1` What is the difference between functional and non-functional requirements? Give two of each for a chat app.
+  - `L1` Why should you say what is out of scope early?
+  - `L2` How many core features do you pick for a 45-minute round, and how do you choose them?
+  - `L2` What are the most common mistakes candidates make in design rounds? ↳ jumping to tech, no numbers, no trade-offs, overbuilding, silence
+- [ ] Non-functional: scale, latency, availability vs consistency, durability, cost ↳ DDIA ch1 "Reliability" (pdf p26), "Scalability" (pdf p30), "Describing performance" (pdf p33) · https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery ("Non-Functional Requirements")
+  - `L1` Which non-functional requirements do you always ask about? ↳ scale, latency, availability vs consistency, durability, cost, security
+  - `L1` Define reliability, availability, scalability and maintainability in one sentence each.
+  - `L1` Fault vs failure: what is the difference? ↳ fault = component deviates; failure = whole system stops serving
+  - `L2` The interviewer says "assume infinite scale". How do you respond?
+  - `L2` Hardware faults vs software faults vs human errors: give an example of each and a defence.
+  - `L2` What does "durability" mean, and how is it different from availability?
+  - `L3` How do you design for a 5-person startup differently from a design for Google scale? Give a concrete example.
+- [ ] Back-of-envelope: DAU → QPS (÷ 86,400 ≈ ÷ 10⁵), peak = 2–3× avg, storage/day, bandwidth ↳ Xu vol1 ch2 "Back-of-the-envelope Estimation" (book, not in library) · DDIA ch1 "Describing load" (pdf p31) · https://github.com/donnemartin/system-design-primer#powers-of-two-table
+  - `L1` What is the usual ratio of peak to average traffic? ↳ 2–3×, more for spiky events
+  - `L2` When do you do estimation, and when do you skip it?
+  - `L2` 100M DAU, each user does 10 reads and 1 write a day. What are read QPS, write QPS and peak QPS?
+  - `L2` 10M new posts a day at 1 KB each plus 10% with a 500 KB image. What is storage per day and per 5 years?
+  - `L2` How do you estimate bandwidth (ingress and egress) from QPS and payload size?
+  - `L2` How do you estimate cache memory for "the hottest 20% of a day's reads"?
+  - `L2` What does an 80/20 rule mean in cache sizing, and when is it wrong?
+  - `L2` How do you estimate the monthly cost of your design during the interview?
+  - `L2` Turn "100K users" into numbers: concurrent users, requests per second, peak factor. Walk me through the maths.
+  - `L2` What is capacity planning, and how much headroom do you keep?
+  - `L3` The interviewer says your numbers are off by 10×. Which parts of your design change and which don't?
+- [ ] API endpoints ↳ https://www.hellointerview.com/learn/system-design/core-concepts/api-design · DDIA ch4 "Data flow through services: REST and RPC" (pdf p149)
+  - `L2` What makes a good API definition in a design round? What do you leave out?
+- [ ] Data model + database choice ↳ DDIA ch2 "Relational vs. document databases today" (pdf p60) · DDIA ch3 "Transaction Processing or Analytics?" (pdf p109) · https://www.hellointerview.com/learn/system-design/core-concepts/data-modeling
+  - `L2` How do you go from the API to the data model? What do you decide about each entity?
+- [ ] High-level diagram ↳ https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery ("High-Level Design") · Xu vol1 ch1 "Scale from Zero to Millions of Users" (book, not in library) · Do: draw 1 design on https://excalidraw.com
+  - `L2` What should the first high-level diagram contain, and what should it **not** contain yet?
+- [ ] Deep dives (the interviewer picks, or you pick the hardest part) ↳ https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery ("Deep Dives") · https://www.hellointerview.com/learn/system-design/in-a-hurry/patterns · Watch: Hello Interview mock interviews (YouTube)
+  - `L2` How do you choose which part to deep-dive into if the interviewer does not pick?
+  - `L2` How do you state a trade-off so that it sounds like engineering and not guessing? ↳ option A vs B, what each costs, which requirement decides
+  - `L2` How do you handle a requirement you have never built before mid-interview?
+- [ ] Bottlenecks, failure modes, monitoring, what you'd do next ↳ DDIA ch1 "Reliability" (pdf p26–30) · DBI ch8 "Cascading Failures" (pdf p292) · https://sre.google/sre-book/monitoring-distributed-systems/
+  - `L2` What is a single point of failure? How do you find them in a diagram?
+  - `L3` The interviewer keeps pushing "what if 10× more traffic?". How do you find the next bottleneck each time?
+  - `L3` How do you wrap up: bottlenecks, failure modes, monitoring, what you'd do next — what goes in each?
+
+**Learn:** HelloInt "Delivery framework" · Xu1 ch2 (estimation), ch3 (framework)
+
+## 6.2 Numbers to know
+- [ ] Latency: L1 0.5 ns, RAM 100 ns, SSD read ~100 µs, same-DC round trip 0.5 ms, disk seek 10 ms,
+      cross-continent 150 ms ↳ https://gist.github.com/jboner/2841832 · https://colin-scott.github.io/personal_website/research/interactive_latency.html · DDIA ch8 "Timeouts and unbounded delays" (pdf p295)
+  - `L1` Latency numbers: L1 cache, RAM, SSD read, same-datacenter round trip, disk seek, cross-continent round trip. ↳ 0.5 ns, 100 ns, ~100 µs, 0.5 ms, 10 ms, 150 ms
+  - `L1` Main memory access vs SSD read, rough numbers?
+  - `L1` What is RTT across the same data center, roughly?
+  - `L2` Why does reading 1 MB sequentially from memory vs SSD vs network vs disk matter for design?
+  - `L2` What latency numbers should every engineer know? ↳ RAM ~100 ns, SSD ~100 µs, same-DC RTT ~0.5 ms, cross-continent ~150 ms
+  - `L2` Give the rough latency numbers: memory read, SSD read, same-datacenter round trip, cross-continent round trip. ↳ ~100 ns, ~100 µs, ~0.5 ms, ~150 ms
+- [ ] Powers of two: 2¹⁰ ≈ 1 thousand (KB), 2²⁰ ≈ 1 million (MB), 2³⁰ ≈ 1 billion (GB), 2⁴⁰ ≈ 1 trillion (TB) ↳ https://github.com/donnemartin/system-design-primer#powers-of-two-table · Xu vol1 ch2 "Back-of-the-envelope Estimation" (book, not in library)
+  - `L1` Powers of two: what are 2¹⁰, 2²⁰, 2³⁰, 2⁴⁰ in KB/MB/GB/TB terms?
+- [ ] One Postgres node: ~5–10k simple QPS; Redis ~100k ops/s; one app server ~1–5k RPS ↳ https://www.hellointerview.com/learn/system-design/core-concepts/numbers-to-know (members-only) · DDIA ch1 "Approaches for coping with load" (pdf p37) · Xu vol1 ch2 (book, not in library)
+  - `L1` Roughly how many simple QPS can one Postgres node serve? One Redis node? One app server? ↳ ~5–10k, ~100k ops/s, ~1–5k RPS
+  - `L2` How do you estimate how many servers you need? What do you assume per server?
+  - `L3` Your estimate says 2 servers are enough. Why might you still run 6?
+- [ ] 1 day ≈ 86,400 s ≈ 10⁵ s; 1M requests/day ≈ 12 QPS ↳ Xu vol1 ch2 "Back-of-the-envelope Estimation" (book, not in library) · DDIA ch1 "Describing load" (pdf p31) · Do: estimate QPS + storage for 3 problems in 6.9
+  - `L1` How many seconds in a day, roughly? Why do people round it to 10⁵?
+  - `L1` 1 million requests per day is about how many QPS? ↳ ~12 QPS
+- [ ] Availability: 99.9% ≈ 8.8 h/year down, 99.99% ≈ 53 min/year ↳ https://sre.google/sre-book/embracing-risk/ · https://github.com/donnemartin/system-design-primer#availability-patterns ("Availability in numbers") · DDIA ch1 "Reliability" (pdf p26)
+  - `L1` How much downtime per year does 99.9% allow? 99.99%? 99.999%? ↳ ~8.8 h, ~53 min, ~5 min
+  - `L1` How much downtime per month is 99.9 %? 99.99 %? ↳ ~43 min vs ~4.3 min per 30 days
+  - `L1` Monthly downtime allowed by 99.9 %?
+  - `L1` What is an SLA, and what does 99.9% vs 99.99% mean in minutes of downtime per month? ↳ ~43 min vs ~4.3 min
+  - `L2` How do you compute availability of two services in series? In parallel? ↳ series multiply; parallel 1 − product of failure rates
+
+**Learn:** "Latency numbers every programmer should know" (Jeff Dean, gist) · Xu1 ch2
+
+## 6.3 Building blocks
+- [ ] Clients, DNS, CDN (push vs pull, cache invalidation, edge) ↳ https://www.cloudflare.com/learning/cdn/what-is-a-cdn/ · https://github.com/donnemartin/system-design-primer#content-delivery-network · https://www.cloudflare.com/learning/dns/what-is-dns/
+  - `L1` What is a CDN and what does it cache?
+  - `L1` Push CDN vs pull CDN.
+  - `L1` What does a CDN cache?
+  - `L1` What is a CDN?
+  - `L2` How do you invalidate CDN content? Why are versioned file names better than purges?
+  - `L2` How do you serve private files through a CDN? ↳ signed URLs / signed cookies, short TTL
+  - `L2` How does a CDN decide what to cache? What is the cache key?
+  - `L3` How would you cut the time to first byte for a user in India talking to a server in the US?
+  - `L3` What is the "thundering herd" after a CDN cache expires, and what is request coalescing?
+- [ ] Load balancers: L4 vs L7, algorithms (round robin, least connections, consistent hashing), health checks ↳ https://github.com/donnemartin/system-design-primer#load-balancer · https://www.cloudflare.com/learning/performance/what-is-load-balancing/ · https://nginx.org/en/docs/http/load_balancing.html
+  - `L1` L4 vs L7 load balancer?
+  - `L1` What does a load balancer do?
+  - `L1` L4 vs L7 load balancer: what can each see and do? ↳ L4: IP/port, TCP; L7: HTTP path, headers, cookies
+  - `L1` Name the common algorithms. ↳ round robin, weighted, least connections, least response time, IP hash, consistent hash
+  - `L1` What is a health check? Active vs passive.
+  - `L1` L4 or L7: which can route by URL path?
+  - `L1` What is a load balancer?
+  - `L1` L4 vs L7 load balancing. ↳ L4 sees IP/port, forwards TCP/UDP; L7 sees HTTP, routes by path/header
+  - `L1` Name the common load-balancing algorithms. ↳ round-robin, least connections, weighted, IP hash, consistent hash, P2C
+  - `L1` L4 or L7: path-based routing?
+  - `L2` What structures does a load balancer use for round robin, least connections and consistent hashing?
+  - `L2` When is least-connections better than round robin? ↳ long or uneven requests, WebSockets, LLM streaming
+  - `L2` What are sticky sessions? Why do people avoid them?
+  - `L2` What is TLS termination at the load balancer? What are the trade-offs?
+  - `L2` The load balancer itself is a single point of failure. How is it made highly available? ↳ active-passive pair, VRRP/floating IP, managed LB, anycast
+  - `L2` What is the "power of two choices" algorithm and why does it work so well?
+  - `L2` Client-side load balancing vs server-side: when do you use each? ↳ gRPC, service mesh vs central LB
+  - `L2` What can an L7 load balancer do that an L4 cannot? What does it cost?
+  - `L2` AWS ALB vs NLB; Azure Application Gateway vs Azure Load Balancer: which for WebSockets, gRPC, static IPs?
+  - `L2` Active vs passive health checks. What should a health check endpoint check?
+  - `L2` What are sticky sessions? Cookie vs IP-hash stickiness. Why do they hurt?
+  - `L2` What is connection draining / deregistration delay?
+  - `L2` What is the PROXY protocol, and when do you need it? ↳ pass client IP through an L4 LB
+  - `L3` Why does round robin behave badly with HTTP/2 or gRPC long-lived connections?
+  - `L3` How does one load balancer avoid being a single point of failure? ↳ multiple nodes + VIP/keepalived/anycast, DNS, managed LB
+  - `L3` What is direct server return (DSR)?
+  - `L3` How do you load-balance long-lived connections (WebSockets, gRPC) so new servers actually get traffic?
+  - `L3` What does consistent hashing at the LB give you, and when is it worth it?
+- [ ] Reverse proxy / API gateway (auth, rate limiting, routing, TLS termination); nginx ↳ https://www.hellointerview.com/learn/system-design/deep-dives/api-gateway · https://github.com/donnemartin/system-design-primer#reverse-proxy-web-server · https://nginx.org/en/docs/
+  - `L1` What is an API gateway?
+  - `L1` What does an API gateway do?
+  - `L1` What is a reverse proxy? How is it different from a load balancer and from a forward proxy?
+  - `L1` What does an API gateway do? ↳ routing, auth, rate limiting, TLS, aggregation, request transformation
+  - `L2` What does an API gateway do (auth, rate limit, routing, TLS, transforms)? When is it overkill?
+  - `L2` Design an API gateway for 200 internal services.
+  - `L2` What do you clarify for the API gateway? ↳ protocols (REST/gRPC/WebSocket), auth types, rate limits, latency budget, multi-tenant
+  - `L2` 500k RPS with a 5 ms added-latency budget. How many gateway instances, and what can't you do inline?
+  - `L2` What does the request pipeline look like? ↳ TLS, auth, rate limit, route, transform, proxy, log
+  - `L2` How do routing rules and config get updated without restarts?
+  - `L2` How do you validate JWTs without calling the auth service each time? ↳ cached JWKS, signature check locally
+  - `L2` How does the gateway proxy WebSockets and streaming (SSE) responses?
+  - `L2` What does the gateway log and trace for every request?
+  - `L2` What is an API gateway, and how is it different from a load balancer?
+  - `L3` How do you avoid the gateway becoming a bottleneck and a single point of failure?
+  - `L3` What is request aggregation in a gateway and when does it become a mess?
+  - `L3` How do you do canary routing by header or percentage through the gateway?
+  - `L3` Build vs buy: Kong / Envoy / APIM / AWS API Gateway — how do you choose?
+  - `L3` How do you deploy a gateway config change safely when one bad rule could break every API?
+  - `L3` What is a service mesh / sidecar proxy (Envoy) and what network jobs does it take from your code?
+- [ ] Stateless app servers + horizontal scaling; autoscaling ↳ DDIA ch1 "Approaches for coping with load" (pdf p37) · https://12factor.net/processes · Xu vol1 ch1 "Scale from Zero to Millions of Users" (book, not in library)
+  - `L1` Vertical vs horizontal scaling: define both. Pros and cons.
+  - `L1` What does "stateless service" mean? Why does it make horizontal scaling easy?
+  - `L1` Where does state go when you make the app servers stateless? ↳ DB, cache, object store, client token
+  - `L1` What is autoscaling? What signals can drive it?
+  - `L1` Vertical vs horizontal scaling: pros and cons.
+  - `L1` What does "stateless service" mean, and why does it make scaling easy?
+  - `L2` When is vertical scaling the right answer, even at a big company?
+  - `L2` What usually becomes the bottleneck first when you scale app servers horizontally? ↳ the database: connections, writes, locks
+  - `L2` Autoscale on CPU, on request rate, or on queue depth? When each?
+  - `L2` What is scale-to-zero and when is it a bad idea? ↳ cold starts, long-lived connections
+  - `L2` What usually breaks first when traffic grows 10×? ↳ DB connections, slow queries, cache misses, a single hot table
+  - `L2` How do you autoscale on the right signal? CPU vs RPS vs queue depth vs latency.
+  - `L2` What is cold start, and how do you handle a sudden spike before autoscaling catches up?
+  - `L3` Your autoscaler adds servers but latency still rises. What could be going on?
+  - `L3` What is the "scale cube" (X, Y, Z axes)? Map each axis to a technique.
+- [ ] Caches: client, CDN, app (in-memory), distributed (Redis); what to cache ↳ https://www.hellointerview.com/learn/system-design/core-concepts/caching · DDIA ch3 "Keeping everything in memory" (pdf p107) · https://aws.amazon.com/caching/best-practices/
+  - `L1` Why cache? What does a cache trade for speed?
+  - `L1` Name the cache layers from client to database. ↳ browser, CDN, gateway, app in-memory, distributed (Redis), DB buffer pool
+  - `L1` What is cache hit ratio? What is a good one?
+  - `L1` Why cache? What are the two hard problems in caching? ↳ invalidation and naming (and off-by-one)
+  - `L1` What is a cache hit ratio, and what is a good one?
+  - `L2` Where would you put a cache and what would you cache?
+  - `L2` What do you cache and what do you never cache? ↳ hot, read-heavy, tolerant of staleness; never secrets or per-request auth decisions blindly
+  - `L2` What is cache invalidation, and why is it called one of the two hard problems?
+  - `L2` On update: delete the cache key or update it? Why do most people delete? ↳ avoids race writing stale value
+  - `L2` Update DB then delete cache: describe the race that still leaves stale data. ↳ slow reader repopulates old value after delete; use short TTL, delayed double delete
+  - `L2` Local in-process cache vs Redis: trade-offs, and how do you keep 50 local caches consistent?
+  - `L2` Design a multi-layer cache: in-process LRU → Redis → database. What goes in each layer and with what TTL?
+  - `L2` How do you keep an in-process cache consistent across 10 pods? ↳ short TTL, pub/sub invalidation, versioned keys
+  - `L2` How do you invalidate on write without race conditions? ↳ delete after DB commit; versioning; beware read-then-set races
+  - `L2` What should never be cached? What about per-user data?
+  - `L3` What did you cache in Redis at AiRA, what TTLs did you choose, and what went wrong?
+  - `L3` The cache made p50 great but p99 worse. How is that possible?
+  - `L3` Where did you add caching at AiRA or Jigsaw, and what hit ratio did you get?
+- [ ] Databases: SQL, NoSQL, search, vector, time-series, analytics warehouse ↳ DDIA ch2 "Relational vs. document databases today" (pdf p60) · DDIA ch3 "Transaction Processing or Analytics?" (pdf p109) · https://www.hellointerview.com/learn/system-design/in-a-hurry/key-technologies
+  - `L2` How do you choose a database for a new service? Which questions do you ask? ↳ access patterns, consistency, scale, joins, transactions, team skill
+  - `L2` What is a time-series database and why not just use Postgres?
+  - `L2` When is "just use Postgres" the right answer, and how far can it go? ↳ JSONB, pgvector, full-text, partitioning, read replicas
+  - `L2` What is polyglot persistence? What does it cost?
+- [ ] Object storage (S3/Blob): presigned URLs, multipart upload, lifecycle rules ↳ https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html · https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html · https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html
+  - `L1` What is object (blob) storage? How is it different from a file system and from a database?
+  - `L1` Why presigned URLs for uploads?
+  - `L2` How do you serve private files to authorised users only? ↳ short-lived presigned GET or signed CDN URLs
+  - `L2` How do users upload a 2 GB file?
+  - `L2` What is a presigned URL and how do you keep it safe? ↳ short expiry, scoped key, content-type/size limits
+  - `L2` What are lifecycle rules and storage tiers (hot, cool, archive)?
+  - `L2` Metadata in a database, bytes in blob storage: why split them?
+  - `L3` Users upload files that are later deleted from the DB. How do you clean up orphaned objects?
+  - `L3` How does S3 achieve 11 nines of durability? ↳ erasure coding, multiple AZs, checksums, background repair
+  - `L3` Erasure coding vs replication: trade-offs.
+- [ ] Queues and streams (see 04-backend 4.6) ↳ DDIA ch11 "Messaging systems" (pdf p449), "Partitioned logs" (pdf p454) · https://www.hellointerview.com/learn/system-design/deep-dives/kafka · DDIA ch4 "Message passing data flow" (pdf p154)
+  - `L1` Why put a message queue between two services? ↳ decoupling, buffering spikes, async work, retries, fan-out
+  - `L2` What is backpressure? How do producers learn the consumer is slow? ↳ bounded queues, lag, blocking, 429s, credit-based flow
+  - `L2` What do you do when the queue keeps growing? ↳ scale consumers, shed load, prioritise, alert on lag/age
+  - `L2` Push vs pull consumers: trade-offs.
+  - `L2` What is fan-out with SNS → SQS (or exchange → queues in RabbitMQ)?
+  - `L3` How do you monitor a queue-based system? Which alerts matter? ↳ lag, oldest message age, DLQ size, consumer errors
+  - `L3` You need request/reply over a queue. How do you do it and why is it usually a smell?
+- [ ] Workers / batch jobs / cron ↳ DMLS ch10 "Cron, Schedulers, and Orchestrators" (pdf p331) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/job-scheduler (members-only) · https://docs.bullmq.io
+- [ ] Service discovery; config and secrets ↳ DDIA ch6 "Request routing" (pdf p227) · DDIA ch9 "Membership and coordination services" (pdf p382) · https://12factor.net/config
+  - `L1` What is service discovery? Client-side vs server-side.
+
+**Learn:** Xu1 ch1 · SDP (building blocks) · ByteByteGo YT · HelloInt "Core concepts" + "Key technologies"
+
+## 6.4 Scaling data
+- [ ] Replication: single-leader, multi-leader, leaderless; sync vs async; failover; split brain ↳ DDIA ch5 "Leaders and Followers" (pdf p168), "Handling node outages" (pdf p172, split brain p173), "Multi-leader replication" (pdf p183), "Leaderless replication" (pdf p193) · Watch: Kleppmann Cambridge "Distributed Systems" lectures (replication)
+  - `L1` Why replicate data? ↳ availability, read scaling, latency (geo), durability
+  - `L1` What is leader–follower (primary–replica) replication?
+  - `L1` Synchronous vs asynchronous replication: trade-offs.
+  - `L2` Leader dies — what happens?
+  - `L2` What is semi-synchronous replication?
+  - `L2` How do you add a new follower without downtime? ↳ snapshot + log position, catch up from WAL
+  - `L2` What happens step by step when the leader dies (failover)? ↳ detect, elect, reconfigure clients, old leader rejoins as follower
+  - `L2` What can go wrong with automatic failover? ↳ lost async writes, split brain, wrong timeout, conflicting IDs
+  - `L2` When do you need multi-leader replication? ↳ multi-datacenter, offline clients, collaborative editing
+  - `L2` How are write conflicts resolved in multi-leader? ↳ LWW, merge, custom handler, CRDTs, avoid by routing
+  - `L2` What is leaderless (Dynamo-style) replication?
+  - `L3` Last-write-wins silently loses data. Show how, and what you'd use instead.
+  - `L3` Multi-leader topologies: circular, star, all-to-all. What breaks in each?
+- [ ] Replication lag consistency: read-your-writes, monotonic reads, consistent prefix ↳ DDIA ch5 "Problems With Replication Lag" (pdf p177–182) · DBI ch11 "Session Models" (pdf p368)
+  - `L1` What is replication lag?
+  - `L1` Read replica lag breaks which guarantee first? ↳ read-your-writes
+  - `L2` Read-your-writes consistency: what is it and how do you implement it with replicas? ↳ read own data from leader, track write timestamp/LSN
+  - `L2` Monotonic reads: what is the anomaly and the fix? ↳ user sees time go backwards; pin user to one replica
+  - `L2` Consistent prefix reads: what anomaly do they prevent?
+  - `L2` A user updates their profile and the page still shows old data. Diagnose. ↳ read from lagging replica
+  - `L2` Read-your-writes, monotonic reads, monotonic writes, writes-follow-reads: define each session guarantee.
+  - `L3` How does replication lag affect a "create then immediately read" API flow in your own code? How did you handle it?
+  - `L3` How would you give a user read-your-writes across devices (phone and laptop)?
+- [ ] Partitioning/sharding: by key range vs by hash; secondary indexes (local vs global); rebalancing ↳ DDIA ch6 "Partitioning of key-value data" (pdf p215), "Partitioning and secondary indexes" (pdf p219), "Rebalancing partitions" (pdf p223) · https://www.hellointerview.com/learn/system-design/core-concepts/sharding
+  - `L1` What is partitioning / sharding? Why do it?
+  - `L1` Partitioning vs replication: how do they combine?
+  - `L1` Range partitioning vs hash partitioning: pros and cons of each.
+  - `L1` What is a shard key (partition key)?
+  - `L2` Secondary indexes on a sharded table: local (document-partitioned) vs global (term-partitioned) indexes. ↳ local = scatter-gather reads; global = cross-shard writes
+  - `L2` What is a scatter-gather query and why does it hurt p99?
+  - `L2` Rebalancing strategies: fixed number of partitions, dynamic splitting, proportional to nodes.
+  - `L2` How does a request find the right shard? ↳ client-aware, routing tier, any-node forward; ZooKeeper/etcd metadata
+  - `L2` What is directory-based (lookup table) sharding?
+  - `L2` What is geo-sharding / tenant-based sharding? Give a use case.
+  - `L3` Automatic vs manual rebalancing: why might you not want automatic?
+- [ ] Consistent hashing with virtual nodes ↳ DBI ch13 "Consistent Hashing" (pdf p425) · DDIA ch6 "Partitioning by hash of key" (pdf p217) · https://www.hellointerview.com/learn/system-design/core-concepts/consistent-hashing
+  - `L1` What problem does consistent hashing solve? ↳ adding/removing a node moves only ~1/N of keys
+  - `L1` Describe the hash ring: where do nodes and keys go, and how does a key find its node?
+  - `L1` With `hash % N`, what fraction of keys move when N goes from 10 to 11? With a ring? ↳ ~91% vs ~9%
+  - `L1` Why virtual nodes in consistent hashing?
+  - `L2` What are virtual nodes, and why do you need them? ↳ even load, gradual rebalancing, weight by capacity
+  - `L2` How many virtual nodes per server, and what does too many cost? ↳ ring memory, slower lookups, more metadata
+  - `L2` Implement a ring with a sorted array of tokens + binary search. ↳ bisect for first token ≥ hash; wrap around
+  - `L2` How does replication work on the ring? ↳ preference list: next N distinct physical nodes clockwise
+  - `L2` Which systems use consistent hashing? ↳ Dynamo, Cassandra, Riak, ketama memcached clients, Envoy ring hash
+  - `L2` Fixed partitions (hash slots) vs a consistent-hash ring: trade-offs.
+  - `L2` How does consistent hashing reduce data movement?
+  - `L2` What is hash mod N and why is it bad when N changes? ↳ almost every key moves
+  - `L2` What is consistent hashing? How does it reduce data movement?
+  - `L2` Why add virtual nodes to consistent hashing? ↳ even spread, heterogeneous capacity, smoother rebalancing
+  - `L3` Rendezvous (highest random weight) hashing vs ring hashing. ↳ score every node per key; no ring; O(N) lookup
+  - `L3` Jump consistent hash: strengths and limits. ↳ tiny, fast, balanced; buckets only added/removed at end
+  - `L3` Consistent hashing with bounded loads, and Maglev lookup tables in load balancers: what do they fix?
+  - `L3` Cache LLM responses by prompt hash across 20 nodes. Add a node without a stampede. ↳ ring with vnodes, warm-up, request coalescing
+  - `L3` What is rendezvous (highest random weight) hashing and when is it better than a ring?
+  - `L3` What is jump consistent hash?
+- [ ] Hot keys / celebrity problem ↳ DDIA ch6 "Skewed workloads and relieving hot spots" (pdf p218) · DDIA ch1 "Describing load" (pdf p31, Twitter celebrities) · https://www.hellointerview.com/learn/system-design/core-concepts/caching (hot keys)
+  - `L1` What is a hot partition?
+  - `L2` One hot key still overloads a node on a perfect ring. What do you do? ↳ replicate hot keys, salt the key, local cache
+  - `L2` What is a hot key in a cache? How do you handle one key getting 1M reads/s? ↳ local in-process cache, replicate key, key suffixes
+  - `L2` What is a hot partition / hot spot? How do you detect it and fix it? ↳ salting keys, split partition, cache, dedicated shard
+  - `L2` The celebrity problem: one user with 100M followers. How do you handle reads and writes for them?
+  - `L2` What is a hot key in Redis, and how do you handle one?
+  - `L3` A celebrity post makes one key take 200k reads/s on one cluster shard. Design a fix.
+  - `L3` How do you handle a celebrity with 100M followers?
+- [ ] Denormalisation, CQRS, materialised views, read models ↳ DDIA ch11 "State, streams, and immutability" (pdf p466, CQRS p468) · DDIA ch3 "Aggregation: Data cubes and materialized views" (pdf p120) · https://martinfowler.com/bliki/CQRS.html
+  - `L1` What is CQRS?
+  - `L2` CQRS without event sourcing: is it possible? Give an example.
+  - `L2` What is a read model / materialised view, and how is it kept up to date?
+  - `L2` The user writes and the read model is behind. How do you handle the UI? ↳ return written data, version tokens, wait for projection
+
+**Learn:** DDIA ch5, ch6 · DBI ch11 · Xu1 ch5 (consistent hashing)
+
+## 6.5 Distributed systems theory
+- [ ] CAP theorem (and why it's really "during a partition, C or A"); PACELC ↳ DDIA ch9 "The cost of linearizability" (pdf p348, CAP p349) · DBI ch11 "Infamous CAP", "Use CAP Carefully" (pdf p343–347) · https://www.hellointerview.com/learn/system-design/core-concepts/cap-theorem
+  - `L1` State the CAP theorem.
+  - `L1` Why can't you "pick CA" in a distributed system? ↳ partitions happen; you only choose behaviour during one
+  - `L1` Explain CAP with a concrete example of two replicas and a network cut.
+  - `L1` What is PACELC?
+  - `L1` Name one AP and one CP data store.
+  - `L2` Explain CAP with an example
+  - `L2` What does C mean in CAP versus C in ACID?
+  - `L2` What does A mean in CAP, precisely, and why do real systems rarely meet it?
+  - `L2` Classify Postgres with replicas, Cassandra, DynamoDB, MongoDB, Redis Cluster, ZooKeeper under PACELC.
+  - `L2` A shopping cart vs a bank balance: CP or AP choice for each, and why?
+  - `L2` What does a CP system do to clients on the minority side of a partition?
+  - `L2` What does an AP system do after the partition heals? ↳ reconcile conflicts: LWW, merge, CRDT, app-level
+  - `L3` Why is CAP considered too simplistic for designing real systems?
+  - `L3` Latency vs consistency when there is no partition (the "ELC" part): give a design where you chose latency.
+  - `L3` Can one system be CP for some operations and AP for others? Give an example.
+  - `L3` Is a single-node Postgres CA? What is the trick in that question?
+- [ ] Consistency models: linearizable, sequential, causal, eventual ↳ DBI ch11 "Consistency Models" (pdf p352–370) · DDIA ch9 "Linearizability" (pdf p336), "Ordering and causality" (pdf p352) · https://jepsen.io/consistency
+  - `L1` What is strong consistency? What is eventual consistency?
+  - `L1` Give a real product example where eventual consistency is fine and one where it is not.
+  - `L1` What does "eventually" mean in eventual consistency — is there a time bound?
+  - `L2` What is linearizability, in plain words? ↳ behaves like one copy; once a read sees a value, later reads do too
+  - `L2` Linearizability vs serializability: what is the difference? ↳ recency of single object vs isolation of multi-object transactions
+  - `L2` What is sequential consistency and how is it weaker than linearizability?
+  - `L2` What is causal consistency? Give an example of a causality violation. ↳ reply visible before the question
+  - `L2` Where do you need linearizability in a real system? ↳ leader election, locks, uniqueness constraints, account balance
+  - `L2` Why is linearizability slow, especially across regions?
+  - `L2` What is bounded staleness?
+  - `L2` What is strong eventual consistency? How do CRDTs give it?
+  - `L3` Are single-leader systems with async replicas linearizable? When are they? ↳ only reading from leader, and only if leader knows it is leader
+  - `L3` Why is causal consistency the strongest model that stays available during partitions?
+  - `L3` Which consistency levels does Cassandra / DynamoDB / MongoDB let you choose per request? Give one use of each.
+- [ ] Quorums: N, R, W; R + W > N ↳ DDIA ch5 "Writing to the database when a node is down" (pdf p193, quorums p195), "Limitations of quorum consistency" (pdf p197) · DBI ch11 "Tunable Consistency" (pdf p371)
+  - `L1` What is a quorum?
+  - `L1` What does `R + W > N` give you?
+  - `L2` Quorums: with N replicas, what do W and R mean, and why does W + R > N help?
+  - `L2` N=3, W=2, R=2. Walk through a write and a read. What if one node is down?
+  - `L3` Does W + R > N guarantee linearizability? Why not? ↳ sloppy quorums, concurrent writes, failed partial writes, clock LWW
+  - `L3` What are sloppy quorums and hinted handoff?
+- [ ] Clocks: wall clock skew, logical clocks (Lamport), vector clocks; why you can't trust timestamps for order ↳ DDIA ch8 "Unreliable Clocks" (pdf p300–312) · DDIA ch9 "Sequence number ordering" (pdf p356, Lamport p358) · DBI ch11 "Vector clocks" (pdf p365)
+  - `L1` Why can't you trust timestamps from different machines to order events?
+  - `L1` What is clock skew? What is clock drift?
+  - `L1` What is NTP and how accurate is it, roughly? ↳ milliseconds in a DC, tens of ms over internet
+  - `L1` Time-of-day clock vs monotonic clock: which do you use to measure a timeout? ↳ monotonic
+  - `L1` Lamport clock or vector clock: which detects concurrency?
+  - `L2` Why are timestamps unreliable for ordering events?
+  - `L2` What can go wrong when NTP steps a clock backwards?
+  - `L2` How does last-write-wins with wall-clock timestamps lose data?
+  - `L2` What is a Lamport clock? How does it work? ↳ counter; max(local, received)+1; gives total order consistent with causality
+  - `L2` What can a Lamport clock not tell you? ↳ whether two events are concurrent
+  - `L2` What is a vector clock, and how does it detect concurrency?
+  - `L2` What is a hybrid logical clock (HLC) and who uses it? ↳ physical time + logical counter; CockroachDB, MongoDB
+  - `L2` What is a leap second, and what has it broken in the past?
+  - `L3` What are version vectors and how do they detect concurrent writes?
+  - `L3` How does Spanner's TrueTime give external consistency? What is commit wait?
+  - `L3` Why do vector clocks grow, and how do systems keep them small?
+  - `L3` Two devices edit offline with skewed clocks. How do you order their changes for the user?
+- [ ] Failure detection, heartbeats, timeouts, partial failures, the "two generals" problem ↳ DDIA ch8 "Unreliable Networks" (pdf p291, detecting faults p294, timeouts p295) · DBI ch9 "Heartbeats and Pings" (pdf p316) · DBI ch8 "Two Generals’ Problem" (pdf p302)
+  - `L1` What is a partial failure, and why does it make distributed systems hard?
+  - `L1` Name the fallacies of distributed computing.
+  - `L1` A request times out. What are the possible things that happened? ↳ request lost, server slow/dead, response lost
+  - `L1` What is a network partition?
+  - `L2` How do you choose a timeout value?
+  - `L2` What is the two generals problem and what does it tell you about acknowledgements?
+  - `L2` What is a heartbeat-based failure detector? Trade-off of short vs long timeouts.
+  - `L2` What is a phi-accrual failure detector?
+  - `L2` What is a GC pause and why can it make a healthy node look dead?
+  - `L3` What is a "gray failure" and why do health checks miss it?
+  - `L3` A node is slow but not dead and keeps flapping in and out of the cluster. What do you do?
+  - `L3` What is a gray failure / partial partition, and why are they harder than clean outages?
+  - `L3` Why can't a node tell a slow peer from a dead one? What does that imply for failure detectors? ↳ unbounded delays; timeouts are guesses; phi accrual
+- [ ] Consensus: Raft basics (leader election, log replication, terms); where it's used (etcd, ZooKeeper) ↳ DBI ch14 "Raft" (pdf p468–475) · https://thesecretlivesofdata.com/raft/ · DDIA ch9 "Fault-tolerant consensus" (pdf p377), "Membership and coordination services" (pdf p382)
+  - `L1` What is consensus? What problems need it? ↳ leader election, locks, atomic commit, membership, total order
+  - `L1` Why does consensus need a majority (quorum) of nodes?
+  - `L1` Why do clusters use 3 or 5 nodes and not 4 or 6?
+  - `L1` Name systems that use Raft or Paxos-like consensus. ↳ etcd, Consul, ZooKeeper (ZAB), Kafka KRaft, CockroachDB, Spanner
+  - `L1` How many nodes can a 5-node Raft cluster lose?
+  - `L2` How does Raft elect a leader? ↳ timeout → candidate, term++, request votes, majority wins
+  - `L2` What is a term in Raft and why does it matter?
+  - `L2` How does Raft replicate a log entry and decide it is committed?
+  - `L2` Why are election timeouts randomised in Raft?
+  - `L2` What do ZooKeeper / etcd give you that you should not build yourself?
+  - `L2` What is total order broadcast and why is it equivalent to consensus?
+  - `L3` How does Raft elect a leader?
+  - `L3` Paxos at a high level: proposers, acceptors, prepare/promise, accept. How does Multi-Paxos relate to Raft?
+  - `L3` What is the FLP impossibility result and how do real systems work around it? ↳ timeouts / partial synchrony, randomisation
+  - `L3` What is a Byzantine fault? Why don't most backend systems care?
+  - `L3` A 5-node Raft cluster is split 2/3. What happens on each side? What happens to the old leader in the 2-side?
+  - `L3` Why is consensus slow, and why do you avoid it on the hot path?
+- [ ] Leader election, leases, fencing tokens ↳ DDIA ch8 "The truth is defined by the majority" (pdf p314, fencing tokens p316) · DBI ch10 "Leader Election" (pdf p327) · https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+  - `L1` What is a fencing token?
+  - `L2` What is split brain? How does a majority quorum prevent it?
+  - `L2` What is a lease? Why are leases tied to time?
+  - `L2` What is a fencing token? Walk through the GC-pause scenario it fixes. ↳ old lock holder wakes up; storage rejects lower token
+  - `L3` Why can a GC pause in a leader node of a distributed system cause a split-brain or stale lock? ↳ DDIA ch8: process pauses; fencing tokens
+- [ ] Idempotency and deduplication across retries ↳ DDIA ch11 "Fault tolerance" (pdf p482, idempotence p483) · DBI ch8 "Exactly-once delivery" (pdf p300) · https://stripe.com/blog/idempotency
+  - `L1` What is an idempotency key?
+  - `L2` How do you implement idempotency keys for a `POST /payments` API? Where do you store them and for how long? ↳ unique key table, store response, TTL, same key + different body = 409
+  - `L2` Two requests with the same idempotency key arrive at the same time. What happens? ↳ insert-first lock / unique constraint; second waits or gets 409
+  - `L2` A call timed out. Did the server do the work? What does that mean for your design? ↳ unknown outcome; idempotency
+- [ ] Distributed transactions: 2PC, sagas, outbox ↳ DDIA ch9 "Atomic commit and two-phase commit (2PC)" (pdf p366) · DBI ch13 "Two-Phase Commit" (pdf p407) · https://microservices.io/patterns/data/saga.html + https://microservices.io/patterns/data/transactional-outbox.html
+  - `L1` What is a distributed transaction? Why is it hard?
+  - `L1` Explain two-phase commit (2PC) step by step.
+  - `L2` How do you keep data consistent across two microservices?
+  - `L2` How do you keep data consistent across two microservices that each own a database? ↳ avoid 2PC; saga + outbox + idempotent consumers, accept eventual consistency
+  - `L2` What happens in 2PC if the coordinator crashes after sending "prepare"? ↳ participants block holding locks until coordinator recovers
+  - `L2` Why is 2PC called a blocking protocol? What does that cost in practice?
+  - `L2` What does 3PC add, and why is it rarely used? ↳ pre-commit phase; assumes bounded delays, breaks under partitions
+  - `L2` What is XA? Why do microservice teams avoid it?
+  - `L3` How does Google Spanner do distributed transactions? ↳ 2PC over Paxos groups + TrueTime commit wait
+  - `L3` How do Calvin-style deterministic databases avoid 2PC?
+- [ ] Gossip / anti-entropy, Merkle trees (know the idea) ↳ DBI ch12 "Merkle Trees" (pdf p388), "Gossip Dissemination" (pdf p392) · DDIA ch5 "Leaderless replication" (pdf p193, read repair + anti-entropy) · DBI ch9 "Gossip and Failure Detection" (pdf p322)
+  - `L1` What is a Merkle tree? ↳ leaves hash data blocks; parents hash children; root summarises all
+  - `L1` What does comparing two Merkle roots tell you?
+  - `L1` How many hashes prove that one leaf belongs to a tree of n leaves? ↳ O(log n) sibling hashes
+  - `L2` How do Dynamo and Cassandra use Merkle trees for anti-entropy repair? ↳ compare per-range trees top-down; sync only differing ranges
+  - `L2` What does building Merkle trees cost during Cassandra repair, and why does incremental repair exist?
+  - `L2` Is a Git repository a Merkle tree? How does Git know two directories are identical instantly? ↳ Merkle DAG of blobs, trees, commits; equal hashes
+  - `L2` What does a blockchain light client verify with a Merkle proof? ↳ transaction inclusion against the block header root
+  - `L2` Certificate Transparency logs: what do inclusion and consistency proofs show?
+  - `L2` Implement a Merkle tree over a list of chunks and produce an inclusion proof.
+  - `L2` Sync a folder between laptop and server efficiently (Dropbox / rsync style). ↳ chunk + hash; tree of hashes finds changed chunks
+  - `L2` Odd number of leaves: what do implementations do, and why can that be a bug? ↳ duplicate last leaf; Bitcoin CVE-2012-2459
+  - `L2` What is a gossip protocol? Where is it used? ↳ membership, failure detection; Cassandra, Consul, Redis Cluster
+  - `L2` What is a Merkle tree and how does it make anti-entropy cheap?
+  - `L3` Second-preimage attacks: why hash leaves and internal nodes differently? ↳ domain separation prefixes 0x00 / 0x01
+  - `L3` How do BitTorrent and IPFS verify content fetched from untrusted peers?
+  - `L3` Two replicas of a 1-billion-row table may have drifted. How do you find the differing rows without shipping all data?
+  - `L3` How could a Merkle tree help prove a RAG index still matches its source documents?
+  - `L3` What is read repair vs anti-entropy (Merkle trees)?
+  - `L3` How does SWIM improve on all-to-all heartbeats?
+
+**Learn:** DDIA ch8, ch9 (key chapters) · DBI ch8–ch14 · raft.github.io (visualisation) · *Designing
+Distributed Systems* (Burns) optional
+
+## 6.6 Microservices vs monolith
+- [ ] Modular monolith first; when to split (team boundaries, scaling, deploy independence) ↳ https://martinfowler.com/bliki/MonolithFirst.html · LEH ch10 "Choosing between monolithic and microservices architectures" (pdf p396) · https://martinfowler.com/articles/microservices.html
+  - `L1` Monolith vs microservices: what is the difference?
+  - `L1` Monolith vs microservices: what are the pros and cons of each?
+  - `L1` What is a modular monolith?
+  - `L1` Name one reason to stay a monolith.
+  - `L2` When is a modular monolith better than microservices for a small team?
+  - `L2` What do you need before splitting a service out (ownership, data, contracts, observability)?
+  - `L2` Monolith or microservices for a 5-person startup?
+  - `L2` Monolith or microservices for a 5-person startup? Defend your answer.
+  - `L2` When do you split a service out? Which signals tell you it is time? ↳ team boundaries, scaling profile, deploy independence, fault isolation
+  - `L3` Jigsaw, StreetDine and AiRA: which were monoliths and which split into services? Would you choose the same again?
+  - `L3` What is the strangler-fig pattern for breaking up a monolith?
+- [ ] Service boundaries (domain-driven design: bounded contexts) ↳ https://martinfowler.com/bliki/BoundedContext.html · https://microservices.io/patterns/decomposition/decompose-by-subdomain.html
+  - `L2` How do you draw service boundaries? What is a bounded context?
+  - `L3` What is Conway's law and how did it shape a system you worked on?
+- [ ] Sync (REST/gRPC) vs async (events) communication ↳ DDIA ch4 "Data flow through services: REST and RPC" (pdf p149), "Message passing data flow" (pdf p154) · https://grpc.io/docs/what-is-grpc/core-concepts/
+  - `L1` What is event-driven architecture?
+  - `L2` Design: an order service publishes `OrderPlaced`; inventory, email and analytics react. Draw topics, keys, groups.
+  - `L2` How do services talk to each other: sync HTTP/gRPC vs async events? Trade-offs.
+  - `L2` Sync request/response vs async messaging: when do you choose each?
+  - `L2` REST vs gRPC vs async events between services: when each?
+- [ ] Data ownership: database per service; avoiding distributed monolith ↳ https://microservices.io/patterns/data/database-per-service.html · DDIA ch11 "Keeping systems in sync" (pdf p459)
+  - `L2` How do services share data?
+  - `L2` Database per service: why? How do services share data then? ↳ APIs, events, replicated read models; never a shared DB
+  - `L2` What is a distributed monolith and how do you recognise one?
+  - `L3` Why is a shared database between microservices an anti-pattern? When is it acceptable?
+- [ ] API gateway, BFF (backend for frontend), service mesh (know the idea) ↳ https://microservices.io/patterns/apigateway.html · https://samnewman.io/patterns/architectural/bff/ · https://istio.io/latest/about/service-mesh/
+  - `L2` What is a BFF (backend for frontend)? When would mobile and web get separate BFFs?
+  - `L2` What is a service mesh (Istio, Linkerd)? What does the sidecar do? ↳ mTLS, retries, timeouts, traffic split, telemetry
+  - `L2` API gateway vs service mesh vs load balancer: who does what?
+  - `L3` What is the BFF (backend for frontend) pattern, and when does it help?
+
+**Learn:** microservices.io · Martin Fowler "MonolithFirst" · *Building Microservices* (Newman) optional
+
+## 6.7 Batch and stream processing
+- [ ] Batch: MapReduce idea, ETL, data warehouse vs data lake ↳ DDIA ch10 "MapReduce and Distributed Filesystems" (pdf p407–427) · DDIA ch3 "Data warehousing" (pdf p110) · DMLS ch3 "ETL: Extract, Transform, and Load" (pdf p90)
+  - `L1` Batch vs stream processing: what is the difference?
+  - `L1` Explain MapReduce with word count.
+  - `L1` What are Spark and Flink, in one line each?
+  - `L2` What happens in the shuffle phase, and why is it expensive?
+  - `L2` Why did Spark replace MapReduce for most workloads? ↳ in-memory DAG, fewer disk writes, richer APIs
+  - `L2` ETL vs ELT; data lake vs data warehouse vs lakehouse.
+  - `L2` What does a DAG orchestrator (Airflow, Dagster) give you for pipelines?
+  - `L2` Why must every pipeline step be idempotent and safe to rerun?
+  - `L3` How do you handle skew (one key with 50% of data) in a batch join?
+  - `L3` How do you detect data quality problems (nulls, schema drift, volume drops) in a pipeline?
+- [ ] Stream: event logs, Kafka, windowing, late events, exactly-once in streams ↳ DDIA ch11 "Partitioned logs" (pdf p454), "Reasoning about time" (pdf p474), "Fault tolerance" (pdf p482) · https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/ · DMLS ch3 "Batch Processing Versus Stream Processing" (pdf p98)
+  - `L2` What is Kafka Streams and how is it different from a plain consumer?
+  - `L2` KStream vs KTable.
+  - `L2` What is a windowed aggregation? Tumbling vs hopping vs sliding vs session windows.
+  - `L2` Event time vs processing time. What are late events and how are they handled?
+  - `L2` Stream–table join: give a use case.
+  - `L2` Event time vs processing time: why does it matter?
+  - `L2` Tumbling, hopping, sliding and session windows: give a use case for each.
+  - `L2` What are watermarks and late events?
+  - `L2` Lambda vs Kappa architecture.
+  - `L2` How do stream processors recover after a crash with exactly-once state? ↳ checkpoints (Flink snapshots), replayable source, transactional sink
+  - `L3` Where does Kafka Streams keep state, and how is it recovered after a crash? ↳ RocksDB local store + changelog topic
+  - `L3` Kafka Streams vs Flink vs Spark Structured Streaming: when each?
+  - `L3` How would you compute "top 10 trending products in the last 5 minutes" over a click topic?
+  - `L3` Stream–stream join vs stream–table join vs table–table join: give an example of each.
+- [ ] Change data capture (Debezium) to feed search/caches/analytics ↳ DDIA ch11 "Change data capture" (pdf p461) · https://debezium.io/documentation/reference/stable/architecture.html
+  - `L1` What is Kafka Connect? Source vs sink connector.
+  - `L1` What is Debezium / CDC?
+  - `L1` What is CDC?
+  - `L1` What is change data capture (CDC)?
+  - `L1` System of record vs derived data: what is the difference?
+  - `L2` How does Debezium read changes from Postgres? ↳ logical replication slot, WAL decoding, publishes to Kafka
+  - `L2` What can you feed with CDC? ↳ search index, cache invalidation, analytics warehouse, other services
+  - `L2` CDC vs outbox: when do you use each?
+  - `L2` What is the initial snapshot problem in CDC, and how is it solved?
+  - `L2` A Postgres replication slot is not being consumed. What happens to the primary? ↳ WAL piles up, disk fills
+  - `L2` How do you backfill a new derived store from years of history?
+  - `L3` How do you keep a cache consistent with the database without dual writes? ↳ CDC-driven invalidation (Debezium → invalidate)
+  - `L3` What is the "database inside out" / unbundling databases idea?
+  - `L3` How do schema changes in the source database flow through a CDC pipeline without breaking consumers?
+  - `L3` How do you verify a derived store (search, warehouse) has not silently drifted from the source? ↳ reconciliation counts, checksums, sampling
+- [ ] Event sourcing (know when it fits) ↳ DDIA ch11 "Event sourcing" (pdf p464) · https://martinfowler.com/eaaDev/EventSourcing.html
+  - `L1` Event vs command vs query: what is the difference?
+  - `L1` What is event sourcing?
+  - `L2` Event notification vs event-carried state transfer vs event sourcing (Fowler's four kinds).
+  - `L2` How do you rebuild current state in an event-sourced system? What are snapshots for?
+  - `L2` What are the benefits of event sourcing? ↳ audit log, replay, temporal queries, new read models later
+  - `L2` What are the costs and traps of event sourcing? ↳ schema evolution, eventual consistency, complexity, GDPR deletion
+  - `L2` When should you **not** use event sourcing?
+  - `L3` How do you handle "delete my data" (GDPR) with an immutable event store? ↳ crypto-shredding, tombstones, keep PII out of events
+  - `L3` How do you rebuild a projection with 2 billion events without downtime?
+  - `L3` Would event sourcing fit AiRA's conversation history or memory? Argue both sides.
+
+**Learn:** DDIA ch10, ch11
+
+## 6.8 Security in design
+- [ ] TLS everywhere; secrets in a vault (Azure Key Vault/AWS Secrets Manager); least privilege IAM ↳ https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html · https://learn.microsoft.com/en-us/azure/key-vault/general/basic-concepts · https://www.cloudflare.com/learning/ssl/what-happens-in-a-tls-handshake/
+  - `L2` How do you manage secrets across dev, staging and prod? ↳ secret manager, never in git, rotation, least privilege
+  - `L2` Where do secrets live, and how do services get them? ↳ vault/Key Vault, managed identity, rotation, never in env files in git
+  - `L2` How do services authenticate to each other? ↳ mTLS, service tokens, workload / managed identity
+  - `L2` What audit logging does a design need, and where does it live?
+- [ ] Encryption at rest and in transit; envelope encryption ↳ https://cloud.google.com/kms/docs/envelope-encryption · https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html
+  - `L1` Encryption in transit vs at rest.
+  - `L1` Encryption at rest vs encryption in transit: what does each protect against?
+  - `L2` What is envelope encryption and why use a KMS?
+  - `L2` What does "disk encryption" on a managed database actually protect you from, and what not? ↳ stolen disks yes; SQL injection and insider with DB access no
+  - `L2` Application-level (field-level) encryption vs database TDE: when do you need the first?
+- [ ] Rate limiting / WAF / DDoS protection ↳ https://stripe.com/blog/rate-limiters · https://www.cloudflare.com/learning/ddos/what-is-a-ddos-attack/ · https://www.cloudflare.com/learning/ddos/glossary/web-application-firewall-waf/
+  - `L2` How does the design protect against DDoS and abuse? ↳ CDN/WAF, rate limits, auth before expensive work, quotas
+  - `L2` What is an application-layer (L7) DDoS vs a volumetric (L3/L4) DDoS?
+  - `L2` What is a WAF, and what can it not catch?
+- [ ] PII handling, data deletion (GDPR / DPDP Act India) ↳ DDIA ch11 "State, streams, and immutability" (pdf p469, deleting data from immutable logs) · https://gdpr.eu/right-to-be-forgotten/ · https://www.meity.gov.in/data-protection-framework (DPDP Act 2023)
+  - `L1` What is PII? Give examples, including less obvious ones. ↳ IP address, device id, voice recordings, email contents
+  - `L2` GDPR basics: lawful basis, data minimisation, purpose limitation, right to access and right to erasure.
+  - `L2` A user asks you to delete all their data. List every place it may live. ↳ primary DB, replicas, backups, logs, caches, search, vectors, LLM traces, third parties
+  - `L2` What is pseudonymisation vs anonymisation? Is a hashed email anonymous?
+  - `L3` How do you design data deletion (GDPR / DPDP) across DB, caches, backups, logs and vector stores?
+  - `L3` What is crypto-shredding, and how does it help with GDPR deletion from backups and event logs?
+  - `L3` Voice recordings and email bodies at AiRA: what consent, retention and access controls should apply?
+  - `L3` How do you delete a user's data from immutable backups and event logs? ↳ crypto-shredding per-user keys, backup expiry
+  - `L3` A breach exposed user emails. What are your notification obligations and timelines? ↳ GDPR 72 h to regulator; India CERT-In 6 h reporting
+
+## 6.9 Classic design problems (practise each in 45 min)
+For each: requirements, estimates, API, schema, diagram, 2 deep dives.
+- [ ] URL shortener (id generation: base62, counter vs hash, collisions; caching redirects; analytics) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/bitly · Xu vol1 ch8 "Design a URL Shortener" (book, not in library) · https://github.com/donnemartin/system-design-primer/blob/master/solutions/system_design/pastebin/README.md
+  - `L1` Design a URL shortener like bit.ly.
+  - `L1` Base62 with 7 characters gives roughly how many codes?
+  - `L2` What do you ask first? ↳ custom aliases, expiry, analytics, read:write ratio, scale, deletion
+  - `L2` Do short links ever change destination? Do the same long URLs get the same short code?
+  - `L2` 100M new URLs a month, 100:1 reads to writes. Estimate write QPS, read QPS and 5-year storage.
+  - `L2` How long must the short code be for 5 years of URLs in base62? ↳ 62⁷ ≈ 3.5 trillion; 7 chars is plenty
+  - `L2` What APIs do you expose? What does the redirect response look like? ↳ POST /urls, GET /{code}; 301 vs 302
+  - `L2` 301 vs 302 redirect: which do you pick and how does it affect analytics?
+  - `L2` How do you generate the short code? Hash vs counter vs random. ↳ hash+collision check, counter+base62, ID ranges per server
+  - `L2` Hashing the long URL and taking 7 chars: how do you handle collisions?
+  - `L2` A global counter is a bottleneck. How do you hand out ID ranges? ↳ ticket server / ZooKeeper allocates blocks per app server
+  - `L2` Which database do you use and what is the schema?
+  - `L2` How do you cache redirects? What hit ratio do you expect?
+  - `L2` How do you handle custom aliases and their uniqueness?
+  - `L2` How do you expire links and clean them up?
+  - `L3` Sequential codes are guessable. Why does that matter and how do you fix it? ↳ enumeration of private links; shuffle/encrypt the counter
+  - `L3` How do you count clicks per link without slowing the redirect? ↳ async event to queue, batch aggregate
+  - `L3` How do you stop the shortener being used for phishing and spam?
+  - `L3` One link goes viral at 500k redirects/s. What breaks and what saves you?
+  - `L3` How do you make this multi-region with low-latency redirects everywhere?
+- [ ] Rate limiter (token bucket vs sliding window; Redis; distributed; where it lives) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/distributed-rate-limiter · Xu vol1 ch4 "Design a Rate Limiter" (book, not in library) · https://stripe.com/blog/rate-limiters
+  - `L1` What is rate limiting? Name four algorithms. ↳ token bucket, leaky bucket, fixed window, sliding window log/counter
+  - `L1` Design a rate limiter for an API used by millions of clients.
+  - `L2` Rate limiter algorithms: fixed window, sliding log, sliding window counter, token bucket, leaky bucket. ↳ burst handling, memory, accuracy at window edges
+  - `L2` Token bucket vs leaky bucket: what does each allow? ↳ token permits bursts to capacity; leaky smooths output
+  - `L2` Where do you enforce rate limits: gateway, app, or both? Per user, per IP, per API key?
+  - `L2` Token bucket vs sliding window: how do they differ for bursts?
+  - `L2` Where do you put the rate limiter: client, gateway, service, or all? Per user, per IP, per API key?
+  - `L2` What do you clarify for the distributed rate limiter? ↳ client-side or server-side, keys (user/IP/API key), limits per endpoint, hard or soft
+  - `L2` Is it a library inside each service or a shared service/gateway feature?
+  - `L2` 1M active API keys, 50k requests/s. How much memory do counters need in Redis?
+  - `L2` Compare token bucket, leaky bucket, fixed window, sliding window log, sliding window counter.
+  - `L2` Show the fixed-window boundary burst problem with numbers.
+  - `L2` Implement token bucket in Redis. Why must the check-and-decrement be atomic? ↳ Lua script or MULTI; race between GET and SET
+  - `L2` Where does the limiter sit: gateway, sidecar, middleware?
+  - `L2` What do you return to a limited client? ↳ 429, Retry-After, X-RateLimit-Remaining
+  - `L2` How do limit rules get configured and reloaded without deploys?
+  - `L3` Redis adds a network hop to every request. How do you cut latency? ↳ local token cache, batch syncs, approximate counts
+  - `L3` Redis is down. Fail open or fail closed? Defend it per endpoint.
+  - `L3` How do you rate-limit across multiple regions without a global round trip?
+  - `L3` How do you rate-limit LLM usage by tokens, not by requests?
+  - `L3` How would you add per-tenant quotas (monthly) on top of per-second limits?
+  - `L3` How do you test that the limiter is correct under concurrency?
+- [ ] Unique ID generator (Snowflake, UUIDv7, DB sequences) ↳ Xu vol1 ch7 "Design a Unique ID Generator in Distributed Systems" (book, not in library) · https://blog.x.com/engineering/en_us/a/2010/announcing-snowflake · https://www.rfc-editor.org/rfc/rfc9562 (UUIDv7)
+  - `L1` Design a service that generates unique IDs across many servers.
+  - `L1` What are the Snowflake ID parts?
+  - `L2` What do you clarify for the unique ID generator? ↳ size (64-bit?), sortable by time, numeric only, QPS, gaps allowed
+  - `L2` 10,000 IDs per second per machine for 1,000 machines: does a Snowflake layout fit?
+  - `L2` Compare auto-increment DB, UUIDv4, UUIDv7, ticket server, Snowflake.
+  - `L2` Draw the Snowflake bit layout. ↳ 1 sign, 41 timestamp ms, 10 machine, 12 sequence
+  - `L2` How long until 41 bits of milliseconds run out? Why a custom epoch?
+  - `L2` What happens when 4,096 IDs are requested in one millisecond on one machine?
+  - `L2` How are machine IDs assigned, and what happens if two machines get the same one?
+  - `L3` Snowflake IDs: how are the 64 bits split? ↳ sign, 41 time, 10 machine, 12 sequence
+  - `L3` How do you generate unique IDs across shards? ↳ Snowflake, UUIDv7, ID with embedded shard id
+  - `L3` The clock moves backwards after an NTP sync. What does your generator do?
+  - `L3` IDs are "roughly" time-ordered across machines. Is that enough for ordering chat messages?
+  - `L3` How did Instagram generate IDs inside Postgres shards?
+  - `L3` Should IDs exposed to users reveal creation time and volume? What do you do about it?
+- [ ] Key-value store (partitioning, replication, quorum, conflict resolution) ↳ Xu vol1 ch6 "Design a Key-Value Store" (book, not in library) · DDIA ch5 "Leaderless replication" (pdf p193–207) · https://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf
+  - `L2` Design a distributed key-value store like DynamoDB or Cassandra.
+  - `L2` What do you clarify for the key-value store? ↳ value size, read/write ratio, consistency needs, latency, availability target, scale
+  - `L2` Strong or eventual consistency — and can the client choose per request?
+  - `L2` 10 TB of data, 3 replicas, 2 TB per node. How many nodes, and how many per partition?
+  - `L2` How do you partition the keys? ↳ consistent hashing with virtual nodes
+  - `L2` How do you replicate each key? Which nodes hold the replicas?
+  - `L2` Walk through a write with N=3, W=2. Walk through a read with R=2.
+  - `L2` How do nodes learn about each other and detect failures? ↳ gossip membership, heartbeats
+  - `L2` What is the on-disk storage engine? Why an LSM tree? ↳ commit log, memtable, SSTables, compaction, Bloom filters
+  - `L2` How do you handle a node that is down for 10 minutes? ↳ sloppy quorum, hinted handoff
+  - `L3` Two clients write the same key concurrently on different replicas. How do you detect and resolve the conflict? ↳ vector clocks, siblings, LWW trade-off
+  - `L3` How do replicas that missed writes catch up? ↳ read repair, Merkle-tree anti-entropy
+  - `L3` How do you add a node and move data without downtime?
+  - `L3` How do you support TTLs and deletes? What are tombstones and why keep them?
+  - `L3` How do you handle a hot key that one partition cannot serve?
+  - `L3` How would you add a conditional write (compare-and-set) to this store?
+- [ ] Chat / WhatsApp (WebSockets, presence, message ordering, delivery receipts, offline delivery, groups) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/whatsapp · Xu vol1 ch12 "Design a Chat System" (book, not in library) · DDIA ch11 "Messaging systems" (pdf p449)
+  - `L1` What is a delivery receipt in chat?
+  - `L2` Design a chat app like WhatsApp with 1:1 and group chats.
+  - `L2` What do you clarify for the chat app? ↳ 1:1 vs groups (size), media, read receipts, history length, E2E encryption, multi-device
+  - `L2` Slack-style channels vs WhatsApp-style groups: what changes in the design?
+  - `L2` 500M DAU, 40 messages/day each, 100 bytes each. Messages per second, storage per year, concurrent connections?
+  - `L2` How do clients connect, and why WebSockets? ↳ persistent bidirectional, low latency; fallback long polling
+  - `L2` Walk a message from sender to receiver when both are online on different servers. ↳ connection registry, pub/sub or routing service
+  - `L2` The receiver is offline. How is the message delivered later? ↳ store in DB/inbox, push notification, sync on reconnect
+  - `L2` How do you store messages? Which database and which partition key? ↳ wide-column, partition by conversation id, cluster by message id
+  - `L2` How do you guarantee message order inside a conversation?
+  - `L2` Sent, delivered, read ticks: how do you implement them?
+  - `L2` How do clients sync history across multiple devices?
+  - `L2` How do you send media (photos, voice notes)? ↳ upload to blob via presigned URL, send pointer
+  - `L2` How does group messaging fan out to 1,000 members?
+  - `L3` How do you avoid duplicate messages when the client retries a send? ↳ client-generated message id, idempotent insert
+  - `L3` How do you keep a per-conversation sequence number without a global lock?
+  - `L3` A chat server with 100k connections crashes. What happens to those users and in-flight messages?
+  - `L3` How does end-to-end encryption change what the server can do? ↳ server can't search/index; key exchange, Signal protocol
+  - `L3` How do you design a 100k-member channel (Slack/Discord) differently from a 10-person group?
+  - `L3` How do you search message history?
+  - `L3` What parts of AiRA's WebSocket setup would you reuse for this chat app, and what would break at WhatsApp scale?
+- [ ] Notification system (push/SMS/email, templates, retries, user preferences, dedupe) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/notification-system (members-only) · Xu vol1 ch10 "Design a Notification System" (book, not in library) · DDIA ch11 "Messaging systems" (pdf p449)
+  - `L2` How would you build a notification system on Kafka with per-user ordering and retries?
+  - `L2` Design a notification service that sends email, SMS and push. Where do queues and templates fit?
+  - `L2` How do you avoid sending the same email or SMS twice when a job retries? ↳ idempotency key per notification, sent log
+  - `L2` How do you handle user notification preferences, quiet hours and unsubscribe?
+  - `L2` What do bounces and complaints mean for email deliverability (SPF, DKIM, DMARC)?
+  - `L2` How do you handle OTP SMS: expiry, attempts, rate limits, cost control?
+  - `L2` Design a notification system that sends push, SMS and email.
+  - `L2` What do you clarify for the notification system? ↳ channels, volume, realtime vs scheduled, preferences, opt-out, priority, rate limits
+  - `L2` 10M push, 1M SMS and 5M emails a day. Peak QPS per channel?
+  - `L2` Draw the flow from "event happened" to "phone buzzes". ↳ API, validation, prefs, template, per-channel queue, workers, provider
+  - `L2` Why a separate queue and worker pool per channel?
+  - `L2` How do you store and respect user preferences and quiet hours?
+  - `L2` How do templates and localisation work?
+  - `L2` A provider (SMS vendor) fails. Retries, backoff, failover to second vendor?
+  - `L2` How do you avoid sending the same notification twice? ↳ dedupe key per event+user, idempotent workers
+  - `L2` How do you track delivered, opened, clicked?
+  - `L3` A marketing blast to 50M users must not delay OTP messages. How? ↳ priority queues, separate pools, rate limits per tier
+  - `L3` How do you rate-limit notifications per user so you don't spam them?
+  - `L3` How do you handle device token expiry and uninstalls?
+  - `L3` How do you send scheduled notifications at the user's local 9 am across time zones?
+- [ ] News feed / Twitter timeline (fan-out on write vs read, celebrities) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/fb-news-feed · Xu vol1 ch11 "Design a News Feed System" (book, not in library) · DDIA ch1 "Describing load" (pdf p31–33, Twitter fan-out)
+  - `L1` Fan-out on write or on read for a celebrity?
+  - `L2` Design a news feed like Twitter's home timeline.
+  - `L2` What do you clarify for the news feed? ↳ follow graph size, ranking or chronological, media, feed freshness, DAU, posts/day
+  - `L2` 300M DAU, 2 posts/day, 200 follows each, feed opened 10 times a day. Write QPS, read QPS, fan-out writes?
+  - `L2` Fan-out on write (push) vs fan-out on read (pull): explain both and their costs.
+  - `L2` How do you handle a celebrity with 100M followers? ↳ hybrid: push for normal users, pull celebrities at read time
+  - `L2` What does the feed cache look like? ↳ Redis list of post IDs per user, capped length
+  - `L2` How do you paginate a feed that changes while scrolling? ↳ cursor by ID/time, not offset
+  - `L2` How do you store posts, follows and media? Which databases?
+  - `L2` How do you count likes on a post with 1M likes a minute? ↳ sharded counters, batched increments
+  - `L3` How do you skip fan-out for inactive users?
+  - `L3` How do you add a ranking model to the feed without making it slow? ↳ candidate generation, lightweight rank, precompute features
+  - `L3` A user unfollows someone. How fast do their posts disappear from the feed?
+  - `L3` A user deletes a post that is already fanned out to 5M feeds. What do you do?
+  - `L3` How do you insert ads into the feed?
+  - `L3` How do you make the feed load in under 200 ms at p99?
+- [ ] Search autocomplete / typeahead (trie, top-k, caching) ↳ Xu vol1 ch13 "Design a Search Autocomplete System" (book, not in library) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k · https://github.com/donnemartin/system-design-primer/blob/master/solutions/system_design/query_cache/README.md
+  - `L1` Where do you put the trie for autocomplete?
+  - `L2` Design search autocomplete that shows the top 5 suggestions as the user types.
+  - `L2` What do you clarify for typeahead? ↳ ranking signal, personalised or global, languages, freshness/trending, latency target
+  - `L2` 10M DAU, 10 searches each, 20 keystrokes per search. Autocomplete QPS?
+  - `L2` Why a trie, and what does each node store? ↳ prefix nodes with cached top-k completions
+  - `L2` How do you build the trie from query logs? How often?
+  - `L2` How do you shard the trie when it does not fit on one machine?
+  - `L2` How do you cut requests from the browser? ↳ debounce, client cache, CDN cache for popular prefixes
+  - `L2` How do you meet a 100 ms p99 budget end to end?
+  - `L3` How do you add trending queries in near real time? ↳ streaming counts, separate fresh trie, merge
+  - `L3` How do you filter offensive or unsafe suggestions?
+  - `L3` How do you personalise suggestions without a per-user trie?
+  - `L3` How do you handle typos in the prefix?
+  - `L3` Trie in memory vs Elasticsearch completion suggester vs Redis sorted sets: trade-offs.
+- [ ] Web crawler (frontier queue, politeness, dedupe with bloom filters) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/web-crawler · Xu vol1 ch9 "Design a Web Crawler" (book, not in library) · https://github.com/donnemartin/system-design-primer/blob/master/solutions/system_design/web_crawler/README.md
+  - `L1` What does a URL frontier hold?
+  - `L1` How does a crawler check "already seen" cheaply?
+  - `L2` Design a web crawler that crawls 1 billion pages a month.
+  - `L2` What do you clarify for the web crawler? ↳ purpose (search/LLM data), content types, freshness, politeness, storage duration
+  - `L2` 1B pages/month at 500 KB each: pages per second and storage per year?
+  - `L2` Draw the web crawler pipeline. ↳ seed URLs, frontier, fetcher, DNS resolver, parser, dedupe, store, URL extractor
+  - `L2` What is the URL frontier and how do you prioritise URLs?
+  - `L2` How do you stay polite to each host? ↳ robots.txt, per-host queue, delay, one fetcher per host
+  - `L2` How do you avoid crawling the same URL twice? ↳ URL normalisation + Bloom filter / seen set
+  - `L2` How do you detect duplicate or near-duplicate content? ↳ content hash, SimHash/MinHash
+  - `L2` Why does DNS become a bottleneck, and how do you fix it?
+  - `L3` How do you avoid spider traps (infinite calendars, session URLs)?
+  - `L3` How do you recrawl pages based on how often they change?
+  - `L3` How do you distribute the frontier across 100 crawler machines and keep per-host politeness?
+  - `L3` A worker crashes mid-crawl. How do you not lose or double-crawl its URLs?
+  - `L3` How do you crawl JavaScript-heavy pages? What does it cost?
+- [ ] Distributed job scheduler / cron (leases, at-least-once, retries) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/job-scheduler (members-only) · DDIA ch8 "The truth is defined by the majority" (pdf p314, leases + fencing) · https://www.hellointerview.com/learn/system-design/in-the-wild/slack-job-queue
+  - `L2` Design a distributed job scheduler that runs one-off and recurring jobs at a given time.
+  - `L2` What do you clarify for the job scheduler? ↳ precision (seconds/minutes), job count, at-most vs at-least-once, job duration, retries
+  - `L2` 100M scheduled reminders, 10% firing in the morning hour. Peak jobs per second?
+  - `L2` How do you store jobs so "what is due now?" is cheap? ↳ index on next_run_at, time buckets, Redis sorted set
+  - `L2` Polling the DB vs a delay queue vs timing wheel: trade-offs.
+  - `L2` How do many workers pick jobs without two running the same job? ↳ SKIP LOCKED, leases, claim with status update
+  - `L2` What is a lease and what happens when a worker dies mid-job?
+  - `L2` How do you compute the next run of a cron expression with time zones and DST?
+  - `L2` How do retries, backoff and a DLQ fit in?
+  - `L3` Design a job scheduler on Redis that survives worker crashes and a Redis failover.
+  - `L3` How do you make job execution idempotent when a lease expires but the old worker still finishes?
+  - `L3` How do you avoid a thundering herd at exactly 9:00:00?
+  - `L3` How do you scale the scheduler itself? Partition jobs by what?
+  - `L3` How do you let users see job history and logs?
+  - `L3` When would you use Temporal / Celery beat / cloud schedulers instead of building this?
+- [ ] File storage / Dropbox (chunking, dedupe, sync, metadata DB) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/dropbox · Xu vol1 ch15 "Design Google Drive" (book, not in library)
+  - `L2` Design Dropbox / Google Drive with sync across devices.
+  - `L2` What do you clarify for file storage and sync? ↳ max file size, sharing, versioning, offline edits, conflict handling, devices per user
+  - `L2` 50M users, 10 GB each on average, 10% daily active editing 5 files: storage and upload traffic?
+  - `L2` Why split files into chunks? How big should chunks be?
+  - `L2` How does chunk-level dedupe work? ↳ content hash per chunk, store once, reference count
+  - `L2` What goes in the metadata DB vs blob storage?
+  - `L2` How does a client learn that a file changed on another device? ↳ long poll / WebSocket notification, then delta sync
+  - `L2` How do you upload only the changed parts of a large file?
+  - `L2` How do you implement file versioning and restore?
+  - `L3` Two devices edit the same file offline. How do you resolve the conflict? ↳ detect via version; keep both as "conflicted copy"
+  - `L3` How do you share a folder with 1,000 people and keep permissions fast to check?
+  - `L3` How do you garbage-collect chunks no longer referenced by any file version?
+  - `L3` Should the client encrypt files before upload? What do you lose if it does?
+- [ ] YouTube / video streaming (upload pipeline, transcoding, CDN, adaptive bitrate) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/youtube · Xu vol1 ch14 "Design YouTube" (book, not in library)
+  - `L1` HLS / DASH are used for what?
+  - `L2` Design YouTube: upload and watch videos.
+  - `L2` What do you clarify for video streaming? ↳ upload vs watch focus, video length/size, devices, live or VOD, global users
+  - `L2` 500 hours uploaded per minute, 1B views a day at ~5 Mbps. Storage per day and peak egress?
+  - `L2` Walk through the upload path. ↳ presigned multipart upload, raw blob, transcode queue, outputs, metadata update
+  - `L2` What is transcoding and why produce many resolutions and codecs?
+  - `L2` How does the transcoding pipeline split work? ↳ split into segments, DAG of tasks, parallel workers
+  - `L2` What is adaptive bitrate streaming (HLS / DASH) and how does the player switch quality?
+  - `L2` Why serve video from a CDN, and what does the origin still do?
+  - `L2` How do you store video metadata, view counts and comments?
+  - `L3` How do you resume a failed 4 GB upload on a mobile network?
+  - `L3` Popular vs long-tail videos: how do you decide what to keep on edge caches?
+  - `L3` How do you count views accurately at billions per day without hammering the DB?
+  - `L3` How do you cut transcoding cost for videos nobody watches?
+  - `L3` What changes for live streaming vs video on demand?
+  - `L3` How do you protect paid content? ↳ signed URLs, DRM, token-authenticated segments
+- [ ] Payment system / wallet (idempotency, double-entry ledger, reconciliation) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/payment-system (members-only) · Xu vol2 ch11 "Payment System", ch12 "Digital Wallet" (book, not in library) · https://stripe.com/blog/ledger-stripe-system-for-tracking-and-validating-money-movement
+  - `L1` What is a double-entry ledger?
+  - `L1` Why integers for money?
+  - `L2` Design a payment system for an e-commerce site.
+  - `L2` Design a digital wallet where users top up and pay each other.
+  - `L2` What do you clarify for the payment system? ↳ own processing or PSP (Stripe/Razorpay), refunds, currencies, payouts, compliance
+  - `L2` What correctness guarantees does money need that a feed does not?
+  - `L2` 1M payments a day: average and peak TPS? Why is throughput rarely the hard part here?
+  - `L2` Walk the pay-in flow from "Pay" button to order confirmed. ↳ payment intent, PSP hosted page, webhook, ledger, order update
+  - `L2` What is an idempotency key and where exactly is it checked?
+  - `L2` What is double-entry bookkeeping and why use a ledger? ↳ every movement = debit + credit, sums to zero, append-only
+  - `L2` Why are ledger entries immutable? How do you correct a mistake?
+  - `L2` How do you handle PSP webhooks that arrive late, twice, or out of order?
+  - `L2` Why store money as integers in minor units, never floats?
+  - `L2` What is the payment state machine?
+  - `L3` What is a ledger? Why use double-entry bookkeeping instead of a `balance` column? ↳ append-only entries, debits = credits, auditable, no lost updates
+  - `L3` Design a wallet with top-ups, spends and refunds that can never go negative under concurrency.
+  - `L3` Design split payments for a marketplace (platform fee + restaurant payout).
+  - `L3` How do you handle currency conversion and rounding so totals still add up?
+  - `L3` How do subscriptions and recurring payments change your design (mandates, retries, dunning)?
+  - `L3` What is reconciliation, and how do you run it against the PSP's settlement files?
+  - `L3` The PSP call timed out. Did money move? What does your system do next? ↳ unknown state, query status, never blind retry
+  - `L3` Wallet transfer A → B: how do you keep balances correct under concurrent transfers? ↳ single DB txn, row locks in fixed order, or ledger
+  - `L3` How do you shard a wallet ledger when one transfer touches two shards?
+  - `L3` How would you design wallet balances with event sourcing?
+  - `L3` How do you handle refunds and partial refunds?
+  - `L3` What do you log and encrypt for PCI-DSS? Why never store card numbers?
+  - `L3` How do you detect fraud without blocking the payment path?
+- [ ] Ticket booking / BookMyShow (seat holds, locking, expiry) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/ticketmaster · DDIA ch7 "Preventing lost updates" (pdf p255), "Preventing write skew and phantoms" (pdf p259) · https://www.hellointerview.com/learn/system-design/in-the-wild/shopify-inventory-reservations
+  - `L1` What prevents two users booking the same seat?
+  - `L2` Design BookMyShow: pick a show, choose seats, pay.
+  - `L2` What do you clarify for ticket booking? ↳ seat map vs general admission, hold time, popular-event spikes, payment flow, cancellations
+  - `L2` A big release opens bookings: 5M users in 10 minutes for 200k seats. Peak QPS on seat selection?
+  - `L2` How do you stop two users booking the same seat? ↳ row lock / conditional update / unique constraint
+  - `L2` How do you hold seats for 10 minutes while the user pays? ↳ status=held with expiry; Redis TTL lock; release job
+  - `L2` Pessimistic vs optimistic locking for seat holds: which and why?
+  - `L2` What happens when the hold expires while payment is in progress?
+  - `L2` How do you show the live seat map to thousands of viewers?
+  - `L2` What is the booking state machine?
+  - `L3` Design room booking for 10k rooms with no double booking under concurrency. ↳ Postgres tstzrange + exclusion constraint (GiST)
+  - `L3` How do you survive a flash crowd for a blockbuster? ↳ virtual waiting room, admission tokens, queue
+  - `L3` Redis holds the seat lock but Postgres is the source of truth. What if they disagree?
+  - `L3` Payment gateway times out. Did the user pay? How do you reconcile?
+  - `L3` How do you stop bots from grabbing all seats?
+- [ ] Ride sharing / Uber (location updates, geohash/quadtree, matching) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/uber · https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search · Xu vol2 ch1 "Proximity Service", ch2 "Nearby Friends" (book, not in library)
+  - `L2` Design Uber: riders request rides, nearby drivers get matched.
+  - `L2` What do you clarify for ride hailing? ↳ matching latency, location update frequency, pricing/surge scope, payments in scope, cities
+  - `L2` 5M active drivers sending location every 4 seconds. Write QPS on the location service?
+  - `L2` How do you store and query live driver locations? ↳ in-memory geo index (Redis GEO / H3 cells), not the main DB
+  - `L2` Geohash vs quadtree vs H3 for this use case: which and why?
+  - `L2` Find drivers within 2 km of a rider. Walk through the query.
+  - `L2` How do you match a rider to a driver and stop two riders getting the same driver? ↳ driver lock with TTL, offer one driver at a time
+  - `L2` The driver doesn't accept within 10 seconds. What happens?
+  - `L2` How does the rider see the driver moving on the map in real time?
+  - `L2` What is the trip state machine? ↳ requested, matched, arriving, in progress, completed, cancelled
+  - `L3` How do you shard the location index by geography, and what about city boundaries?
+  - `L3` How do you compute ETA, and why not just straight-line distance?
+  - `L3` How does surge pricing work as a system (inputs, frequency, consistency)?
+  - `L3` A region's location service dies. What do riders and drivers see?
+  - `L3` How do you keep trip records correct when the driver's phone loses network mid-trip?
+- [ ] Leaderboard (Redis sorted sets) ↳ Xu vol2 ch10 "Real-time Gaming Leaderboard" (book, not in library) · https://redis.io/docs/latest/develop/data-types/sorted-sets/ · https://www.hellointerview.com/learn/system-design/problem-breakdowns/overview (no breakdown; reuse Top K ideas)
+  - `L1` Design a real-time leaderboard for a game with 50M players.
+  - `L1` Which Redis type powers a leaderboard?
+  - `L2` Build a game leaderboard with Redis sorted sets: top 10, a user's rank, users around me. ↳ ZADD, ZREVRANGE, ZREVRANK; ties via composite score
+  - `L2` What do you clarify for the leaderboard? ↳ global vs friends vs regional, time windows (daily/all-time), ties, update rate
+  - `L2` 5M daily players, 10 score updates each. Update QPS and sorted-set memory?
+  - `L2` Why a Redis sorted set? What are the costs of ZADD, ZREVRANK, ZREVRANGE? ↳ O(log n) skip list
+  - `L2` How do you get a player's rank and the 5 players around them?
+  - `L2` How do you do daily and weekly leaderboards? ↳ one key per period, expire old keys
+  - `L2` How do you break ties fairly? ↳ composite score: points + inverse timestamp
+  - `L2` Where is the durable copy of scores, and how do you rebuild Redis after loss?
+  - `L2` What APIs do you expose: submit score, top N, my rank?
+  - `L3` A leaderboard for 100M players doesn't fit one Redis node. What now? ↳ shard by score range, approximate rank buckets
+  - `L3` 500M players don't fit in one sorted set. How do you shard and still answer "what is my rank?" ↳ score-range shards with counts, or approximate rank
+  - `L3` How do you show a friends-only leaderboard efficiently?
+  - `L3` How do you stop cheaters from posting fake scores?
+  - `L3` How do you handle a season reset at midnight for 50M players?
+- [ ] Hotel / restaurant reservation; food delivery order tracking (your StreetDine angle) ↳ Xu vol2 ch7 "Hotel Reservation System" (book, not in library) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/gopuff (Local Delivery Service) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/uber (live location tracking)
+  - `L2` Design a hotel reservation system.
+  - `L2` What do you clarify for hotel reservation? ↳ room types vs specific rooms, overbooking policy, date ranges, cancellations, payment timing
+  - `L2` 5,000 hotels, 1M rooms, 70% occupancy, 3-night stays. Reservations per second? Why is this small?
+  - `L2` Model room inventory per room type per date. Why per date? ↳ row per (hotel, type, date) with total and reserved
+  - `L2` How do you reserve a 3-night stay atomically?
+  - `L2` How do you prevent double booking under concurrency? ↳ conditional update `reserved < total`, optimistic version, constraint
+  - `L2` A user clicks "Book" twice. How do you not create two reservations?
+  - `L2` What APIs do you expose for search, hold and confirm?
+  - `L2` How do you release held rooms when payment never completes?
+  - `L3` How do you allow 10% overbooking safely?
+  - `L3` How do search (availability for dates) and booking stay consistent when search is cached?
+  - `L3` How do you sync inventory with external channels (OTAs) that also sell your rooms?
+  - `L3` How would you shard reservation data, and why might one Postgres primary be enough?
+- [ ] Metrics/logging platform (ingest, time-series storage, retention) ↳ Xu vol2 ch5 "Metrics Monitoring and Alerting System" (book, not in library) · https://www.hellointerview.com/learn/system-design/deep-dives/time-series-databases · https://www.hellointerview.com/learn/system-design/problem-breakdowns/metrics-monitoring (members-only)
+  - `L2` How does a time-series database store and compress points? ↳ columnar chunks, delta-of-delta timestamps, XOR floats (Gorilla)
+  - `L2` Design a metrics monitoring and alerting system.
+  - `L2` What do you clarify for the metrics system? ↳ number of hosts/series, resolution, retention, query patterns, alert latency
+  - `L2` 100k hosts × 500 metrics every 10 s: data points per second and storage per day?
+  - `L2` Push vs pull collection: trade-offs. ↳ Prometheus pulls; push for short-lived jobs and firewalls
+  - `L2` What is a time series, and what are labels / cardinality?
+  - `L2` Why a time-series database instead of Postgres? How is the data compressed? ↳ delta-of-delta timestamps, XOR floats
+  - `L2` What is downsampling and retention tiering?
+  - `L2` How does alert evaluation work, and how do you avoid alert storms? ↳ rules engine, for-duration, grouping, dedupe, silences
+  - `L2` What does the query language need to support (rate, sum by label, percentiles)?
+  - `L2` Design a centralised logging system for 2,000 services.
+  - `L2` What do you clarify for the logging pipeline? ↳ volume, retention, search needs, structured or not, PII, cost ceiling
+  - `L2` 5 TB of logs a day, 30 days hot, 1 year cold. Storage and ingest rate?
+  - `L2` Draw the logging pipeline. ↳ agent (Fluent Bit), buffer (Kafka), processors, index/store, query UI
+  - `L2` Why put Kafka between agents and the index?
+  - `L2` Full-text index everything (Elasticsearch) vs index labels only (Loki): trade-offs.
+  - `L2` How do you correlate logs with traces? ↳ trace id in every log line
+  - `L2` How do you redact PII and secrets from logs?
+  - `L2` Structured (JSON) vs plain-text logs: why does it matter for the pipeline?
+  - `L3` A team adds a `user_id` label. What happens to the system?
+  - `L3` How do you make the monitoring system itself highly available? Who monitors the monitor?
+  - `L3` How do you shard ingestion and queries across many TSDB nodes?
+  - `L3` How do you compute p99 across 1,000 servers correctly? ↳ histograms/sketches merged, not averaged percentiles
+  - `L3` Log volume spikes 10× during an incident — exactly when you need logs. How do you cope? ↳ buffering, sampling debug logs, priority, backpressure
+  - `L3` How do you keep costs down? ↳ sampling, levels, tiered storage, drop noisy logs, metrics instead
+  - `L3` How do you make "search last 15 minutes across all services" fast?
+  - `L3` How do you enforce retention and deletion for compliance across hot and cold tiers?
+- [ ] Collaborative editor / Google Docs (OT vs CRDT — know the idea) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/google-docs (members-only) · https://www.hellointerview.com/learn/system-design/in-the-wild/figma-multiplayer · DBI ch11 "Strong Eventual Consistency and CRDTs" (pdf p375)
+  - `L1` OT or CRDT: which needs a central server?
+  - `L2` Design Google Docs: many users editing the same document at the same time.
+  - `L2` What do you clarify for collaborative editing? ↳ concurrent editors per doc, offline editing, rich text, comments, history, latency
+  - `L2` 10M docs edited a day, average 3 editors, 1 op/second each while typing. Ops per second?
+  - `L2` Why does naive "last write wins" on the whole document fail?
+  - `L2` What is Operational Transformation (OT)? Give a two-user insert example.
+  - `L2` What is a CRDT and how does it avoid a central transformer?
+  - `L2` OT vs CRDT: trade-offs for a server-based product.
+  - `L2` How do edits flow: client → server → other clients? ↳ WebSocket per doc session, server sequences ops, broadcasts
+  - `L2` How do you show other users' cursors and presence?
+  - `L3` How do CRDTs in collaborative editors relate to data structures? ↳ mergeable replicated sets, counters, sequences
+  - `L3` Why route all editors of one document to the same server? What if it dies?
+  - `L3` How do you store the document: snapshots plus an operation log?
+  - `L3` How does offline editing merge back when the user reconnects?
+  - `L3` How do you implement version history and "restore this version"?
+  - `L3` How do permissions change mid-session (someone loses edit access)?
+
+**Learn:** Xu1 (URL shortener, rate limiter, KV store, ID gen, chat, notification, news feed, autocomplete,
+crawler, YouTube, Drive) · Xu2 (proximity, Uber-like, payments, wallet, hotel, ad click aggregation, stock
+exchange) · HelloInt (free breakdowns: Ticketmaster, Uber, WhatsApp, Dropbox, …) · Gaurav Sen / ByteByteGo YT ·
+SDP solutions
+
+## 6.10 AI system design problems (very likely for your roles)
+- [ ] RAG chatbot over company documents (ingest pipeline, chunking, embedding, vector DB, retrieval, rerank,
+      generation with citations, permissions per document, evals, freshness) ↳ AIE ch6 "RAG Architecture" (pdf p280), "Retrieval Optimization" (pdf p291–296) · LEH ch4 "Designing the architecture of the RAG feature pipeline" (pdf p158) · LEH ch9 "Understanding the LLM twin’s RAG inference pipeline" (pdf p347)
+  - `L2` Design a RAG chatbot over a company's documents.
+  - `L2` Design a RAG system for 10M documents with per-user permissions.
+  - `L2` What do you clarify for the RAG system? ↳ sources (Drive, Confluence, Slack), size, update rate, permissions, citations, languages, accuracy bar
+  - `L2` 10M docs, 20 chunks each, 1,024-dim float32 vectors. Vector index memory, and with quantisation?
+  - `L2` Embedding cost and time for the initial backfill of 200M chunks?
+  - `L2` Draw the RAG ingestion pipeline. ↳ connectors, parse, clean, chunk, embed, upsert with metadata + ACLs
+  - `L2` Draw the RAG query pipeline. ↳ rewrite query, hybrid retrieve, filter by ACL, rerank, build prompt, generate with citations
+  - `L2` A user uploads a PDF and it must become searchable. Walk through the path. ↳ FastAPI auth + upload → object storage → job row (status) → queue → worker: parse, chunk, embed → Qdrant upsert → status done
+  - `L2` How does the user see processing status, and what states does a document go through? ↳ uploaded → queued → processing → indexed / failed; poll endpoint or SSE
+  - `L2` A worker crashes halfway through a document. What happens, and how is it retried? ↳ ack after success, visibility timeout / lease, retry with backoff, DLQ after N tries
+  - `L2` How do you avoid processing the same document twice (double upload, redelivered job)? ↳ content hash, idempotent job id, deterministic chunk ids so upserts overwrite
+  - `L2` The embedding API fails on chunk 900 of 2,000. Do you restart the document? ↳ checkpoint per batch; resume; idempotent upserts
+  - `L3` Design a RAG system for 10M documents with per-user permissions
+  - `L3` One upload has a million pages. What changes? ↳ split into page-range sub-jobs, fan out, stream parse, per-tenant quotas
+  - `L3` How do you scale workers separately from the API servers, and what metric drives it? ↳ queue depth / age of oldest job
+  - `L3` Multi-tenant RAG: one collection with tenant filter vs collection per tenant in Qdrant?
+  - `L3` How do you handle questions that need many documents (aggregation) rather than one passage?
+- [ ] LLM gateway (provider abstraction, routing by cost/latency, fallbacks, retries, rate limits per tenant,
+      semantic caching, token metering/billing, logging/tracing) ↳ AIE ch10 "Step 3. Add Model Router and Gateway" (pdf p480), "Step 4. Reduce Latency with Caches" (pdf p484) · LEH ch11 "Prompt monitoring" (pdf p480) · https://huyenchip.com/2024/07/25/genai-platform.html
+  - `L1` What does an LLM gateway meter?
+  - `L2` How do you keep LLM costs under control at 1M users?
+  - `L2` Design an LLM gateway that all product teams and tenants use to call models.
+  - `L2` What do you clarify for the multi-tenant LLM gateway? ↳ providers, streaming, tenants, budgets, data residency, logging rules, latency overhead allowed
+  - `L2` 5k requests/s, 30% streaming, average 2k tokens each. Gateway instances and log storage per day?
+  - `L2` What features does the gateway own? ↳ unified API, auth, routing, fallbacks, retries, rate limits, metering, logging, caching
+  - `L2` How do you abstract different providers' APIs (OpenAI, Anthropic, Gemini) behind one interface?
+  - `L2` How do you route by cost, latency or capability?
+  - `L2` How do fallbacks work when a provider returns 429 or 5xx — including mid-stream?
+  - `L2` How do you rate-limit and budget per tenant in tokens and money?
+  - `L2` How do you count tokens and bill tenants accurately for streamed responses?
+  - `L2` Exact cache vs semantic cache: when is each safe?
+  - `L2` Walk me through the architecture diagram: clients, gateway pods, Redis, Postgres, Qdrant, Kafka, providers, observability.
+  - `L2` Walk me through one request end to end, from `POST /v1/chat/completions` to the last streamed token. ↳ auth, validate, rate limit, cache, route, breaker, stream, usage event
+  - `L3` How do you route LLM requests to the GPU servers with the right model and warm KV cache? ↳ model-aware routing, prefix/session affinity, queue depth
+  - `L3` How do you keep tenant data isolated in logs, caches and provider calls? ↳ tenant-scoped cache keys, PII redaction, per-tenant retention, no-train flags
+  - `L3` How do you add guardrails (PII, prompt injection, output filters) without adding much latency?
+  - `L3` How do you keep the gateway from becoming a single point of failure for the whole company?
+  - `L3` How do you roll out a new model version to 5% of traffic and compare quality?
+  - `L3` Design a gateway that serves 20 internal teams with different budgets, models and data rules.
+  - `L3` Design an AI platform that lets you swap the model provider in a day.
+  - `L3` Draw the request flow when the cache hits, when the primary provider fails, and when the tenant is over quota.
+  - `L3` Design a multi-provider LLM gateway for AiRA (Azure OpenAI primary, Bedrock / Vertex fallback): routing, quotas, failover, cost.
+- [ ] Customer-support agent that takes actions (tools, permissions, human approval, audit log) ↳ AIE ch6 "Agents" (pdf p299, tools + write actions p302) · AIE ch10 "Step 2. Put in Guardrails" (pdf p475), "Step 5. Add Agent Patterns" (pdf p487) · https://www.anthropic.com/engineering/building-effective-agents
+  - `L2` Design a customer-support AI agent that can issue refunds and change orders.
+  - `L2` What do you clarify for the customer-support agent? ↳ allowed actions, money limits, escalation rules, channels, languages, audit needs
+  - `L2` 50k tickets a day, 6 LLM calls per ticket. Token cost per ticket and per month?
+  - `L2` How do you expose actions to the model as tools with permissions? ↳ narrow tools, server-side auth checks, limits per action
+  - `L2` Which actions need human approval, and how does the approval flow work?
+  - `L2` How do you hand off to a human agent with full context?
+  - `L2` What goes in the audit log for every action?
+  - `L2` How does the agent fetch order history and policy context (APIs + RAG over policies)?
+  - `L2` How do you keep conversation state across channels (chat, email, phone)?
+  - `L2` Design a customer-support agent that can issue refunds. ↳ policy as code, refund limits, approval above threshold, audit, eval set
+  - `L2` In that support agent, who decides if a refund is allowed: the model or code?
+  - `L3` How do you stop a user talking the agent into a refund it shouldn't give?
+  - `L3` How do you make tool calls idempotent so a retried step doesn't refund twice?
+  - `L3` How do you evaluate the agent before letting it act on real customers? ↳ replay past tickets, sandbox tools, shadow mode
+  - `L3` What do you monitor live for this agent? ↳ resolution rate, escalation rate, refund totals, CSAT, anomalies
+- [ ] Realtime voice assistant (your AiRA design: WebSocket, VAD/STT/LLM/TTS streaming, barge-in, latency budget) ↳ AIE ch9 "Inference Performance Metrics" (pdf p436, TTFT + latency budget) · LEH ch10 "Online real-time inference" (pdf p389) · https://platform.openai.com/docs/guides/realtime
+  - `L2` Design a realtime voice assistant: the user talks, the assistant answers out loud with low latency.
+  - `L2` What do you clarify for the realtime voice assistant? ↳ latency target, languages, interruptions, tools/actions, devices, concurrent calls, telephony
+  - `L2` Build a latency budget from end of user speech to first audio out. ↳ VAD end ~200ms, STT final, LLM TTFT, TTS first chunk, network
+  - `L2` 10k concurrent calls at 16 kHz 16-bit audio: bandwidth in and out, and WebSocket servers needed?
+  - `L2` Draw the voice pipeline. ↳ mic, WebSocket, VAD, streaming STT, LLM, streaming TTS, client playback
+  - `L2` What is barge-in, and what must happen in every stage when the user interrupts? ↳ stop TTS playback, cancel LLM/TTS, truncate history to heard audio
+  - `L2` Why stream every stage instead of waiting for each to finish?
+  - `L2` How do you chunk LLM output for TTS so speech starts early but sounds natural? ↳ sentence/phrase boundaries
+  - `L2` WebSockets vs WebRTC for the audio transport: trade-offs on mobile networks.
+  - `L2` How do you handle tool calls (calendar, reminders) mid-conversation without dead air? ↳ filler speech, parallel tool calls, timeouts
+  - `L2` Design a voice agent with <800 ms response.
+  - `L3` Where are buffers in the pipeline, and how do you apply backpressure without adding latency?
+  - `L3` How do you scale voice sessions horizontally when each session is stateful? ↳ sticky session per call, session state in Redis for recovery
+  - `L3` STT or TTS vendor degrades mid-call. How do you fail over?
+  - `L3` How do you measure p50/p95 voice-to-voice latency in production?
+  - `L3` How do you store call audio and transcripts with privacy and consent?
+  - `L3` How would you cut per-minute cost of a voice call by half?
+  - `L3` Design a voice agent backend with under 800 ms to first audio for 10k concurrent calls.
+  - `L3` Design a voice agent that takes restaurant orders over the phone and calls tools mid-call.
+- [ ] Chat assistant with long-term memory (what to store, retrieval, privacy, cost) ↳ AIE ch6 "Memory" (pdf p324) · https://arxiv.org/abs/2310.08560 (MemGPT) · AIE ch5 "Context Length and Context Efficiency" (pdf p242)
+  - `L2` Design a long-term memory service so an assistant remembers users across conversations.
+  - `L2` What do you clarify for the memory service? ↳ what counts as memory, retention, user control/deletion, latency budget, users, privacy
+  - `L2` 1M users, 50 new memories each a month, 1,536-dim vectors. Storage after a year? Retrieval QPS?
+  - `L2` What do you store: raw transcripts, extracted facts, summaries, a graph? Why?
+  - `L2` How do you extract memories from a conversation? Sync or async? ↳ async LLM extraction after turn/session, so chat latency isn't hit
+  - `L2` How do you retrieve relevant memories for a new message within the latency budget?
+  - `L2` Vector store vs graph store vs both: what does each answer well? ↳ vectors: fuzzy similarity; graph: entities, relations, multi-hop
+  - `L2` How does the user see, edit and delete what the assistant remembers?
+  - `L2` Design a chat service for 1M users on a hosted LLM API. Draw it end to end.
+  - `L3` Design ChatGPT (streaming, conversation storage, rate limits, scaling GPU inference)
+  - `L3` How do you keep Memgraph and Qdrant consistent when one write fails?
+  - `L3` How do you stop memory from filling the prompt with stale or irrelevant facts? ↳ recency/importance scoring, decay, summarisation, top-k budget
+  - `L3` How do you evaluate whether memory makes answers better?
+  - `L3` How do you isolate users' memories and handle "forget me" requests across all stores?
+  - `L3` Design a personal assistant agent with long-term memory for 1M users. Storage, retrieval, cost.
+- [ ] Email/ticket triage pipeline (classification, extraction, queues, human review) ↳ LEH ch10 "Asynchronous inference" (pdf p390) · DMLS ch7 "Batch Prediction Versus Online Prediction" (pdf p217) · AIE ch10 "User Feedback" (pdf p498)
+  - `L2` Design a pipeline that classifies incoming emails/tickets, extracts fields and routes them.
+  - `L2` What do you clarify for the triage pipeline? ↳ volume, categories, latency (realtime or batch), accuracy bar, human review, languages
+  - `L2` 1M emails a day. LLM cost with a large model vs a small classifier first?
+  - `L2` Draw the triage pipeline. ↳ ingest → queue → classify → extract → validate → route; low-confidence → human queue
+  - `L2` Small model / rules first, LLM only for hard cases: how do you build that cascade?
+  - `L2` How do you get structured output reliably? ↳ JSON schema / function calling, validation, retry on failure
+  - `L2` How do you use confidence to decide what goes to humans?
+  - `L2` How do you handle attachments and quoted email threads before classification?
+  - `L2` How do you keep the pipeline flowing when the LLM provider rate-limits you?
+  - `L2` Design an email-triage agent: read, label, draft replies, never send without approval.
+  - `L3` How do human corrections flow back to improve the system?
+  - `L3` How do you detect drift when new kinds of tickets appear?
+  - `L3` How do you measure precision and recall per category, and which errors cost most?
+  - `L3` How do you redact PII before sending emails to a third-party LLM?
+- [ ] Document extraction at scale (your Jigsaw job extraction: batch LLM calls, validation, retries, cost) ↳ LEH ch10 "Offline batch transform" (pdf p391) · AIE ch2 "Structured Outputs" (pdf p123) · https://platform.openai.com/docs/guides/batch
+  - `L2` Design a system that extracts structured data from millions of documents (job posts, resumes, invoices) with LLMs.
+  - `L2` What do you clarify for document extraction? ↳ document formats, schema, accuracy target, deadline (realtime or overnight), budget
+  - `L2` 5M documents at 3k input tokens each. Cost with realtime API vs batch API, and time to finish?
+  - `L2` How do you parse PDFs, HTML and scanned images before the LLM?
+  - `L2` How do you split work into jobs, track status and retry failures?
+  - `L2` How do you stay under provider rate limits with many workers? ↳ token-bucket per provider, shared limiter, adaptive concurrency
+  - `L2` How do you validate outputs against the schema and fix bad ones?
+  - `L2` What does the data model for documents, jobs, attempts and results look like?
+  - `L2` How do you choose a model per document type by cost and accuracy?
+  - `L3` How do you measure extraction accuracy without labelling everything? ↳ golden set, sampling audits, field-level metrics
+  - `L3` How do you re-run only changed or failed documents when the prompt changes?
+  - `L3` How do you handle documents longer than the context window?
+  - `L3` Design a batch pipeline that extracts 20 fields from 100k PDFs a day with an LLM. ↳ queue, batch API, schema validation, retries, spot checks, cost cap
+- [ ] Recommendation / candidate matching (embeddings + filters + reranker; your Jigsaw work) ↳ HOL ch8 "Dense Retrieval" (pdf p250), "Reranking" (pdf p262) · LEH ch9 "Advanced RAG retrieval optimization: filtered vector search" (pdf p361) · https://www.hellointerview.com/learn/system-design/deep-dives/vector-databases
+  - `L2` Design a system that matches candidates to job openings and ranks them for recruiters.
+  - `L2` What do you clarify for candidate matching? ↳ number of jobs/candidates, structured vs free-text, hard filters, explainability, bias rules
+  - `L2` 10M candidate profiles, 100k open jobs, recruiters search 50k times a day. Index size and QPS?
+  - `L2` How do you parse resumes and job descriptions into structured fields? ↳ LLM extraction + schema validation + human review
+  - `L2` Hard filters (location, years, visa) vs soft relevance: how do you combine them?
+  - `L2` Keyword search vs embeddings vs hybrid for matching skills.
+  - `L2` What does the two-stage pipeline look like? ↳ candidate retrieval (filters + ANN/BM25), then reranker
+  - `L2` How do you keep the index fresh when profiles change?
+  - `L2` How do you explain to a recruiter why a candidate ranked high?
+  - `L2` Design semantic search and "similar items" recommendations for a catalogue of 50M items.
+  - `L2` What do you clarify for semantic search and recommendations? ↳ item types, filters, personalisation, freshness, latency, cold-start items and users
+  - `L2` 50M items × 768-dim vectors. Memory for HNSW in float32 vs int8, and QPS per node?
+  - `L2` What does the two-stage retrieval + ranking architecture look like?
+  - `L2` How do you build item and user embeddings?
+  - `L2` How do you handle new items with no interactions (cold start)?
+  - `L2` How do you serve "similar items" fast — precompute or query on the fly?
+  - `L3` How would you build search over candidate profiles at Jigsaw with filters (skills, location, years)?
+  - `L3` How do you evaluate match quality? ↳ recruiter actions as labels, offline ranking metrics, A/B tests
+  - `L3` How do you avoid biased ranking (gender, college) and prove it?
+  - `L3` Skill synonyms ("React" vs "ReactJS" vs "frontend"): how do you normalise them?
+  - `L3` How do you evaluate recommendations offline and online? ↳ recall@k, NDCG; A/B test CTR, conversion
+  - `L3` How do you avoid feedback loops where popular items get more popular?
+  - `L3` How do you update embeddings for 50M items without a full rebuild?
+  - `L3` How do you blend business rules (sponsored, in stock, diversity) into the final ranking?
+- [ ] Browser/computer-use agent platform (sandboxing, sessions, concurrency, secrets — your AiRA browser) ↳ AIE ch6 "Tools" (pdf p302), "Agent Failure Modes and Evaluation" (pdf p322) · AIE ch5 "Defenses Against Prompt Attacks" (pdf p272) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/leetcode (sandboxed execution)
+  - `L1` Why sandbox each browser agent session?
+  - `L2` Design a platform where an AI agent controls a browser to do tasks for users (book, fill forms, research).
+  - `L2` What do you clarify for the browser agent platform? ↳ task length, concurrency, sites, logins/secrets, human approval points, cost per task
+  - `L2` 2,000 concurrent browser sessions at ~1 GB RAM each. How many machines, and cost per task-minute?
+  - `L2` Draw the components. ↳ task API, queue, orchestrator/agent loop, browser pool, sandbox, state store, live view
+  - `L2` How does the agent loop work? ↳ observe (DOM/screenshot), plan, act (tool), check, repeat; step limits
+  - `L2` How do you isolate each user's browser session? ↳ container/microVM per session, separate profiles, network egress rules
+  - `L2` How do you manage a warm pool of browsers to avoid cold starts?
+  - `L2` How do you persist task state so a crash mid-task can resume?
+  - `L2` How do users watch the agent live and take over? ↳ CDP screencast / VNC stream over WebSocket
+  - `L3` Which actions need human approval, and how do you pause and resume the task?
+  - `L3` How do you handle CAPTCHAs and bot blocks — and where do you draw the line?
+  - `L3` How do you measure task success rate and debug failed runs? ↳ step traces, screenshots, replay
+  - `L3` Design a browser-task service for 10k users (book tickets, fill forms). ↳ session pool, per-user slots, queue, takeover, cost per task
+- [ ] Text-to-video / long generation job service (your Lumen: streaming, job state, cost) ↳ LEH ch10 "Asynchronous inference" (pdf p390), "Autoscaling capabilities to handle spikes in usage" (pdf p422) · AIE ch10 "AI Pipeline Orchestration" (pdf p496) · https://www.hellointerview.com/learn/system-design/patterns/long-running-tasks (members-only)
+  - `L2` Design a service where users submit long generation jobs (text-to-video, long reports) that take minutes.
+  - `L2` What do you clarify for the long-running job service? ↳ job duration, GPU or API, progress updates, cancellation, priority tiers, cost per job
+  - `L2` 100k jobs a day at 3 GPU-minutes each. GPUs needed at peak with a 2× peak factor?
+  - `L2` Why an async job API (submit → job id → status) instead of a long HTTP request?
+  - `L2` What is the job state machine, and where is it stored?
+  - `L2` How do you stream progress and partial results to the user?
+  - `L2` How do you schedule jobs across GPU workers with priorities and fairness per user?
+  - `L2` How does a user cancel a job, and what happens to GPU work already running?
+  - `L2` Where are outputs stored and how are they delivered? ↳ blob storage, signed URL, notification
+  - `L3` A worker dies at 80% of a 10-minute job. How do you checkpoint and resume?
+  - `L3` How do you cap cost per user and stop runaway jobs?
+  - `L3` What did you learn building Lumen's job flow, and what would you change?
+  - `L3` How do you estimate queue wait time and show it honestly to users?
+- [ ] ChatGPT-like chat service (token streaming, conversation storage, context overflow, resume and stop mid-stream, usage metering)
+  - `L2` Design ChatGPT: users chat with an LLM and see tokens stream in.
+  - `L2` What do you clarify for the ChatGPT-like chat service? ↳ own GPUs or API, users, context length, history retention, files/tools, free vs paid tiers
+  - `L2` 10M DAU, 15 messages each, 500 output tokens per reply. Tokens per second at peak, and GPUs needed?
+  - `L2` What is the monthly API cost of that traffic at $X per million tokens?
+  - `L2` How do tokens stream from the model to the browser? ↳ model stream → server → SSE/WebSocket → client
+  - `L2` SSE vs WebSocket for token streaming: which and why?
+  - `L2` How do you store conversations and messages? Which DB and partition key?
+  - `L2` The conversation exceeds the context window. What do you do? ↳ truncate, summarise older turns, retrieve relevant past turns
+  - `L2` The user refreshes the page mid-stream. How do they get the rest of the answer? ↳ generation continues server-side, buffer in Redis Streams, resume by offset
+  - `L2` The user clicks "Stop generating". What happens server-side?
+  - `L2` How do you rate-limit and meter usage per user and tier? ↳ tokens per minute, monthly quotas, priority queues
+  - `L2` How do you handle file uploads and tool calls (web search, code) in a chat?
+  - `L3` How do you route requests across GPU pools and models with different costs?
+  - `L3` Provider is down or slow. How do you fail over across providers mid-conversation?
+  - `L3` How do you autoscale GPU inference when cold start takes minutes?
+  - `L3` How do you add moderation/guardrails on input and output without killing latency?
+  - `L3` How do you collect feedback (thumbs up/down) and use it?
+- [ ] LLM evaluation platform (datasets, test cases, judges, CI gates on prompt changes, production sampling, versioned runs)
+  - `L2` Design a platform to evaluate LLM features before release and monitor them in production.
+  - `L2` How do you evaluate and monitor an LLM system in production?
+  - `L2` What do you clarify for the LLM evaluation platform? ↳ teams/use cases, metrics, human labels, CI integration, cost limits, data privacy
+  - `L2` 50 eval suites × 1,000 cases × 3 judge calls, run on every PR. Cost and time per run?
+  - `L2` What are the core objects? ↳ datasets, test cases, prompts/versions, runs, scores, judges, reports
+  - `L2` How do you run evals in CI and block a bad prompt change?
+  - `L2` How do you sample production traffic into eval datasets safely?
+  - `L2` How do you version prompts, models and datasets so a run is reproducible?
+  - `L3` Scores are noisy between runs. How do you tell a real regression from noise?
+  - `L3` How do you turn user feedback and production failures into new test cases automatically?
+- [ ] Agent designs: research agent, CI-fixing coding agent, multi-tenant agent platform, agentic commerce checkpoints
+  - `L2` Design a research agent that writes a cited report.
+  - `L2` Design a coding agent that fixes failing CI builds and opens a PR.
+  - `L3` Design a multi-tenant agent platform where customers bring their own tools and prompts. ↳ tenant isolation, quotas, secrets, sandbox, per-tenant evals
+  - `L3` Design an agent that can buy things for the user (agentic commerce). Where are the human checkpoints?
+
+**Learn:** AIE ch6, ch9, ch10 (architecture and feedback — the best chapter for this) · LEH ch1, ch4, ch9, ch10,
+ch11 · HOL ch8 · Eugene Yan "Patterns for building LLM-based systems" · Anthropic-agents · Chip Huyen blog
+"Building a generative AI platform" (huyenchip.com)
+
+## 6.11 Probabilistic structures and geo indexing
+- [ ] Bloom filter: no false negatives, tunable false positives; used in LSM trees, crawlers, "username taken?" ↳ DBI ch7 "Bloom Filters" (pdf p246) · https://samwho.dev/bloom-filters/ · DDIA ch3 "SSTables and LSM-trees" (pdf p96–99)
+  - `L1` What is a Bloom filter, and what question does it answer? ↳ "definitely not present" or "probably present"
+  - `L1` Can it give false negatives? False positives?
+  - `L1` How do insert and lookup work with k hash functions over m bits?
+  - `L1` Can you delete from a Bloom filter? ↳ no; use a counting Bloom filter or cuckoo filter
+  - `L1` Does a Bloom filter ever say "no" wrongly?
+  - `L1` What is a Bloom filter? Can it give false negatives? False positives?
+  - `L1` Bloom filter: which error can it make?
+  - `L2` What controls the false-positive rate? Bits per element for about 1%? ↳ m/n and k; ~10 bits/element, k ≈ 7
+  - `L2` What is the optimal number of hash functions? ↳ k = (m/n)·ln 2
+  - `L2` How do you get k hash functions cheaply? ↳ double hashing: h1 + i·h2
+  - `L2` What happens when you insert far more items than planned? ↳ FPR climbs toward 1; scalable Bloom filters add layers
+  - `L2` Implement a Bloom filter over a `bytearray` / `Uint8Array`.
+  - `L2` How do LSM databases use Bloom filters, and what do they save? ↳ skip SSTables without the key; fewer disk reads
+  - `L2` Where else are Bloom filters used? ↳ Cassandra, Postgres bloom extension, CDNs, Medium recommendations, Bitcoin SPV
+  - `L2` Counting Bloom filter vs cuckoo filter: what does each add? ↳ deletion; cuckoo is also smaller at low FPR
+  - `L2` Design a "username taken?" check for 1B usernames with a Bloom filter in front of the database.
+  - `L2` Check if a URL was already crawled among 10B URLs
+  - `L2` Where are Bloom filters used in real systems? ↳ LSM-tree reads, crawlers, "username taken?", cache penetration
+  - `L2` How do you size a Bloom filter for 1B items at 1% false positives? ↳ ~10 bits per item, ~1.2 GB, ~7 hashes
+  - `L2` Why can't you delete from a plain Bloom filter? What is a counting Bloom filter / cuckoo filter?
+  - `L2` Check if a URL was already crawled among 10B URLs. How?
+  - `L3` How do you union two Bloom filters? Can you intersect them? ↳ same m, k, hashes: OR for union; AND approximates
+  - `L3` How would you dedupe events with Redis `BF.ADD` / `BF.EXISTS`, and what does a false positive cost you?
+  - `L3` What is a Bloom filter (RedisBloom), and where would you use one? ↳ cache penetration, "username taken"; false positives only
+- [ ] HyperLogLog: approximate unique counts (daily active users) in kilobytes ↳ https://redis.io/docs/latest/develop/data-types/probabilistic/hyperloglogs/ · https://en.wikipedia.org/wiki/HyperLogLog · DDIA ch11 "Uses of stream processing" (pdf p471–472)
+  - `L1` What problem does HyperLogLog solve? ↳ approximate count-distinct in small fixed memory
+  - `L1` Exact count-distinct of 1B items with a hash set: roughly how much memory? ↳ tens of GB
+  - `L1` What do Redis `PFADD`, `PFCOUNT` and `PFMERGE` do?
+  - `L1` Memory of one Redis HyperLogLog?
+  - `L1` Which data type counts uniques in 12 KB?
+  - `L1` What is HyperLogLog used for?
+  - `L2` Why do leading zeros in a hash say something about cardinality? ↳ k leading zeros suggests ~2^k distinct values
+  - `L2` Why split into m registers and combine with a harmonic mean? ↳ cuts variance; harmonic mean damps outliers
+  - `L2` How much memory does a Redis HLL use, and what is its standard error? ↳ 12 KB; about 0.81%
+  - `L2` Standard error as a function of the register count. ↳ ≈ 1.04/√m
+  - `L2` How do you merge two HLLs, and why is that powerful? ↳ register-wise max; union across days or shards
+  - `L2` Can you intersect HLLs? ↳ only via inclusion–exclusion; error grows fast
+  - `L2` Why does HLL need a small-range correction? ↳ many empty registers → switch to linear counting
+  - `L2` Sparse vs dense encoding in Redis HLL.
+  - `L2` HLL vs Bloom filter vs Count-Min Sketch: which question does each answer? ↳ how many distinct; is x present; how often x
+  - `L2` What is HyperLogLog? What error and memory does it have? ↳ ~0.81% standard error; at most 12 KB per key
+  - `L2` Unique visitors per page per day for 1M pages: set vs HyperLogLog vs bitmap.
+  - `L2` Count unique visitors per page per day for 1B events
+  - `L2` Count unique visitors per page per day for 1B events. How? ↳ HyperLogLog per page per day, ~12 KB each, ~0.8% error
+  - `L3` Design daily, weekly and monthly unique visitors for 100M users. ↳ HLL per day; PFMERGE for week and month
+  - `L3` Postgres `count(DISTINCT)` is slow on a big table. Options? ↳ postgresql-hll extension, pre-aggregation, approximate answers
+  - `L3` Count unique active users per tenant per day in an AI product cheaply.
+  - `L3` HyperLogLogs can be merged; why is that so useful for analytics rollups?
+- [ ] Count-min sketch: approximate frequencies / top-K (trending hashtags) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/top-k · https://en.wikipedia.org/wiki/Count%E2%80%93min_sketch
+  - `L1` What is a Count-Min Sketch, and what does it estimate? ↳ approximate frequency of each item in a stream
+  - `L1` How do update and query work? ↳ d rows × w counters; increment one per row; query takes the min
+  - `L1` Does it over-estimate or under-estimate, and why? ↳ only over-estimates; collisions only add
+  - `L1` Does a Count-Min Sketch under-count?
+  - `L1` What is a count-min sketch used for?
+  - `L2` How do width and depth relate to error and confidence? ↳ w ≈ e/ε, d ≈ ln(1/δ)
+  - `L2` Memory of a CMS vs an exact hash map of counts for 1B distinct keys.
+  - `L2` Count-Min Sketch vs Bloom filter: what is similar, what is different?
+  - `L2` Find top-K heavy hitters with a CMS. ↳ CMS for counts + min-heap of candidates
+  - `L2` What is conservative update, and why does it reduce error? ↳ raise only counters below the new estimate
+  - `L2` Can a CMS handle decrements? ↳ yes if true counts stay non-negative
+  - `L2` Merge sketches from two servers. ↳ same dimensions and hashes: add cell by cell
+  - `L2` Implement a Count-Min Sketch in about 20 lines.
+  - `L2` Find trending hashtags (top-K) over a stream. How? ↳ count-min sketch + min-heap, windowed
+  - `L3` Top-K heavy hitters over an unbounded stream that doesn't fit in memory. ↳ Count-Min Sketch + heap; Space-Saving / Misra–Gries
+  - `L3` Count Sketch vs Count-Min Sketch: what do the ±1 hashes buy you? ↳ unbiased estimates; median of rows
+  - `L3` Detect abusive IPs at 1M requests/second: CMS or exact counters? ↳ CMS per window + threshold; exact counts for flagged keys
+  - `L3` Sliding-window counts with sketches: how do you expire old data? ↳ ring of per-minute sketches; sum the recent ones
+  - `L3` Where could a CMS help in an LLM gateway (per-tenant token usage, hot prompts)?
+- [ ] Geohash, quadtree, S2/H3 cells; PostGIS / Redis GEO for "nearby" queries ↳ https://www.hellointerview.com/learn/system-design/deep-dives/proximity-search · DDIA ch3 "Other indexing structures" (pdf p104, multi-dimensional indexes p106) · https://redis.io/docs/latest/commands/geosearch/
+  - `L1` What is a geohash?
+  - `L1` Which Redis type stores driver locations for nearby search?
+  - `L2` Which structure for "drivers near me"? ↳ geohash, quadtree, R-tree, H3; Redis GEO is a sorted set
+  - `L2` How do `GEOADD` and `GEOSEARCH` work underneath? ↳ geohash stored as a sorted-set score
+  - `L2` Find drivers within 2 km
+  - `L2` Find drivers within 2 km of a rider. Which index do you use? ↳ geohash/H3 cells + neighbours, Redis GEO, PostGIS
+  - `L2` Geohash vs quadtree vs S2/H3: trade-offs.
+  - `L3` "Restaurants within 2 km" (StreetDine): geohash vs quadtree vs H3. Why not Euclidean on lat/long? ↳ cells + neighbours, then haversine; PostGIS or Redis GEO
+  - `L3` R-tree vs quadtree vs geohash for a ride-hailing app.
+  - `L3` Why do you need to search neighbouring geohash cells, not just one?
+  - `L3` How do you handle a dense city centre vs empty countryside in a geo index? ↳ adaptive quadtree, variable precision
+
+## 6.12 Multi-region and disaster recovery
+- [ ] RPO vs RTO; backup/restore vs pilot light vs warm standby vs active-active ↳ https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html · https://sre.google/sre-book/data-integrity/
+  - `L1` What are RPO and RTO?
+  - `L1` Backup/restore vs pilot light vs warm standby vs active-active: what does each cost and recover?
+  - `L1` RPO measures what? RTO measures what?
+  - `L1` What are RTO and RPO?
+  - `L1` High availability vs disaster recovery vs backup.
+  - `L1` RTO vs RPO?
+  - `L1` Cheapest DR strategy?
+  - `L2` Your only region goes down — what happens and how long until you're back?
+  - `L2` Your only region goes down. What happens and how long until you're back?
+  - `L2` What are the DR strategies from cheapest to most expensive? ↳ backup/restore, pilot light, warm standby, multi-site active-active
+  - `L2` What must be replicated to survive a full region outage? ↳ data, secrets/keys, images, config, DNS, IaC, quotas in target region
+  - `L3` Design DR for AiRA on Azure with RPO 15 minutes and RTO 1 hour. What does it cost?
+- [ ] Active-passive vs active-active; conflict handling across regions (multi-leader, CRDTs) ↳ DDIA ch5 "Use cases for multi-leader replication" (pdf p183), "Handling write conflicts" (pdf p186) · DBI ch11 "Strong Eventual Consistency and CRDTs" (pdf p375) · https://crdt.tech
+  - `L1` Active-passive vs active-active: what is the difference?
+  - `L2` Active-active: how do you handle the same record written in two regions? ↳ home region per user, multi-leader + conflict resolution, CRDTs
+  - `L2` How do you replicate a database across regions, sync or async, and what does each cost in latency?
+  - `L2` Which components must be global (auth, user directory) and which can be regional?
+  - `L2` Active-passive vs active-active across regions: trade-offs. ↳ cost, data consistency/conflicts, failover complexity
+  - `L3` How do you avoid split brain when failing over a region automatically?
+  - `L3` How do you avoid split-brain when failing a database over to another region?
+- [ ] GeoDNS / anycast / global load balancers; latency-based routing ↳ https://www.cloudflare.com/learning/cdn/glossary/anycast-network/ · https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-latency.html · DDIA ch5 "Use cases for multi-leader replication" (pdf p183, multi-datacenter)
+  - `L1` What is anycast in one line?
+  - `L2` How do you serve users in India and the US with low latency?
+  - `L2` What is DNS load balancing and what are its limits? ↳ TTL caching, no health awareness, uneven clients
+  - `L2` What is GeoDNS / latency-based routing? What is anycast?
+  - `L2` What is a global server load balancer (GSLB) vs a regional one?
+  - `L2` How do you serve users in India and the US with low latency?
+  - `L2` What is anycast? How does it route users to the nearest PoP? ↳ same IP announced from many places via BGP
+  - `L2` DNS-based global load balancing vs anycast: trade-offs. ↳ DNS TTL caching vs fast anycast failover
+  - `L2` How would you fail over DNS from one region to another, and how long does it take? ↳ health-checked DNS / Front Door; TTL bounds
+  - `L3` How do you fail over DNS and clients quickly when TTLs and caches hold old records?
+  - `L3` Design global routing for an API with users in India and the US. Front Door / CloudFront / global LB?
+- [ ] Data residency (keeping Indian users' data in India); compliance ↳ https://www.meity.gov.in/data-protection-framework (DPDP Act 2023; search "DPDP Act 2023 summary") · https://gdpr.eu/right-to-be-forgotten/
+  - `L2` What is data residency, and how do you keep Indian users' data in India (DPDP Act)?
+  - `L2` What is data residency, and why does it matter when you call a US LLM API from India or the EU?
+- [ ] Chaos testing; game days ↳ https://principlesofchaos.org · https://netflix.github.io/chaosmonkey/ · https://sre.google/sre-book/testing-reliability/
+  - `L2` What is a game day / chaos experiment, and what does it test?
+  - `L2` What is a DR drill / game day, and what would you run first?
+  - `L3` What is a chaos experiment / game day? Design one for a voice product.
+- [ ] Zone and region resilience: surviving an AZ loss, region pairs, composite SLAs, static stability, restore drills
+  - `L1` Composite SLA of two 99.9% services in series? ↳ ~99.8%
+  - `L2` What is an Azure region pair and why does it matter for DR?
+  - `L2` Zonal vs zone-redundant vs regional services: what is the difference?
+  - `L2` How do you compute a composite SLA for an app that depends on App Service, Postgres and Redis?
+  - `L2` How do you make a web app survive the loss of one availability zone?
+  - `L2` How do you test that backups actually restore?
+  - `L3` A cloud region had a multi-hour outage. Which of your dependencies would have failed even if your app was multi-region? ↳ global control planes, identity, shared third parties
+  - `L3` What is static stability, and why should failover not depend on the failed region's control plane?
+
+## 6.13 More design problems (asked often at Indian startups/product companies)
+- [ ] Instagram / photo sharing (upload pipeline, feed, CDN, likes counters) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/instagram (members-only) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/fb-news-feed · https://www.hellointerview.com/learn/system-design/patterns/large-blobs (members-only)
+  - `L2` Design Instagram: upload photos, follow people, see a feed, like and comment.
+  - `L2` What do you clarify for photo sharing? ↳ photos vs video vs stories, feed ranking, DAU, read:write ratio, global users
+  - `L2` 500M DAU, 100M photo uploads a day at 2 MB after compression. Storage per year and CDN egress?
+  - `L2` Walk through the upload pipeline. ↳ presigned upload, resize to sizes, store variants, CDN, metadata write
+  - `L2` Why generate multiple image sizes at upload time instead of on request?
+  - `L2` How do you build the feed? Reuse your news-feed answer and say what changes for media.
+  - `L2` How do you count likes on a viral photo? ↳ sharded counters, async aggregation, approximate display
+  - `L2` Which databases store users, posts, follows and likes, and why?
+  - `L2` How would you build the explore / search page at a high level?
+  - `L3` How do you make images load fast on slow Indian mobile networks? ↳ WebP/AVIF, progressive, size per device, edge CDN
+  - `L3` How do you moderate uploads for unsafe content at upload scale?
+  - `L3` How do stories (24-hour expiry) change storage and feed design?
+  - `L3` A user deletes their account. How do you remove all their photos, including CDN copies?
+- [ ] Distributed cache (Memcached/Redis cluster: partitioning, replication, eviction, hot keys) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/distributed-cache (members-only) · https://www.hellointerview.com/learn/system-design/deep-dives/redis · https://github.com/donnemartin/system-design-primer/blob/master/solutions/system_design/query_cache/README.md
+  - `L2` Design a distributed in-memory cache.
+  - `L2` What do you clarify for the distributed cache? ↳ data size, hit latency, eviction, persistence, consistency with DB, multi-region
+  - `L2` 2 TB of hot data, 1M ops/s, 64 GB nodes. How many nodes with replication?
+  - `L2` How do clients find the node for a key? ↳ consistent hashing in client, or hash slots (Redis Cluster 16,384)
+  - `L2` Replication and failover for cache nodes: worth it or not?
+  - `L2` What happens to hit rate when you add a node?
+  - `L2` How do you expire millions of keys with TTLs efficiently? ↳ lazy expiry on read + periodic sampling
+  - `L3` How do you handle a hot key that one node cannot serve?
+  - `L3` How did Facebook's memcache use leases to fix stale sets and thundering herds?
+  - `L3` How do you keep caches in two regions consistent with one primary DB?
+  - `L3` How do you handle large values (1 MB+) and memory fragmentation?
+  - `L3` How do you resize the cache cluster without a stampede on the database?
+- [ ] Distributed message queue (Kafka-like: partitions, replication, consumer offsets, retention) ↳ Xu vol2 ch4 "Distributed Message Queue" (book, not in library) · DDIA ch11 "Partitioned logs" (pdf p454) · https://www.hellointerview.com/learn/system-design/deep-dives/kafka
+  - `L2` Design a distributed message queue like Kafka.
+  - `L2` What do you clarify for the distributed message queue? ↳ ordering, delivery guarantee, retention, throughput, message size, replay
+  - `L2` 1M messages/s at 1 KB, 7 days retention, RF=3. Disk and network per broker for 30 brokers?
+  - `L2` Why an append-only log on disk, and why is it fast?
+  - `L2` How do topics split into partitions and where is ordering guaranteed?
+  - `L2` How are consumer offsets stored and committed?
+  - `L2` How is each partition replicated, and when is a write acknowledged?
+  - `L2` How do consumer groups divide partitions? What triggers a rebalance?
+  - `L2` How does a producer pick a partition, and how are writes batched?
+  - `L3` How do you elect a new partition leader without losing committed data? ↳ ISR, high watermark, leader epoch, controller
+  - `L3` How would you add delayed messages or priorities to this design?
+  - `L3` How do you make retention cheap for months of data? ↳ segment files, tiered storage to object store
+  - `L3` How would you give exactly-once from producer to consumer in your design?
+- [ ] Flash sale / inventory (Big Billion Days: queueing users, stock reservation, oversell protection) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/flash-sale (members-only) · DDIA ch7 "Preventing lost updates" (pdf p255) · https://www.hellointerview.com/learn/system-design/in-the-wild/shopify-inventory-reservations
+  - `L1` What is a virtual waiting room?
+  - `L2` Design the checkout and inventory system for an e-commerce site.
+  - `L2` Design Flipkart's flash sale for 10M users and 10k items.
+  - `L2` What do you clarify for the e-commerce checkout? ↳ multi-warehouse, reservation window, payment methods, cart persistence, oversell tolerance
+  - `L2` 10M users hit "buy" in the first minute of a sale. Peak QPS and how much hits the DB?
+  - `L2` How do you prevent overselling? ↳ atomic conditional decrement (`stock > 0`), reservation rows, Redis DECR + DB truth
+  - `L2` Reserve stock at add-to-cart, at checkout, or at payment? Trade-offs.
+  - `L2` What saga runs on checkout, and what are its compensations?
+  - `L2` How do you release reservations when the user abandons payment?
+  - `L2` Where does the cart live (Redis, DB, client) and why?
+  - `L3` Design Flipkart's flash sale for 10M users and 10k items
+  - `L3` One hot item gets 1M requests/s. How do you keep the stock counter from melting? ↳ pre-split stock buckets, Redis Lua, queue buyers
+  - `L3` How do you put users in a virtual queue and admit them fairly?
+  - `L3` How do you keep inventory consistent across warehouses and channels (app, web, marketplace)?
+  - `L3` What do you degrade first when the sale overloads the system?
+  - `L3` How do you test a flash sale design before the real event? ↳ load tests with real traffic shape, game days
+- [ ] Coupon / promo system (redemption limits, idempotency, fraud) ↳ https://stripe.com/blog/idempotency · DDIA ch7 "Preventing write skew and phantoms" (pdf p259) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/overview (no breakdown; reuse Ticketmaster contention ideas)
+  - `L2` Design a coupon / promo code system for an e-commerce site.
+  - `L2` What do you clarify for the coupon system? ↳ coupon types, per-user and global limits, stacking rules, expiry, targeting
+  - `L2` A coupon limited to the first 10,000 users goes viral on social media. Redemption QPS at launch?
+  - `L2` How do you model coupons, rules and redemptions?
+  - `L2` How do you enforce "max 10,000 redemptions" under heavy concurrency? ↳ atomic counter (Redis DECR / conditional update), reserve then confirm
+  - `L2` How do you enforce "once per user" across devices and retries? ↳ unique (user, coupon) constraint, idempotency key
+  - `L2` When is a coupon "used" — at apply, at checkout, or at payment success? What if payment fails?
+  - `L2` What APIs do you expose: validate, apply, redeem, reverse?
+  - `L2` How do you cache coupon rules so validation at checkout stays fast?
+  - `L3` How do you detect coupon abuse (fake accounts, shared codes)?
+  - `L3` How do you evaluate stacking rules fast for a cart with 30 items?
+  - `L3` How do you generate 1M unique, unguessable single-use codes?
+  - `L3` How do you reconcile redemptions against orders and refunds at day end?
+- [ ] Online judge / code execution sandbox (queues, isolation, time/memory limits — same ideas as agent sandboxes) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/leetcode · https://firecracker-microvm.github.io · https://gvisor.dev/docs/
+  - `L2` Design LeetCode's "run code" backend.
+  - `L2` Design a sandbox that runs untrusted code from 1,000 users at once.
+  - `L2` What do you clarify for the online judge? ↳ languages, time/memory limits, contest peaks, network access, result latency
+  - `L2` A contest with 50k users submitting every 2 minutes, 5 s per run. How many concurrent sandboxes?
+  - `L2` Why put submissions on a queue instead of running them in the API request?
+  - `L2` How do you isolate untrusted code? ↳ containers + seccomp, gVisor, Firecracker microVMs; no network, read-only FS
+  - `L2` How do you enforce CPU time, wall time and memory limits?
+  - `L2` How does the user get the result? ↳ poll job status, or WebSocket/SSE push
+  - `L2` How do you compare outputs (exact, whitespace, floating point, custom checkers)?
+  - `L3` Design a sandbox that runs untrusted code from 1,000 users at once
+  - `L3` Container vs microVM vs WASM sandbox: security and cold-start trade-offs.
+  - `L3` How do you keep warm sandbox pools so cold starts don't kill latency?
+  - `L3` How do you stop fork bombs, crypto miners and sandbox escapes?
+  - `L3` How do you handle a contest spike and keep the contest leaderboard live?
+- [ ] Feature flag / remote config service (low-latency reads, caching at the edge, gradual rollout) ↳ https://martinfowler.com/articles/feature-toggles.html · DDIA ch9 "Membership and coordination services" (pdf p382) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/overview (no breakdown)
+  - `L2` Design a feature flag service like LaunchDarkly.
+  - `L2` What do you clarify for the feature flag service? ↳ server and client SDKs, targeting rules, percentage rollouts, change propagation time, audit
+  - `L2` 1,000 services, 50k instances, flags read on every request. Why can't each read hit a central server?
+  - `L2` Where is flag evaluation done — in the SDK or on the server? Trade-offs.
+  - `L2` How do flag changes reach SDKs quickly? ↳ streaming (SSE) + polling fallback, local cache
+  - `L2` How do you do a stable 10% rollout so a user doesn't flip between on and off? ↳ hash(user id + flag) mod 100
+  - `L2` What happens if the flag service is down?
+  - `L2` What is the data model for flags, rules, segments and environments?
+  - `L3` How do you evaluate flags in a mobile app without leaking all rules to the client?
+  - `L3` How do you keep an audit trail and roll back a bad flag change?
+  - `L3` How do you clean up stale flags in the codebase?
+  - `L3` How would you use flags to roll out a new LLM model or prompt at AiRA?
+  - `L3` How do you run A/B experiments on top of flags and get clean metrics?
+- [ ] Search engine over documents (crawl/ingest, inverted index, ranking, sharding the index) ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/fb-post-search · DDIA ch6 "Partitioning and secondary indexes" (pdf p219–223, by-term = global index) · https://www.hellointerview.com/learn/system-design/deep-dives/elasticsearch
+  - `L2` How does a search query run across shards? ↳ scatter to shards, local top-k, gather and merge
+  - `L2` Design search over 1 billion documents (a site search or internal company search).
+  - `L2` What do you clarify for document search? ↳ document types, update rate, query latency, ranking signals, permissions, languages
+  - `L2` 1B docs at 10 KB of text. Raw size, index size, and number of shards?
+  - `L2` Ingest path: crawl/ingest, parse, tokenise, index. Where do queues sit?
+  - `L2` Shard by document or by term? Why does almost everyone shard by document?
+  - `L2` How does a query fan out to shards and merge top-k results?
+  - `L2` How do you rank: BM25, freshness, popularity, personalisation?
+  - `L2` How do you apply updates and deletes to the index in near real time?
+  - `L2` How do replicas help query throughput and failover in the search cluster?
+  - `L3` How do you reindex 500M documents with a new mapping without downtime? ↳ new index, backfill, alias swap
+  - `L3` How do you rank by a mix of text relevance, recency and popularity?
+  - `L3` How do you enforce per-user document permissions in search results without slowing queries?
+  - `L3` How do you add semantic (vector) search alongside keyword search?
+  - `L3` How do you measure search quality? ↳ click-through, NDCG on judged queries, zero-result rate
+  - `L3` How do you answer a query whose common term matches 100M documents quickly? ↳ early termination, tiered index, result caching
+- [ ] Zomato/Swiggy order + delivery tracking; UPI-like payment flow; Splitwise backend ↳ https://www.hellointerview.com/learn/system-design/problem-breakdowns/gopuff (Local Delivery Service) · https://www.hellointerview.com/learn/system-design/problem-breakdowns/uber · Xu vol2 ch11 "Payment System" (book, not in library)
+  - `L2` Design Swiggy/Zomato: browse restaurants, order food, track delivery.
+  - `L2` What do you clarify for food delivery? ↳ cities, restaurant integration, delivery partners, live tracking, payments, peak hours
+  - `L2` 2M orders a day with 3× dinner peak. Order QPS at peak, and location updates from 300k riders?
+  - `L2` What services do you split into? ↳ catalogue/menu, search, cart, order, payment, dispatch, tracking, notifications
+  - `L2` What is the order state machine, and who moves each transition?
+  - `L2` How does the restaurant receive and accept an order reliably (tablet offline)?
+  - `L2` How do you show "restaurants open now that deliver to me" fast? ↳ geo index + serviceability polygons + cache
+  - `L2` How do you handle menu item availability changes during the dinner rush?
+  - `L2` How do you assign a delivery partner? What do you optimise?
+  - `L2` How does live order tracking reach the customer's app?
+  - `L2` How does a UPI payment flow work at a high level? ↳ PSP app, NPCI switch, issuer/acquirer banks, collect vs intent
+  - `L2` Design the backend for Splitwise.
+  - `L2` What do you clarify for expense splitting? ↳ groups, split types, currencies, settlements, offline edits, notifications
+  - `L2` 20M users, 5 expenses a week each. Why is scale easy here and correctness the real problem?
+  - `L2` Store expenses and compute balances, or store balances directly? Trade-offs.
+  - `L2` How do you compute "who owes whom" in a group?
+  - `L2` How do you simplify debts to the fewest payments? ↳ net balances, greedy match max creditor/debtor
+  - `L2` How do you handle editing or deleting an old expense?
+  - `L2` What APIs and tables do you need (users, groups, expenses, splits, settlements)?
+  - `L2` How do you record a settlement payment — is it just another expense?
+  - `L3` Payment succeeded but order creation failed. What does the customer see and how do you fix it? ↳ idempotency, saga, auto-refund, reconciliation
+  - `L3` How do you batch two orders to one rider?
+  - `L3` How do you compute the delivery-time promise shown before ordering?
+  - `L3` Two members edit the same expense at once. How do you avoid lost updates?
+  - `L3` How do you handle multi-currency groups and exchange rates over time?
+  - `L3` How do you notify group members of new expenses without spamming them?
+  - `L3` How would you settle up through real UPI payments and keep both records consistent?
+- [ ] Google Calendar / meeting scheduler (recurrence, time zones, conflicts) ↳ DDIA ch7 "Preventing write skew and phantoms" (pdf p259, meeting-room booking p262) · https://www.rfc-editor.org/rfc/rfc5545 (RRULE recurrence) · DDIA ch8 "Unreliable Clocks" (pdf p300)
+  - `L2` Design Google Calendar with meeting invites and free/busy lookup.
+  - `L2` What do you clarify for the calendar? ↳ recurrence, time zones, invites across orgs, rooms, reminders, sync with other clients
+  - `L2` 100M users, 5 events/day, reminders on most. Reminder fires per second at the 9 am peak?
+  - `L2` How do you store recurring events? Expand all instances or store the rule? ↳ store RRULE + exceptions; expand on read for a window
+  - `L2` How do you store times so DST changes don't break meetings? ↳ wall time + IANA zone for future events, UTC for instants
+  - `L2` How do you find a free slot for 8 people? ↳ free/busy intervals, merge, intersect
+  - `L2` How do invites and RSVPs flow between users and organisations?
+  - `L2` How do you send event reminders reliably at the right time?
+  - `L2` How do you sync events with phones and other clients (CalDAV, push changes)?
+  - `L2` Design a meeting-scheduling agent across Gmail and Calendar for two people in different time zones.
+  - `L3` "Edit this and following events" on a recurring series: how do you model it?
+  - `L3` How do you prevent double-booking a meeting room?
+  - `L3` How do you partition calendar data and answer free/busy across many users fast?
+- [ ] Presence / online status (heartbeats, TTL keys in Redis, fan-out to online friends, multi-device, flapping)
+  - `L1` What does a heartbeat do for presence?
+  - `L2` Design the "online / last seen" indicator for a chat app.
+  - `L2` What do you clarify for presence / online status? ↳ freshness needed, who can see it, idle vs offline, multi-device, privacy settings
+  - `L2` 100M online users sending a heartbeat every 30 s: what QPS hits the presence service?
+  - `L2` Heartbeats vs connection open/close events: which do you trust and why?
+  - `L2` Where do you store presence? ↳ Redis with TTL keys, refreshed by heartbeat
+  - `L2` How do you tell friends that a user went online without a storm of messages?
+  - `L2` How do you handle flapping on bad mobile networks? ↳ grace period before marking offline
+  - `L2` A user is online on phone and laptop. How do you combine their status?
+  - `L2` What APIs and events does the presence service expose?
+  - `L3` A user with 5,000 friends goes online. How do you fan out cheaply? ↳ only to online friends, lazy fetch on open, subscriptions
+  - `L3` How do you show presence in a 100k-member Slack channel?
+  - `L3` What consistency do you need for presence, and why is "approximately right" fine?
+  - `L3` How do you respect privacy settings like "hide last seen" during fan-out?
+- [ ] Proximity service / Yelp nearby (geo index choice, read-heavy listings, radius search, ranking by distance and rating)
+  - `L2` Design "find restaurants near me" like Yelp.
+  - `L2` What do you clarify for the proximity service? ↳ radius, filters (open now, rating), business update rate, read QPS, map view vs list
+  - `L2` 100M DAU, 5 searches each, 200M businesses. Search QPS and index size?
+  - `L2` Why can't you just index latitude and longitude separately?
+  - `L2` Geohash: how does precision map to cell size, and how do you search a radius? ↳ prefix length; query cell + 8 neighbours
+  - `L2` Quadtree: how is it built and when does a node split?
+  - `L2` Business data changes rarely but reads are huge. How does that shape the design? ↳ read replicas, cache, rebuild index offline
+  - `L2` PostGIS vs Redis GEO vs Elasticsearch geo queries: when each?
+  - `L2` Business owners edit listings. How fast must changes appear, and how do they flow?
+  - `L3` How do you rank results by distance, rating and relevance together?
+  - `L3` How do you handle the edge where two nearby points have very different geohashes?
+  - `L3` How would you serve "nearby friends" where both sides move?
+  - `L3` How do you shard the geo index across regions and countries?
+- [ ] Stock exchange / order matching engine (order book, price-time priority, sequencer, market data fan-out)
+  - `L2` Design a stock exchange order matching system.
+  - `L2` What do you clarify for the stock exchange? ↳ order types (limit/market/cancel), symbols count, latency target, fairness, market data fan-out
+  - `L2` 10k symbols, 1M orders per second at peak. What does one matching engine per symbol need to sustain?
+  - `L2` What is an order book? How is it structured in memory? ↳ price levels (sorted map), FIFO queue per level
+  - `L2` Walk through matching a market buy against the book. ↳ price-time priority
+  - `L2` Why is the matching engine single-threaded per symbol?
+  - `L2` What is the sequencer and why does everything go through it?
+  - `L2` How do you publish market data (ticks, depth) to thousands of subscribers?
+  - `L2` How do you handle cancel and modify requests that race with matches?
+  - `L3` How do you make the matching engine fault tolerant without slowing it? ↳ event-sourced input log, deterministic replay, hot standby
+  - `L3` Where do microseconds go, and why do exchanges avoid GC, locks and the network stack?
+  - `L3` How do pre-trade risk checks fit in without adding latency?
+  - `L3` How is a broker's order system (like Zerodha's) different from the exchange itself?
+- [ ] Ad click aggregation (event-time windows, late events, exactly-once counts, OLAP rollups, batch reconciliation)
+  - `L2` Design a system that counts ad clicks per ad per minute for billing and dashboards.
+  - `L2` What do you clarify for ad click aggregation? ↳ freshness, accuracy for billing, late events, query dimensions, retention
+  - `L2` 1B clicks a day, 3× peak. Events per second, and raw storage per day at 100 bytes each?
+  - `L2` Draw the click aggregation pipeline. ↳ click log → Kafka → stream aggregator → OLAP store; raw to data lake
+  - `L2` Tumbling windows on event time: how do you handle late clicks? ↳ watermarks, allowed lateness, correction updates
+  - `L2` How do you get exactly-once counts when the aggregator restarts?
+  - `L2` How do you deduplicate repeated clicks from the same user?
+  - `L2` What does the aggregated table look like (keys, columns, granularity)?
+  - `L3` How do you reconcile the streaming result with a nightly batch recompute? ↳ lambda-style check; batch is source of truth for billing
+  - `L3` How do you handle a hot ad receiving 30% of clicks?
+  - `L3` How do you detect click fraud in the pipeline?
+  - `L3` Which store serves "clicks per ad per minute, filtered by country"? ↳ ClickHouse/Druid/Pinot, pre-aggregated rollups
+  - `L3` You find a bug in the aggregator. How do you recompute last week's numbers? ↳ replay raw events from Kafka / data lake
+- [ ] Email service / Gmail (SMTP send and receive, mailbox storage, per-user search, SPF/DKIM/DMARC)
+  - `L2` Design an email service like Gmail: send, receive, search, folders.
+  - `L2` What do you clarify for the email service? ↳ users, attachments, search, spam filtering, threads, retention, IMAP support
+  - `L2` 1B users, 40 emails received a day at 50 KB average. Storage per day?
+  - `L2` How does sending work end to end? ↳ SMTP outbound queue, MX lookup, retries, bounces
+  - `L2` How does receiving work? ↳ SMTP inbound, spam/virus checks, store, index, notify client
+  - `L2` How do you store emails and attachments? ↳ metadata DB partitioned by user, bodies/attachments in blob
+  - `L2` How do you implement threads / conversations?
+  - `L2` How do you search a user's mailbox fast? ↳ per-user inverted index
+  - `L2` How do clients see new mail instantly? ↳ WebSocket / long poll, IMAP IDLE, mobile push
+  - `L3` What are SPF, DKIM and DMARC and why does your outbound pipeline care?
+  - `L3` How do you protect sender reputation (IP warmup, rate limits per domain)?
+  - `L3` How do you dedupe a large attachment sent to 10,000 recipients?
+  - `L3` How do you shard mailboxes, and what about one user with 10M emails?
+
+## 6.14 Performance engineering
+- [ ] Measure first: latency vs throughput, utilisation, Little's law, Amdahl's law, USE method
+  - `L1` What is latency vs throughput? Response time vs latency?
+  - `L1` Latency vs throughput vs bandwidth: define each.
+  - `L1` Why "measure first, optimise second"? What goes wrong otherwise?
+  - `L1` What is a bottleneck?
+  - `L1` What does "premature optimisation is the root of all evil" actually mean, in full context?
+  - `L1` Little's law formula?
+  - `L1` Amdahl's law in one sentence?
+  - `L1` Target CPU utilisation before latency climbs?
+  - `L2` Can you improve throughput while making latency worse? Give an example. ↳ batching, bigger queues, Nagle
+  - `L2` What is Little's law? Use it: 200 req/s at 50 ms average — how many requests are in flight? ↳ L = λ·W = 10
+  - `L2` What is Amdahl's law? If 20 % of a job is serial, what is the maximum speed-up? ↳ 5×
+  - `L2` What happens to latency as utilisation approaches 100 %? Why do people target 60–70 %? ↳ queueing theory: wait time explodes near the knee
+  - `L2` What is the USE method, and how do you apply it to find a bottleneck?
+  - `L2` Walk me through how you would approach "the API is slow" with no other information.
+  - `L2` What is a performance budget, and how do you split one across the stages of a request?
+  - `L2` CPU-bound vs I/O-bound vs memory-bound: how do you tell which one you are?
+  - `L3` What is the Universal Scalability Law, and why does throughput sometimes go down as you add nodes? ↳ contention + coherency cost
+  - `L3` How do you prove an optimisation worked and wasn't noise? ↳ repeated runs, same env, variance, percentiles, before/after in prod metrics
+  - `L3` What is the anti-method of "streetlight" debugging, and how do you avoid it?
+- [ ] Profiling: CPU vs wall-clock, sampling vs instrumenting profilers, flame graphs, finding the hot path
+  - `L1` What is a profiler? Sampling vs instrumenting profiler.
+  - `L1` What is a flame graph? What do the x-axis and y-axis mean? ↳ width = share of samples; y = stack depth; x is not time
+  - `L1` Flame graph: what does width mean?
+  - `L1` On-CPU vs off-CPU in one line?
+  - `L1` Tool to profile a live Python process with no code change?
+  - `L1` Node tool for flame graphs?
+  - `L2` How do you read a flame graph to find the hot path? What is a "plateau"?
+  - `L2` On-CPU vs off-CPU flame graphs: what does each show? When do you need off-CPU? ↳ off-CPU for waiting: I/O, locks, sleeps
+  - `L2` What is an icicle graph and a differential flame graph?
+  - `L2` Why might a profile show time in `epoll_wait` or `(idle)`, and what does that tell you?
+  - `L2` Can you profile in production? What is the overhead of a sampling profiler at 99 Hz?
+  - `L2` What is continuous profiling (Pyroscope, Parca, Datadog profiler), and why is it useful?
+  - `L2` What is wall-clock time vs CPU time in a profile?
+  - `L2` What do `clinic doctor`, `clinic flame`, `clinic bubbleprof` and `clinic heapprofiler` each tell you?
+  - `L2` How do you generate a flame graph with `0x` or `node --cpu-prof`?
+  - `L2` cProfile vs py-spy vs Scalene vs pyinstrument: when do you use each? ↳ py-spy attaches to a live process with no code change
+  - `L3` Why do some flame graphs have broken stacks or `[unknown]` frames? ↳ missing frame pointers, JIT symbols, `--perf-basic-prof`
+  - `L3` How do you profile one slow request rather than the whole process?
+  - `L3` What is eBPF, and how do tools like `bpftrace` help with production performance?
+  - `L3` Tell me about a time a profile showed something you didn't expect.
+- [ ] Tail latency and overload: fan-out amplification, hedged requests, adaptive concurrency limits, metastable failure, backpressure
+  - `L1` What is a hedged request?
+  - `L2` What is tail latency and why does it get worse when one request fans out to many services? ↳ tail amplification: slowest of N calls dominates
+  - `L2` What is a cascading failure? Walk through one.
+  - `L2` What is a hedged request? What is a tied request? ↳ send second copy after p95 delay; cancel loser
+  - `L2` What is admission control / concurrency limiting (e.g. adaptive limits)?
+  - `L3` What are hedged requests and when do they help tail latency?
+  - `L3` What is adaptive concurrency limiting (e.g. Netflix concurrency-limits)? Why is it better than fixed limits?
+  - `L3` What is metastable failure, and why does a system stay down after the trigger is gone?
+  - `L3` Producer is faster than consumer in a streaming pipeline. What are your options? ↳ buffer (bounded), drop, block/backpressure, scale consumer
+  - `L3` What causes tail latency in a single service? ↳ GC, queueing, noisy neighbours, background tasks, lock contention, cold caches
+  - `L3` What is metastable failure, and why can a system stay broken after the trigger is gone?
+  - `L3` Would you hedge LLM calls? What does it cost?

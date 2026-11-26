@@ -1,0 +1,416 @@
+# 9. Core CS — OS, concurrency, networking, DBMS theory (P1)
+
+Mostly asked by service companies and larger product companies (one round of rapid-fire theory). Startups ask
+the concurrency parts.
+
+---
+
+## 9.1 Processes and threads
+- [ ] Process vs thread (memory, cost, isolation); what a process control block holds ↳ OSTEP "The Abstraction: The Process" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf · OSTEP "Concurrency: An Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf
+  - `L1` What is a program, a process and a thread?
+  - `L1` Process vs thread: memory, cost, isolation, communication.
+  - `L1` What do threads of one process share, and what does each thread have of its own? ↳ share heap, code, globals, fds; own stack, registers, PC
+  - `L1` What is a process control block (PCB)? What does it hold? ↳ PID, state, registers, PC, memory maps, open files, scheduling info
+  - `L1` Does a thread have its own heap?
+  - `L1` Process vs thread?
+  - `L2` Why are threads cheaper to create and switch than processes?
+  - `L2` What happens to other threads if one thread crashes (segfault) vs if one process crashes?
+  - `L2` What is a daemon process? What is a daemon thread?
+  - `L2` Why are threads cheaper?
+- [ ] Context switching and its cost ↳ OSTEP "Mechanism: Limited Direct Execution" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-mechanisms.pdf · https://eli.thegreenplace.net/2018/measuring-context-switching-and-memory-overheads-for-linux-threads/
+  - `L1` What is a context switch?
+  - `L2` What does a context switch cost, and where does the cost come from? ↳ save/restore registers, kernel entry, TLB/cache pollution
+  - `L2` Process switch vs thread switch: which is cheaper and why?
+- [ ] User-level vs kernel threads; green threads / coroutines ↳ https://en.wikipedia.org/wiki/Thread_(computing) (kernel vs user threads, M:N, green threads) · https://docs.python.org/3/library/asyncio-task.html (coroutines) · https://go.dev/doc/faq#goroutines
+  - `L1` What is a coroutine?
+  - `L2` User-level threads vs kernel threads. What are the 1:1, M:1 and M:N models?
+  - `L2` Green threads, coroutines and goroutines: how do they relate to OS threads?
+  - `L3` How does Linux implement threads (`clone`, tasks)? Is a thread a "lightweight process"?
+- [ ] Process states (new, ready, running, waiting, terminated) ↳ OSTEP "The Abstraction: The Process" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-intro.pdf ("Process States") · Neso Academy "Operating System" playlist (process states video, YouTube)
+  - `L1` What are the process states? Draw the state diagram. ↳ new, ready, running, waiting/blocked, terminated
+- [ ] IPC: pipes, sockets, shared memory, message queues, signals ↳ https://beej.us/guide/bgipc/ · OSTEP "Interlude: Process API" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf (pipes, signals) · https://man7.org/linux/man-pages/man7/signal.7.html
+  - `L1` What is IPC? Name the main mechanisms. ↳ pipes, named pipes, sockets, shared memory, message queues, signals
+  - `L1` Signal that cannot be caught?
+  - `L1` How do two processes communicate?
+  - `L2` Pipe vs named pipe (FIFO) vs Unix domain socket vs TCP socket.
+  - `L2` Shared memory vs message passing: trade-offs. Why is shared memory the fastest IPC?
+  - `L2` What are signals? `SIGTERM` vs `SIGKILL` vs `SIGINT`. Which can a process catch?
+  - `L2` How do two processes on the same machine communicate in your stack (e.g. Gunicorn master and workers)?
+- [ ] fork/exec; zombie and orphan processes ↳ OSTEP "Interlude: Process API" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-api.pdf (fork, exec, wait) · https://man7.org/linux/man-pages/man2/wait.2.html (zombies) · https://en.wikipedia.org/wiki/Zombie_process
+  - `L1` Which system call creates a new process in Unix?
+  - `L2` What do `fork()` and `exec()` do? Why are they separate calls?
+  - `L2` What is copy-on-write after `fork()`? Why does it matter for Redis `BGSAVE`?
+  - `L2` What is a zombie process? What is an orphan process? How do you get rid of zombies? ↳ parent must `wait()`; orphans re-parented to init
+  - `L3` What does `fork()` in a multi-threaded process do, and why is it dangerous?
+- [ ] System calls, user vs kernel mode, interrupts and traps; monolithic vs microkernel; syscall cost (strace, io_uring)
+  - `L1` What is a system call? Give five examples. ↳ `read`, `write`, `open`, `fork`, `mmap`, `socket`
+  - `L1` User mode vs kernel mode: why have two modes?
+  - `L1` What is an interrupt? Hardware interrupt vs software trap vs exception.
+  - `L1` What is a kernel? Monolithic vs microkernel.
+  - `L2` How does a user program switch into kernel mode for a system call? ↳ syscall instruction traps; kernel checks number, runs handler, returns
+  - `L3` What does `strace` show you, and how would you use it to debug a hanging process?
+  - `L3` Why are system calls expensive, and how do `io_uring`, vDSO and batching reduce the cost?
+
+## 9.2 CPU scheduling
+- [ ] FCFS, SJF, round robin, priority scheduling, multilevel queues ↳ OSTEP "Scheduling: Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf · OSTEP "Scheduling: The Multi-Level Feedback Queue" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-mlfq.pdf · Gate Smashers CPU scheduling videos (YouTube)
+  - `L1` What is CPU scheduling and why is it needed?
+  - `L1` Explain FCFS. What is the convoy effect?
+  - `L1` Explain SJF and SRTF (preemptive SJF).
+  - `L1` Explain round robin. What is a time quantum?
+  - `L1` Scheduling algorithm with the convoy effect?
+  - `L2` What is the long-term, short-term and medium-term scheduler?
+  - `L2` Why is SJF optimal for average waiting time, and why can't you implement it exactly? ↳ needs future burst lengths; estimate with exponential averaging
+  - `L2` What happens to round robin if the quantum is very large? Very small?
+  - `L2` Multilevel queue vs multilevel feedback queue.
+  - `L2` Which algorithm suits interactive systems and which suits batch jobs?
+  - `L2` What is the dispatcher, and what is dispatch latency?
+- [ ] Preemptive vs non-preemptive; starvation and aging ↳ OSTEP "Scheduling: The Multi-Level Feedback Queue" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-mlfq.pdf (starvation, priority boost = aging) · OSTEP "Scheduling: Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf
+  - `L1` Preemptive vs non-preemptive scheduling.
+  - `L1` Explain priority scheduling. What is starvation, and what is aging?
+  - `L1` Cure for starvation in priority scheduling?
+- [ ] Throughput, turnaround, waiting, response time ↳ OSTEP "Scheduling: Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched.pdf (turnaround and response time) · Neso Academy "Operating System" playlist (CPU scheduling problems, YouTube)
+  - `L1` Define throughput, turnaround time, waiting time and response time.
+  - `L2` Given processes with arrival and burst times, compute average waiting time under FCFS, SJF and RR (q=2).
+- [ ] Real schedulers: Linux CFS, multiprocessor affinity, priority inversion and inheritance, CPU quota throttling
+  - `L3` How does Linux's CFS (Completely Fair Scheduler) decide who runs next? ↳ lowest virtual runtime; red-black tree; nice weights
+  - `L3` What is priority inversion? How did it hit the Mars Pathfinder, and what is priority inheritance?
+  - `L3` Multiprocessor scheduling: processor affinity and load balancing. Why does affinity help caches?
+  - `L3` How do Kubernetes CPU limits (CFS quota) cause throttling and latency spikes for a busy service?
+  - `L3` Priority inversion with mutexes: how do priority-inheritance mutexes fix it?
+
+## 9.3 Memory
+- [ ] Stack vs heap ↳ OSTEP "Interlude: Memory API" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-api.pdf · OSTEP "The Abstraction: Address Spaces" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-intro.pdf
+  - `L1` Stack vs heap: what lives where, and who frees it?
+  - `L1` What is a memory leak? Can you leak memory in a garbage-collected language?
+  - `L1` Stack vs heap?
+  - `L2` What is a stack overflow, and why does deep recursion cause it?
+- [ ] Virtual memory, pages, page tables, TLB ↳ OSTEP "Paging: Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-paging.pdf · OSTEP "Paging: Faster Translations (TLBs)" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-tlbs.pdf · OSTEP "The Abstraction: Address Spaces" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-intro.pdf
+  - `L1` What is logical (virtual) address vs physical address? What does the MMU do?
+  - `L1` What is paging? What is a page and a frame?
+  - `L1` What is virtual memory, and why do we need it? ↳ isolation, bigger-than-RAM address space, simpler programs, sharing
+  - `L1` What is a TLB?
+  - `L1` TLB is a cache of what?
+  - `L1` What is virtual memory and why do we need it?
+  - `L2` What does the OS use to map virtual to physical pages? ↳ multi-level page table (radix tree) + TLB
+  - `L2` How is a virtual address translated with a page table? ↳ page number → frame via page table; offset unchanged
+  - `L2` Why are page tables multi-level? ↳ flat table for 64-bit space is huge; only allocate used parts
+  - `L2` Compute effective memory access time given TLB hit ratio, TLB time and memory time.
+  - `L2` What happens to the TLB on a context switch? What is an ASID?
+  - `L2` What is virtual memory and what does the MMU do?
+  - `L3` What are huge pages and why do databases sometimes want them (and sometimes disable transparent huge pages)?
+- [ ] Page faults, demand paging, thrashing ↳ OSTEP "Beyond Physical Memory: Mechanisms" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys.pdf · OSTEP "Beyond Physical Memory: Policies" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys-policy.pdf (thrashing)
+  - `L1` What is a page fault?
+  - `L1` What is demand paging?
+  - `L1` What is thrashing?
+  - `L1` What is thrashing?
+  - `L2` What is swapping?
+  - `L2` Walk through what happens on a page fault, step by step.
+  - `L2` Minor vs major page fault.
+  - `L2` What causes thrashing, and how does an OS detect and stop it? ↳ working sets exceed RAM; page-fault frequency; reduce multiprogramming
+  - `L2` What is the working set model?
+  - `L2` What is a page fault? Minor vs major.
+  - `L3` A server's latency spikes and `vmstat` shows high `si`/`so`. What is happening and what do you do?
+- [ ] Page replacement: FIFO, LRU, optimal ↳ OSTEP "Beyond Physical Memory: Policies" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-beyondphys-policy.pdf · DBI ch5 "Page Replacement" (pdf p151–155, FIFO, LRU, CLOCK, LFU)
+  - `L1` Which page-replacement algorithm is optimal but impossible?
+  - `L1` Which page-replacement algorithm shows Belady's anomaly?
+  - `L2` Page replacement: FIFO, LRU, Optimal. Run each on a reference string with 3 frames.
+  - `L2` What is Belady's anomaly, and which algorithm suffers from it? ↳ FIFO: more frames can give more faults
+  - `L2` Why is exact LRU too expensive for an OS, and what is the clock (second-chance) algorithm?
+  - `L3` How is OS page replacement related to cache eviction in Redis and database buffer pools?
+- [ ] Fragmentation (internal vs external), segmentation ↳ OSTEP "Segmentation" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-segmentation.pdf · OSTEP "Free-Space Management" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-freespace.pdf
+  - `L1` What is segmentation?
+  - `L1` Internal vs external fragmentation. Which does paging have?
+  - `L1` Paging causes internal or external fragmentation?
+  - `L2` Paging vs segmentation: trade-offs. What is segmented paging?
+  - `L2` Contiguous allocation: first fit, best fit, worst fit. What is compaction?
+- [ ] Memory-mapped files; page cache (why databases care) ↳ DBI ch5 "Buffer Management" (pdf p144–147, why databases manage their own page cache) · OSTEP "Complete Virtual Memory Systems" https://pages.cs.wisc.edu/~remzi/OSTEP/vm-complete.pdf (Linux page cache) · https://db.cs.cmu.edu/mmap-cidr2022/
+  - `L2` What is a memory-mapped file (`mmap`)? Why do databases and vector stores use it?
+  - `L3` Why do PostgreSQL and many databases rely on the OS page cache, while others bypass it with `O_DIRECT`?
+
+## 9.4 Concurrency and synchronisation
+- [ ] Race conditions, critical sections ↳ OSTEP "Concurrency: An Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf · DBI ch8 "Concurrent Execution" (pdf p279)
+  - `L1` What is a race condition? Show one with `count += 1` across threads. ↳ read-modify-write isn't atomic
+  - `L1` Does Node.js need locks? When does it still have races? ↳ interleaving across `await`; worker threads + SharedArrayBuffer
+  - `L1` What is a race condition?
+  - `L1` What is a critical section? What are the three requirements of a critical-section solution? ↳ mutual exclusion, progress, bounded waiting
+  - `L2` What is Peterson's solution, and why doesn't it work on modern CPUs without barriers?
+  - `L2` Show a race condition with two threads incrementing a shared counter, and fix it.
+- [ ] Mutex, semaphore (binary vs counting), condition variables, monitors ↳ OSTEP "Locks" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf · OSTEP "Condition Variables" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf · OSTEP "Semaphores" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf
+  - `L1` Mutex vs semaphore vs condition variable.
+  - `L1` What is a mutex?
+  - `L1` What is a semaphore? Binary vs counting semaphore.
+  - `L1` Mutex vs binary semaphore: what is the difference? ↳ ownership: only locker unlocks a mutex; semaphore signals across threads
+  - `L1` What is a monitor?
+  - `L1` What is a condition variable?
+  - `L1` Binary semaphore or mutex: which has ownership?
+  - `L1` Mutex vs semaphore?
+  - `L2` Why `wait()` inside `while` and not `if`? ↳ spurious wakeups; another consumer took the item
+  - `L2` **Print in Order** (LC 1114) and **Print FooBar Alternately** (LC 1115) — events or semaphores.
+  - `L2` What do `wait()` (P) and `signal()` (V) do on a semaphore?
+  - `L2` Why must you check a condition variable in a `while` loop, not an `if`? ↳ spurious wakeups; condition may change before reacquiring lock
+  - `L2` What is a reentrant (recursive) lock? When do you need one?
+  - `L2` What is a barrier? What is a latch?
+  - `L3` How is a mutex implemented? What is a futex? ↳ atomic CAS fast path in user space; kernel wait queue only on contention
+  - `L3` What is lock convoy / lock contention, and how do you find it in production?
+- [ ] Spinlocks; read-write locks ↳ OSTEP "Locks" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf (spin locks, test-and-set) · OSTEP "Semaphores" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf (reader-writer locks) · DBI ch5 "Readers-writer lock" (pdf p182)
+  - `L1` What is a spinlock?
+  - `L2` Implement a read-write lock. What is writer starvation?
+  - `L2` Spinlock vs blocking mutex: when is spinning better? ↳ short critical sections on multicore; never on single core
+  - `L2` What is a read-write lock? When does it help and when does it hurt?
+- [ ] Deadlock: four conditions (mutual exclusion, hold and wait, no preemption, circular wait); prevention, avoidance (banker's algorithm idea), detection ↳ OSTEP "Common Concurrency Problems" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf (deadlock conditions, prevention, avoidance, detection) · DBI ch5 "Deadlocks" (pdf p179)
+  - `L1` What is a deadlock?
+  - `L1` What are the four necessary conditions for deadlock (Coffman)? ↳ mutual exclusion, hold and wait, no preemption, circular wait
+  - `L1` Four Coffman conditions?
+  - `L1` Algorithm for deadlock avoidance?
+  - `L2` The four conditions for deadlock, and how to break each. ↳ mutual exclusion, hold-and-wait, no preemption, circular wait
+  - `L2` Deadlock prevention vs avoidance vs detection and recovery vs ignoring it (ostrich).
+  - `L2` How do you prevent each of the four conditions? Which is easiest in practice? ↳ break circular wait with a global lock ordering
+  - `L2` Explain the banker's algorithm. What is a safe state?
+  - `L2` Given Allocation, Max and Available matrices, find a safe sequence.
+  - `L2` What is a resource-allocation graph? When does a cycle mean deadlock for sure? ↳ single-instance resources: cycle ⇔ deadlock
+  - `L2` What is a wait-for graph, and how is it used for detection?
+  - `L2` How do you recover from a deadlock once detected?
+  - `L2` Why is the banker's algorithm rarely used in real operating systems?
+  - `L2` Four conditions for deadlock and how to prevent one
+  - `L3` How would you detect a deadlock among DB transactions? ↳ cycle in the wait-for graph
+  - `L3` Can you deadlock with a single thread? With async/await? ↳ yes: non-reentrant lock reacquired; awaiting own task; pool exhaustion
+  - `L3` Connection-pool deadlock: a request holds one DB connection and waits for a second from the same exhausted pool. Explain and fix.
+  - `L3` How do you debug a hung Node or Python service that you suspect is deadlocked? ↳ thread dumps (`py-spy dump`), `pg_locks`, event-loop lag, async stack
+  - `L3` What is a deadlock, and how can it happen with two locks in Python?
+- [ ] Livelock, starvation ↳ OSTEP "Common Concurrency Problems" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf (livelock) · OSTEP "Scheduling: The Multi-Level Feedback Queue" https://pages.cs.wisc.edu/~remzi/OSTEP/cpu-sched-mlfq.pdf (starvation)
+  - `L1` What is livelock? How is it different from deadlock?
+  - `L1` What is starvation?
+  - `L2` Give a livelock example from real systems. ↳ retry storms without jitter; two polite threads backing off together
+- [ ] Atomic operations, compare-and-swap, lock-free idea ↳ OSTEP "Locks" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-locks.pdf (compare-and-swap) · DBI ch6 "Taming Concurrency with Compare-and-Swap" (pdf p208) · DDIA ch7 "Preventing lost updates" (pdf p255, compare-and-set)
+  - `L1` What is an atomic operation?
+  - `L1` What is compare-and-swap (CAS)?
+  - `L1` CAS stands for?
+  - `L2` What is compare-and-swap, and how does a lock-free (Treiber) stack use it?
+  - `L2` What is the ABA problem with CAS, and how do you fix it? ↳ value changes A→B→A; use version tag/counter
+  - `L2` What is lock-free vs wait-free?
+  - `L3` What is the ABA problem? ↳ A→B→A fools CAS; tagged pointers or hazard pointers
+  - `L3` How does Java's ConcurrentHashMap avoid a global lock? ↳ per-bin locks and CAS; lock-free reads
+  - `L3` Implement a lock-free stack push with CAS (pseudo-code). What can still go wrong?
+- [ ] Classic problems: producer–consumer, readers–writers, dining philosophers ↳ OSTEP "Condition Variables" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-cv.pdf (producer–consumer) · OSTEP "Semaphores" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf (readers–writers, dining philosophers) · LeetCode "Concurrency" problem set (practice)
+  - `L1` What is the producer–consumer problem?
+  - `L1` State the producer–consumer (bounded buffer) problem.
+  - `L1` State the readers–writers problem.
+  - `L1` State the dining philosophers problem.
+  - `L2` Implement a thread-safe bounded blocking queue with a lock and two condition variables. ↳ not_full / not_empty; wait inside a while loop
+  - `L2` Implement the same bounded queue with two semaphores and a mutex.
+  - `L2` **Design Bounded Blocking Queue** (LC 1188, premium).
+  - `L2` **The Dining Philosophers** (LC 1226) — how do you avoid deadlock? ↳ global lock order, limit diners, try-lock
+  - `L2` Backpressure: what should a producer do when the bounded queue is full? ↳ block, drop, reject with 429, shed oldest
+  - `L2` Write a thread-safe producer–consumer with semaphores (`empty`, `full`, `mutex`). Why does the order of waits matter? ↳ wrong order: producer holds mutex while waiting; deadlock
+  - `L2` Write producer–consumer with a lock and condition variables.
+  - `L2` First vs second readers–writers problem: who starves in each?
+  - `L2` Give three solutions to dining philosophers. ↳ resource ordering, at most N−1 seated, waiter/arbitrator, pick both atomically
+  - `L2` Write a thread-safe producer–consumer
+- [ ] Concurrency vs parallelism; async I/O vs threads ↳ OSTEP "Event-based Concurrency (Advanced)" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-events.pdf · https://fastapi.tiangolo.com/async/ · Rob Pike talk "Concurrency is not Parallelism" https://go.dev/blog/waza-talk
+  - `L1` Concurrency vs parallelism.
+  - `L1` Concurrency or parallelism: one core juggling many tasks?
+  - `L1` Concurrency vs parallelism?
+  - `L1` Synchronous vs asynchronous vs parallel vs concurrent: define each.
+  - `L1` What is the difference between concurrency and parallelism?
+  - `L1` Concurrency vs parallelism: what is the difference?
+  - `L2` Async I/O vs threads: when would you choose each for a backend?
+  - `L3` How many threads should a CPU-bound vs an I/O-bound service run? ↳ CPU-bound ≈ cores; I/O-bound more, or async
+  - `L3` Your Python service spawns a thread per request and falls over at 2,000 concurrent requests. Why, and what do you change?
+  - `L3` Thread-per-request vs event loop vs worker pool: compare memory and throughput for 10k idle WebSocket connections.
+- [ ] Memory visibility: CPU caches and reordering, memory barriers, happens-before, false sharing
+  - `L2` What is memory visibility? Why can one thread not see another thread's write? ↳ CPU caches, store buffers, compiler/CPU reordering
+  - `L2` What is a memory barrier / fence? What does `volatile` guarantee in Java (and what not)?
+  - `L2` What is a happens-before relationship?
+  - `L3` What is false sharing, and how does it slow down multi-threaded code?
+
+## 9.5 File systems and I/O
+- [ ] Inodes, file descriptors; everything is a file in Unix ↳ OSTEP "Interlude: Files and Directories" https://pages.cs.wisc.edu/~remzi/OSTEP/file-intro.pdf · OSTEP "File System Implementation" https://pages.cs.wisc.edu/~remzi/OSTEP/file-implementation.pdf
+  - `L1` What is an inode? What does it store, and what does it not store? ↳ metadata, block pointers; not the filename
+  - `L1` What is a file descriptor?
+  - `L1` What does "everything is a file" mean in Unix?
+  - `L1` Hard link vs soft (symbolic) link.
+  - `L1` What does the inode not store?
+  - `L2` What happens when you delete a file that a process still has open?
+  - `L2` What is "too many open files", and how do you fix it on a busy server? ↳ fd limit (`ulimit -n`); leaked sockets/files; raise limit, close properly
+  - `L2` Contiguous vs linked vs indexed file allocation.
+- [ ] Blocking vs non-blocking I/O; select/poll/epoll/kqueue (how Node/nginx scale) ↳ https://copyconstruct.medium.com/the-method-to-epolls-madness-d9d2d6378642 · OSTEP "Event-based Concurrency (Advanced)" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-events.pdf · https://man7.org/linux/man-pages/man7/epoll.7.html
+  - `L1` Blocking vs non-blocking I/O.
+  - `L1` Linux mechanism behind Node's event loop on network sockets?
+  - `L2` Which queues and buffers sit inside Node's event loop and Linux networking?
+  - `L2` `select` vs `poll` vs `epoll` vs `kqueue`. ↳ O(n) scans vs kernel-maintained ready list; edge/level triggered
+  - `L2` How does `epoll` let one thread handle 10k connections?
+  - `L2` How do Node.js (libuv) and nginx use epoll/kqueue to scale?
+  - `L2` Synchronous vs asynchronous I/O vs I/O multiplexing.
+  - `L2` How does epoll let one thread handle 10k connections?
+  - `L3` What is zero-copy (`sendfile`), and why does Kafka use it?
+  - `L3` Why is file I/O in Node.js done on the thread pool even though network I/O uses epoll?
+  - `L3` What is `io_uring`, and what does it change compared with epoll?
+  - `L3` What is `epoll` and why does it scale better than `select`/`poll`?
+  - `L3` Blocking vs non-blocking I/O on an FD. What does `EAGAIN` mean?
+- [ ] fsync and durability ↳ OSTEP "Interlude: Files and Directories" https://pages.cs.wisc.edu/~remzi/OSTEP/file-intro.pdf ("Writing Immediately With fsync()") · DBI ch5 "Recovery" (pdf p157–158, PostgreSQL and fsync) · OSTEP "Crash Consistency: FSCK and Journaling" https://pages.cs.wisc.edu/~remzi/OSTEP/file-journaling.pdf
+  - `L1` Which call forces data from the page cache to disk?
+  - `L2` What is a journaling file system, and what problem does it solve?
+  - `L2` What does `fsync` do, and why does a database call it on commit?
+  - `L2` What is `fsync` and why do databases care?
+  - `L3` What is the page cache, and why does `write()` returning not mean the data is on disk?
+
+## 9.6 Networking (theory)
+- [ ] OSI 7 layers vs TCP/IP 4 layers; which protocol lives where ↳ https://www.cloudflare.com/learning/ddos/glossary/open-systems-interconnection-model-osi/ · Neso Academy "Computer Networks" playlist (OSI and TCP/IP model videos, YouTube)
+  - `L1` Name the 7 OSI layers and one protocol at each.
+  - `L1` OSI 7 layers vs the TCP/IP 4-layer model: how do they map?
+  - `L1` Layer of the OSI model where routers work?
+  - `L1` Explain the OSI model
+  - `L1` Name the layers of the OSI model and of the TCP/IP model. Which ones matter in daily backend work?
+  - `L1` At which layer do IP, TCP, UDP, TLS, HTTP, DNS and Ethernet sit?
+  - `L1` What is a packet, a segment, a datagram and a frame?
+  - `L2` Router vs switch vs hub. At which layer does each work?
+  - `L2` What is encapsulation? Show how an HTTP request is wrapped as it goes down the stack.
+- [ ] IP addressing, subnetting/CIDR, NAT ↳ https://www.cloudflare.com/learning/network-layer/what-is-a-subnet/ · https://docs.aws.amazon.com/vpc/latest/userguide/vpc-cidr-blocks.html · Neso Academy "Computer Networks" playlist (subnetting videos, YouTube)
+  - `L1` What is an IP address? IPv4 vs IPv6.
+  - `L1` What is NAT, and why does almost every home and VPC use it?
+  - `L1` IPv4 vs IPv6: sizes and why IPv6 exists.
+  - `L1` What is a subnet? What does `/24` mean in `10.0.1.0/24`? ↳ first 24 bits are network; 256 addresses
+  - `L1` What are the private IPv4 ranges? ↳ 10/8, 172.16/12, 192.168/16
+  - `L1` How many bits in an IPv4 address? IPv6?
+  - `L1` How many addresses in a `/24`?
+  - `L2` What is CIDR? How many usable hosts are in a /24 and a /28? ↳ /24: 254; /28: 14
+  - `L2` Are `10.0.1.5` and `10.0.2.5` in the same subnet with mask `/23`? Show the working.
+  - `L2` What are private IP ranges? ↳ 10/8, 172.16/12, 192.168/16
+  - `L2` How many usable hosts are in a `/26`? In a `/16`? Why does AWS give you 5 fewer per subnet?
+- [ ] TCP vs UDP; TCP handshake and teardown; sliding window; congestion control (slow start) ↳ https://hpbn.co/building-blocks-of-tcp/ (handshake, flow control, slow start) · https://hpbn.co/building-blocks-of-udp/ · DDIA ch8 "Unreliable Networks" (pdf p291–297)
+  - `L1` TCP vs UDP. Give two uses of each.
+  - `L1` Explain the TCP three-way handshake and the four-way teardown.
+  - `L1` TCP 3-way handshake
+  - `L1` What is flow control? What is the receive window (rwnd)?
+  - `L1` What is congestion control? How is it different from flow control? ↳ protects network vs protects receiver
+  - `L1` What is slow start?
+  - `L2` What is TCP flow control (sliding window) vs congestion control (slow start)?
+  - `L2` What is the TIME_WAIT state, and why can it exhaust ports on a busy client?
+  - `L2` What is the congestion window (cwnd)? How do cwnd and rwnd together limit sending?
+  - `L2` What happens to cwnd when a packet is lost? Additive increase, multiplicative decrease.
+  - `L2` Why are new TCP connections slow for the first few round trips? What is the initial window today? ↳ slow start; IW10 ≈ 14 KB
+  - `L2` What is the bandwidth-delay product, and why does it set the window size you need?
+  - `L2` What is window scaling and why was it needed?
+  - `L2` What is a zero window? What does it tell you about the receiver?
+  - `L2` Loss-based (Reno, CUBIC) vs model-based (BBR) congestion control.
+  - `L3` How does CUBIC grow its window, and why is it the Linux default?
+  - `L3` How does BBR estimate bottleneck bandwidth and min RTT? When does it beat CUBIC? ↳ lossy long-fat links; doesn't treat loss as congestion
+  - `L3` What is bufferbloat and how does it hurt realtime voice?
+  - `L3` What is ECN (explicit congestion notification)?
+  - `L3` What is TCP slow start after idle, and why might you disable it on long-lived connections?
+  - `L3` Packet loss of 1% — what does it do to TCP throughput and to a voice call?
+- [ ] ARP, DHCP, ICMP basics ↳ https://www.cloudflare.com/learning/ddos/glossary/internet-control-message-protocol-icmp/ · Neso Academy "Computer Networks" playlist (ARP, DHCP videos, YouTube)
+  - `L1` What is a MAC address? What is ARP? ↳ ARP maps IP to MAC on the local network
+  - `L1` What does DHCP do? ↳ DORA: discover, offer, request, acknowledge
+  - `L1` What is ICMP? Which tools use it? ↳ ping, traceroute (TTL exceeded)
+  - `L1` Protocol that maps IP to MAC?
+  - `L2` How does your laptop find the MAC address of the router? ↳ ARP for the default gateway's IP
+  - `L2` What is ICMP and which tools use it? Why might ping fail while HTTP works?
+- [ ] HTTP, DNS, TLS (see 04-backend 4.1–4.2) ↳ https://github.com/alex/what-happens-when · https://www.cloudflare.com/learning/dns/what-is-dns/ · https://www.cloudflare.com/learning/ssl/what-happens-in-a-tls-handshake/
+  - `L1` Which transport protocol does DNS mainly use?
+  - `L3` Where do HTTP, DNS and TLS sit in the stack, and why is QUIC built on UDP?
+- [ ] Sockets API basics ↳ https://beej.us/guide/bgnet/ · https://docs.python.org/3/howto/sockets.html
+  - `L1` What is a port? What is a socket?
+  - `L1` What is a port? Why do we need ports on top of IP addresses?
+  - `L1` What is a socket? What 5 things identify a TCP connection? ↳ 5-tuple: protocol, src IP, src port, dst IP, dst port
+  - `L2` What are the basic sockets API calls on server and client? ↳ socket, bind, listen, accept / connect; send, recv, close
+- [ ] Routing: default gateway, routing tables, BGP; MTU, MSS, fragmentation and path MTU black holes
+  - `L1` What is the default MTU on Ethernet? ↳ 1500
+  - `L2` What does the default gateway do? What is a routing table?
+  - `L3` What is MTU? What happens when a packet is bigger than the path MTU? ↳ fragmentation or ICMP "fragmentation needed"; PMTUD
+  - `L3` What is an MTU black hole and how does it show up? ↳ small requests work, large responses hang; ICMP blocked; MSS clamping
+  - `L3` Why do VPNs, VXLAN and overlay networks lower the effective MTU, and what breaks when nobody adjusts it?
+  - `L3` What is TCP MSS and how does it relate to MTU? ↳ MSS = MTU − IP − TCP headers, e.g. 1460
+  - `L3` What is BGP, in one minute, and why do BGP mistakes take down big sites?
+
+## 9.7 DBMS theory
+- [ ] ER model, keys, relational algebra basics ↳ CMU 15-445 lecture "Relational Model & Algebra" https://15445.courses.cs.cmu.edu/ · DDIA ch2 "Relational Model vs. Document Model" (pdf p48)
+  - `L1` What is a DBMS? Why not just use files?
+  - `L1` What is the relational model? Relation, tuple, attribute, domain, schema.
+  - `L1` What is an ER diagram? Entity, attribute, relationship.
+  - `L1` Super key vs candidate key vs primary key vs alternate key vs composite key.
+  - `L1` What is a foreign key? What does referential integrity mean?
+  - `L1` Strong vs weak entity. What is a partial key?
+  - `L1` Types of attributes: simple, composite, multivalued, derived.
+  - `L2` One-to-one, one-to-many, many-to-many: how is each mapped to tables?
+  - `L2` Participation (total vs partial) and cardinality constraints.
+  - `L2` What is generalisation, specialisation and aggregation in ER? How do you map inheritance to tables?
+  - `L2` Relational algebra: select (σ), project (π), union, set difference, Cartesian product, rename.
+  - `L2` Express a join and a division in relational algebra. ↳ join = σ over ×; division for "for all" queries
+  - `L2` What is the three-schema architecture? Physical vs logical data independence.
+  - `L2` What is DDL, DML, DCL and TCL? Give examples.
+  - `L3` Draw the ER diagram for a food-delivery app and convert it to tables.
+- [ ] Normal forms 1NF–BCNF with examples ↳ Decomplexify "Learn Database Normalization - 1NF, 2NF, 3NF, 4NF, 5NF" (YouTube) · https://www.geeksforgeeks.org/normal-forms-in-dbms/ · DDIA ch2 "Many-to-one and many-to-many relationships" (pdf p53, why normalize)
+  - `L1` What is normalization and why do we do it?
+  - `L1` What are insertion, update and deletion anomalies?
+  - `L1` What is a functional dependency?
+  - `L1` Define 1NF, 2NF, 3NF and BCNF in one line each.
+  - `L1` Which normal form removes transitive dependencies?
+  - `L1` Every determinant is a candidate key: which normal form?
+  - `L2` Take a table `(student_id, name, course_id, course_name, instructor)` and normalise it to 3NF step by step.
+  - `L2` What is a partial dependency? Which normal form removes it? ↳ non-key attribute depends on part of composite key; 2NF
+  - `L2` What is a transitive dependency? Which normal form removes it?
+  - `L2` 3NF vs BCNF: give a table that is in 3NF but not in BCNF.
+  - `L2` What is the closure of an attribute set, and how do you use it to find candidate keys?
+  - `L2` Find the candidate keys of R(A,B,C,D) with A→B, B→C, C→D.
+  - `L2` What is a lossless-join decomposition? What is dependency preservation?
+  - `L2` Is a column holding a JSON array or comma-separated values a 1NF violation? Is JSONB in Postgres "allowed"?
+  - `L3` What are multivalued dependencies and 4NF? 5NF and join dependencies, briefly.
+  - `L3` Can BCNF decomposition lose dependency preservation? Why might you stop at 3NF?
+  - `L3` What is the minimal (canonical) cover of a set of functional dependencies?
+- [ ] ACID, isolation levels, serializability, two-phase locking ↳ DDIA ch7 "The meaning of ACID" (pdf p237) · DDIA ch7 "Two-phase locking (2PL)" (pdf p270) · DBI ch5 "Concurrency Control" (pdf p165–178)
+  - `L1` What is a transaction?
+  - `L1` What does ACID stand for? Explain each letter with an example.
+  - `L1` What are the transaction states? ↳ active, partially committed, committed, failed, aborted
+  - `L1` What are the four SQL isolation levels?
+  - `L1` What is a dirty read, a non-repeatable read and a phantom read?
+  - `L1` PostgreSQL default isolation level?
+  - `L1` Which isolation level stops phantoms in the SQL standard?
+  - `L2` Which anomalies does each isolation level allow? What is PostgreSQL's default and MySQL InnoDB's default?
+  - `L2` What is a lost update? What is write skew? Give an example of each. ↳ two doctors on call go off; both read, both write
+  - `L2` Snapshot isolation vs serializable: why isn't snapshot isolation serializable?
+  - `L3` How does PostgreSQL implement SERIALIZABLE (SSI)? What do you do when it throws a serialization failure? ↳ track rw-dependencies; abort; app retries the transaction
+  - `L3` What does "durable" really mean if the disk has a write cache? ↳ fsync, FUA, battery-backed cache; disks can lie
+- [ ] Indexing (B+ tree, hashing), clustered vs non-clustered ↳ DBI ch2 "Ubiquitous B-Trees" (pdf p69–84) · DBI ch1 "Index Files" and "Primary Index as an Indirection" (pdf p48–51, clustered) · DDIA ch3 "Hash indexes" (pdf p92) and "Other indexing structures" (pdf p104–105, clustered index)
+  - `L1` What is an index? What does it cost?
+  - `L1` Clustered vs non-clustered index.
+  - `L1` Primary vs secondary index. Dense vs sparse index.
+  - `L1` What is a B+ tree, and how is it different from a B-tree?
+  - `L1` Range query: hash index or B+ tree?
+  - `L1` Can a table have two clustered indexes?
+  - `L2` Why do databases use B+ trees instead of binary search trees? ↳ high fan-out, few disk reads, sorted leaves linked for ranges
+  - `L2` What is the height of a B+ tree for 100 million rows with fan-out 500? ↳ about 3–4 levels
+  - `L2` Hash index vs B+ tree index: which supports range queries, and why?
+  - `L3` Postgres hash index vs B-tree index: why is the B-tree almost always chosen? ↳ no ranges or ordering; equality only
+  - `L3` What is a bitmap index, and why is it common in analytics databases?
+- [ ] Joins algorithms (nested loop, hash, sort-merge) ↳ CMU 15-445 lecture "Join Algorithms" https://15445.courses.cs.cmu.edu/ · https://use-the-index-luke.com/sql/join · DDIA ch10 "Reduce-side joins and grouping" (pdf p413, sort-merge) and "Map-side joins" (pdf p418, hash)
+  - `L2` What are the three join algorithms: nested loop, hash join, sort-merge join? When does the planner pick each?
+  - `L2` What is an index nested-loop join, and why does it need an index on the inner table?
+  - `L2` Cost of a hash join vs a sort-merge join in terms of I/O and memory. ↳ hash: build + probe, needs memory; merge: sort cost unless pre-sorted
+  - `L2` What does query optimisation do? Heuristic vs cost-based optimisation.
+  - `L3` Why does selection pushdown in relational algebra make queries faster?
+- [ ] Recovery: WAL, checkpoints, ARIES (know the idea) ↳ DBI ch5 "Recovery" (pdf p157–164, log semantics, steal/force, ARIES) · DDIA ch3 "B-trees" (pdf p102, write-ahead log) · CMU 15-445 lectures "Logging" and "Recovery" https://15445.courses.cs.cmu.edu/
+  - `L1` Which letter of ACID does WAL mainly give you?
+  - `L2` How does the database keep a B-tree consistent after a crash mid-split? ↳ WAL records page changes; redo on recovery
+  - `L2` What is write-ahead logging (WAL)? Why log before writing the page?
+  - `L2` What is a checkpoint, and why is it needed?
+  - `L2` Undo vs redo logging. Steal/no-steal and force/no-force policies.
+  - `L3` What is ARIES at a high level? Name its three recovery phases. ↳ analysis, redo, undo
+- [ ] Schedules: serial vs serializable, conflict vs view serializability, precedence graphs, recoverable and cascadeless
+  - `L1` Precedence graph with a cycle means?
+  - `L2` What is a schedule? Serial vs non-serial schedule.
+  - `L2` What is a serializable schedule? Conflict vs view serializability.
+  - `L2` How do you test conflict serializability with a precedence graph? ↳ edge per conflicting op pair; acyclic ⇔ conflict-serializable
+  - `L2` Recoverable vs cascadeless vs strict schedules.
+- [ ] Concurrency control: 2PL variants (strict, rigorous), shared/exclusive and intention locks, timestamp ordering, MVCC
+  - `L1` Strict 2PL holds exclusive locks until when?
+  - `L2` What is two-phase locking (2PL)? Growing and shrinking phases.
+  - `L2` Basic 2PL vs strict 2PL vs rigorous 2PL. Which prevents cascading aborts?
+  - `L2` Shared vs exclusive locks. What is lock granularity and intention locks?
+  - `L2` What is timestamp-ordering concurrency control?
+  - `L2` What is MVCC? How does it let readers not block writers? ↳ keep row versions; readers see a snapshot
+  - `L3` Optimistic vs pessimistic concurrency control: which suits a high-contention seat-booking table?
+
+**Learn (all of 9):** *Operating System Concepts* (Galvin) chapters on processes, threads, sync, deadlocks, memory
+· GeeksforGeeks OS/CN/DBMS interview sets (rapid revision) · Neso Academy / Gate Smashers (YouTube) · Linux notes
+(`Linux Commands/`) · DBI ch1–ch5 for DBMS internals · Hussein (epoll, OS for backend engineers)

@@ -1,0 +1,1409 @@
+# 3. Language depth — Python, JavaScript/TypeScript, Node.js (P0)
+
+Pick **one primary** for coding rounds (Python for AI roles is easiest) but expect "how does X work under the
+hood" questions on both, because your resume shows both.
+
+---
+
+## 3.1 Python — core
+- [ ] Everything is an object; names vs objects; `id`, `is` vs `==` ↳ https://nedbatchelder.com/text/names.html · https://docs.python.org/3/reference/datamodel.html ("Objects, values and types")
+  - `L1` What does "everything is an object" mean in Python?
+  - `L1` What is the difference between a name (variable) and an object?
+  - `L1` What three things does every object have? ↳ identity, type, value
+  - `L1` What does `id()` return?
+  - `L1` `is` vs `==`: what does each compare?
+  - `L1` Why should you write `x is None` and not `x == None`?
+  - `L1` What does `is` compare?
+  - `L1` `is` vs `==`?
+  - `L2` What is string interning, and why should you never rely on `is` for strings?
+  - `L2` What is truthiness? Which values are falsy? How do `__bool__` and `__len__` decide it?
+  - `L2` What do `and` / `or` actually return? ↳ one of the operands, not a bool
+  - `L3` What are `None`, `True`, `False`, `Ellipsis` and `NotImplemented` — singletons, and why it matters?
+- [ ] Mutable vs immutable types; why default mutable arguments are a bug (`def f(x=[])`) ↳ https://docs.python.org/3/tutorial/controlflow.html#default-argument-values · https://docs.python-guide.org/writing/gotchas/ ("Mutable default arguments")
+  - `L1` Which built-in types are mutable and which are immutable?
+  - `L1` Is a tuple mutable?
+  - `L1` What is printed by `def f(x=[]): x.append(1); return x` called twice? ↳ `[1, 1]`
+  - `L1` What happens with `def f(a, b=[])` called twice?
+  - `L2` `a = [1, 2]; b = a; b += [3]` vs `b = b + [3]` — what is `a` in each case? ↳ `+=` mutates in place; `+` makes a new list
+  - `L2` `t = ([1], 2); t[0] += [3]` — what happens? ↳ list is mutated, then TypeError on tuple assignment
+  - `L2` Can a tuple be used as a dict key if it contains a list? Why not?
+  - `L2` What does "hashable" mean, and why must hashable objects be immutable in practice?
+  - `L2` What happens with `def f(a, b=[])` called twice, and how do you fix it? ↳ default evaluated once at def time; use `None` sentinel
+  - `L3` Why is the mutable-default behaviour sometimes used on purpose (a cheap cache)? Is that a good idea?
+  - `L3` What is a sentinel object (`_MISSING = object()`), and when is `None` not a good default?
+- [ ] Pass by object reference ("call by sharing") ↳ https://nedbatchelder.com/text/names.html · Python FAQ "How do I write a function with output parameters (call by reference)?" (docs.python.org/3/faq/programming.html)
+  - `L1` Is Python pass-by-value or pass-by-reference? ↳ neither: call by sharing / pass by object reference
+  - `L1` Is Python pass-by-value or by reference?
+  - `L2` A function receives a list and appends to it. Does the caller see the change? What if it reassigns the parameter?
+- [ ] List vs tuple vs set vs dict — internals and costs; dict ordering (3.7+) ↳ https://wiki.python.org/moin/TimeComplexity · https://docs.python.org/3/tutorial/datastructures.html · Raymond Hettinger "Modern Python Dictionaries: A confluence of a dozen great ideas" (PyCon 2017, YouTube)
+  - `L1` List vs tuple: what is the difference, and when do you use each?
+  - `L1` List vs set: when do you pick a set?
+  - `L1` What is the time complexity of `x in list`, `x in set`, `x in dict`?
+  - `L1` Are dicts ordered? Since which version is it guaranteed? ↳ insertion order, guaranteed 3.7
+  - `L1` What kinds of objects can be dict keys?
+  - `L1` Complexity of `x in set`?
+  - `L1` Are dicts ordered in Python 3.7+?
+  - `L1` Difference between list and tuple, when to use each?
+  - `L2` How does a Python `dict` work inside, and why is it insertion-ordered since 3.7? ↳ sparse index table + compact entries array; open addressing, perturbed probing
+  - `L2` When does a Python dict resize? ↳ when about two-thirds full
+  - `L2` How is a Python list stored in memory? Why is `append` amortised O(1)? ↳ dynamic array of pointers; over-allocation on growth
+  - `L2` How does a dict work inside? ↳ hash table, open addressing, compact entries + sparse index
+  - `L2` What happens on a hash collision in a dict?
+  - `L2` Why is a tuple slightly faster and smaller than a list?
+  - `L2` How do you merge two dicts? ↳ `{**a, **b}` or `a | b` (3.9+)
+  - `L2` You modify a dict while iterating over it. What happens? ↳ RuntimeError: dictionary changed size during iteration
+  - `L3` Why does a dict get slow if many keys have the same hash? What attack uses this? ↳ hash flooding; string hash randomisation (PYTHONHASHSEED)
+- [ ] Shallow vs deep copy ↳ https://docs.python.org/3/library/copy.html · Real Python "Shallow vs Deep Copying of Python Objects" (realpython.com)
+  - `L1` Shallow copy vs deep copy: what is the difference?
+  - `L1` Three ways to make a shallow copy of a list.
+  - `L1` `copy.copy` or `copy.deepcopy` for a list of lists?
+  - `L2` What does `deepcopy` do with cycles, and how can a class customise copying? ↳ memo dict; `__copy__`/`__deepcopy__`
+  - `L3` `[[0] * 3] * 3` — what goes wrong when you set `grid[0][0] = 1`? ↳ three references to one inner list
+- [ ] Comprehensions; generator expressions; `*args`, `**kwargs`; unpacking ↳ https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions · https://docs.python.org/3/tutorial/controlflow.html#arbitrary-argument-lists · Real Python "Python args and kwargs: Demystified" (realpython.com)
+  - `L1` What do `*args` and `**kwargs` collect?
+  - `L1` What is a list comprehension? A dict comprehension? A set comprehension?
+  - `L1` List comprehension vs generator expression: what is the difference?
+  - `L2` What are keyword-only and positional-only parameters (`*` and `/`)? Why would an API use them?
+  - `L2` What is unpacking? Show `a, *rest = items` and `f(*lst, **d)`.
+  - `L2` What is the order of parameters in a signature? ↳ positional-only, normal, *args, keyword-only, **kwargs
+  - `L2` `map`/`filter` vs comprehensions: which is more Pythonic and why?
+  - `L2` Do comprehensions leak their loop variable in Python 3?
+  - `L2` When is a nested comprehension too clever? How do you keep it readable?
+- [ ] Scope: LEGB, `global`, `nonlocal`, closures ↳ https://docs.python.org/3/tutorial/classes.html#python-scopes-and-namespaces · Real Python "Python Scope & the LEGB Rule" (realpython.com) · https://docs.python.org/3/reference/executionmodel.html
+  - `L1` What is the LEGB rule?
+  - `L1` What are `global` and `nonlocal` for?
+  - `L1` What is a closure?
+  - `L1` What is a lambda, and what can it not contain?
+  - `L1` Are functions first-class objects in Python? What does that let you do?
+  - `L2` Why does `x += 1` inside a function raise `UnboundLocalError` when `x` is global?
+  - `L2` Where are a closure's captured variables stored? ↳ cell objects, `__closure__`
+  - `L3` How does Python look up a name at runtime vs at compile time? Why are locals faster than globals?
+- [ ] Exceptions: try/except/else/finally, custom exceptions, `raise from` ↳ https://docs.python.org/3/tutorial/errors.html (incl. "Exception Chaining" for raise from) · Real Python "Python Exceptions: An Introduction" (realpython.com)
+  - `L1` try / except / else / finally — when does each block run?
+  - `L1` How do you define a custom exception? What should it inherit from?
+  - `L1` `Exception` vs `BaseException`: why not catch `BaseException`? ↳ KeyboardInterrupt, SystemExit, CancelledError
+  - `L2` What does `raise ... from err` do? What about `raise ... from None`?
+  - `L2` Why is a bare `except:` bad? Why is `except Exception: pass` bad?
+  - `L2` How do you design an exception hierarchy for a service (domain errors vs infra errors)?
+  - `L2` What does `finally` do if the `try` block has a `return`? And if `finally` also returns?
+  - `L2` EAFP vs LBYL: which style is Pythonic, and when is LBYL better?
+  - `L3` What is an `ExceptionGroup` and `except*` (3.11)? Where do you meet them? ↳ TaskGroup raises them
+  - `L3` How do you attach context to an exception without losing the traceback (`add_note`, chaining)?
+- [ ] `collections` (deque, Counter, defaultdict, OrderedDict, namedtuple), `frozenset`, `heapq` and `bisect`
+  - `L2` Cost of `list.insert(0, x)` and `list.pop(0)`? What do you use instead? ↳ O(n); `collections.deque`
+  - `L2` What do `collections.defaultdict`, `Counter`, `OrderedDict`, `deque` and `namedtuple` give you?
+  - `L2` `dict.get(k, default)` vs `dict.setdefault` vs `defaultdict`: when each?
+  - `L2` `frozenset` — what is it for?
+  - `L2` What does `heapq` give you, and what is its complexity for push/pop?
+  - `L2` What is `bisect` used for?
+  - `L3` Implement an LRU cache with `OrderedDict` (or with a dict + doubly linked list).
+
+## 3.2 Python — data model and OOP
+- [ ] Classes, `__init__` vs `__new__`, instance vs class attributes ↳ https://docs.python.org/3/tutorial/classes.html#class-and-instance-variables · https://docs.python.org/3/reference/datamodel.html#object.__new__
+  - `L1` Instance attribute vs class attribute: what is the difference?
+  - `L1` `__init__` vs `__new__`: what does each do?
+  - `L1` What is `self`? Is it a keyword?
+  - `L2` What are "private" names in Python (`_x`, `__x`)? What is name mangling?
+- [ ] Dunder methods: `__repr__`, `__str__`, `__eq__`, `__hash__`, `__len__`, `__iter__`, `__getitem__`, `__call__` ↳ https://docs.python.org/3/reference/datamodel.html#special-method-names · Fluent Python ch1 "The Python Data Model" (Ramalho, not in library)
+  - `L1` Why must dict keys be hashable / immutable in Python? What breaks if you mutate a key? ↳ hash changes → lookup probes the wrong slot
+  - `L1` `__repr__` vs `__str__`: which one matters more and why?
+  - `L2` The `__hash__` / `__eq__` contract in Python. What happens if you define only `__eq__`? ↳ equal → equal hashes; class becomes unhashable
+  - `L2` Name the dunder methods that make a class behave like a container. ↳ `__len__`, `__getitem__`, `__iter__`, `__contains__`
+  - `L2` What does `__call__` do? Where is it useful?
+  - `L2` What do `__eq__` and `__hash__` have to agree on?
+  - `L2` What does `__getattr__` vs `__getattribute__` do?
+  - `L2` What do `__enter__`, `__aenter__`, `__iter__`, `__aiter__` tell you about the protocols Python uses?
+  - `L2` Why must objects used as dict keys be hashable? What if you override `__eq__` only?
+  - `L3` You override `__eq__` but not `__hash__`. What happens to your objects in a set? ↳ `__hash__` set to None; unhashable
+- [ ] Inheritance, MRO (C3 linearisation), `super()` ↳ https://docs.python.org/3/howto/mro.html · Raymond Hettinger "Super considered super!" (PyCon 2015, YouTube)
+  - `L1` Can a Python class inherit from two classes?
+  - `L1` What does MRO stand for?
+  - `L2` What is the MRO? How does C3 linearisation order the classes?
+  - `L2` What does `super()` call in a diamond inheritance? ↳ next class in the MRO, not the parent
+  - `L2` What is a mixin, and how do you use one safely?
+  - `L2` What is MRO?
+  - `L2` What is the diamond problem? How do Python (MRO / C3) and TypeScript (no multiple inheritance, mixins) handle it?
+  - `L3` Explain `super()` in Python with multiple inheritance and the MRO. ↳ cooperative calls follow MRO, not the direct parent
+- [ ] `@staticmethod`, `@classmethod`, `@property` ↳ https://docs.python.org/3/library/functions.html#classmethod · LEH ch3 "The dispatcher: How do you instantiate the right crawler?" (pdf p95–96, @classmethod factory) · Real Python "Python's Instance, Class, and Static Methods Demystified" (realpython.com)
+  - `L1` `@classmethod` vs `@staticmethod` vs a normal method.
+  - `L1` What does `@property` turn a method into?
+  - `L1` classmethod vs staticmethod?
+  - `L2` What are `@staticmethod`, `@classmethod` and `@property` — are they decorators?
+  - `L2` What is `@property` for? Write a getter and a validated setter.
+  - `L2` Static methods vs class methods vs instance methods (Python); `static` in TypeScript. When each?
+- [ ] `dataclasses`, `__slots__`, abstract base classes (`abc`) ↳ https://docs.python.org/3/library/dataclasses.html · https://docs.python.org/3/library/abc.html · LEH ch3 "The crawlers" (pdf p98–100, ABC base crawler)
+  - `L1` What is a dataclass, and what does `@dataclass` generate for you?
+  - `L1` What does `__slots__` remove?
+  - `L2` What does `__slots__` save, and how is that similar to V8 hidden classes?
+  - `L2` What are abstract base classes (`abc.ABC`, `@abstractmethod`)? When would you use them over a Protocol?
+  - `L2` What is `__slots__`, and what does it save? ↳ no per-instance `__dict__`; less memory, faster attribute access
+  - `L2` What do `frozen=True`, `field(default_factory=list)` and `slots=True` do in a dataclass?
+- [ ] Descriptors (know the idea: how `@property` works) ↳ https://docs.python.org/3/howto/descriptor.html
+  - `L3` What is a descriptor? How does `@property` work using one? ↳ object with `__get__`/`__set__` on the class
+  - `L3` Data descriptor vs non-data descriptor: which wins over the instance `__dict__`?
+  - `L3` How do Django model fields and SQLAlchemy columns use descriptors?
+- [ ] Metaclasses (know what they are; rarely asked deeply) ↳ https://docs.python.org/3/reference/datamodel.html#metaclasses · Real Python "Python Metaclasses" (realpython.com)
+  - `L3` What is a metaclass? What is `type`'s role? ↳ class of a class; `type(name, bases, ns)` builds classes
+  - `L3` When would you use `__init_subclass__` instead of a metaclass (e.g. a plugin registry)?
+  - `L3` How do Pydantic and Django ORM use metaclasses to turn class attributes into fields?
+
+## 3.3 Python — iterators, generators, decorators, context managers
+- [ ] Iterable vs iterator protocol (`__iter__`, `__next__`, `StopIteration`) ↳ https://docs.python.org/3/library/stdtypes.html#iterator-types · Real Python "Iterators and Iterables in Python" (realpython.com)
+  - `L1` Iterable vs iterator: what is the difference?
+  - `L1` What do `__iter__` and `__next__` do? What ends iteration? ↳ `StopIteration`
+  - `L2` What does `for` actually do under the hood?
+  - `L2` Can you iterate a generator twice? Why not?
+- [ ] Generators, `yield`, lazy evaluation, memory benefit; `yield from`; `send` ↳ https://realpython.com/introduction-to-python-generators/ · https://docs.python.org/3/howto/functional.html#generators · David Beazley "Generator Tricks for Systems Programmers" (dabeaz.com/generators)
+  - `L1` What is a generator? What does `yield` do?
+  - `L1` What does `yield` turn a function into?
+  - `L2` Why use a generator to read a 10 GB file?
+  - `L2` Write a generator that yields chunks of N items from any iterable.
+  - `L2` What does `yield from` do? ↳ delegates to sub-generator; forwards send/throw; returns its value
+  - `L2` What do `gen.send()`, `gen.throw()` and `gen.close()` do?
+  - `L2` How does a generator keep its local state between calls? ↳ suspended frame object
+  - `L2` Why use a generator to read a 10 GB file?
+  - `L3` What is the `return` value of a generator, and how do you get it? ↳ `StopIteration.value`; result of `yield from`
+  - `L3` How were generators the basis of early asyncio coroutines (`@asyncio.coroutine`, `yield from`)?
+  - `L3` Build a lazy pipeline: read lines → parse JSON → filter → batch 500 → insert. Where does memory stay flat?
+  - `L3` What happens to a generator's `finally` block if the consumer stops early?
+- [ ] Decorators: function wrapping, `functools.wraps`, decorators with arguments, class decorators ↳ https://realpython.com/primer-on-python-decorators/ · https://docs.python.org/3/library/functools.html#functools.wraps
+  - `L1` What is a decorator? What does `@dec` above a function mean? ↳ `f = dec(f)`
+  - `L1` When does decorator code run — at import or at call?
+  - `L1` What does `functools.wraps` copy?
+  - `L2` Write a decorator that times a function.
+  - `L2` Write a decorator that retries a function 3 times with backoff.
+  - `L2` What does `functools.wraps` fix? What breaks without it? ↳ `__name__`, `__doc__`, `__wrapped__`, signature for docs/FastAPI
+  - `L2` How do you write a decorator that takes arguments, like `@retry(times=3)`? ↳ three levels: factory → decorator → wrapper
+  - `L2` In what order do stacked decorators apply?
+  - `L2` How do you write a decorator that works on both sync and async functions?
+  - `L2` What is a class decorator? Give an example (`@dataclass`).
+  - `L2` How do you write a decorator as a class (with `__call__`)?
+  - `L2` Write a decorator that times a function / retries 3 times
+  - `L3` How does FastAPI's `@app.get("/x")` register a route? Is it a normal decorator?
+  - `L3` Where did you write custom decorators in production (auth checks, logging, tracing, retries)?
+- [ ] Context managers: `with`, `__enter__`/`__exit__`, `contextlib.contextmanager` ↳ https://realpython.com/python-with-statement/ · https://docs.python.org/3/library/contextlib.html
+  - `L1` What does the `with` statement guarantee?
+  - `L1` What do `__enter__` and `__exit__` do?
+  - `L2` Write a context manager for a DB transaction (commit on success, rollback on error).
+  - `L2` How does `contextlib.contextmanager` turn a generator into a context manager?
+  - `L2` What does returning `True` from `__exit__` do? ↳ swallows the exception
+  - `L2` What do `contextlib.suppress`, `ExitStack` and `closing` do?
+  - `L2` Write a context manager for a DB transaction
+- [ ] `functools`: `lru_cache`, `partial`; `itertools` basics ↳ https://docs.python.org/3/library/functools.html · https://docs.python.org/3/library/itertools.html
+  - `L2` `functools.lru_cache` on an instance method: what leak can it cause? ↳ cache holds `self`; instances never freed
+  - `L2` What does `functools.partial` do? Give a real use.
+  - `L2` What do `itertools.chain`, `islice`, `groupby`, `tee`, `product`, `batched` give you?
+  - `L2` Why must `itertools.groupby` input be sorted first?
+  - `L2` What does `functools.lru_cache` do? What must the arguments be? ↳ memoises; args must be hashable
+  - `L2` `lru_cache` vs `cache` vs `cached_property`.
+  - `L3` What does `functools.singledispatch` do?
+
+## 3.4 Python — concurrency
+- [ ] The GIL: what it locks, why CPU-bound threads don't speed up, why I/O-bound threads do ↳ https://realpython.com/python-gil/ · David Beazley "Understanding the Python GIL" (PyCon 2010, YouTube)
+  - `L1` Is `list.append` thread-safe in CPython? Is `d[k] += 1`? ↳ single bytecode ops are atomic under GIL; += isn't
+  - `L1` What is the GIL in CPython?
+  - `L1` Does the GIL stop data races in Python?
+  - `L1` What is the GIL?
+  - `L1` What does the GIL stand for?
+  - `L1` Why don't threads speed up CPU-bound Python code?
+  - `L1` Why do threads still help for I/O-bound code? ↳ GIL released during blocking I/O
+  - `L1` What is the GIL, and what does it mean for CPU-bound vs I/O-bound code?
+  - `L2` Does the GIL make Python code thread-safe? Show code that still races.
+  - `L2` When do Python threads give a speed-up despite the GIL? ↳ I/O-bound work and C extensions that release the GIL
+  - `L2` Why does the GIL exist? What does it protect? ↳ refcounts and interpreter internals from data races
+  - `L2` Does the GIL make your code thread-safe? Is `counter += 1` atomic? ↳ no; read-modify-write can interleave
+  - `L2` What does the GIL mean for a FastAPI app with uvicorn workers?
+  - `L2` What is the GIL and how does it affect a FastAPI app?
+  - `L2` How do you speed up CPU-heavy Python? ↳ vectorise (NumPy), multiprocessing, Cython/Rust extensions, move work out
+  - `L3` How do C extensions (NumPy) release the GIL, and why does that matter for threads?
+  - `L3` An embedding or reranking model runs inside your FastAPI process. What performance problems does that cause?
+- [ ] `threading` vs `multiprocessing` vs `asyncio` — when to use which ↳ https://realpython.com/python-concurrency/ · https://docs.python.org/3/library/concurrency.html
+  - `L1` When do you use `threading`, `multiprocessing` and `asyncio`?
+  - `L1` What is `concurrent.futures`? `ThreadPoolExecutor` vs `ProcessPoolExecutor`.
+  - `L1` Threads or processes for CPU-bound work?
+  - `L1` Threads vs processes vs asyncio in Python: when each?
+  - `L2` threading vs multiprocessing vs asyncio in Python: which for CPU-bound and which for I/O-bound work?
+  - `L2` Cooperative vs preemptive multitasking: which is asyncio and which is threading?
+  - `L2` What does a process pool cost compared with a thread pool? ↳ process start, pickling args/results, separate memory
+  - `L2` What can't you send to a process pool? ↳ unpicklable objects: lambdas, open sockets, DB connections
+  - `L2` fork vs spawn vs forkserver start methods: what changes and why is fork risky with threads?
+  - `L2` What are `threading.Lock`, `RLock`, `Event`, `Condition` and `queue.Queue` used for?
+  - `L2` How do you share data between processes? ↳ queues, pipes, shared memory, Manager, external store
+  - `L2` You need to embed 100k documents (CPU) and call an API 10k times (I/O). Which model for each?
+  - `L2` Is it safe to share one `requests.Session` / DB connection across threads?
+  - `L3` Why can mixing `fork` and an already-running event loop or thread pool break things?
+  - `L3` What happens to threads when the main thread exits? Daemon vs non-daemon threads.
+- [ ] asyncio: event loop, coroutines, `await`, tasks, `gather`, `create_task`, cancellation, timeouts ↳ https://docs.python.org/3/library/asyncio-task.html · https://realpython.com/async-io-python/
+  - `L1` What is an event loop?
+  - `L1` What is a coroutine? What does `async def` return when you call it?
+  - `L1` What is a Task, and how is it different from a coroutine?
+  - `L1` What does `asyncio.run()` do?
+  - `L1` What does `asyncio.gather` return?
+  - `L1` Which exception does a cancelled task raise inside itself?
+  - `L1` Sequential awaits vs `Promise.all` / `asyncio.gather`: what is the difference in total latency?
+  - `L2` What is uvloop, and why does it make FastAPI/uvicorn faster?
+  - `L2` `asyncio.gather` vs `Promise.all`; `asyncio.create_task` vs starting a promise.
+  - `L2` What happens if you call an `async def` function without `await`? ↳ coroutine never runs; "never awaited" warning
+  - `L2` `asyncio.gather` vs `asyncio.wait` vs `TaskGroup`: when each?
+  - `L2` What does `return_exceptions=True` change in `gather`?
+  - `L2` What does `TaskGroup` (3.11) do when one task fails? ↳ cancels siblings; raises ExceptionGroup
+  - `L2` How do you put a timeout on a coroutine? ↳ `asyncio.timeout()` (3.11) or `wait_for`
+  - `L2` How does cancellation work? What is `CancelledError`, and why must you re-raise it?
+  - `L2` What is an async generator (`async def` + `yield`) and `async for`? Where did you use one (LLM token streams)?
+  - `L2` What is an async context manager (`async with`, `__aenter__`, `@asynccontextmanager`)?
+  - `L2` `httpx.AsyncClient` vs `aiohttp` vs `requests`: which and why? Why reuse one client?
+  - `L2` What is uvloop, and what does it change?
+  - `L2` What is the "await in a loop" anti-pattern, and when is it actually correct?
+  - `L2` Batching vs streaming vs pipelining: give an example of each.
+  - `L3` A task you created with `create_task` disappeared mid-run. Why? ↳ no strong reference kept; garbage collected
+  - `L3` What happens when you `task.cancel()` a task that is iterating an async generator? How does `CancelledError` propagate and clean up?
+  - `L3` What is structured concurrency, and why is `TaskGroup` safer than fire-and-forget tasks?
+  - `L3` How does `await` actually suspend? ↳ coroutine yields a Future up to the loop; resumed on callback
+  - `L3` What is `uvloop`, and why is it faster?
+  - `L3` What is `asyncio.shield`, and when would you use it?
+  - `L3` Retry with exponential backoff and jitter around an async HTTP call — write it.
+- [ ] Blocking calls inside async code (and `run_in_executor` / `asyncio.to_thread`) ↳ https://docs.python.org/3/library/asyncio-dev.html ("Running Blocking Code") · https://docs.python.org/3/library/asyncio-task.html#asyncio.to_thread · https://fastapi.tiangolo.com/async/
+  - `L1` What is `asyncio.to_thread` for?
+  - `L2` What happens if you call `requests.get` inside an `async def` FastAPI endpoint? What is the Node equivalent mistake?
+  - `L2` What happens if you call `requests.get` or `time.sleep` inside an async function?
+  - `L2` `run_in_executor` vs `asyncio.to_thread`: how do you call blocking code from async?
+  - `L2` You call `requests.get` inside an async endpoint — what happens?
+  - `L2` In FastAPI, what happens if you call a blocking function inside an `async def` endpoint? ↳ blocks the whole event loop; use `def` or run_in_threadpool
+  - `L2` `async def` vs `def` endpoints in FastAPI: where does each run?
+  - `L3` How would you run CPU-heavy work from a FastAPI app without blocking requests? ↳ process pool, or a task queue worker
+  - `L3` How do you detect what is blocking the event loop in production? ↳ debug mode, slow callback warnings, py-spy, loop lag metric
+  - `L3` asyncio task starvation: one coroutine never awaits. How do you detect it? ↳ asyncio debug mode, slow callback warnings, loop lag metric
+- [ ] Python 3.13 free-threaded build (know it exists) ↳ https://docs.python.org/3/howto/free-threading-python.html · https://peps.python.org/pep-0703/
+  - `L2` What is the free-threaded (no-GIL) build in Python 3.13, and what is the catch? ↳ opt-in build, C extension compatibility, single-thread slowdown
+  - `L3` Free-threaded Python (3.13+, no GIL): what changes for dicts, lists and your own structures?
+  - `L3` What is free-threaded Python (PEP 703, 3.13t)? What changes for library authors?
+  - `L3` What is the free-threaded (no-GIL) build of Python 3.13, and what did it change about refcounting? ↳ biased refcounting, immortal objects, per-object locks
+  - `L3` What are immortal objects (PEP 683)?
+  - `L3` What are sub-interpreters (PEP 684/734), and how do they differ from free threading?
+  - `L3` What does free-threaded Python (no-GIL, 3.13+) change, and would you use it yet?
+- [ ] Queues, locks, semaphores in asyncio ↳ https://docs.python.org/3/library/asyncio-sync.html (Semaphore = limit concurrent calls) · https://docs.python.org/3/library/asyncio-queue.html
+  - `L2` `queue.Queue` vs `asyncio.Queue` vs `multiprocessing.Queue`: when each?
+  - `L2` Producer/consumer with `asyncio.Queue` and graceful shutdown. ↳ sentinels or `join()` + `task_done()`, then cancel workers
+  - `L2` Use a counting semaphore to limit concurrent calls to an LLM API to 5 (asyncio or Node).
+  - `L2` How do you limit concurrency in asyncio? ↳ `asyncio.Semaphore`
+  - `L2` How do you limit to 10 concurrent API calls in asyncio? ↳ `asyncio.Semaphore(10)`
+  - `L2` What is `asyncio.Queue`? Write a producer–consumer with N workers.
+  - `L2` What is `asyncio.Lock` for if there is only one thread?
+  - `L2` How do you limit 10 concurrent API calls in asyncio?
+  - `L2` Why is `Promise.all` over 10,000 items dangerous, and how do you limit concurrency? ↳ p-limit, semaphores, batches, `asyncio.Semaphore`
+- [ ] Concurrency models compared: Node event loop vs Python asyncio vs Go goroutines vs OS and virtual threads; function colouring
+  - `L2` Node has no GIL but is single-threaded too. Compare how each handles CPU-bound work. ↳ Node: worker_threads (separate isolates); Python: multiprocessing, C extensions release GIL
+  - `L2` Node event loop vs Python asyncio: what is similar and what is different? ↳ both single-threaded loops; asyncio explicit loop, tasks, uvloop (libuv)
+  - `L2` Go goroutines vs Node async: what does the Go scheduler give you that Node cannot? ↳ preemptive M:N scheduling, parallel by default, blocking-style code
+  - `L2` OS threads vs green threads vs event loop: memory per unit and context-switch cost.
+  - `L2` Java virtual threads: what problem do they solve, and how does it compare to Node?
+  - `L3` Python asyncio cancellation (`CancelledError`) vs JS AbortController: which is more ergonomic and why?
+  - `L3` Why are async "function colours" a cost in JS and Python but not in Go?
+  - `L3` You must build a service doing heavy JSON transforms plus thousands of outbound HTTP calls. Node, Python or Go? Defend it.
+  - `L3` AiRA uses FastAPI and Jigsaw used NestJS. Compare how each handled concurrency under load in your experience.
+  - `L3` How do you run sync and async code in one codebase without "function colouring" pain?
+
+## 3.5 Python — typing, memory, tooling
+- [ ] Type hints, `Optional`, `Union`, generics, `Protocol`, `TypedDict`; mypy/pyright ↳ https://mypy.readthedocs.io/en/stable/cheat_sheet_py3.html · https://docs.python.org/3/library/typing.html · LEH ch3 "The NoSQL data warehouse documents" (pdf p111–112, Generic/TypeVar base class)
+  - `L1` Are type hints enforced at runtime?
+  - `L1` What is `Optional[X]`? How do you write it in 3.10+? ↳ `X | None`
+  - `L1` What do `Union`, `Literal`, `Any` and `Callable` mean?
+  - `L2` What is a `Protocol`? How is it different from an ABC? ↳ structural typing; no inheritance needed
+  - `L2` How do generics work in Python (`TypeVar`, `Generic[T]`, 3.12 `class Box[T]` syntax)?
+  - `L2` What is `TypedDict` good for (typing JSON-like dicts)?
+  - `L2` mypy vs pyright: what do they do, and how do you add typing to an untyped codebase gradually?
+  - `L3` What are `ParamSpec`, `TypeGuard` and `@overload` used for?
+- [ ] Pydantic models (validation, v2) ↳ https://docs.pydantic.dev/latest/concepts/models/ · LEH ch4 "Pydantic domain entities" (pdf p179) · https://docs.pydantic.dev/latest/migration/ (v1 → v2)
+  - `L1` What is Pydantic, and why does FastAPI use it?
+  - `L1` What is the Pydantic v2 method to turn a model into a dict?
+  - `L2` What changed from Pydantic v1 to v2? ↳ Rust core, `model_validate`, `model_dump`, `field_validator`, `ConfigDict`
+  - `L2` `field_validator` vs `model_validator` (mode before/after): when each?
+  - `L2` What is strict mode vs lax (coercion) mode in Pydantic? Example: `"1"` into an `int` field.
+  - `L2` How do you load settings from env vars with `pydantic-settings`?
+  - `L2` What do `Annotated[int, Field(gt=0)]` and custom types give you?
+  - `L2` Pydantic v2 vs v1: why is v2 much faster?
+  - `L3` What is `TypeAdapter` for, and when do you need it instead of a `BaseModel`?
+  - `L3` How do discriminated unions work in Pydantic? Where would you use one (e.g. LLM tool calls)?
+  - `L3` Pydantic validation is showing up in your profile for large responses. What do you do? ↳ `model_construct`, skip response_model, orjson, return dicts
+  - `L3` How do `computed_field`, aliases and `serialization_alias` help when the API shape differs from the DB shape?
+  - `L3` How did you use Pydantic to validate LLM structured output at AiRA?
+- [ ] Memory: reference counting + cyclic garbage collector; `__del__` caveats ↳ https://github.com/python/cpython/blob/main/InternalDocs/garbage_collector.md · https://docs.python.org/3/library/gc.html · DDIA ch8 "Process pauses" (pdf p309, why GC pauses matter)
+  - `L1` How does CPython free memory? ↳ reference counting, plus a cyclic GC for cycles
+  - `L1` What is `sys.getrefcount`, and why is it always one higher than you expect?
+  - `L1` Does CPython use reference counting?
+  - `L1` How does Python free memory? ↳ reference counting, plus a cyclic garbage collector
+  - `L2` Explain mark-and-sweep garbage collection in graph terms. ↳ traverse from roots; unreached objects freed
+  - `L2` Reference counting vs tracing GC (V8): trade-offs. ↳ immediate free and predictable vs no cycle handling, overhead per assignment
+  - `L2` Why does CPython need a separate cyclic garbage collector? Give an example cycle.
+  - `L2` What are CPython's GC generations and thresholds (`gc.get_threshold`)?
+  - `L2` What is pymalloc / the small-object allocator, and why does a Python process often not return memory to the OS?
+  - `L2` What is `weakref` in Python, and when do you use `WeakValueDictionary`?
+  - `L2` What is a reference cycle, and why can't refcounting free it?
+  - `L2` How does the generational GC work (generations 0/1/2, thresholds)?
+  - `L2` Why is `__del__` risky?
+  - `L2` What is a `weakref`, and when do you use one (caches, observers)?
+  - `L2` How do you find a memory leak in a Python service? ↳ memray, tracemalloc, objgraph
+  - `L3` `gc.disable()` at Instagram: what did they do and why did it help? ↳ copy-on-write after fork; GC touched pages
+  - `L3` Copy-on-write after `fork()` in gunicorn/uvicorn workers vs Node cluster: how does GC break page sharing? ↳ `gc.freeze()` in Python
+  - `L3` Would you turn off the GC in a hot service (as Instagram did)? What are the trade-offs?
+- [ ] Virtual envs, `pip`/`uv`/`poetry`; packaging basics ↳ https://docs.python.org/3/tutorial/venv.html · LEH ch2 "Poetry: dependency and virtual environment management" (pdf p56–57) · https://docs.astral.sh/uv/
+  - `L1` What is a virtual environment, and why use one per project?
+  - `L2` pip vs pip-tools vs poetry vs uv: what does each give you?
+  - `L2` What is `pyproject.toml`? What replaced `setup.py`?
+  - `L2` What are ruff, black and isort, and why do teams use them?
+  - `L3` Why should a Docker image install from a lockfile, and how do you keep the image small with uv?
+  - `L3` What is a wheel vs an sdist? Why do some packages need a compiler?
+  - `L3` Two libraries need conflicting versions of one dependency. What are your options?
+- [ ] Common gotchas: late binding in closures in loops, integer caching, float precision ↳ https://docs.python-guide.org/writing/gotchas/ ("Late binding closures") · https://docs.python.org/3/tutorial/floatingpoint.html
+  - `L2` Why is `256 is 256` true but `1000 is 1000` sometimes false? ↳ small-int cache -5..256; implementation detail
+  - `L2` What is late binding in closures? Predict `[lambda: i for i in range(3)]` called. ↳ all return 2; fix with default arg `i=i`
+  - `L3` Why does `0.1 + 0.2 != 0.3`, and when do you use `Decimal` or integers instead? ↳ binary floating point; money as Decimal or integer paise
+- [ ] Python performance and leak hunting: cProfile, py-spy, tracemalloc, memray; fast idioms; C extensions; RSS growth
+  - `L1` What does Python's `tracemalloc` do?
+  - `L2` How do you find a memory leak in a FastAPI service? ↳ tracemalloc snapshots diff, objgraph, memray, py-spy for CPU
+  - `L2` What leak patterns are common in Python services? ↳ module-level caches, `lru_cache` on methods, global lists, unclosed sessions
+  - `L2` Why is `@lru_cache` on an instance method a leak?
+  - `L2` How do you profile a slow Python function? ↳ cProfile, py-spy, line_profiler, scalene
+  - `L2` How do you find a memory leak in a long-running Python service? ↳ tracemalloc snapshots, objgraph, memray, growth over time
+  - `L2` What makes Python code fast: list comprehensions, built-ins, local variables, avoiding attribute lookups — why?
+  - `L2` String building in a loop with `+=` vs `"".join()`: why does it matter?
+  - `L2` When would you reach for NumPy, Cython, Rust (PyO3) or a C extension?
+  - `L3` In AiRA's Python services, where does memory actually go when serving embeddings or LLM calls? ↳ model weights, numpy arrays (off-heap), request buffers, caches
+  - `L3` Why is `lru_cache` on an instance method a memory leak risk? ↳ cache holds `self`; objects never freed
+  - `L3` What is the specialising adaptive interpreter (3.11+), and why did Python get faster?
+  - `L3` Your service RSS keeps growing but `tracemalloc` shows no leak. What else can it be? ↳ fragmentation, C extension memory, arenas not returned to OS
+
+**Learn (Python):** PyDocs (Data model, asyncio) · *Fluent Python* (Ramalho, best book) · Real Python articles
+(GIL, asyncio, decorators) · ArjanCodes on YouTube
+
+---
+
+## 3.6 JavaScript — core
+- [ ] `var` / `let` / `const`; hoisting; temporal dead zone ↳ https://javascript.info/var · https://javascript.info/variables · MDN "let" reference, "Temporal dead zone" section (developer.mozilla.org)
+  - `L1` `var` vs `let` vs `const`: three differences. ↳ function vs block scope, hoisting/TDZ, redeclaration/reassignment
+  - `L1` What is hoisting?
+  - `L1` What is the temporal dead zone (TDZ)?
+  - `L1` Does `const` make an object immutable?
+  - `L1` Is `let` hoisted?
+  - `L1` Can you reassign a `const` object's property?
+  - `L2` What prints? `console.log(a); var a = 1;` and then the same with `let`. ↳ undefined; ReferenceError
+  - `L2` Function declaration vs function expression vs arrow function: which are hoisted and how?
+  - `L2` What prints? `console.log(typeof x); let x = 1;` ↳ ReferenceError — `typeof` is not safe in the TDZ
+  - `L2` What creates an accidental global, and how does `"use strict"` stop it?
+  - `L2` What else does strict mode change? ↳ `this` undefined in plain calls, no silent failures, no `with`, no octal
+  - `L3` Why does `let` in a `for` loop create a new binding per iteration, and what does the spec do to make that work?
+  - `L3` What happens with a function declaration inside a block in sloppy vs strict mode?
+  - `L3` What is the difference between the global object (`globalThis`) and the global lexical environment (`let` at top level)?
+- [ ] Types, coercion, `==` vs `===`, truthy/falsy, `typeof null` ↳ `javascript/jsNotes.md` "Type Conversions" + "Type Conversion and Comparisons" · https://javascript.info/type-conversions · https://javascript.info/comparison
+  - `L1` Name the primitive types in JavaScript. ↳ string, number, bigint, boolean, undefined, null, symbol
+  - `L1` Is `Symbol` a primitive or an object? Is a function an object?
+  - `L1` `null` vs `undefined`: what does each mean, and when do you get each?
+  - `L1` What does `typeof null` return, and why? ↳ "object"; historical bug, never fixed
+  - `L1` What does `typeof` return for an array, a function, `NaN`, an undeclared variable?
+  - `L1` List all falsy values. ↳ false, 0, -0, 0n, "", null, undefined, NaN
+  - `L1` Are `[]` and `{}` truthy? What is `Boolean([])`?
+  - `L1` What does `!!value` do?
+  - `L1` `==` vs `===`: what is the difference?
+  - `L1` `typeof null`?
+  - `L1` `null == undefined`?
+  - `L1` `Number(null)`?
+  - `L1` `Number(undefined)`?
+  - `L1` `Number("")`?
+  - `L1` Is `[]` truthy?
+  - `L1` `"3" * "4"`?
+  - `L2` What do `Number(undefined)`, `Number(null)`, `Number("")`, `Number("  123  ")`, `Number("12px")` return?
+  - `L2` Why is `null >= 0` true but `null == 0` false? ↳ comparisons convert to number; `==` treats null specially
+  - `L2` Why are `undefined > 0`, `undefined < 0` and `undefined == 0` all false?
+  - `L2` Why is `undefined == null` true but `undefined === null` false?
+  - `L2` What do `"5" + 2`, `"5" - 2`, `true + 1`, `[] + []`, `[] + {}` evaluate to?
+  - `L2` Why is `[] == ![]` true? ↳ `![]` is false → 0; `[]` → "" → 0
+  - `L2` What does `[1, 2, 3].map(parseInt)` return, and why? ↳ parseInt gets index as radix: [1, NaN, NaN]
+  - `L2` What are `ToPrimitive`, `valueOf` and `toString` used for during coercion?
+  - `L2` What is the difference between a primitive and its wrapper object (`"a"` vs `new String("a")`)?
+  - `L3` What is `Symbol.toPrimitive`, and how does it change `+obj` and template-string conversion?
+  - `L3` How does the `==` algorithm work, step by step, for object vs primitive?
+- [ ] Scope and closures (and the loop + `var` + setTimeout bug) ↳ https://javascript.info/closure · https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures (incl. "Creating closures in loops")
+  - `L1` What is lexical scope?
+  - `L1` What is a closure? Explain with an example.
+  - `L1` Give three practical uses of closures. ↳ private state, factories/partial application, callbacks/handlers, memoize
+  - `L1` Explain closures with an example
+  - `L2` What is the scope chain?
+  - `L2` What is block scope, and how did `let` fix the classic loop bug?
+  - `L2` What is shadowing?
+  - `L2` What is an IIFE, and why was it used before modules?
+  - `L2` What prints? `for (var i = 0; i < 3; i++) setTimeout(() => console.log(i))` — and with `let`? ↳ 3 3 3; 0 1 2
+  - `L2` Fix the `var` loop bug three ways. ↳ `let`, IIFE, pass `i` as setTimeout third arg / bind
+  - `L2` Write a counter with private state using a closure.
+  - `L2` Write `once(fn)`.
+  - `L2` Write `memoize(fn)`. What is the key, and what is the memory risk?
+  - `L2` What is currying? Write `curry(fn)` for any number of arguments.
+  - `L2` What is partial application, and how does it differ from currying?
+  - `L2` Closures vs classes with private fields (`#x`): when do you use each?
+  - `L2` What is a stale closure? Give a backend example (a timer reading an old config value).
+  - `L2` Output of `for (var i=0;i<3;i++) setTimeout(()=>console.log(i))`?
+  - `L3` Do closures capture variables or values? Show code that proves it.
+  - `L3` Implement the module pattern and explain what ES modules replaced.
+- [ ] `this` rules: default, implicit, explicit (`call`/`apply`/`bind`), `new`, arrow functions ↳ https://javascript.info/object-methods · https://javascript.info/bind · https://javascript.info/arrow-functions
+  - `L1` What is `this` in JavaScript?
+  - `L1` Name the four binding rules for `this`, in priority order. ↳ new > explicit (call/apply/bind) > implicit (obj.f()) > default
+  - `L1` `call` vs `apply` vs `bind`: difference?
+  - `L1` How is `this` different in an arrow function? ↳ lexical; taken from enclosing scope; cannot be rebound
+  - `L1` Arrow functions: own `this` or lexical `this`?
+  - `L1` Does `bind` call the function?
+  - `L2` What is `this` in a plain function call in strict vs sloppy mode?
+  - `L2` Why does `const f = obj.method; f()` lose `this`? How do you fix it?
+  - `L2` What prints (CommonJS)? `const o = { n: 'a', f() { return () => this.n }, g: () => this.n }; console.log(o.f()(), o.g())`
+  - `L2` Why do class methods passed as callbacks (e.g. `emitter.on('x', this.handle)`) lose `this`? Two fixes.
+  - `L2` Can you re-`bind` a bound function? ↳ no; first bind wins (except with `new`)
+  - `L2` Implement `Function.prototype.bind`. ↳ return function, merge args, handle `new` and prototype
+  - `L2` Implement `call` and `apply` without using them. ↳ temporary Symbol property on the context
+  - `L2` What is `this` inside a `setTimeout` callback in Node?
+  - `L2` What is `this` at the top level of a CommonJS module vs an ES module? ↳ `module.exports` vs undefined
+  - `L3` Why are arrow functions bad as object methods and prototype methods?
+  - `L3` Arrow-function class fields (`handle = () => {}`) vs prototype methods: memory and inheritance trade-offs.
+- [ ] Prototypes and the prototype chain; `class` is sugar over prototypes ↳ https://javascript.info/prototype-inheritance · https://javascript.info/class · MDN "Inheritance and the prototype chain" (developer.mozilla.org)
+  - `L1` What is a prototype? What is the prototype chain?
+  - `L1` `__proto__` vs `prototype`: difference?
+  - `L1` Is `class` in JS real classes or sugar? ↳ sugar over prototypes, plus stricter semantics
+  - `L1` What does `new` do, step by step? ↳ create object, link prototype, call with `this`, return object unless object returned
+  - `L1` What does `new` return if the constructor returns a primitive?
+  - `L2` Implement `new` as a function (`myNew(Ctor, ...args)`).
+  - `L2` Implement `instanceof`.
+  - `L2` What does `Object.create(proto)` do? What is `Object.create(null)` good for? ↳ dictionary with no inherited keys like `__proto__`
+  - `L2` How do you do inheritance without `class` (constructor functions + prototypes)?
+  - `L2` What does `super` do in a constructor and in a method? Why must `super()` come before `this`?
+  - `L2` What are static methods and static blocks?
+  - `L2` Private fields (`#x`) vs TypeScript `private`: what is the difference at runtime? ↳ `#x` truly private; TS `private` is compile-time only
+  - `L2` Getters and setters: when are they useful, and what is the cost?
+  - `L2` What are mixins, and how do you write one?
+  - `L2` `hasOwnProperty` vs `in` vs `Object.hasOwn`.
+  - `L2` What does `new` do step by step?
+  - `L3` What is prototype pollution? How does `merge(target, JSON.parse(userInput))` cause it? ↳ `__proto__` key; block it, `Object.create(null)`, Map
+  - `L3` How do you extend built-ins like `Error` or `Array` correctly, and what used to break with transpilers?
+  - `L3` How are classes implemented in JavaScript under the hood (prototypes)? What does `class` add?
+- [ ] Objects vs Map/Set; WeakMap; shallow vs deep copy (`structuredClone`) ↳ https://javascript.info/map-set · https://javascript.info/weakmap-weakset · MDN "structuredClone()" (developer.mozilla.org)
+  - `L1` Object vs `Map`: when do you use each? ↳ any key type, order, size, frequent add/delete, no prototype keys
+  - `L1` What is a `Set`? How do you dedupe an array?
+  - `L1` Does `structuredClone` copy functions?
+  - `L2` JS `Map` vs plain object: key types, ordering, performance, prototype pitfalls.
+  - `L2` What are V8 hidden classes (shapes) and inline caches? Why does property order matter? ↳ same shape → monomorphic fast path; many shapes → megamorphic
+  - `L2` When does a V8 object drop into dictionary mode? ↳ deleting properties, many dynamically added properties
+  - `L2` Shallow copy vs deep copy: give two ways to do each.
+  - `L2` What does `structuredClone` copy that `JSON.parse(JSON.stringify())` loses? ↳ Date, Map, Set, cycles, undefined; not functions or class prototypes
+  - `L2` What is the order of keys in an object? ↳ integer-like keys ascending, then strings in insertion order, then symbols
+  - `L2` `Object.keys` vs `Object.entries` vs `for…in` vs `Reflect.ownKeys`.
+  - `L2` What does `JSON.stringify` do with `undefined`, functions, `Date`, `NaN` and a `toJSON` method?
+  - `L2` How do you compare two objects for equality? Implement `deepEqual`.
+  - `L3` Implement `deepClone` that handles cycles, Date, Map and Set. ↳ WeakMap of seen objects
+  - `L3` What are property descriptors (`writable`, `enumerable`, `configurable`) and `Object.defineProperty`?
+- [ ] Array methods: map/filter/reduce/flatMap; immutability ↳ https://javascript.info/array-methods
+  - `L1` `map` vs `forEach` vs `filter` vs `reduce` vs `flatMap`: what does each return?
+  - `L1` Is `Object.freeze` deep?
+  - `L2` `Object.freeze` vs `Object.seal` vs `Object.preventExtensions`. Is freeze deep?
+  - `L2` How do you update nested state immutably? Why care in backend code?
+  - `L2` Which array methods mutate and which return a new array? What are `toSorted`, `toReversed`, `with`?
+  - `L2` Why does `[10, 1, 2].sort()` give `[1, 10, 2]`? ↳ default sort compares strings
+  - `L2` What is `Object.groupBy` / `Map.groupBy`?
+  - `L3` Why might immutable updates of a 100k-element array in a hot path be a performance problem, and what do you do?
+- [ ] Destructuring, spread/rest, optional chaining, nullish coalescing ↳ https://javascript.info/destructuring-assignment · https://javascript.info/rest-parameters-spread · https://javascript.info/optional-chaining
+  - `L1` What is destructuring? Spread vs rest?
+  - `L1` What do optional chaining (`?.`) and nullish coalescing (`??`) do?
+  - `L1` `0 ?? 5` and `0 || 5`?
+  - `L2` `??` vs `||`: when do they give different results? ↳ `0`, `""`, `false` are kept by `??`
+- [ ] Modules: ESM vs CommonJS ↳ https://javascript.info/modules-intro · https://nodejs.org/api/esm.html · https://nodejs.org/api/modules.html
+  - `L1` CommonJS vs ES modules: name four differences. ↳ require vs import, sync vs async load, dynamic vs static, live bindings
+  - `L1` How does Node decide whether a `.js` file is ESM or CJS? ↳ `"type"` in package.json, `.mjs`/`.cjs`
+  - `L1` What is a transpiler? What is a polyfill? How are they different? ↳ rewrites syntax vs adds missing runtime APIs
+  - `L1` `require` is sync or async?
+  - `L1` Transpiler or polyfill: adds `Array.prototype.at` to old engines?
+  - `L2` What are "live bindings" in ESM, and how is that different from CJS `module.exports`?
+  - `L2` Can you `require` an ES module? Can you `import` a CommonJS module? What are the caveats? ↳ newer Node allows require(esm) without top-level await; named exports detection
+  - `L2` What is dynamic `import()` and when would you use it?
+  - `L2` How does `require` cache modules? What does it mean for singletons?
+  - `L2` What is a circular dependency? What happens in CJS vs ESM? ↳ CJS gets partial exports; ESM TDZ errors
+  - `L2` What is tree shaking, and why does it need ESM?
+  - `L2` How do `__dirname` and `__filename` work in ESM? ↳ `import.meta.dirname` / `import.meta.url`
+- [ ] Weak references: WeakMap, WeakSet, WeakRef, FinalizationRegistry; ephemerons; weak caches and their limits
+  - `L1` What is a WeakMap? How is it different from a Map?
+  - `L1` Why can't you iterate a WeakMap or get its size?
+  - `L1` What can be a WeakMap key? ↳ objects and non-registered symbols, not primitives
+  - `L1` Can a WeakMap key be a string?
+  - `L1` Does `FinalizationRegistry` guarantee the callback runs?
+  - `L2` Give a real use of WeakMap. ↳ per-object metadata/cache without preventing GC; private data
+  - `L2` Is a WeakMap a cache with eviction? Why is it the wrong tool for an HTTP response cache keyed by URL string?
+  - `L2` What is a WeakRef? What does `deref()` return?
+  - `L2` What is a FinalizationRegistry? Why should you not rely on it for cleanup? ↳ no timing guarantee; may never run
+  - `L2` WeakSet: give a use case. ↳ marking visited objects, branding objects created by a factory
+  - `L2` What are WeakMap and WeakSet for, compared with Map and Set?
+  - `L3` What is an ephemeron, and how does the GC treat WeakMap entries? ↳ value kept alive only while key is reachable
+  - `L3` Why are WeakRef targets kept alive until the end of the current job (microtask turn)?
+  - `L3` Design a cache that holds large objects while memory is available but lets the GC drop them. What can go wrong?
+- [ ] JS numbers: IEEE 754 floats (`0.1 + 0.2`), NaN and `Object.is`, safe integer range, BigInt, 64-bit ids in JSON
+  - `L1` What is `NaN`? Why is `NaN === NaN` false? How do you check for it? ↳ `Number.isNaN`, `Object.is`
+  - `L1` What is the safe integer range of `Number`? What is `BigInt` for? ↳ ±(2^53 − 1); arbitrary-size integers
+  - `L1` `typeof NaN`?
+  - `L1` `NaN === NaN`?
+  - `L1` `0.1 + 0.2 === 0.3`?
+  - `L1` Largest safe integer?
+  - `L2` Why is `0.1 + 0.2 !== 0.3`? How do you compare money safely? ↳ IEEE 754 binary floats; integers in paise/cents, decimal libs
+  - `L2` What is `Object.is` and how does it differ from `===`? ↳ NaN equals NaN; +0 and −0 differ
+  - `L2` Can you mix `BigInt` and `Number` in arithmetic? What does `JSON.stringify(10n)` do? ↳ TypeError for both
+  - `L3` Why might `array.includes(NaN)` and `indexOf(NaN)` differ, and how does that relate to number representation?
+  - `L3` Why do 64-bit ids from a database (e.g. Twitter snowflake ids) break in JSON, and how do you fix it? ↳ above 2^53 precision lost; send as strings
+- [ ] Symbols and well-known symbols; Proxy traps and Reflect — uses and costs
+  - `L1` What is a Symbol? Why use one as an object key?
+  - `L2` What are well-known symbols? Name three. ↳ `Symbol.iterator`, `Symbol.asyncIterator`, `Symbol.toPrimitive`, `Symbol.hasInstance`
+  - `L2` `Symbol('x')` vs `Symbol.for('x')`.
+  - `L2` What is a `Proxy`? Name three traps.
+  - `L2` What is `Reflect`, and why use it inside Proxy traps?
+  - `L2` Give a real use of Proxy. ↳ validation, ORMs/lazy loading, observability, MobX/Vue reactivity, mocks
+  - `L3` Build a Proxy that logs every property read and throws on unknown keys.
+  - `L3` What is the performance cost of Proxy, and why should it stay out of hot paths?
+- [ ] Implement-it utilities: debounce, throttle, map/filter/reduce polyfills, flatten, `get` by path, pipe/compose, groupBy, deepFreeze
+  - `L2` Implement `debounce(fn, ms)`. ↳ clear previous timer, keep `this`/args, optional leading/cancel
+  - `L2` Implement `throttle(fn, ms)`. Debounce vs throttle — give a backend use for each.
+  - `L2` Implement `Array.prototype.map` (polyfill). ↳ handle `thisArg`, holes, don't mutate, index and array args
+  - `L2` Implement `Array.prototype.filter` and `Array.prototype.reduce` (with and without an initial value).
+  - `L2` Implement `flatten(arr, depth)` without `.flat()`.
+  - `L2` Implement `get(obj, 'a.b[0].c', defaultValue)`.
+  - `L2` Implement `pipe` and `compose`.
+  - `L2` Implement `groupBy(arr, keyFn)` and `chunk(arr, size)`.
+  - `L2` Implement `bind`, `debounce`, `throttle`, `Promise.all`
+  - `L3` Implement `deepFreeze`.
+  - `L3` Implement `debounce` that returns a promise resolving with the last call's result.
+
+## 3.7 JavaScript — async and the event loop
+- [ ] Call stack, Web APIs/libuv, task (macrotask) queue, microtask queue ↳ https://javascript.info/event-loop · Philip Roberts "What the heck is the event loop anyway?" (JSConf EU, YouTube) · https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
+  - `L1` What is the call stack?
+  - `L1` What is the event loop, in one sentence?
+  - `L1` What is a macrotask (task)? Give examples. ↳ timers, I/O callbacks, setImmediate
+  - `L1` What is a microtask? Give examples. ↳ promise reactions, `queueMicrotask`, `await` continuations
+  - `L1` Microtasks vs macrotasks: which run first after the current code finishes?
+  - `L1` Microtask or macrotask: `await` continuation?
+  - `L1` Microtask or macrotask: `setTimeout`?
+  - `L2` Browser event loop vs Node event loop: what is different? ↳ rendering steps, no nextTick/setImmediate, libuv phases
+  - `L2` What does `await` do to the call stack? Where does the function continue?
+  - `L2` Why is "async" code still not parallel in Node?
+  - `L3` What is a "job" in the ECMAScript spec, and who owns the microtask queue — V8 or Node?
+  - `L3` How do async stack traces work in V8 (`--async-stack-traces`), and why are they "zero-cost"?
+- [ ] Order: sync → all microtasks (promises, `queueMicrotask`) → one macrotask (setTimeout, I/O) → repeat ↳ https://jakearchibald.com/2015/tasks-microtasks-queues-and-schedules/ · https://javascript.info/microtask-queue · Jake Archibald "In The Loop" (JSConf.Asia, YouTube)
+  - `L1` Which runs first: `process.nextTick` or `Promise.then` (CommonJS)?
+  - `L2` Describe the order: sync code → microtasks → one macrotask → microtasks → … Why does it matter?
+  - `L2` What is the `process.nextTick` queue, and how is it different from the promise microtask queue?
+  - `L2` In CommonJS code, which runs first: `process.nextTick` or `Promise.then`? ↳ nextTick queue drains first
+  - `L2` What is `queueMicrotask` and when would you use it over `process.nextTick`?
+  - `L2` Can microtasks starve the event loop? Show how. ↳ microtask that keeps scheduling microtasks; I/O never runs
+  - `L2` Why can recursive `process.nextTick` starve I/O while recursive `setImmediate` cannot?
+  - `L2` Since Node 11, when are microtasks drained relative to timers and immediates? ↳ after every single callback, matching browsers
+  - `L3` Why does Node keep `process.nextTick` at all if promises exist? ↳ API contracts: emit events after constructor returns; legacy
+  - `L3` In an ES module (`.mjs`), why can a `Promise.then` callback run before a `process.nextTick` callback scheduled earlier? ↳ module evaluation itself runs inside a microtask
+- [ ] Callbacks → Promises → async/await; error handling with try/catch ↳ https://javascript.info/async · https://javascript.info/async-await · https://javascript.info/promise-error-handling
+  - `L1` What is a callback? What is the Node error-first callback convention?
+  - `L1` What is callback hell, and how do promises fix it?
+  - `L1` What is a Promise? Name its three states.
+  - `L1` What does `async` do to a function's return value? ↳ always returns a promise
+  - `L1` What does `await` do?
+  - `L1` What does an `async` function always return?
+  - `L2` What is "Zalgo" — an API that is sometimes sync and sometimes async — and why is it dangerous? ↳ unpredictable order; always defer with nextTick
+  - `L2` How does `util.promisify` work? Implement a small version.
+  - `L2` What does `.then` return? What happens when a `.then` handler returns a promise?
+  - `L2` `.catch` vs the second argument of `.then`: difference?
+  - `L2` What does `.finally` receive and return?
+  - `L2` `return promise` vs `return await promise` inside `try/catch`: which catches the rejection? ↳ only `return await` lets the local catch see it
+  - `L2` What is a thenable, and how does `await` treat one?
+  - `L2` Sequential vs parallel awaits: how do you run two independent calls at the same time?
+  - `L2` What is the "async forEach" bug? ↳ `forEach` ignores returned promises; use `for…of` or `Promise.all`
+  - `L2` What is top-level await, and where can you use it?
+  - `L2` How do you convert an event-based API (e.g. a stream end) into a promise? ↳ `events.once`, `stream/promises.finished`
+  - `L3` How does `async/await` work under the hood (generators + promises, state machine)?
+  - `L3` Why is creating a promise per item in a hot path costly, and when would you batch?
+  - `L3` What is "promise anti-pattern: explicit construction" (wrapping a promise in `new Promise`)?
+  - `L3` Implement `sleep(ms)` and `timeout(promise, ms)`.
+  - `L3` Implement `retry(fn, { retries, backoff })` with exponential backoff and jitter.
+  - `L3` Implement a minimal `Promise` class (then, catch, resolve chaining). ↳ states, handler queue, async via microtask, thenable adoption
+- [ ] `Promise.all` / `allSettled` / `race` / `any` ↳ https://javascript.info/promise-api · https://www.greatfrontend.com (implement Promise.all / allSettled)
+  - `L1` What does `Promise.all` do? What if one rejects?
+  - `L1` What is the difference between `Promise.all` and `Promise.allSettled`?
+  - `L1` What does `Promise.race` do? What does `Promise.any` do?
+  - `L1` `Promise.all` vs `allSettled` in one line.
+  - `L1` What does `Promise.any` reject with if all fail?
+  - `L1` Difference between `Promise.all` and `allSettled`?
+  - `L2` `Promise.race` vs `Promise.any`: what does each do when the first one rejects? ↳ race rejects; any waits for first fulfil, `AggregateError` if all fail
+  - `L2` When `Promise.all` rejects, are the other operations cancelled? ↳ no; they keep running; results ignored
+  - `L2` What does `Promise.all([])` return? `Promise.race([])`? ↳ resolves with `[]`; race never settles
+  - `L2` Implement `Promise.all`. ↳ preserve order, count completions, reject on first, handle empty and non-promises
+  - `L2` Implement `Promise.allSettled` and `Promise.race`.
+  - `L2` Implement `Promise.any`.
+  - `L2` How do you implement a timeout for a promise with `Promise.race`, and what does it fail to do? ↳ underlying work keeps running; needs AbortSignal
+  - `L2` What is `Promise.withResolvers`, and when is it handy?
+  - `L2` Implement `Promise.all` as a polyfill.
+  - `L2` `Promise.all` vs `Promise.allSettled` vs `Promise.race` vs `Promise.any`: when each?
+- [ ] Unhandled rejections ↳ https://javascript.info/promise-error-handling ("Unhandled rejections") · Node docs process "Event: 'unhandledRejection'" (https://nodejs.org/api/process.html)
+  - `L1` What is an unhandled promise rejection?
+  - `L1` What does Node do on an unhandled rejection since Node 15? ↳ throws; process exits (`--unhandled-rejections=throw` default)
+  - `L1` What happens on an unhandled rejection in Node 20?
+  - `L2` What is `unhandledRejection` vs `rejectionHandled`?
+- [ ] Event-loop ordering puzzles: what prints with sync code, nextTick, promises, await, timers, setImmediate and I/O mixed
+  - `L2` What prints? `console.log(1); setTimeout(()=>console.log(2)); Promise.resolve().then(()=>console.log(3)); process.nextTick(()=>console.log(4)); console.log(5)` ↳ sync, then nextTick, then promise, then timer
+  - `L2` What prints? `new Promise(r=>{console.log('a'); r(); console.log('b')}).then(()=>console.log('c')); console.log('d')` ↳ executor runs synchronously; resolve does not stop it
+  - `L2` What prints? `async function f(){console.log('a'); await null; console.log('b')} f(); console.log('c')` ↳ body runs sync until first await
+  - `L2` What prints? `setTimeout(()=>console.log('timeout'),0); setImmediate(()=>console.log('immediate'))` in the main module. ↳ order not deterministic; depends on loop start timing
+  - `L2` Same two lines inside an `fs.readFile` callback: what prints now, and why is it deterministic? ↳ after poll comes check; immediate first
+  - `L2` What prints? `Promise.resolve().then(()=>console.log(1)).then(()=>console.log(2)); Promise.resolve().then(()=>console.log(3)).then(()=>console.log(4))` ↳ chains interleave: each `.then` queues the next
+  - `L2` What prints? `setTimeout(()=>{console.log('t1'); Promise.resolve().then(()=>console.log('p'))}); setTimeout(()=>console.log('t2'))` ↳ Node ≥ 11 drains microtasks between timers
+  - `L2` What prints? `setImmediate(()=>console.log('i')); process.nextTick(()=>console.log('n')); Promise.resolve().then(()=>console.log('p')); console.log('s')`
+  - `L2` What prints? `emitter.on('x',()=>console.log('handler')); emitter.emit('x'); console.log('after')` ↳ emit is synchronous
+  - `L2` What prints? `try { setTimeout(()=>{ throw new Error('x') }) } catch (e) { console.log('caught') }` ↳ not caught; throws later on another stack; process crashes
+  - `L2` What prints? `async function f(){ throw new Error('x') } try { f() } catch { console.log('caught') }` ↳ not caught; returns rejected promise; unhandled rejection
+  - `L2` What prints? `Promise.resolve(1).then(2).then(console.log)` ↳ non-function `then` argument is ignored; value passes through
+  - `L2` What prints? `Promise.reject(new Error('e')).catch(e=>'ok').then(v=>console.log(v))`
+  - `L2` What prints? `const p = new Promise(r=>r(1)); p.then(v=>console.log(v)); p.then(v=>console.log(v+1))`
+  - `L2` What prints? `process.nextTick(()=>console.log('n1')); Promise.resolve().then(()=>{console.log('p1'); process.nextTick(()=>console.log('n2'))}); Promise.resolve().then(()=>console.log('p2'))` ↳ promise queue drains fully before nextTick queue checked again
+  - `L2` What prints? `queueMicrotask(()=>console.log('q')); process.nextTick(()=>console.log('n')); console.log('s')`
+  - `L2` What prints? `const start = Date.now(); setTimeout(()=>console.log(Date.now()-start), 0); while (Date.now()-start < 200) {}` ↳ ≈200: timers cannot interrupt sync code
+  - `L2` Predict output of mixed `setTimeout`, `Promise.then`, `process.nextTick`, `setImmediate`
+  - `L3` What prints? `setTimeout(()=>console.log('a'),1); setTimeout(()=>console.log('b'),0)` ↳ Node clamps 0 to 1 ms; same bucket keeps insertion order
+  - `L3` What prints? `async function f(){ return Promise.resolve(1) } f().then(()=>console.log('f')); Promise.resolve().then(()=>console.log('a')).then(()=>console.log('b')).then(()=>console.log('c'))` ↳ returning a promise from async costs extra ticks
+  - `L3` What prints? `async function a(){ console.log('a1'); await b(); console.log('a2') } async function b(){ console.log('b') } a(); Promise.resolve().then(()=>console.log('p')); console.log('s')`
+  - `L3` What happens? `const p = Promise.reject(new Error('x')); setTimeout(()=>p.catch(()=>{}), 0)` ↳ unhandled rejection detected after microtasks drain; Node ≥ 15 crashes
+  - `L3` What happens? `function loop(){ process.nextTick(loop) } loop(); setTimeout(()=>console.log('t'), 0)` ↳ starvation: timer never fires
+  - `L3` Same with `setImmediate(loop)` instead of `process.nextTick(loop)`. Does `t` print?
+  - `L3` What prints? `setImmediate(()=>{ console.log('i1'); process.nextTick(()=>console.log('n')) }); setImmediate(()=>console.log('i2'))`
+  - `L3` Explain the output of a puzzle using `await` inside a `for` loop vs `Promise.all(arr.map(async …))`: which is sequential?
+  - `L3` Write your own ordering puzzle that mixes all of: sync, nextTick, promise, timer, immediate, I/O. Explain each line.
+- [ ] Concurrency control in JS: promise pools (p-limit), rate limiters, request coalescing (singleflight), async mutex and semaphore
+  - `L2` Run 100 promises with at most 5 at a time. Write it. ↳ worker pool pulling from shared index, or p-limit
+  - `L2` Why is `Promise.all(urls.map(fetch))` over 10,000 URLs a bad idea?
+  - `L2` Run 100 promises with max 5 at a time (write it)
+  - `L3` Implement a rate limiter (N calls per second) for an external API client.
+  - `L3` Fan out 20 LLM tool calls with a concurrency limit, per-call timeout and partial results. Sketch the code.
+  - `L3` What is request coalescing (singleflight), and how do you implement it with a promise map? ↳ share in-flight promise per key; delete on settle
+  - `L3` What is a semaphore and a mutex in single-threaded JS? Why can you still need them? ↳ interleaving across awaits on shared state
+  - `L3` Implement `asyncPool(limit, items, fn)` and type it.
+
+## 3.8 TypeScript
+- [ ] Structural typing; `type` vs `interface` ↳ https://www.typescriptlang.org/docs/handbook/2/everyday-types.html ("Differences Between Type Aliases and Interfaces") · https://www.typescriptlang.org/docs/handbook/type-compatibility.html
+  - `L1` Why TypeScript? What does it give you, and what does it not give you at runtime?
+  - `L1` What is structural typing ("duck typing at compile time")? How is it different from nominal typing (Java)?
+  - `L1` `type` vs `interface`: differences, and which do you default to? ↳ merging, extends vs &, unions only with type
+  - `L1` What is type inference? When should you write annotations anyway?
+  - `L1` Can an `interface` describe a union?
+  - `L1` Do TypeScript types exist at runtime?
+  - `L1` `type` vs `interface`?
+  - `L2` What is an excess property check, and why does it fire for an object literal but not a variable?
+  - `L2` Optional property (`x?: T`) vs `x: T | undefined`: is there a difference? ↳ with `exactOptionalPropertyTypes`, yes
+  - `L2` What is type widening? Why does `let x = 'a'` have type `string` but `const x = 'a'` type `'a'`?
+  - `L2` What is the `object` type vs `Object` vs `{}`? ↳ `{}` accepts any non-nullish value
+  - `L2` What are index signatures, and what is the problem with `Record<string, T>` lookups? ↳ returns T even if missing; `noUncheckedIndexedAccess`
+  - `L2` What are tuple types, optional and rest elements, and named tuples?
+  - `L2` What are function overloads, and when is a union or generic better?
+  - `L2` `readonly` properties and `ReadonlyArray`: do they protect you at runtime?
+  - `L2` What is type erasure? Why can't you check `if (x instanceof MyInterface)`?
+  - `L3` Why is TypeScript's type system unsound on purpose? Give two examples. ↳ array covariance, method bivariance, `any`, index access
+  - `L3` What are covariance and contravariance? What does `strictFunctionTypes` change? ↳ parameters checked contravariantly for function-typed props, not methods
+  - `L3` What are the `in`/`out` variance annotations on type parameters?
+- [ ] Union, intersection, literal types; narrowing (`typeof`, `in`, discriminated unions, type guards) ↳ https://www.typescriptlang.org/docs/handbook/2/narrowing.html · https://www.typescriptlang.org/docs/handbook/2/everyday-types.html (unions, literal types)
+  - `L1` What is a literal type? What is a union type? What is an intersection type?
+  - `L1` What is narrowing? Name five ways to narrow. ↳ typeof, instanceof, in, equality/truthiness, discriminant, type predicate
+  - `L1` What is a discriminated (tagged) union?
+  - `L2` Intersection of two object types with a conflicting property type: what do you get? ↳ property becomes `never`
+  - `L2` Write a user-defined type guard (`x is Foo`). What happens if your guard lies?
+  - `L2` What is an assertion function (`asserts x is Foo`)? When do you use it?
+  - `L2` How do you get exhaustiveness checking in a `switch`? ↳ default branch assigns to `never`; or `satisfies never`
+  - `L2` Model an API response that is loading / success with data / error with message as a discriminated union.
+  - `L2` Why does narrowing get lost inside a callback? ↳ mutable variable may change; copy to `const`
+  - `L2` Why does `typeof x === 'object'` not rule out `null`?
+  - `L2` Model payment events (`initiated`, `captured`, `refunded`, `failed`) so invalid combinations cannot be built.
+  - `L2` Narrowing with `in`: what are its traps?
+  - `L2` Narrow the `unknown` result of `JSON.parse` to a typed object without using `as`.
+  - `L2` What does "make illegal states unrepresentable" mean? Give an example from your code.
+  - `L3` What are inferred type predicates (TS 5.5), e.g. `arr.filter(x => x !== undefined)`?
+  - `L3` How does control-flow analysis work for aliased conditions and destructured discriminants?
+  - `L3` Model an LLM agent step (tool call, tool result, final answer, error) as a discriminated union and write the reducer.
+- [ ] Generics with constraints (`<T extends …>`), `keyof`, indexed access, `typeof` on values ↳ https://www.typescriptlang.org/docs/handbook/2/generics.html · https://www.typescriptlang.org/docs/handbook/2/keyof-types.html · https://www.typescriptlang.org/docs/handbook/2/indexed-access-types.html
+  - `L1` What are generics? Why not just use `any`?
+  - `L1` What does `<T extends Something>` mean?
+  - `L1` What does `keyof T` give you? What does `typeof value` give you at the type level?
+  - `L1` What is an indexed access type (`T['name']`, `T[number]`)?
+  - `L1` What does `keyof { a: 1; b: 2 }` give?
+  - `L2` Write a typed `getProperty<T, K extends keyof T>(obj: T, key: K)`. What is its return type? ↳ `T[K]`
+  - `L2` What is a generic default (`<T = string>`)?
+  - `L2` How does TypeScript infer a generic from arguments? When do you have to pass it explicitly?
+  - `L2` What is a "useless" generic (type parameter used only once), and why avoid it? ↳ golden rule: type param must relate two things
+  - `L2` Write a generic `Repository<T extends { id: string }>` interface with `findById`, `save`, `delete`.
+  - `L2` What are `const` type parameters (`<const T>`), and what problem do they solve?
+  - `L2` How do you type a function that takes an array and returns its first element, keeping tuple types?
+  - `L2` Generic classes vs generic functions: when do you use each?
+  - `L2` What is `NoInfer<T>` (TS 5.4) and when do you need it?
+  - `L2` What does `keyof any` return? ↳ `string | number | symbol`
+  - `L2` Get the union of values of a `const` object (`(typeof obj)[keyof typeof obj]`).
+  - `L3` Implement a retry-with-timeout wrapper that keeps the original function's TypeScript types.
+  - `L3` Why does `function f<T>(x: T): T` sometimes infer a wider type than you want, and how do you control it?
+  - `L3` What is a higher-kinded type, and why can't TypeScript express it directly?
+  - `L3` Write `pick<T, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K>` and explain each part.
+  - `L3` Why do too many generics make an API hard to use? How do you keep public signatures simple?
+- [ ] Utility types: `Partial`, `Required`, `Pick`, `Omit`, `Record`, `ReturnType`, `Awaited` ↳ https://www.typescriptlang.org/docs/handbook/utility-types.html · https://github.com/type-challenges/type-challenges (easy: Pick, Readonly, Awaited)
+  - `L1` What do `Partial`, `Required`, `Readonly` and `Record` do?
+  - `L1` What do `Pick` and `Omit` do?
+  - `L1` What do `Exclude`, `Extract` and `NonNullable` do?
+  - `L1` What do `ReturnType`, `Parameters` and `Awaited` do?
+  - `L1` `Partial<T>` makes properties what?
+  - `L1` Which utility type removes `null` and `undefined`?
+  - `L2` What are `InstanceType`, `ConstructorParameters` and `ThisType`?
+  - `L2` Create a DTO type for "update user" from the `User` type: all optional, without `id` and `createdAt`.
+- [ ] `unknown` vs `any` vs `never`; `as const`; `satisfies` ↳ https://www.typescriptlang.org/docs/handbook/2/functions.html ("unknown", "never") · https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html (satisfies) · TS Handbook "Object Types" / const assertions (typescriptlang.org/docs/handbook)
+  - `L1` `any` vs `unknown`: which is safer and why?
+  - `L1` What is `never`? Give two places it appears.
+  - `L1` What is `void`? `void` vs `undefined` as a return type?
+  - `L1` What does `satisfies` do? How is it different from a type annotation?
+  - `L1` `any` or `unknown` — which forces a check before use?
+  - `L1` What type does a function that always throws return?
+  - `L1` Does `satisfies` change the inferred type?
+  - `L1` `unknown` vs `any`?
+  - `L2` What does `as const` do?
+  - `L2` What is a type assertion (`as`), and why is it dangerous? What is the non-null assertion `!`?
+  - `L2` Show a case where `satisfies` keeps a narrower type than `: Type` would. ↳ config object keeps literal keys while checked
+- [ ] Conditional and mapped types (know the idea; implement `Partial` yourself) ↳ https://www.typescriptlang.org/docs/handbook/2/conditional-types.html · https://www.typescriptlang.org/docs/handbook/2/mapped-types.html · https://github.com/type-challenges/type-challenges (medium)
+  - `L1` What is a conditional type (`T extends U ? X : Y`)?
+  - `L1` What is a mapped type?
+  - `L2` What is `infer`? Write `ElementType<T>` for arrays. ↳ `T extends (infer U)[] ? U : never`
+  - `L2` What is a distributive conditional type? What is `ToArray<string | number>`? ↳ distributes: `string[] | number[]`
+  - `L2` How do you stop distribution? ↳ wrap in a tuple: `[T] extends [U]`
+  - `L2` What are mapping modifiers (`readonly`, `?`, `-readonly`, `-?`)?
+  - `L2` What is key remapping with `as` in a mapped type? Write `Getters<T>` producing `getName()` style keys.
+  - `L2` What are template literal types? Type an event name like `user:created` from two unions.
+  - `L2` What are `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize`?
+  - `L3` What happens to a distributive conditional type when you pass `never`? ↳ result is `never` (empty union)
+  - `L3` What are recursive type limits ("type instantiation is excessively deep") and how do you avoid them?
+  - `L3` Type-level code makes `tsc` slow. How do you find and fix slow types? ↳ `--extendedDiagnostics`, `--generateTrace`, simpler types, interfaces over intersections
+- [ ] `strict` flags; declaration files; runtime validation (zod) vs compile-time types ↳ https://www.typescriptlang.org/tsconfig ("strict" flag family) · https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html · https://zod.dev
+  - `L1` Why do you need runtime validation if you have TypeScript?
+  - `L1` What is Zod? What does `z.infer` give you?
+  - `L1` What does `z.infer` return?
+  - `L2` Where must you validate at runtime? ↳ HTTP input, env vars, queue messages, third-party API responses, LLM JSON output
+  - `L2` `parse` vs `safeParse` in Zod.
+  - `L2` Zod vs class-validator + class-transformer (NestJS) vs Pydantic: compare.
+  - `L2` How do you validate and type `process.env` at startup?
+  - `L2` How do you validate structured JSON output from an LLM with Zod, and what do you do when it fails? ↳ safeParse, repair/retry with error, JSON schema in prompt
+  - `L2` What is `z.discriminatedUnion`, and why is it faster and clearer than `z.union`?
+  - `L2` Single source of truth: schema → type, or type → schema? Trade-offs.
+  - `L2` How do you share request/response types between a NestJS backend and a React frontend?
+  - `L2` What do OpenAPI codegen, tRPC and ts-rest each give you?
+  - `L3` Design a type-safe API client: given a route map type, `client.get('/users/:id')` infers params and response.
+  - `L3` Design a typed EventEmitter where `emit('order.created', payload)` checks payload by event name.
+  - `L3` Design a builder with progressive narrowing: `.select()` must be called before `.build()` compiles.
+  - `L3` Validation cost: when does validating every message in a hot Kafka consumer hurt, and what do you do?
+- [ ] Type-level programming: implementing utility types (MyPick, MyOmit, MyAwaited), UnionToIntersection, Equals, DeepPartial, Paths
+  - `L2` Implement `MyPick<T, K>`. ↳ `{ [P in K]: T[P] }` with `K extends keyof T`
+  - `L2` Implement `MyPartial<T>` and `MyReadonly<T>`.
+  - `L2` Implement `MyOmit<T, K>`. Why is the built-in `Omit` not strict about `K`?
+  - `L2` Implement `MyExclude<T, U>` and explain why it relies on distribution.
+  - `L2` Implement `MyReturnType<T>` and `MyParameters<T>` with `infer`.
+  - `L2` Implement `MyAwaited<T>` that unwraps nested promises.
+  - `L2` Implement `MyRecord<K, V>`.
+  - `L2` Implement `MyPick<T, K>`
+  - `L3` Write `DeepPartial<T>` and `DeepReadonly<T>`. What about arrays and functions?
+  - `L3` Write `Paths<T>` that produces all dot paths (`"user.address.city"`) of a nested object.
+  - `L3` Parse a route string like `/users/:id/posts/:postId` into `{ id: string; postId: string }` with template literal types.
+  - `L3` Implement `TupleToUnion<T>`, `First<T>`, `Last<T>` and `Length<T>`.
+  - `L3` Implement `UnionToIntersection<U>`. ↳ contravariant inference position of function parameters
+  - `L3` Implement `IsNever<T>` and explain why `T extends never` alone fails.
+  - `L3` Implement `Equals<A, B>` (the one type-challenges uses) and explain why it is tricky.
+  - `L3` Implement `Trim<S>` and `Split<S, D>` with template literal types.
+  - `L3` Implement `Mutable<T>` and `RequiredKeys<T>` (keys that are not optional).
+- [ ] Branded (nominal) types and Result/Either types; typed custom errors; `unknown` in `catch`
+  - `L1` What is a branded (nominal) type? Why would you want one?
+  - `L1` What is a `Result<T, E>` (Either) type?
+  - `L2` Write a `UserId` brand so a `string` or an `OrderId` cannot be passed where a `UserId` is expected. ↳ `string & { readonly __brand: 'UserId' }` + constructor function
+  - `L2` Where do you create branded values safely? ↳ one validating constructor/parse function at the boundary
+  - `L2` Brand money amounts in paise vs rupees, or validated emails. Give two more real examples.
+  - `L2` Write a `Result<T, E>` type plus `ok`, `err`, `map` and `andThen`.
+  - `L2` Exceptions vs Result types: trade-offs in a NestJS/Express service.
+  - `L2` Why is the type of `e` in `catch (e)` `unknown` (with `useUnknownInCatchVariables`), and how do you handle it?
+  - `L2` How do you model expected domain errors vs unexpected bugs in TS?
+  - `L2` How do you type custom error classes, and why set `name` and use `cause`?
+  - `L2` How do you make an async function return `Promise<Result<T, E>>` and never throw?
+  - `L3` How do you combine many `Result`s (like `Promise.all` but for results), and type it?
+  - `L3` neverthrow vs Effect vs plain exceptions: when would you adopt a library?
+  - `L3` Unique symbols as brands vs string literal brands: differences.
+  - `L3` Build a `Result`-returning wrapper around an LLM call that distinguishes rate limit, timeout, invalid JSON and refusal.
+- [ ] Enums vs literal unions vs `as const` objects; declaration merging, module augmentation, `.d.ts`, publishing typed packages
+  - `L1` What is an enum? Numeric vs string enums.
+  - `L1` What is a `.d.ts` file?
+  - `L2` Enums vs union of string literals vs `as const` objects: which do you use and why? ↳ unions/`as const` are erased; enums emit code, numeric enums unsafe
+  - `L2` What are `const enum`s and why do some teams ban them? ↳ inlined; break with isolatedModules/Babel/SWC
+  - `L2` Why are numeric enums type-unsafe (any number is assignable in older TS)?
+  - `L2` What is declaration merging? Which declarations can merge?
+  - `L2` How do you add a `user` property to Express's `Request` type? ↳ module augmentation: `declare global` / `declare module 'express-serve-static-core'`
+  - `L2` How do you type a JS library that has no types? ↳ `@types/x`, write `declare module 'x'`, minimal `.d.ts`
+  - `L2` What is `declare`? What is ambient context?
+  - `L2` What is DefinitelyTyped, and what goes wrong when `@types` versions drift from the library?
+  - `L3` What are namespaces, and why are they rarely used today?
+  - `L3` How do you publish a library with correct types for both ESM and CJS consumers? ↳ `exports` with `types` conditions, check with arethetypeswrong
+  - `L3` What is `erasableSyntaxOnly` and Node's built-in type stripping, and why do they push teams away from enums?
+- [ ] tsconfig: `strict` family, `noUncheckedIndexedAccess`, target/module/moduleResolution, `isolatedModules`, tsc vs tsx vs SWC
+  - `L1` What does `"strict": true` turn on? ↳ noImplicitAny, strictNullChecks, strictFunctionTypes, strictBindCallApply, strictPropertyInitialization, etc.
+  - `L1` What does `strictNullChecks` do?
+  - `L1` What does `noImplicitAny` do?
+  - `L1` Which flag makes `arr[i]` include `undefined`?
+  - `L2` What does `noUncheckedIndexedAccess` do, and why is it not part of `strict`?
+  - `L2` What do `exactOptionalPropertyTypes`, `noImplicitOverride` and `noPropertyAccessFromIndexSignature` do?
+  - `L2` What do `target`, `lib`, `module` and `moduleResolution` control?
+  - `L2` What is `isolatedModules`, and why do esbuild/SWC/Babel need it?
+  - `L2` `tsc` vs ts-node vs tsx vs SWC vs esbuild: which type-checks and which only strips types?
+  - `L2` What are `skipLibCheck`, `esModuleInterop` and `allowSyntheticDefaultImports`?
+  - `L2` What are project references and `composite`? When do monorepos need them?
+  - `L2` What are `paths` aliases, and why do they break at runtime without extra tooling?
+  - `L2` What is `strictPropertyInitialization`, and how do NestJS DTOs and TypeORM entities deal with it? ↳ definite assignment `!`, constructor init
+  - `L3` How does TypeScript's `module` / `moduleResolution` (`nodenext`, `bundler`) map onto Node's ESM/CJS rules?
+  - `L3` Which strict flags would you turn on first in a legacy codebase, and in what order?
+  - `L3` How do you keep type-checking fast in CI for a large repo? ↳ incremental, project refs, `tsc --noEmit` separate from build
+  - `L3` What does Node's native TypeScript support (type stripping) do and not do?
+
+## 3.9 Node.js
+- [ ] Single thread + libuv thread pool (fs, dns, crypto, zlib); default pool size 4 ↳ https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop (event loop vs worker pool) · libuv docs "Design overview" (docs.libuv.org) · Hussein Nasser "libuv thread pool" (YouTube)
+  - `L1` What is the libuv thread pool?
+  - `L1` What is its default size? ↳ 4
+  - `L1` How do you change it? ↳ `UV_THREADPOOL_SIZE` env var, before the pool is first used
+  - `L1` Default libuv thread pool size?
+  - `L1` Env var to change it?
+  - `L1` Does an HTTP request use the thread pool?
+  - `L1` Does `fs.readFile` use the thread pool?
+  - `L1` Does `dns.lookup` use the thread pool?
+  - `L2` What does Node.js run on a single thread, and what runs on the libuv thread pool? ↳ JS on main thread; fs, DNS, crypto, zlib on pool
+  - `L2` Which Node APIs use the thread pool? ↳ fs (most), `dns.lookup`, crypto pbkdf2/scrypt/randomBytes async, zlib async
+  - `L2` Which do **not** use it? ↳ TCP/UDP sockets, HTTP, `dns.resolve*` (c-ares), pipes, timers
+  - `L2` Why does `dns.lookup` use the pool while `dns.resolve` does not? ↳ lookup calls blocking getaddrinfo; resolve uses c-ares async
+  - `L2` How can slow DNS make your HTTP client slow even though HTTP does not use the pool? ↳ `dns.lookup` per request fills pool; cache DNS, keep-alive
+  - `L2` What is the maximum `UV_THREADPOOL_SIZE`? ↳ 1024
+  - `L2` Why does setting `process.env.UV_THREADPOOL_SIZE` inside your app sometimes not work?
+  - `L2` When should you raise the pool size, and what does too large cost? ↳ heavy fs/crypto/zlib; cost is memory, context switches, CPU contention
+  - `L2` Is the thread pool shared across all requests? What does one slow `fs` call on NFS do to everyone else?
+  - `L2` bcrypt hashing in a login API: how does it interact with the pool, and how do you size it? ↳ native bcrypt uses pool; cost factor; dedicated workers
+  - `L2` What is the libuv thread pool, which operations use it, and what does `UV_THREADPOOL_SIZE` change? ↳ fs, dns.lookup, crypto pbkdf2/scrypt, zlib
+  - `L3` Six `crypto.pbkdf2` calls start together with the default pool. How do their finish times group, and why? ↳ 4 finish together, then 2: pool size 4
+  - `L3` You start an `https.request`, an `fs.readFile` and four `crypto.pbkdf2` calls at once. Which finishes first and why? ↳ HTTP not on pool; fs waits behind pbkdf2 for a pool thread
+  - `L3` How does a pool task flow: JS call → C++ → `uv_queue_work` → worker thread → completion back on the loop?
+  - `L3` Why are the pool threads not used to run JavaScript?
+  - `L3` Native addons (e.g. sharp, bcrypt, sqlite) also use the pool. What happens when an addon blocks a pool thread for seconds?
+  - `L3` How would you measure thread pool saturation? ↳ queue latency of fs/crypto calls; async_hooks timings; no direct metric
+  - `L3` What is DNS resolution cost in Node, and why can `dns.lookup` on the thread pool become a bottleneck?
+- [ ] Event loop phases: timers → pending → poll → check (`setImmediate`) → close; `process.nextTick` queue ↳ https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick · https://nodejs.org/en/learn/asynchronous-work/understanding-processnexttick
+  - `L1` Name the phases of the Node event loop in order. ↳ timers → pending callbacks → idle/prepare → poll → check → close
+  - `L1` Which phase runs `setTimeout` and `setInterval` callbacks?
+  - `L1` Which phase runs `setImmediate` callbacks?
+  - `L1` Which phase runs most I/O callbacks?
+  - `L1` Which phase runs `setImmediate`?
+  - `L1` Which phase waits for I/O?
+  - `L1` Name the six event-loop phases.
+  - `L1` Is `setTimeout(fn, 0)` really zero?
+  - `L1` What does `timer.unref()` do?
+  - `L2` What happens in the timers phase? Is `setTimeout(fn, 100)` guaranteed to run at 100 ms? ↳ minimum delay; runs when loop reaches timers after expiry
+  - `L2` What happens in the pending callbacks phase? ↳ deferred system I/O callbacks, e.g. some TCP errors
+  - `L2` What are idle and prepare used for?
+  - `L2` What happens in the poll phase? When does it block, and for how long? ↳ waits for I/O until nearest timer or immediates pending
+  - `L2` What happens in the check phase?
+  - `L2` What happens in the close callbacks phase? Give an example. ↳ `socket.on('close')` after `destroy()`
+  - `L2` When does the event loop exit? What keeps it alive? ↳ no active handles or requests; refs keep it alive
+  - `L2` What do `timer.unref()` and `timer.ref()` do? When would you unref a timer?
+  - `L2` What is the difference between a libuv handle and a libuv request?
+  - `L2` How does Node store timers so it does not check each one every loop? ↳ lists grouped by duration, a binary heap of expiries
+  - `L2` `setInterval` with a callback that takes longer than the interval: what happens?
+  - `L2` What is the maximum `setTimeout` delay, and what happens above it? ↳ 2^31−1 ms (~24.8 days); larger becomes 1 ms
+  - `L3` Why is the poll phase where the loop "sleeps", and how does it compute the timeout?
+  - `L3` What does `setImmediate` give you that `setTimeout(fn, 0)` cannot guarantee?
+  - `L3` Draw the whole loop with where `process.nextTick` and promise microtasks are drained.
+  - `L3` What is `timers/promises` (`setTimeout` returning a promise), and how does it support AbortSignal?
+- [ ] Blocking the event loop (CPU work, sync fs, big JSON.parse) and how to detect/fix it ↳ https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop · https://nodejs.org/api/perf_hooks.html (monitorEventLoopDelay) · Clinic.js Doctor (clinicjs.org)
+  - `L1` What does "blocking the event loop" mean?
+  - `L1` Give five ways people accidentally block the loop. ↳ sync fs, big JSON.parse/stringify, regex backtracking, crypto sync, heavy loops
+  - `L1` What is event-loop lag (delay)?
+  - `L1` API to measure event-loop delay?
+  - `L1` What is ReDoS?
+  - `L1` Why is Node fast for I/O but bad at CPU-heavy work?
+  - `L1` What blocks the event loop? Give five examples. ↳ sync crypto/fs, big JSON.parse/stringify, regex, tight loops, sync compression
+  - `L1` What is event-loop lag / event-loop utilisation, and how do you measure it? ↳ `perf_hooks.monitorEventLoopDelay`, ELU
+  - `L1` What blocks the Node event loop?
+  - `L2` How do you measure event-loop lag in production? ↳ `perf_hooks.monitorEventLoopDelay` histogram p99, export as metric
+  - `L2` What is event loop utilization (ELU), and how is it different from CPU usage?
+  - `L2` One slow request makes every other request on the same instance slow. Why, and how do you confirm it?
+  - `L2` What is ReDoS? Show a dangerous regex. ↳ catastrophic backtracking, e.g. `(a+)+$`; use safe-regex, RE2, limits
+  - `L2` How do you parse a 200 MB JSON payload without blocking? ↳ size limits, streaming parser, worker thread, different format
+  - `L2` Which `*Sync` APIs are okay to use, and when? ↳ startup/config loading, CLI scripts — never in request path
+  - `L2` How does clinic doctor show a blocked loop?
+  - `L2` How do you break a long CPU loop into chunks so the loop stays responsive? ↳ process in batches, yield via `setImmediate`
+  - `L2` How would you write a health check that detects a stuck event loop? ↳ liveness fails if loop lag high; watchdog thread
+  - `L2` Kubernetes liveness probe keeps failing during traffic spikes. How can event-loop blocking be the cause?
+  - `L2` How do load balancers or `@fastify/under-pressure` shed load when the loop is overloaded? ↳ return 503 when ELU/lag/heap above threshold
+  - `L2` What happens to the whole server if one request does a CPU-heavy loop? How do you fix it? ↳ blocks event loop; worker threads or a queue
+  - `L2` `JSON.stringify` of a 10 MB object in a request handler: what happens to other requests? How do you fix it?
+  - `L3` Why is `JSON.stringify` of a large object a hidden blocker in logging and caching code?
+  - `L3` How can a big `Array.sort` or `Object.keys` over 1M entries hurt p99 latency?
+  - `L3` How do you find which code blocked the loop after the fact? ↳ CPU profile, `--cpu-prof`, blocked-at, async stack traces
+  - `L3` Event-loop lag is fine on average but p99 is 300 ms. What are you looking for? ↳ periodic jobs, GC pauses, big payloads, cron, sync logging
+  - `L3` What is `async_hooks` / AsyncLocalStorage overhead, and when does it matter?
+  - `L3` How do you find an event-loop block in production that you can't reproduce locally? ↳ blocked-at, ELU metrics, continuous profiling, `--cpu-prof` on a canary
+  - `L3` Bun / Deno vs Node for performance: would you switch a production service? Why or why not?
+- [ ] Worker threads vs `cluster` vs multiple processes behind a load balancer (PM2/K8s) ↳ https://nodejs.org/api/worker_threads.html · https://nodejs.org/api/cluster.html · PM2 docs "Cluster mode" (pm2.keymetrics.io)
+  - `L1` How do you handle a CPU-heavy task in Node?
+  - `L1` What is `worker_threads`?
+  - `L1` What is the `cluster` module?
+  - `L1` What is `child_process`? `spawn` vs `exec` vs `execFile` vs `fork`.
+  - `L1` worker_threads or cluster for a CPU-heavy hash?
+  - `L2` What is `SharedArrayBuffer` and when do you use it?
+  - `L2` worker_threads vs cluster: what is the difference, and when do you use each? ↳ workers: CPU tasks in one process; cluster: scale HTTP across cores
+  - `L2` Do worker threads share memory? What can they share? ↳ separate isolates; share via SharedArrayBuffer, transfer ArrayBuffers
+  - `L2` How do worker threads communicate? What is the cost of `postMessage`? ↳ structured clone copies data; transfer lists avoid copy
+  - `L2` Why should you use a worker pool (e.g. Piscina) instead of spawning a worker per request?
+  - `L2` What is `SharedArrayBuffer` + `Atomics` used for? Give a use case.
+  - `L2` What is `exec`'s danger with user input? ↳ shell injection; use `execFile`/`spawn` with args array
+  - `L2` What happens to memory if you start 8 worker threads? ↳ each has its own V8 heap and event loop
+  - `L2` How does cluster share one port between processes? ↳ primary accepts and distributes (round-robin), or shared handle
+  - `L2` When is it better to offload CPU work to a separate service or queue (BullMQ, Celery) instead of a worker thread?
+  - `L2` How do you handle an error or crash inside a worker thread?
+  - `L2` How would you resize 1,000 images per minute in a Node API? ↳ queue + workers; sharp (native, pool); separate service
+  - `L2` How would you handle a CPU-heavy task in Node?
+  - `L2` Worker threads vs child processes vs cluster: when each?
+  - `L2` How many Node processes would you run per machine or pod, and why?
+  - `L3` Node.js worker threads, `SharedArrayBuffer` and `Atomics`: when would you use them?
+  - `L3` How do transferable objects (`postMessage` with transfer list) avoid copying between threads?
+  - `L3` Why is `cluster` less common in Kubernetes deployments? ↳ one process per pod; scale replicas; simpler memory limits
+  - `L3` What are `resourceLimits` on a Worker, and why set them?
+  - `L3` Can you pass a function or a class instance to a worker? What survives structured clone?
+  - `L3` How do you cancel a long-running computation inside a worker? ↳ `worker.terminate()`, or check a shared flag via Atomics
+  - `L3` Would you do embedding computation or tokenization in Node workers or in a Python service? Defend it (tie to AiRA).
+- [ ] Streams: readable/writable/transform, piping, backpressure, `pipeline()` ↳ https://nodejs.org/en/learn/modules/backpressuring-in-streams · https://nodejs.org/api/stream.html (stream.pipeline())
+  - `L1` What is a stream in Node, and why use one instead of reading a whole file?
+  - `L1` Name the four stream types. ↳ Readable, Writable, Duplex, Transform
+  - `L1` Give an example of each stream type in Node's core.
+  - `L1` What is backpressure?
+  - `L1` Four stream types?
+  - `L1` What does `write()` returning `false` mean?
+  - `L1` Which event says a Writable can take more data?
+  - `L1` Why prefer `pipeline` over `pipe`?
+  - `L1` Default `highWaterMark` for a byte stream?
+  - `L1` What is backpressure in streams?
+  - `L2` How does backpressure work on a Writable? ↳ `write()` returns false; wait for `'drain'`
+  - `L2` What is `highWaterMark`? What are its defaults? ↳ 16 KiB before Node 22, 64 KiB since; 16 objects in object mode
+  - `L2` Flowing vs paused mode in a Readable.
+  - `L2` What is object mode?
+  - `L2` `pipe()` vs `stream.pipeline()`: why prefer pipeline? ↳ propagates errors, destroys all streams, callback/promise on finish
+  - `L2` What goes wrong if you `.on('data')` and write to a slow destination without checking the return value?
+  - `L2` Write a Transform stream that uppercases text / parses CSV lines.
+  - `L2` How do you consume a Readable with `for await…of`?
+  - `L2` What are `stream/promises` and `Readable.from()`?
+  - `L2` What is a Duplex stream? Is a TCP socket Duplex?
+  - `L2` What are `'end'`, `'finish'`, `'close'` and `'error'`, and which side emits each?
+  - `L2` Design: process a 10 GB CSV and write results to Postgres in under 100 MB of memory. ↳ read stream → line split → transform → batch → write with backpressure
+  - `L2` How do you stream LLM tokens to the browser (SSE) with Node streams?
+  - `L2` Why can multi-byte UTF-8 characters break when you split chunks naively? ↳ use `setEncoding` / `StringDecoder`
+  - `L2` How do you stream an upload to S3 in Node without holding it in memory? ↳ busboy stream → S3 multipart upload; respect backpressure
+  - `L2` What is backpressure in Node streams, and what does `pipeline()` handle for you?
+  - `L2` What are streams and backpressure in Node, and why do they matter for big responses?
+  - `L3` Implement your own Readable that pulls from a paginated API, respecting backpressure. ↳ fetch in `_read`, push until false
+  - `L3` How does `pipeline` handle an error in the middle stream? What about cleanup of file handles?
+  - `L3` How do you implement parallel processing in a Transform while keeping output order?
+  - `L3` Web Streams (`ReadableStream`) vs Node streams: why both exist, and how to convert? ↳ `Readable.toWeb` / `fromWeb`
+  - `L3` How does backpressure travel across the network (TCP window → socket → your stream)?
+  - `L3` A client reads your SSE stream very slowly. What happens to server memory, and how do you protect it?
+- [ ] Buffers; handling large files ↳ https://nodejs.org/api/buffer.html · https://nodejs.org/api/fs.html (fs.createReadStream for big files)
+  - `L1` What is a Buffer in Node.js?
+  - `L1` Is Buffer memory inside the V8 heap? ↳ no; external memory, tracked as `external`/`arrayBuffers`
+  - `L1` `Buffer.alloc` vs `Buffer.allocUnsafe`: difference?
+  - `L1` Is Buffer memory on the V8 heap?
+  - `L2` Why is `Buffer.allocUnsafe` faster, and what is the security risk? ↳ uninitialized memory can leak old data
+  - `L2` What is the Buffer pool (8 KB slab), and why can a small `Buffer.slice` keep a big chunk alive?
+  - `L2` `buf.slice()` / `subarray()` vs `Buffer.from(buf)`: which one copies?
+  - `L2` Buffer vs ArrayBuffer vs TypedArray vs DataView: how are they related?
+  - `L2` Why can reading a whole 2 GB file into a Buffer fail even if the machine has RAM? ↳ `buffer.constants.MAX_LENGTH`, heap/external limits; stream instead
+  - `L2` How do you convert between Buffer and string, and what encodings matter? ↳ utf8, base64, hex; multi-byte chars split across chunks
+  - `L2` How do you read a large JSON body without blowing memory? ↳ size limits, streaming parser, reject early
+  - `L3` How does V8 account for external memory so GC still runs when Buffers pile up? ↳ `AdjustAmountOfExternalAllocatedMemory` pressure
+  - `L3` Your service handles audio chunks for realtime voice. How do you avoid Buffer churn and GC pressure? ↳ reuse buffers, pool, stream, avoid base64 round-trips
+- [ ] Error handling: sync throw vs rejected promise vs `error` events; graceful shutdown (SIGTERM) ↳ https://nodejs.org/api/errors.html · https://expressjs.com/en/advanced/healthcheck-graceful-shutdown.html · https://nodejs.org/api/process.html (signal events: SIGTERM)
+  - `L1` How do you handle errors with async/await?
+  - `L1` What is a graceful shutdown?
+  - `L1` Which exit code should a process use after a clean shutdown, and after a forced one?
+  - `L2` Sync throw vs rejected promise vs `'error'` event: how is each one caught?
+  - `L2` What happens if an EventEmitter emits `'error'` with no listener? ↳ it throws; usually crashes the process
+  - `L2` `process.on('uncaughtException')`: what is it for, and why must you not keep serving after it? ↳ state unknown; log, flush, exit, let supervisor restart
+  - `L2` Operational errors vs programmer errors: how do you treat each? ↳ handle/retry operational; crash on bugs
+  - `L2` What is `error.cause`, and how do you wrap errors without losing the stack?
+  - `L2` What was the `domain` module and why is it deprecated?
+  - `L2` Walk through graceful shutdown step by step. ↳ stop accepting, fail readiness, drain in-flight, close DB/queues, flush logs, exit
+  - `L2` What does `server.close()` do, and why can it hang forever? ↳ waits for keep-alive connections; `closeIdleConnections`, timeout
+  - `L2` Why does Node as PID 1 in Docker sometimes not receive SIGTERM? ↳ shell form CMD, npm wrapper; use exec form, tini, `--init`
+  - `L2` How do you shut down Kafka/BullMQ consumers without losing or duplicating messages?
+  - `L2` How do NestJS `enableShutdownHooks` and `onModuleDestroy` work?
+  - `L2` Why should you set a hard timeout that force-exits?
+  - `L2` How do you track in-flight requests so you know when draining is done? ↳ counter middleware, `server.close` callback, per-socket idle tracking
+  - `L2` How do you gracefully shut down a server with in-flight requests?
+  - `L3` How do you design error handling for a long LLM agent run where one tool call fails?
+  - `L3` How do you handle `unhandledRejection` and `uncaughtException` in production? ↳ log, stop accepting, exit, let orchestrator restart
+- [ ] Memory leaks: closures, global caches, listeners; heap snapshots ↳ Node.js Learn "Diagnostics → Memory" (nodejs.org/en/learn) · Chrome DevTools docs "Fix memory problems" (developer.chrome.com/docs/devtools) · Hussein Nasser / Node internals videos (YouTube)
+  - `L1` What is a memory leak in a garbage-collected language?
+  - `L1` Name five common causes of memory leaks in Node.js. ↳ globals, unbounded caches/Maps, listeners, timers/intervals, closures holding big objects
+  - `L1` What are the symptoms of a leak in production? ↳ heap grows sawtooth-upward, GC time rises, latency rises, OOM restart
+  - `L1` Name three memory-leak causes in Node.
+  - `L2` How does a Node.js or Python process leak memory in practice? ↳ global caches, listeners, closures, unbounded queues, ref cycles with finalizers
+  - `L2` How can a closure leak memory? Give an example.
+  - `L2` How do accidental globals happen, and how does strict mode help?
+  - `L2` Why is a module-level `const cache = {}` or `new Map()` a classic leak? How do you fix it? ↳ unbounded growth; LRU with max size/TTL, Redis, WeakMap
+  - `L2` How do event listeners leak? What is the `MaxListenersExceededWarning` telling you?
+  - `L2` How can `setInterval` leak? What about a `setTimeout` that is never cleared?
+  - `L2` How can promises leak — for example a promise that never settles, or a growing promise chain?
+  - `L2` How can per-request data stored in a long-lived object leak (request → socket → user map)?
+  - `L2` How can logging or metrics with high-cardinality labels leak memory? ↳ prom-client label sets per user id never freed
+  - `L2` What leaks can `AsyncLocalStorage` or `async_hooks` cause if misused?
+  - `L2` Can the `require` cache leak? When would dynamic requires grow memory?
+  - `L2` Why is "memory goes up after a load test and never comes down" not always a leak? ↳ heap grew and stays reserved; check heapUsed after GC
+  - `L2` What leaks can an unconsumed HTTP response body or unclosed stream cause? ↳ sockets held, buffers retained, keep-alive pool exhausted
+  - `L2` How do you find a memory leak?
+  - `L2` How do you take and compare heap snapshots to find a memory leak?
+  - `L2` Name the common causes of memory leaks in Node services. ↳ global caches without bounds, listeners, closures, timers, unbounded Maps
+  - `L3` Why do all closures created in one scope share the same Context object, and what leak can that cause?
+  - `L3` What is a detached DOM node, and what is the Node.js equivalent (objects referenced only by a forgotten registry)?
+  - `L3` How can a native addon or a C++ library leak memory that heap snapshots do not show? ↳ off-heap; RSS grows, heap flat; valgrind/heaptrack
+  - `L3` How does an LLM streaming service leak memory if clients disconnect mid-stream? ↳ abort not wired; generator keeps buffering; listeners stay
+  - `L3` How can a closure cause a memory leak? ↳ captures big object; long-lived callback keeps it alive
+  - `L3` How do you find and fix a memory leak in an Express service? ↳ heap snapshots, listeners, global caches, closures
+- [ ] Express/NestJS middleware model; NestJS DI, modules, providers, guards, interceptors, pipes ↳ https://expressjs.com/en/guide/using-middleware.html · https://docs.nestjs.com/faq/request-lifecycle · https://docs.nestjs.com/providers
+  - `L3` Fastify vs Express: why is Fastify faster, and does it matter for a DB-bound API?
+- [ ] Node's concurrency model: JS on one thread, libuv, non-blocking I/O, reactor pattern, epoll/kqueue/IOCP vs thread-per-request
+  - `L1` Is Node.js single-threaded? Give the precise answer. ↳ JS runs on one thread; libuv pool, V8 GC and helper threads exist
+  - `L1` What is libuv, and what does it give Node?
+  - `L1` What is non-blocking I/O?
+  - `L1` Blocking vs non-blocking call: give one example of each in Node.
+  - `L1` What is the reactor pattern? ↳ event demultiplexer + event queue + handlers
+  - `L1` Is JavaScript in Node run on one thread?
+  - `L1` Is Node single-threaded?
+  - `L2` How can one thread serve 10,000 concurrent connections? ↳ OS readiness notification (epoll/kqueue/IOCP), no thread per connection
+  - `L2` What are epoll, kqueue and IOCP, and which one does libuv use on Linux, macOS and Windows?
+  - `L2` Thread-per-request (classic Java/Apache) vs event loop (Node/Nginx): trade-offs.
+  - `L2` What kind of workload is Node good at, and what kind is it bad at? ↳ I/O-bound good; CPU-bound bad unless offloaded
+  - `L2` What threads does a Node process actually have running? ↳ main, 4 libuv pool, V8 platform/GC workers, inspector
+  - `L2` What is the C++ binding layer between JS and libuv, and how does `fs.readFile` reach the OS?
+  - `L3` Why did Ryan Dahl pick JavaScript for an event-driven server?
+  - `L3` Why is file I/O done on the thread pool while network I/O is not? ↳ no portable async file readiness API; sockets have epoll
+  - `L3` What is io_uring, and how could it change Node's file I/O?
+  - `L3` "Node is fast" — when is a single Node process actually slower than a threaded server?
+- [ ] AsyncLocalStorage and async_hooks: carrying request context through awaits, and what they cost
+  - `L1` What is `AsyncLocalStorage` for?
+  - `L2` Why do async stack traces lose frames, and how do you keep context for logs? ↳ AsyncLocalStorage request id
+  - `L3` What is `AsyncLocalStorage`, and how does it carry a request id through awaits?
+  - `L3` What is `async_hooks`, and why is it costly?
+
+**Learn (JS/TS/Node):** JS notes (`javascript/jsNotes.md`) · MDN (closures, event loop, promises) ·
+javascript.info (best free JS course) · TS Handbook (typescriptlang.org/docs) · type-challenges (GitHub, easy +
+medium) · Node docs "Event loop, timers and nextTick" + "Backpressuring in streams" · Hussein (Node internals) ·
+NestJS docs (docs.nestjs.com: fundamentals)
+
+## 3.10 Small gaps worth closing
+- [ ] JS iterators and generators (`function*`, `for…of`, async iterators `for await` — used for streaming LLM tokens) ↳ https://javascript.info/generators · https://javascript.info/async-iterators-generators · MDN "for await...of" (developer.mozilla.org)
+  - `L1` What is the iterable protocol? The iterator protocol? ↳ `[Symbol.iterator]()` returns `{ next() }` → `{ value, done }`
+  - `L1` What is a generator function (`function*`)? What does `yield` do?
+  - `L1` `for…of` or `for…in` for array values?
+  - `L2` What is an async iterator, and how is `for await…of` used to consume LLM token streams?
+  - `L2` `for…of` vs `for…in`: what does each iterate?
+  - `L2` Make a custom class iterable.
+  - `L2` Write a generator that yields an infinite id sequence, and take the first 5.
+  - `L2` What do `gen.next(value)`, `gen.return()` and `gen.throw()` do?
+  - `L2` What is `yield*`?
+  - `L2` What is an async generator? Use one to page through an API that returns a cursor.
+  - `L2` How do you stream LLM tokens with `for await…of`, and how do you stop early? ↳ `break` calls `return()`; wire to AbortController
+  - `L3` How do generators relate to async/await historically (co, regenerator)?
+  - `L3` What are iterator helpers (`.map`, `.filter`, `.take` on iterators), and why are they lazy?
+- [ ] Node `EventEmitter`; `AbortController` for cancelling fetch/LLM streams ↳ https://nodejs.org/api/events.html · https://developer.mozilla.org/en-US/docs/Web/API/AbortController
+  - `L1` What is an EventEmitter?
+  - `L1` `on` vs `once` vs `off` (`removeListener`).
+  - `L1` Are listeners called synchronously or asynchronously?
+  - `L1` How do you cancel a `fetch`?
+  - `L1` Is `emitter.emit` synchronous?
+  - `L1` Default max listeners per event?
+  - `L2` What is `AbortController` / `AbortSignal`? How do you cancel a `fetch`?
+  - `L2` What is `AbortSignal.timeout(ms)` and `AbortSignal.any([...])`?
+  - `L2` How would you cancel an in-flight LLM stream when the user hits stop? ↳ abort signal from client disconnect to SDK call; stop generator; close socket
+  - `L2` In what order are listeners called? How do you add one at the front? ↳ registration order; `prependListener`
+  - `L2` What is `MaxListenersExceededWarning`, and what does it usually mean? ↳ default 10; often a listener leak
+  - `L2` What happens if a listener throws?
+  - `L2` How do you await an event? ↳ `events.once(emitter, name)`
+  - `L2` How do you iterate events as an async iterator? ↳ `events.on(emitter, name)`
+  - `L2` What does `removeAllListeners()` do, and why is calling it on a shared emitter dangerous?
+  - `L2` Why do you emit events in `process.nextTick` from a constructor?
+  - `L2` EventEmitter vs callbacks vs promises: when is each the right API?
+  - `L2` What is `captureRejections`, and why does an async listener need it?
+  - `L2` Implement a tiny EventEmitter (`on`, `off`, `once`, `emit`).
+  - `L2` How would you cancel an in-flight LLM stream when the user hits stop?
+  - `L2` How do you cancel in-flight work when the client disconnects? ↳ AbortController, asyncio cancellation, propagate to LLM/DB calls
+  - `L3` How do you make your own async function cancellable with AbortSignal? ↳ accept signal, check `signal.aborted`, listen `abort`, cleanup, throw AbortError
+  - `L3` Implement a small EventEmitter with `on`, `off`, `once`, `emit`.
+  - `L3` EventEmitter vs `EventTarget` in Node: differences.
+  - `L3` Is an in-process EventEmitter a good event bus for a microservice? What breaks when you scale to 3 pods? ↳ events not shared; use Redis pub/sub, Kafka
+- [ ] TS/NestJS decorators and `reflect-metadata` (how `@Injectable()` and `@Get()` work) ↳ https://www.typescriptlang.org/docs/handbook/decorators.html · https://docs.nestjs.com/custom-decorators · https://github.com/rbuckton/reflect-metadata
+  - `L1` What is a decorator in TypeScript?
+  - `L1` Which package lets NestJS read constructor parameter types?
+  - `L2` How does NestJS know what to inject into a constructor? ↳ `emitDecoratorMetadata` writes `design:paramtypes`; `reflect-metadata` reads it
+  - `L2` How do NestJS decorators like `@Controller()` and `@Get()` register routes?
+  - `L2` Write a custom NestJS decorator (`@CurrentUser()`) and a custom method decorator (`@Timed()`).
+  - `L2` Legacy `experimentalDecorators` vs standard (TC39 stage 3) decorators: what changed?
+  - `L2` How do NestJS decorators register routes?
+  - `L3` Write a class decorator and a property decorator that store metadata, and a function that reads it.
+  - `L3` Why do standard decorators not support parameter decorators, and what does that mean for NestJS?
+  - `L3` How do NestJS decorators like `@Get()` register routes? ↳ store metadata via reflect-metadata; router scans it at bootstrap
+- [ ] npm: `package-lock.json`, semver ranges (`^` vs `~`), peer deps, `npm ci`; ESM vs CJS resolution in Node ↳ https://docs.npmjs.com/about-semantic-versioning · npm docs "npm ci" + "package-lock.json" (docs.npmjs.com) · https://nodejs.org/api/packages.html (ESM vs CJS resolution)
+  - `L1` What is `^1.2.3` vs `~1.2.3` vs `1.2.3` in package.json?
+  - `L1` What is `package-lock.json` for? `npm install` vs `npm ci`?
+  - `L1` What does `^` allow in semver?
+  - `L1` `^1.2.3` vs `~1.2.3`?
+  - `L2` What is the `exports` field in package.json, and what problem does it solve?
+  - `L2` dependencies vs devDependencies vs peerDependencies vs optionalDependencies.
+  - `L2` What is the dual-package hazard?
+  - `L3` What is a supply-chain attack on npm, and how do you reduce the risk? ↳ lockfiles, `npm ci`, audit, pin, provenance, disable install scripts
+  - `L3` Why does `npm ci` fail when package.json and the lockfile disagree, and why is that good for CI?
+- [ ] Python: `uv`/`poetry` lockfiles; `__init__.py` and imports; `if __name__ == "__main__"` ↳ https://docs.python.org/3/tutorial/modules.html (packages, __init__.py) · https://docs.python.org/3/library/__main__.html · LEH ch2 "Poetry: dependency and virtual environment management" (pdf p56–57, poetry.lock)
+  - `L1` What does `if __name__ == "__main__":` do?
+  - `L1` What is `__init__.py` for? What is a namespace package?
+  - `L1` What does `if __name__ == "__main__"` guard?
+  - `L2` What is a lockfile, and why do you commit it? ↳ exact pinned versions incl. transitive deps; reproducible builds
+  - `L2` What happens when you `import` a module the second time? ↳ cached in `sys.modules`
+  - `L2` What causes a circular import, and how do you fix it?
+  - `L2` Absolute vs relative imports: which do you prefer in an app?
+  - `L3` How does Python find a module? ↳ `sys.path`, finders and loaders, site-packages
+- [ ] Python `logging` module properly (handlers, levels, structured logs); `dataclass` vs Pydantic vs `TypedDict` ↳ https://docs.python.org/3/howto/logging.html · https://docs.python.org/3/howto/logging-cookbook.html · https://docs.pydantic.dev/latest/concepts/dataclasses/ (dataclass vs Pydantic)
+  - `L2` dataclass vs Pydantic model vs attrs vs `TypedDict` vs `NamedTuple`: when each? ↳ validation at boundaries vs plain internal data
+  - `L2` How do you set up structured logging with the `logging` module (handlers, levels, JSON, request id)?
+
+## 3.11 Python for AI engineers (P2, asked in some AI-engineer rounds)
+- [ ] NumPy basics: arrays, shapes, broadcasting, vectorised cosine similarity ↳ https://numpy.org/doc/stable/user/absolute_beginners.html · https://numpy.org/doc/stable/user/basics.broadcasting.html · HOL ch4 "What If We Do Not Have Labeled Data?" (pdf p145–148, cosine similarity on embeddings)
+  - `L1` What is a NumPy array, and why is it faster than a Python list for maths?
+  - `L1` What is an array's shape and dtype?
+  - `L2` What is broadcasting? Give an example.
+  - `L2` Compute top-5 cosine-similar rows of a 10k×768 matrix without Python loops. ↳ normalise rows, matrix multiply, `argpartition`
+  - `L2` What does vectorisation mean, and why is a Python loop over rows slow?
+  - `L2` Compute top-5 cosine-similar rows of a 10k×768 matrix without loops
+- [ ] pandas basics: load CSV, filter, group by, merge — enough for data cleaning in a take-home ↳ https://pandas.pydata.org/docs/user_guide/10min.html · DMLS ch3 "Row-Major Versus Column-Major Format" (pdf p74–77, "NumPy Versus pandas" p76)
+  - `L2` pandas: load a CSV, filter rows, group by a column and merge two frames.
+  - `L2` Why is `df.iterrows()` slow, and what do you use instead?
+  - `L3` A pandas job runs out of memory on a 5 GB CSV. What do you do? ↳ chunksize, dtypes, columns subset, Polars/DuckDB
+- [ ] PyTorch basics: tensors, devices (CPU/GPU), a forward pass, `no_grad`, loading a Hugging Face model ↳ https://pytorch.org/tutorials/beginner/basics/intro.html · HOL ch1 "Generating Your First Text" (pdf p54–55) · HOL ch2 "Downloading and Running an LLM" (pdf p61)
+  - `L2` PyTorch basics: what are a tensor, a device and `torch.no_grad()`?
+- [ ] Hugging Face `transformers`/`sentence-transformers`: tokenizer + model, embeddings in 5 lines ↳ HOL ch2 "Text Embeddings (for Sentences and Whole Documents)" (pdf p83–84) · https://sbert.net · https://huggingface.co/docs/transformers/quicktour
+  - `L2` Load a sentence-transformer and embed 1,000 sentences in batches.
+  - `L2` How do you load a Hugging Face model and tokenizer in a few lines?
+  - `L2` How do you serve a local embedding model behind FastAPI without blocking the event loop?
+  - `L2` Load a sentence-transformer and embed 1,000 sentences in batches
+  - `L3` How do you batch many small embedding requests into one model call (dynamic batching)?
+- [ ] Jupyter for exploration vs scripts for production ↳ DMLS ch10 "Dev Environment Setup" (pdf p323–326, notebooks vs scripts) · Joel Grus "I don't like notebooks" (JupyterCon 2018, YouTube)
+  - `L2` Jupyter for exploration vs scripts for production: where is the line?
+
+## 3.12 Node.js — V8 engine, memory and profiling
+- [ ] V8 pipeline: parser and AST, Ignition bytecode, Sparkplug, Maglev, TurboFan; JIT, type feedback, deopts, OSR, code cache
+  - `L1` What is V8? Where is it used besides Node.js?
+  - `L1` Is JavaScript interpreted or compiled? Give the honest answer for V8. ↳ both: bytecode interpreter plus tiered JIT compilers
+  - `L1` What is a JIT compiler?
+  - `L1` What does the parser produce? What is an AST?
+  - `L1` What is Ignition? What is TurboFan?
+  - `L1` What is bytecode, and why not compile straight to machine code?
+  - `L1` Which engine runs Node.js?
+  - `L1` Name V8's interpreter. ↳ Ignition
+  - `L1` Name V8's top optimizing compiler. ↳ TurboFan
+  - `L1` What is the baseline (non-optimizing) compiler called? ↳ Sparkplug
+  - `L1` What is a deopt?
+  - `L2` Walk me through what happens from `node app.js` to machine code running. ↳ source → scanner → parser → AST → Ignition bytecode → feedback → JIT tiers
+  - `L2` What is lazy parsing (pre-parsing), and why does V8 not fully parse every function at startup?
+  - `L2` What is type feedback? Where is it stored? ↳ feedback vector per function, filled by inline caches during interpretation
+  - `L2` What makes a function "hot" enough to be optimized?
+  - `L2` What is speculative optimization? What does TurboFan assume and what does it check?
+  - `L2` What is deoptimization (deopt / bailout)? Give three things that cause it. ↳ shape change, type change (SMI → double), out-of-bounds, arguments misuse
+  - `L2` What is on-stack replacement (OSR) and when does V8 use it? ↳ long-running loop switches to optimized code mid-execution
+  - `L2` What are Sparkplug and Maglev and why were they added between Ignition and TurboFan? ↳ fast baseline compiler; mid-tier optimizer; cheaper to reach than TurboFan
+  - `L2` How do you see which functions get optimized and deoptimized? ↳ `--trace-opt`, `--trace-deopt`, `%GetOptimizationStatus` with `--allow-natives-syntax`
+  - `L2` What is a deopt loop and why is it bad for performance?
+  - `L2` Why does a micro-benchmark that runs a function 10 times tell you almost nothing?
+  - `L2` What is the code cache / compile cache, and how does Node use it to speed up startup? ↳ cached bytecode; `module.enableCompileCache`, V8 snapshots
+  - `L3` What does TurboFan's "sea of nodes" IR mean, roughly, and what optimizations does it enable? ↳ inlining, escape analysis, bounds-check elimination, constant folding
+  - `L3` What is function inlining, and why can a huge function never be inlined?
+  - `L3` What is escape analysis? How can it remove an object allocation completely?
+  - `L3` Why can `try/catch` or `arguments` once have killed optimization, and is that still true today?
+  - `L3` What are V8 startup snapshots, and how does Node's `--build-snapshot` use them?
+  - `L3` How does V8 compile WebAssembly differently from JS (Liftoff and TurboFan)?
+  - `L3` Your p99 latency spikes for the first minute after every deploy. How could the JIT explain it, and what do you do? ↳ cold code, warm-up traffic, compile cache, readiness after warm-up
+- [ ] Hidden classes (shapes/maps), transition chains, dictionary mode; inline caches: monomorphic, polymorphic, megamorphic
+  - `L1` What is a hidden class (also called shape or map in V8)?
+  - `L1` Why does V8 need hidden classes when JS objects are dynamic dictionaries?
+  - `L1` What is an inline cache (IC)?
+  - `L1` Define monomorphic, polymorphic and megamorphic call sites.
+  - `L1` What is a hidden class?
+  - `L1` What is an inline cache?
+  - `L1` Monomorphic means how many shapes?
+  - `L1` What does `delete obj.x` often do to an object's shape?
+  - `L2` How do transition chains work when you add properties one by one? ↳ each new property creates a transition to a new map
+  - `L2` `const a = {}; a.x = 1; a.y = 2;` and `const b = {}; b.y = 2; b.x = 1;` — same hidden class? Why does it matter?
+  - `L2` Why should a constructor initialize all fields, in the same order, every time?
+  - `L2` What does `delete obj.prop` do to the hidden class? ↳ often drops object to dictionary (slow) mode
+  - `L2` What is "dictionary mode" (slow properties) and when does an object fall into it?
+  - `L2` In-object properties vs the properties backing store: what is the difference?
+  - `L2` What happens when you assign a value of a different type to an existing field (int then string)? ↳ field representation generalizes; map deprecated; dependent code may deopt
+  - `L2` Do two class instances with an optional field set only sometimes share a shape? What is the fix? ↳ always assign it, e.g. `this.x = undefined`
+  - `L2` How does an inline cache make `obj.x` fast? ↳ remembers map → offset; next lookup is one compare plus load
+  - `L2` How many shapes can a polymorphic IC hold in V8 before it goes megamorphic? ↳ about 4
+  - `L2` What does a megamorphic property access cost compared with a monomorphic one?
+  - `L2` A shared `getId(entity)` function is called with users, orders and products. What happens to its IC?
+  - `L2` Why can a generic utility (`deepMerge`, `get(obj, path)`) be slow in a hot path?
+  - `L2` How do ICs relate to type feedback and to the decisions TurboFan makes?
+  - `L3` What is slack tracking and how does V8 decide how many in-object slots to reserve?
+  - `L3` What are map deprecation and map migration?
+  - `L3` How do prototypes affect shapes, and why is changing an object's prototype at runtime (`Object.setPrototypeOf`) slow?
+  - `L3` Why are objects built from JSON.parse or object literals with the same keys usually shape-friendly?
+  - `L3` How would you show hidden classes in a heap snapshot or with `%DebugPrint`?
+  - `L3` How would you make a hot function monomorphic without duplicating business logic?
+  - `L3` Why are function call sites (call ICs) also subject to polymorphism, and what does that do to inlining?
+  - `L3` What is the megamorphic stub cache?
+  - `L3` Is chasing monomorphism worth it in a typical NestJS CRUD service? When is it worth it? ↳ rarely; only in measured hot loops (parsers, serializers, math)
+  - `L3` Why is changing an object's prototype at runtime bad for performance?
+- [ ] Value representation: SMIs, HeapNumbers, pointer compression, elements kinds (packed vs holey), string representations
+  - `L1` What is a SMI (small integer)?
+  - `L1` How does V8 tell a pointer from a SMI? ↳ pointer tagging, low bit
+  - `L1` What is a HeapNumber, and when is a number stored as one?
+  - `L1` What is a SMI?
+  - `L1` Packed or holey: which is faster?
+  - `L2` What range fits in a SMI with pointer compression on 64-bit? ↳ 31-bit signed
+  - `L2` What are elements kinds? Name the main ones. ↳ PACKED_SMI, PACKED_DOUBLE, PACKED_ELEMENTS, and HOLEY variants
+  - `L2` Packed vs holey arrays: how do you make a holey array, and why is it slower?
+  - `L2` Elements kinds only move one way. What does that mean? ↳ SMI → DOUBLE → ELEMENTS; never back
+  - `L2` Why is `new Array(1000)` worse than pushing 1000 elements, for V8? ↳ starts HOLEY; holes need prototype-chain checks
+  - `L2` Why should you avoid putting `NaN`, `-0` or a string into an array of small ints?
+  - `L2` What are dictionary elements (sparse arrays), e.g. `arr[1_000_000] = 1` on an empty array?
+  - `L2` What are typed arrays (`Float64Array`, `Uint8Array`) and why are they fast for numeric work?
+  - `L2` How are strings represented in V8? ↳ one-byte vs two-byte, cons strings, sliced strings, internalized strings
+  - `L3` What is pointer compression and what does it save and limit? ↳ 32-bit offsets in a 4 GB cage; halves pointer memory
+  - `L3` Why can a sliced substring of a huge string keep the huge string alive? ↳ sliced string references parent; flatten or copy
+  - `L3` What are cons strings (rope strings) and when does V8 flatten them?
+- [ ] V8 heap layout: stack vs heap, new/old/large-object spaces, isolates and contexts, `process.memoryUsage()`, RSS vs heap
+  - `L1` Stack vs heap: what lives where in a JS program?
+  - `L1` Are JS primitives always on the stack and objects always on the heap? ↳ simplification; closures, boxed numbers and strings live on heap
+  - `L1` What is "Maximum call stack size exceeded"? What causes it?
+  - `L1` What does `process.memoryUsage()` return? ↳ rss, heapTotal, heapUsed, external, arrayBuffers
+  - `L1` What does `process.memoryUsage().external` count?
+  - `L2` What are new space and old space?
+  - `L2` What are the semi-spaces in new space ("from" and "to")?
+  - `L2` What other spaces exist in the V8 heap? ↳ large object space, code space, map space (older), read-only space
+  - `L2` What is the large object space and which objects go there?
+  - `L2` `rss` is 1.5 GB but `heapUsed` is 200 MB. Where can the rest be? ↳ Buffers/external, native addons, thread stacks, fragmentation, code, malloc arenas
+  - `L2` What is `heapTotal` vs `heapUsed`?
+  - `L2` What does `v8.getHeapStatistics()` and `v8.getHeapSpaceStatistics()` tell you?
+  - `L2` How big is the default Node stack, and how do you change it? ↳ ~984 KB; `--stack-size`, but OS thread limit
+  - `L2` How do closures keep variables alive on the heap after the outer function returns? ↳ captured variables moved into a Context object
+  - `L3` What is a V8 isolate, and what is a context? How do worker_threads use isolates?
+  - `L3` What is memory fragmentation and how does compaction help?
+  - `L3` Why can RSS stay high after the heap shrinks? ↳ allocator keeps pages; glibc arenas; `MALLOC_ARENA_MAX`, jemalloc
+- [ ] V8 garbage collection: Scavenger, Mark-Sweep-Compact, Orinoco (parallel, incremental, concurrent), write barriers, `--trace-gc`
+  - `L1` What is garbage collection? What does "reachable" mean?
+  - `L1` What are GC roots? ↳ global object, stack, handles, compiled code references
+  - `L1` What is the generational hypothesis?
+  - `L1` What is a minor GC and what is a major GC in V8?
+  - `L1` What is a stop-the-world pause?
+  - `L1` Which GC cleans the young generation? ↳ Scavenger
+  - `L1` Which GC cleans the old generation? ↳ Mark-Sweep-Compact
+  - `L1` What is the name of V8's GC project? ↳ Orinoco
+  - `L1` State the generational hypothesis in one line.
+  - `L1` Flag to print GC events?
+  - `L1` Does V8 use reference counting?
+  - `L2` How does the Scavenger (Cheney's algorithm) work? ↳ copy live objects from-space to to-space; swap; promote survivors
+  - `L2` When does an object get promoted to old space? ↳ survives two scavenges (roughly)
+  - `L2` Why is a scavenge cheap when most objects die young? ↳ cost proportional to live objects, not garbage
+  - `L2` How does Mark-Sweep-Compact work, phase by phase?
+  - `L2` What is tri-color marking (white, grey, black)?
+  - `L2` What does Orinoco mean? Parallel vs incremental vs concurrent GC. ↳ helper threads in pause; small steps; background threads while JS runs
+  - `L2` What is a write barrier and why does concurrent/incremental marking need one?
+  - `L2` What is a remembered set, and why does the Scavenger need old-to-new pointers?
+  - `L2` What does `node --trace-gc` print? Read a line of it for me. ↳ type (Scavenge / Mark-Compact), heap before → after, pause ms, reason
+  - `L2` What are idle-time GC tasks?
+  - `L2` Is reference counting used by V8? Why not? ↳ no; tracing GC; cycles would need extra collector
+  - `L2` What triggers a major GC?
+  - `L2` Can you force GC in Node? Should you? ↳ `--expose-gc` then `global.gc()`; only for tests and diagnostics
+  - `L2` How does V8's garbage collector work (young vs old generation, scavenge vs mark-sweep-compact)?
+  - `L2` What does `--max-old-space-size` do, and how should it relate to the container memory limit?
+  - `L2` What is a hidden class / inline cache, and how can code shape cause deoptimisation?
+  - `L3` What is lazy sweeping and concurrent sweeping?
+  - `L3` What is the young generation size, and when would you tune `--max-semi-space-size`? ↳ high allocation rate; fewer scavenges and less premature promotion
+  - `L3` What is premature promotion and why does it make major GCs more frequent?
+  - `L3` What is the Minor Mark-Compact / Minor Mark-Sweep collector and why was it explored?
+  - `L3` How do GC pauses show up in p99 latency, and how do you prove GC is the cause? ↳ `--trace-gc` timestamps, perf_hooks `gc` entries, correlate with latency
+  - `L3` What is `PerformanceObserver` with entry type `gc`, and how would you export GC pause metrics to Prometheus?
+  - `L3` Compare V8's GC with the JVM's G1/ZGC and Go's GC at a high level. ↳ generational vs non-generational Go; pause targets; concurrent marking everywhere
+  - `L3` GC pauses are causing p99 spikes. How do you confirm it, and what can you do? ↳ `--trace-gc`, reduce allocation, object pooling, heap sizing
+- [ ] Heap snapshots: shallow vs retained size, retainers, dominators, three-snapshot technique, taking snapshots in production
+  - `L1` What is a heap snapshot?
+  - `L1` How do you attach Chrome DevTools to a Node process? ↳ `node --inspect`, chrome://inspect
+  - `L1` Shallow size vs retained size in one line each.
+  - `L2` Shallow size vs retained size: define both.
+  - `L2` What are retainers and the retainer path? How do you read them?
+  - `L2` Explain the three-snapshot technique for finding leaks. ↳ baseline, after load, after more load; compare objects allocated between
+  - `L2` Summary, Comparison, Containment and Statistics views: what is each for?
+  - `L2` What is the allocation timeline / allocation sampling profiler, and when is it better than snapshots?
+  - `L2` How do you take a heap snapshot in production without DevTools? ↳ `v8.writeHeapSnapshot()`, `--heapsnapshot-signal=SIGUSR2`, `--heapsnapshot-near-heap-limit`
+  - `L2` What does taking a heap snapshot cost the running process? ↳ stop-the-world, roughly 2× heap memory, seconds of pause
+  - `L2` How do you safely snapshot one pod in Kubernetes without hurting users? ↳ take it out of the load balancer first, then snapshot, copy file out
+  - `L2` Prod memory grows 50 MB per hour and the pod restarts every day. Walk me through your debugging plan.
+  - `L2` What is `--heapsnapshot-near-heap-limit` and why is it useful for OOM crashes you cannot reproduce?
+  - `L2` How do you tell a leak from a legitimately large working set?
+  - `L3` What is `(closure)`, `(system)`, `(array)`, `(concatenated string)` in a snapshot, and why do you often see them at the top?
+  - `L3` What are distance and dominators in a heap snapshot?
+  - `L3` How do you compare snapshots in a script rather than by hand (e.g. memlab, heap snapshot parsers)?
+  - `L3` How would you add continuous memory monitoring so a leak is caught before it hits prod? ↳ heapUsed after GC metric, alert on slope, soak tests in CI
+  - `L3` A leak only shows up after 3 days under real traffic. How do you get evidence without waiting 3 days each time?
+- [ ] Heap limits: `--max-old-space-size`, `--max-semi-space-size`, V8 OOM vs container OOM kill (137), sizing heap to pod limits
+  - `L1` What is `--max-old-space-size`?
+  - `L1` What error do you see when Node runs out of heap? ↳ "FATAL ERROR: … JavaScript heap out of memory"
+  - `L1` How do you pass V8 flags to Node in Docker? ↳ `NODE_OPTIONS`, or flags in CMD
+  - `L1` Flag to raise the old-space heap limit?
+  - `L1` Exit code when the kernel OOM-kills a container?
+  - `L2` How does Node pick the default heap limit, and how does it relate to container memory? ↳ newer Node reads cgroup limits; older versions used host RAM
+  - `L2` A container has a 1 GB limit. What should `--max-old-space-size` be, and why not 1024? ↳ leave headroom for new space, Buffers, stacks, native: ~70–75%
+  - `L2` V8 heap OOM vs the kernel OOM killer (exit code 137): how do you tell which one killed your pod?
+  - `L2` What is `--max-semi-space-size` and when would you raise it?
+  - `L2` What happens to GC behaviour as the heap gets close to its limit? ↳ frequent major GCs, long pauses, throughput collapses before crash
+  - `L2` Raising the heap limit made the crash go away. Is the problem solved?
+  - `L2` How do Kubernetes memory requests and limits interact with Node's heap limit?
+  - `L2` One Node process with 8 GB heap vs four with 2 GB each: trade-offs.
+  - `L2` How do you watch heap usage per pod and alert before the OOM kill? ↳ heapUsed after GC vs limit, RSS vs container limit, restart counts
+  - `L3` Why do GC pauses get longer with a bigger old space, and what does that mean for latency SLOs?
+  - `L3` What is the 4 GB pointer-compression cage, and when does it limit heap size?
+  - `L3` How do you set heap size correctly when running `cluster` workers or worker_threads inside one container? ↳ each isolate has its own heap; sum must fit; `resourceLimits`
+- [ ] Profiling Node: CPU profiles and flame graphs, `--inspect`, `--cpu-prof`, clinic.js, 0x, `perf`, APM and continuous profiling
+  - `L1` What is a CPU profile? What is a flame graph?
+  - `L1` How do you read a flame graph? What do width and height mean? ↳ width = time on CPU; height = stack depth
+  - `L1` What does `node --inspect` give you? `--inspect-brk`?
+  - `L1` Flag to open the inspector?
+  - `L1` Which clinic tool finds event-loop and I/O delays? ↳ bubbleprof (doctor triages first)
+  - `L1` What does a flame graph's width show?
+  - `L2` What do clinic doctor, clinic flame and clinic bubbleprof each show?
+  - `L2` What is 0x and how does it build flame graphs?
+  - `L2` What do `--cpu-prof` and `--heap-prof` write, and how do you open the result?
+  - `L2` What is `node --prof` + `--prof-process`, and when would you use it instead of DevTools?
+  - `L2` Sampling profiler vs instrumentation profiler: trade-offs.
+  - `L2` What does a wide plateau of `JSON.parse` or `RegExp` in the flame graph tell you?
+  - `L2` How do you profile a Node service under realistic load? ↳ autocannon/k6 load + clinic or `--cpu-prof`, production-like data
+  - `L2` How do you use `perf_hooks` (`performance.now`, `PerformanceObserver`, `timerify`) for targeted timing?
+  - `L2` What is the `--trace-gc`, `--trace-opt`, `--trace-deopt` output good for in practice?
+  - `L2` What does an APM (Datadog, New Relic, Elastic, OpenTelemetry) give you that a local profiler does not?
+  - `L3` How do you get native frames (libuv, C++) into a flame graph? ↳ Linux `perf` with `--perf-basic-prof`
+  - `L3` What is continuous profiling (Pyroscope, Datadog profiler) and is it safe to run in production?
+  - `L3` You profiled and found nothing hot, but latency is high. What next? ↳ off-CPU time: I/O waits, event-loop lag, GC, lock contention, DB
+- [ ] Writing V8-friendly JS: stable shapes, no `delete`, monomorphic hot paths, fewer allocations, when micro-optimising is worth it
+  - `L1` Name three habits that keep objects on the fast path in V8. ↳ init all fields in constructor, same order, no `delete`
+  - `L2` Why prefer setting a property to `undefined` over `delete`?
+  - `L2` Why are arrays with mixed types slower than arrays of one type?
+  - `L2` Object spread in a hot loop (`{...a, x}`) vs mutation: what does it cost? ↳ allocation per iteration, GC pressure, shape churn
+  - `L2` `for` loop vs `forEach` vs `for…of` vs `map`: does it matter today?
+  - `L2` Why is `JSON.parse(JSON.stringify(x))` for deep copy slow and lossy?
+  - `L2` String building: `+=` vs `array.join` vs template literals — what does V8 do?
+  - `L2` Why does creating functions inside a hot loop hurt?
+  - `L2` When is `Map` faster than a plain object, and when is it slower?
+  - `L2` What is object pooling and when is it worth it in JS?
+  - `L2` How do you reduce allocations in a high-throughput JSON API? ↳ avoid intermediate arrays, stream serialize, fast-json-stringify with schema
+  - `L3` Why does Fastify use schema-based serialization (`fast-json-stringify`), and what V8 behaviour does it exploit?
+  - `L3` Why do performance tips from 2016 blog posts often no longer apply?
+  - `L3` How do you decide whether a micro-optimization is worth it? ↳ profile first, measure p99 not averages, readability cost
+  - `L3` Your hot loop gets 3× slower after adding one optional field to some objects. Explain why. ↳ new shapes → polymorphic/megamorphic ICs → deopt

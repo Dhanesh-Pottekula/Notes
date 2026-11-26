@@ -103,7 +103,7 @@ top = '''  <header>
       <li><a href="ai_engineering/index.html"><span class="num">2</span><span class="t">AI Engineering</span><span class="d">Chip Huyen. The main reference for AI engineer roles: evaluation, prompting, RAG and agents, finetuning, inference optimization, architecture. The basis of AI system-design rounds. <span class="meta">12 pages</span></span></a></li>
       <li><a href="llm_engineers_handbook/index.html"><span class="num">3</span><span class="t">LLM Engineer's Handbook</span><span class="d">Iusztin &amp; Labonne. One end-to-end production LLM system: data, RAG pipelines, SFT and DPO, evaluation, inference, deployment, LLMOps. Good material for "design a RAG system". <span class="meta">13 pages</span></span></a></li>
     </ol>
-    <p class="note">Each page has an "Interview angle" box per section with an answer you can say out loud, and a "Check yourself" quiz. See also <a href="../career/interview-prep-subjects.md">interview-prep-subjects.md</a>.</p>
+    <p class="note">Each page has an "Interview angle" box per section with an answer you can say out loud, and a "Check yourself" quiz. See also <a href="../career/interview-topics/index.html">the interview topic pages</a>.</p>
   </section>'''
 out = os.path.join(HERE, "index.html")
 open(out, "w", encoding="utf-8").write(add_annotate(page("LLM Bookshelf", top), out))

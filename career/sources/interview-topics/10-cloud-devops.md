@@ -1,0 +1,1921 @@
+# 10. Cloud and DevOps (P1)
+
+---
+
+## 10.1 Linux and shell
+- [ ] Files and permissions (`chmod`, `chown`, rwx, octal), users and groups ↳ `Linux Commands/7. linux commands.txt` (chown, chmod, groups) · `Docker/ShellScripting.md` (chmod octal 4/2/1) · linuxjourney.com "Permissions" lessons
+  - `L1` Read `-rwxr-x--- 1 app web 4096 file`. Who can do what?
+  - `L1` What does `chmod 755` mean? `chmod 644`? `chmod 600`? ↳ r=4, w=2, x=1 for user/group/other
+  - `L1` What does `chown user:group file` do?
+  - `L1` What do read, write and execute mean on a **directory**? ↳ list names, create/delete entries, enter/traverse
+  - `L1` What is `sudo`? `su` vs `sudo`?
+  - `L1` How do you add a user and add them to a group? ↳ `useradd`, `usermod -aG`, `groupadd`
+  - `L1` What does `chmod 600` allow?
+  - `L1` What does the sticky bit do on `/tmp`?
+  - `L1` Which file holds password hashes?
+  - `L2` What is `umask`? With umask 022, what permissions does a new file get? A new directory? ↳ 644 and 755
+  - `L2` What is the setuid bit? Give a real example. ↳ `/usr/bin/passwd` runs as root
+  - `L2` What is the setgid bit on a directory?
+  - `L2` What is the sticky bit, and why does `/tmp` have it? ↳ only owner can delete their files
+  - `L2` Where are users, passwords and groups stored? ↳ `/etc/passwd`, `/etc/shadow`, `/etc/group`
+  - `L2` How do you give a user passwordless sudo for one command only? Why edit with `visudo`?
+  - `L2` What does `id` show?
+  - `L2` Why does your app fail with "Permission denied" after you added your user to the `docker` group, and what fixes it? ↳ new group needs new login session; `newgrp`
+  - `L2` What is a system user (`useradd -r`, nologin shell), and why run services as one?
+  - `L3` What are ACLs (`getfacl`/`setfacl`) and when are classic permissions not enough?
+  - `L3` What are Linux capabilities, and how do they split root's power? ↳ e.g. CAP_NET_BIND_SERVICE for port <1024
+  - `L3` How can a non-root process listen on port 80? ↳ capability, authbind, reverse proxy, `ip_unprivileged_port_start`
+  - `L3` What are SELinux and AppArmor, and how do you tell they are blocking you?
+- [ ] Processes: `ps`, `top`/`htop`, `kill` and signals (SIGTERM vs SIGKILL), `nohup`, systemd services ↳ `Linux Commands/11. linux commands.txt` (ps, kill, kill -9) + `Linux Commands/10. linux commands.txt` (systemctl) · https://missing.csail.mit.edu/2020/command-line/ (job control, signals) · linuxjourney.com "Processes" lessons
+  - `L1` SIGTERM vs SIGINT vs SIGKILL. Which can you catch?
+  - `L1` Can you catch SIGKILL?
+  - `L1` What does `ps aux` show? What do the columns USER, PID, %CPU, %MEM, VSZ, RSS, STAT mean?
+  - `L1` How do you find the PID of a process by name? ↳ `pgrep`, `ps aux | grep`, `pidof`
+  - `L1` Foreground vs background job. What do `&`, `jobs`, `fg`, `bg` and Ctrl+Z do?
+  - `L1` What does `nohup` do? How is it different from running with `&`?
+  - `L1` What is a signal?
+  - `L1` SIGTERM vs SIGKILL.
+  - `L1` What do SIGINT, SIGHUP, SIGQUIT, SIGSTOP and SIGCONT do?
+  - `L1` What does `kill -9 <pid>` do, and why is it the last resort?
+  - `L1` What signal does `Ctrl+C` send? `Ctrl+Z`? `Ctrl+\`?
+  - `L1` Which signal does `kill` send by default?
+  - `L1` Which signal can never be caught?
+  - `L1` What does `nohup` protect a process from?
+  - `L1` SIGTERM vs SIGKILL?
+  - `L2` What happens to background jobs when you close your SSH session? How do you keep them running? ↳ SIGHUP; nohup, setsid, tmux/screen, systemd
+  - `L2` Which signals cannot be caught or ignored? ↳ SIGKILL, SIGSTOP
+  - `L2` What do `kill`, `pkill` and `killall` do differently?
+  - `L2` What does `kill -0 <pid>` do? ↳ checks process exists and you may signal it
+- [ ] Networking: `curl`, `ss`/`netstat`, `lsof -i`, `dig`, `ping`, `traceroute` ↳ `Linux Commands/6. linux commands.txt` (lsof) · Julia Evans "Bite Size Networking" zine (wizardzines.com) · linuxjourney.com "Network" lessons
+  - `L1` What does `ping` tell you, and what doesn't it?
+  - `L1` What does `traceroute` show? How does it work? ↳ increasing TTL, ICMP time-exceeded per hop
+  - `L1` What does `curl -v` show you?
+  - `L1` What does `dig` do? `nslookup`?
+  - `L1` How do you see which process is listening on port 8080? ↳ `ss -ltnp`, `lsof -i :8080`
+  - `L1` Which tool shows open sockets on Linux today: `ss` or `netstat`?
+  - `L1` How do you see which ports are listening and which process owns each? ↳ `ss -ltnp`, `lsof -i -P -n`
+  - `L1` Port 8080 is already in use. Find and stop the process.
+  - `L1` What do `ping`, `curl`, `wget` and `dig` each do?
+  - `L1` How do you see the machine's IP addresses? ↳ `ip addr`, `hostname -I`
+  - `L1` Command to see listening ports with process names?
+  - `L1` Port 8080 is already in use — find and stop the process
+  - `L2` Read this `curl -v` output: where do you see DNS, connect, TLS, request headers and response headers?
+  - `L2` How do you time each phase of a request with curl? ↳ `-w` with time_namelookup, time_connect, time_appconnect, time_starttransfer
+  - `L2` How do you send a request to a specific IP while keeping the right Host/SNI? ↳ `curl --resolve host:443:IP`
+  - `L2` `ss` vs `netstat`. What do the `-t -u -l -n -p -a` flags do?
+  - `L2` What do Recv-Q and Send-Q mean in `ss` for a listening socket vs an established one?
+  - `L2` How do you count connections by state on a server? ↳ `ss -tan | awk '{print $1}' | sort | uniq -c`
+  - `L2` How do you test if a TCP port is open from a container with no curl? ↳ `nc -zv`, bash `/dev/tcp`, `telnet`
+  - `L2` Port 8080 is already in use. Find and stop the process.
+  - `L2` `ss` vs `netstat`. Why was netstat replaced?
+  - `L2` What do `ip route` and `ip neigh` show?
+  - `L2` How do you check whether a remote port is reachable from this box? ↳ `nc -zv host port`, `curl -v telnet://`, bash `/dev/tcp`
+  - `L2` How do you count TCP connections per state and per remote IP?
+  - `L2` What is `/etc/resolv.conf` and `/etc/hosts`? What is `nsswitch.conf`?
+  - `L2` How do you make an HTTP request with headers, a JSON body and a timeout using curl?
+  - `L2` How do you download a file and resume it if it breaks? ↳ `curl -C -`, `wget -c`
+  - `L2` What do `iptables -L -n`, `nft list ruleset` and `ufw status` show?
+  - `L2` What is `tcpdump` and give one command you would actually run.
+  - `L2` What is `lsof -i :5432` vs `lsof -p <pid>` vs `lsof +D /dir`?
+  - `L2` Scenario: the service won't start because the port is in use. Steps?
+  - `L3` What are `sysctl` settings like `net.core.somaxconn` and `net.ipv4.ip_local_port_range` for?
+  - `L3` What do `nstat` / `netstat -s` counters tell you about retransmits and listen-queue overflows?
+- [ ] Text: `grep`, `awk`, `sed`, `cut`, `sort | uniq -c`, `tail -f`, `jq` ↳ `Linux Commands/4. linux commands.txt` (grep, sed, awk, cut, tail) · https://missing.csail.mit.edu/2020/data-wrangling/ · jq manual (jqlang.org)
+  - `L1` What do `grep`, `sed` and `awk` each do, in one line?
+  - `L1` What do `grep -i`, `-v`, `-r`, `-n`, `-c`, `-E` and `-A/-B/-C` do?
+  - `L1` `head`, `tail`, `tail -f`, `tail -F`, `less`: when do you use each? ↳ -F survives log rotation
+  - `L1` What does `wc -l` do?
+  - `L1` What do `sort`, `uniq` and `cut` do? Why must you sort before `uniq`?
+  - `L1` Which command finds files by name under a directory?
+  - `L2` Count the top 10 client IPs in an nginx access log. ↳ `awk '{print $1}' | sort | uniq -c | sort -rn | head`
+  - `L2` Count HTTP status codes in an access log.
+  - `L2` Find all 5xx responses in the last hour of logs.
+  - `L2` Print the 10 slowest requests from a log that has the response time in field 11.
+  - `L2` Replace a string in many files in place with `sed`. What is different on macOS? ↳ `sed -i ''` on BSD
+  - `L2` Print only the second column of a CSV. `cut` vs `awk`.
+  - `L2` Sum a numeric column with `awk`. Compute an average.
+  - `L2` Find files larger than 100 MB modified in the last 7 days. ↳ `find / -xdev -size +100M -mtime -7`
+  - `L2` Delete log files older than 30 days safely. ↳ `find … -mtime +30 -print` first, then `-delete`
+  - `L2` Grep a pattern across a directory but skip `node_modules`. What is ripgrep?
+  - `L2` Extract one field from JSON logs with `jq`. Filter JSON lines where `level == "error"`.
+  - `L2` Count requests per minute from a timestamped log.
+  - `L2` Show unique error messages and how often each appears.
+  - `L2` Follow a log and show only lines with a request id.
+  - `L2` What does `sort -k2 -n -t,` do?
+  - `L3` Find which request ids appear in log A but not in log B. ↳ `comm`, `sort`, `join` or `grep -vFf`
+  - `L3` Parse a multi-GB log quickly. What makes grep/awk fast or slow? ↳ `LC_ALL=C`, fixed strings, avoid UUOC, parallel
+  - `L3` Run a command over 10,000 files in parallel. ↳ `xargs -P`, GNU parallel
+  - `L3` Write an awk script that prints p50 and p99 latency per endpoint.
+- [ ] Disk and memory: `df`, `du`, `free`; environment variables ↳ `Linux Commands/5. linux commands.txt` (free -m, df -h) · https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55 · `Docker/ShellScripting.md`
+  - `L1` `df -h` vs `du -sh`.
+  - `L1` How do you find the biggest directories under `/var`? ↳ `du -xh --max-depth=1 /var | sort -h`
+  - `L1` What is mounting? What does `/etc/fstab` do?
+  - `L1` Explain the standard directories: `/etc`, `/var`, `/var/log`, `/tmp`, `/opt`, `/usr`, `/home`, `/proc`.
+  - `L1` How do you create and extract a `.tar.gz`? ↳ `tar -czf`, `tar -xzf`
+  - `L1` Command to show disk usage per filesystem?
+  - `L1` Command to show inode usage?
+  - `L2` The disk is full but `du` adds up to much less than `df` says. Why? ↳ deleted-but-open files, other mounts hidden, reserved blocks
+  - `L2` `df -h` shows space left but you get "No space left on device". Why? ↳ out of inodes; `df -i`
+  - `L2` What creates millions of tiny files and eats inodes on servers? ↳ session files, cache dirs, mail queues, temp files
+  - `L2` What does `iostat -x 1` show? What do `%util`, `await` and `r/s`/`w/s` mean?
+  - `L2` How do you find which process is doing the most disk I/O? ↳ `iotop`, `pidstat -d`
+  - `L2` Why is writing a file "fast" and then the box stalls later? ↳ dirty pages in page cache, writeback flush
+  - `L2` What is logrotate and how do you set it up for an app log? What is `copytruncate` for?
+  - `L2` ext4 vs xfs: which have you used and what is different?
+  - `L2` Your cloud VM disk is slow. What are IOPS and throughput limits on EBS / Azure managed disks?
+  - `L2` Scenario: disk full at 3 am. Walk through finding and freeing space safely. ↳ `df -h`, `du`, deleted-open files, logs, Docker, inodes
+  - `L3` What is the I/O scheduler, and why is it often `none` on NVMe?
+  - `L3` What is direct I/O (`O_DIRECT`) and who uses it?
+  - `L3` How do you grow a disk on a cloud VM without downtime? ↳ resize disk, `growpart`, `resize2fs`/`xfs_growfs`
+  - `L3` What is LVM and why would you use it on a server?
+- [ ] SSH, keys, `scp`/`rsync`; cron ↳ https://missing.csail.mit.edu/2020/command-line/ ("Remote machines": SSH, keys, scp/rsync) · `Docker/DockerCommands.md` "AWS SSH Access" · DMLS ch10 "Cron, Schedulers, and Orchestrators" (pdf p331–333)
+  - `L1` What is cron? Read this line: `*/5 * * * * /opt/backup.sh`.
+  - `L1` How does SSH key authentication work? ↳ server holds public key; client proves it has private key by signing
+  - `L1` How do you create an SSH key and put it on a server? ↳ `ssh-keygen -t ed25519`, `ssh-copy-id`
+  - `L1` `scp` vs `rsync`.
+  - `L1` What does `*/15 * * * *` mean in cron?
+  - `L1` Which permissions does `~/.ssh/authorized_keys` need?
+  - `L2` Your SSH key login fails with "bad permissions". Which permissions must `~/.ssh` and `authorized_keys` have? ↳ 700 and 600
+  - `L2` Why did your cron job work in the shell but fail under cron? ↳ minimal PATH/env, no TTY, cwd, permissions; log output
+  - `L2` Where does cron output go, and how do you capture it?
+  - `L2` What goes in `~/.ssh/config` and why use it?
+  - `L2` What is `known_hosts`, and what does "REMOTE HOST IDENTIFICATION HAS CHANGED" mean?
+  - `L2` What is ssh-agent and agent forwarding? Why is forwarding risky?
+  - `L2` What is an SSH tunnel? Local vs remote port forwarding. ↳ `-L` reach private DB via bastion; `-R` expose local
+  - `L2` How do you reach a private VM through a bastion in one command? ↳ `ssh -J` (ProxyJump)
+  - `L2` How do you harden SSH on a public VM? ↳ keys only, no root login, fail2ban, restrict source IPs/NSG
+  - `L2` What is `tmux` / `screen`, and why use it for long jobs over SSH?
+  - `L2` `rsync -avz --delete`: what does each flag do and what is dangerous?
+  - `L2` Scenario: SSH to the VM hangs after login. What could cause it?
+  - `L2` Scenario: a cron job silently stopped running. Where do you look?
+  - `L3` How do you stop the same cron job running twice on three VMs? ↳ `flock`, distributed lock, single scheduler
+  - `L3` How do SSH certificates (signed by a CA) differ from plain keys, and why do big teams use them?
+  - `L3` What are cloud alternatives to SSH for VMs? ↳ AWS SSM Session Manager, Azure Bastion, serial console
+- [ ] Shell scripting basics: variables, loops, exit codes, `set -euo pipefail` ↳ https://missing.csail.mit.edu/2020/shell-tools/ · `Docker/ShellScripting.md` (set -e, set -x) · Aaron Maxwell "Use the Unofficial Bash Strict Mode" (redsymbol.net)
+  - `L1` What is the shebang line? `#!/bin/bash` vs `#!/usr/bin/env bash`.
+  - `L1` How do you make a script executable and run it?
+  - `L1` How do you define and use a variable? Why quote `"$var"`?
+  - `L1` What is an exit code? How do you read the last one? ↳ `$?`; 0 = success
+  - `L1` What are `$0`, `$1`, `$#`, `$@`, `$*` and `$$`?
+  - `L1` Environment variable vs shell variable. What does `export` do?
+  - `L1` What does `$?` hold?
+  - `L1` What does `set -u` do?
+  - `L1` What does `pipefail` do?
+  - `L2` What does `set -euo pipefail` do, piece by piece?
+  - `L2` What are the gotchas of `set -e`? ↳ ignored in conditions, `&&` lists, subshells; `cmd || true`
+  - `L2` What does `set -x` do, and when do you use it?
+  - `L2` `"$@"` vs `$*`: why does it matter for filenames with spaces?
+  - `L2` Write a loop over all `.log` files in a directory, safely.
+  - `L2` Write a loop that reads a file line by line. ↳ `while IFS= read -r line; do …; done < file`
+  - `L2` `[ ]` vs `[[ ]]` vs `(( ))`.
+  - `L2` How do you test if a file exists, a directory exists, a string is empty? ↳ `-f`, `-d`, `-z`
+  - `L2` How do you write a function that returns a value?
+  - `L2` How do you give a variable a default value? ↳ `${VAR:-default}`, `${VAR:?error}`
+  - `L2` What is a subshell, and why doesn't a variable set inside `cmd | while read` survive?
+  - `L2` How do you parse flags in a script? ↳ `getopts`, case loop
+  - `L2` What is ShellCheck and what does it catch?
+  - `L2` Write a retry-with-backoff loop for a flaky command.
+  - `L2` Write a deploy script: pull image, stop old container, start new, health-check, roll back on failure.
+  - `L3` How do you make a script safe to run twice (idempotent)?
+  - `L3` How do you prevent two copies of a script from running at once? ↳ `flock`
+  - `L3` How do you create and always clean up a temp file? ↳ `mktemp` + `trap 'rm -f "$tmp"' EXIT`
+  - `L3` When should a script stop being bash and become Python?
+  - `L3` `source script.sh` vs `./script.sh`: what is different?
+- [ ] Deeper network debugging: tcpdump/Wireshark, mtr, TCP traceroute, openssl s_client, ip, nsenter, netem fault injection
+  - `L2` What is `mtr` and why is it better than traceroute for intermittent loss?
+  - `L2` How do you capture traffic on port 443 with `tcpdump` and save it for Wireshark? ↳ `tcpdump -i any port 443 -w out.pcap`
+  - `L2` What can and can't you see in a pcap of HTTPS traffic? How do you decrypt your own? ↳ SNI, sizes, timing; SSLKEYLOGFILE
+  - `L2` What do `openssl s_client -connect` and `-showcerts` tell you?
+  - `L2` How do you check certificate expiry from the command line?
+  - `L2` What do `ip addr`, `ip route` and `ip neigh` show?
+  - `L3` What is `tcptraceroute` / `traceroute -T` and why use TCP instead of ICMP?
+  - `L3` How do you inspect network traffic inside a running container's network namespace? ↳ `nsenter -t <pid> -n tcpdump`, sidecar `--net container:`
+  - `L3` How do you reproduce bad network conditions (latency, loss) locally? ↳ `tc qdisc netem`, toxiproxy
+- [ ] Process lifecycle: fork/exec, copy-on-write, PPID tree, states (R/S/D/Z), zombies and orphans, threads via clone, /proc/<pid>
+  - `L1` What is a process? Process vs program vs thread.
+  - `L1` What is a PID? What is PID 1 on a normal Linux machine? ↳ init, usually systemd
+  - `L1` What is PID 1 on most modern distros?
+  - `L1` What state letter is a zombie in `ps`?
+  - `L2` How does Linux create a new process? Explain `fork()` then `exec()`.
+  - `L2` Why split process creation into fork and exec instead of one call? ↳ child can set up FDs, env, redirects before exec
+  - `L2` What is copy-on-write in `fork()` and why does it make fork cheap?
+  - `L2` What is the parent PID (PPID)? How do you see the process tree? ↳ `ps -ef --forest`, `pstree`
+  - `L2` Process states: R, S, D, T, Z. What does each mean?
+  - `L2` What is the D state (uninterruptible sleep), and why can't you kill a process in it? ↳ waiting on I/O in kernel, often disk/NFS
+  - `L2` What is a zombie process? How do you get rid of zombies? ↳ exited, parent didn't `wait()`; fix/kill parent
+  - `L2` What is an orphan process? Who adopts it? ↳ init/subreaper re-parents and reaps it
+  - `L2` Zombie vs orphan.
+  - `L2` What is in `/proc/<pid>/`? Name five useful files. ↳ cmdline, environ, status, fd/, maps, limits, cwd
+  - `L2` Process vs thread in Linux: what do threads share? What is a thread in the kernel's eyes? ↳ tasks sharing memory/FDs via `clone()`
+  - `L3` What is a process group and a session? Why do they matter for signals and terminals?
+  - `L3` What is a daemon, and what did the classic "double fork" achieve?
+  - `L3` What is `vfork()` / `posix_spawn()` and why do Python's `subprocess` and big JVMs care? ↳ forking a huge process is slow; spawn avoids copying page tables
+  - `L3` Why is forking after starting threads dangerous? ↳ only calling thread copied; locks held by others stay locked
+  - `L3` Scenario: a deploy left the server with thousands of zombie processes. What happened and how do you clean up?
+- [ ] Signals in depth: SIGHUP, SIGCHLD, SIGPIPE, SIGSEGV and core dumps, bash traps, signal handlers, exit code 128+N
+  - `L2` What is SIGHUP traditionally used for by daemons like nginx? ↳ reload config without restart
+  - `L2` What is SIGCHLD and who should handle it?
+  - `L2` What is SIGPIPE, and when does a server get it? ↳ writing to a closed socket/pipe; usually ignored, handle EPIPE
+  - `L2` What is SIGSEGV? What is a core dump and how do you enable one? ↳ `ulimit -c`, core_pattern
+  - `L2` How do you trap a signal in a bash script? Write a cleanup trap. ↳ `trap 'cleanup' EXIT INT TERM`
+  - `L2` What does graceful shutdown mean for an HTTP/WebSocket server? List the steps. ↳ stop accepting, fail readiness, drain in-flight, close pools, exit
+  - `L2` How do you handle SIGTERM in Python (asyncio / FastAPI) and in Node.js?
+  - `L3` What is a signal mask, and why are only async-signal-safe functions allowed in a handler?
+  - `L3` What is the self-pipe trick / `signalfd`, and why do event loops use them?
+  - `L3` What does the exit code 128+N mean in the shell? Decode 130, 137 and 143.
+- [ ] systemd: unit files, systemctl, Restart= policies, journalctl filters, timers, service sandboxing, the boot process
+  - `L1` What is systemd?
+  - `L1` What do `systemctl start`, `stop`, `restart`, `reload`, `enable`, `status` do?
+  - `L1` `enable` vs `start`.
+  - `L1` How do you read a service's logs? ↳ `journalctl -u name -f`
+  - `L1` Command to follow a systemd service's logs?
+  - `L1` What must you run after editing a unit file?
+  - `L2` Write a systemd unit file for a FastAPI app. Which sections and keys matter? ↳ [Unit] After=, [Service] User, ExecStart, Restart, Environment, [Install]
+  - `L2` What does `Restart=on-failure` do, and what are `RestartSec` and start limits?
+  - `L2` After editing a unit file, what must you run? ↳ `systemctl daemon-reload`
+  - `L2` How do you pass environment variables and secrets to a systemd service? ↳ `Environment=`, `EnvironmentFile=`, credentials
+  - `L2` `journalctl` filters: by time, by boot, by priority, follow. ↳ `--since`, `-b`, `-p err`, `-f`
+  - `L2` What are systemd timers, and why might you use them instead of cron?
+  - `L2` What is a target in systemd (vs runlevels)?
+  - `L2` What are `Type=simple`, `exec`, `forking` and `notify`?
+  - `L3` How does systemd stop a service? What are `KillMode`, `TimeoutStopSec` and `KillSignal`?
+  - `L3` Walk through the Linux boot process from power on to login. ↳ firmware (BIOS/UEFI), GRUB, kernel + initramfs, systemd, targets
+  - `L3` What is initramfs and why is it needed?
+  - `L3` What sandboxing options does systemd give a service? ↳ ProtectSystem, PrivateTmp, NoNewPrivileges, MemoryMax
+  - `L3` What is `systemd-analyze blame` for?
+- [ ] File descriptors: FDs 0/1/2, ulimit nofile and EMFILE, lsof, inodes and hard vs soft links, deleted-but-open files, /proc and /dev
+  - `L1` What are FDs 0, 1 and 2?
+  - `L1` What does "everything is a file" mean in Linux? Give examples. ↳ files, sockets, pipes, devices, /proc entries
+  - `L1` What is `ulimit -n`?
+  - `L1` What is FD 2?
+  - `L1` What does `lsof` stand for?
+  - `L1` What does `ulimit -n` show?
+  - `L2` Your server logs "Too many open files" (EMFILE). What is happening and how do you fix it? ↳ FD limit or leak; raise nofile, find leak with lsof
+  - `L2` How do you see how many FDs a process has open and what they point to? ↳ `ls /proc/<pid>/fd | wc -l`, `lsof -p <pid>`
+  - `L2` Soft vs hard limits. How do you raise `nofile` permanently for a systemd service? For a Docker container? ↳ `LimitNOFILE=`, `--ulimit nofile=`
+  - `L2` EMFILE vs ENFILE. ↳ per-process vs system-wide (`fs.file-max`)
+  - `L2` Each WebSocket connection uses one FD. How does that set the max connections per process?
+  - `L2` What is an inode? How is it different from a filename?
+  - `L2` Hard link vs soft (symbolic) link. ↳ hard = same inode, same FS; soft = path pointer, can dangle
+  - `L2` You deleted a 20 GB log file but `df` still shows the disk full. Why? ↳ process still holds open FD; `lsof +L1`; restart or truncate
+  - `L2` What is `/dev/null`, `/dev/zero`, `/dev/urandom`?
+  - `L2` What is in `/proc` and `/sys`? Are they on disk?
+  - `L2` Scenario: "Too many open files" in the app log. Steps?
+  - `L3` What happens to open FDs across `fork()` and `exec()`? What is `O_CLOEXEC` for?
+  - `L3` What is the difference between a file description and a file descriptor (`dup()`, shared offsets)?
+- [ ] Pipes and redirection: |, >, >>, 2>&1, here-docs, process substitution, xargs, SIGPIPE, stdout buffering
+  - `L1` What does a pipe `|` do?
+  - `L1` `>` vs `>>` vs `<`.
+  - `L1` What does `2>&1` mean?
+  - `L1` What does `tee` do?
+  - `L1` What does `2>&1` do?
+  - `L2` Why is `cmd > out.log 2>&1` different from `cmd 2>&1 > out.log`? ↳ redirections apply left to right
+  - `L2` What does `&>` do in bash?
+  - `L2` What is a named pipe (FIFO)? When would you use one?
+  - `L2` What is a here-document and a here-string?
+  - `L2` What is process substitution `<(cmd)`? Give a use. ↳ `diff <(sort a) <(sort b)`
+  - `L2` What is the exit status of a pipeline, and what does `pipefail` change?
+  - `L2` What happens when the reader of a pipe exits early (`cmd | head -1`)? ↳ writer gets SIGPIPE
+  - `L2` What do `$(...)` and backticks do? Why prefer `$(...)`?
+  - `L2` What does `xargs` do, and why use `-0` with `find -print0`?
+  - `L2` `;` vs `&&` vs `||` between commands.
+  - `L3` How does the shell implement a pipe? ↳ `pipe()` syscall, fork two children, `dup2` FDs, exec
+  - `L3` Why can output appear out of order or late when piped (stdout buffering)? How do you fix it? ↳ full buffering when not a TTY; `stdbuf -oL`, `PYTHONUNBUFFERED`
+  - `L3` What is a pipe's buffer size, and what happens when it is full?
+- [ ] Linux memory: free vs available, RSS vs VSZ, page cache, swap and swappiness, OOM killer, overcommit, huge pages
+  - `L1` What does `free -m` show? Explain each column. ↳ total, used, free, shared, buff/cache, available
+  - `L1` "free" vs "available" memory: which do you look at?
+  - `L1` What is swap?
+  - `L1` What is the OOM killer?
+  - `L1` Command to show free memory in MB?
+  - `L1` In `free`, which column tells you how much memory apps can still get?
+  - `L2` RSS vs VSZ (virtual size). Why is VSZ often huge and harmless?
+  - `L2` What is shared memory, and why does adding up RSS of all processes overcount? ↳ shared libs, CoW pages; PSS
+  - `L2` What is the page cache? Why does Linux "use all my RAM"? ↳ caches files; reclaimable; good thing
+  - `L2` What are buffers vs cache in `free`?
+  - `L2` How do you tell a process was OOM-killed? ↳ `dmesg -T | grep -i oom`, journalctl -k, exit 137
+  - `L2` How does the OOM killer choose which process to kill? ↳ oom_score from memory use, `oom_score_adj`
+  - `L2` Is swapping good or bad for a latency-sensitive API? What is `swappiness`?
+  - `L2` What is a memory leak vs memory growth from caches? How do you tell them apart in a Python service?
+  - `L2` What do `vmstat 1` columns si/so tell you?
+  - `L2` Scenario: the app was OOM-killed overnight. How do you prove it and find the cause?
+  - `L3` What is memory overcommit and what do `vm.overcommit_memory` 0/1/2 do?
+  - `L3` What are huge pages / transparent huge pages, and why do Redis and databases often say turn THP off?
+  - `L3` Why does a Python process often not give memory back to the OS after freeing objects? ↳ allocator arenas, fragmentation
+  - `L3` What is NUMA and when does it matter for a backend?
+  - `L3` How do you see the memory map of a process? ↳ `/proc/<pid>/smaps`, `pmap -x`
+  - `L3` Scenario: memory "used" keeps growing for days but the app's RSS is flat. Explain. ↳ page cache, slab (dentries), tmpfs, other processes
+  - `L3` Scenario: a VM with lots of free RAM starts swapping. Why can that happen?
+- [ ] CPU and load: load average, top CPU fields (us/sy/wa/st), steal time, context switches, nice, CFS scheduler, affinity
+  - `L1` What do the three numbers in `uptime` / load average mean?
+  - `L1` Load average is 4.0. Is that bad? ↳ depends on core count
+  - `L1` What does `top` show? What does `htop` add?
+  - `L1` How do you see how many CPU cores a machine has? ↳ `nproc`, `lscpu`, `/proc/cpuinfo`
+  - `L1` What does load average count on Linux besides running tasks?
+  - `L1` What does `st` mean in `top`?
+  - `L2` What counts toward Linux load average that does not count on other Unixes? ↳ D-state tasks waiting on disk I/O
+  - `L2` Load is 30 on an 8-core box but CPU is 20% busy. What is going on? ↳ D-state, I/O wait, NFS/disk stalls
+  - `L2` Explain the CPU fields in `top`: us, sy, ni, id, wa, hi, si, st.
+  - `L2` What is steal time (`st`), and what does a high value mean on a cloud VM? ↳ hypervisor gives CPU to other tenants; burstable credits
+  - `L2` What is `%iowait` and why is it a misleading metric?
+  - `L2` What is a context switch? Voluntary vs involuntary. Where do you see them? ↳ `vmstat` cs, `pidstat -w`
+  - `L2` What are `nice` and `renice`? Range and meaning.
+  - `L2` A process shows 400% CPU in top. How is that possible?
+  - `L2` How do you find which thread inside a process is using the CPU? ↳ `top -H -p`, `ps -L`, py-spy
+  - `L2` What does a Python process at 100% on one core tell you, and how does that relate to the GIL and worker count?
+  - `L2` Scenario: load average 50 on 4 cores. Diagnose.
+  - `L3` How does the Linux CFS scheduler decide who runs next? What is EEVDF?
+  - `L3` What is CPU affinity (`taskset`) and when would you pin a process?
+  - `L3` What is the run queue length, and how do you see it? ↳ `vmstat` r column, `sar -q`
+  - `L3` Scenario: CPU is 100% `sy` (system time). What does that suggest and how do you dig in? ↳ syscall storms, lock contention, page faults; perf, strace -c
+- [ ] Syscalls and tracing: user vs kernel space, strace, ltrace, perf, flame graphs, py-spy, eBPF tools
+  - `L1` What is a system call? Give five you know. ↳ read, write, open, socket, fork, execve, mmap
+  - `L1` User space vs kernel space.
+  - `L1` What does `strace` do?
+  - `L1` Which tool traces system calls?
+  - `L2` A process hangs. How do you use `strace -p` to see what it is waiting on?
+  - `L2` What do `strace -f`, `-e trace=network`, `-c` and `-T` do?
+  - `L2` Use strace to find which config file an app is actually reading. ↳ `strace -e trace=openat`
+  - `L2` Why is strace slow, and why be careful running it in production? ↳ ptrace stops on every syscall; big overhead
+  - `L2` What does `ltrace` show that strace doesn't?
+  - `L2` What is `perf top` / `perf record` used for?
+  - `L2` What is a flame graph and how do you read it? ↳ width = time on CPU; look for wide plateaus
+  - `L2` What is py-spy and why is it handy for a running Python service?
+  - `L3` What is eBPF, and why is it safer and cheaper than strace for production tracing?
+  - `L3` Name a few bcc/bpftrace tools and what they show. ↳ execsnoop, opensnoop, biolatency, tcpconnect, tcpretrans
+  - `L3` How does a syscall actually switch into the kernel, and what is the cost?
+  - `L3` What is the vDSO and which calls use it? ↳ `gettimeofday`/`clock_gettime` without a real syscall
+  - `L3` On-CPU vs off-CPU profiling: what does each find?
+  - `L3` Scenario: a Python worker is stuck at 0% CPU and not responding. How do you find where it is stuck? ↳ py-spy dump, strace -p, /proc/<pid>/stack
+- [ ] Package management: apt/dpkg vs yum/dnf/rpm, update vs upgrade, pinning versions, unattended security upgrades
+  - `L1` `apt` vs `yum`/`dnf`: which distros use which?
+  - `L1` How do you install, remove and search for a package with apt? ↳ `apt install`, `apt remove`, `apt search`
+  - `L1` `apt` or `yum` on Ubuntu?
+  - `L2` `apt update` vs `apt upgrade`. How do you pin a package version?
+  - `L2` `dpkg` vs `apt`; `rpm` vs `yum`.
+  - `L2` How do you find which package a file came from? ↳ `dpkg -S`, `rpm -qf`
+  - `L2` What are unattended security upgrades, and would you enable them on a prod VM?
+- [ ] Troubleshooting a slow server: USE method, 60-second checklist (uptime, dmesg, vmstat, mpstat, iostat, sar), triage scenarios
+  - `L1` A server is slow. What commands do you run first?
+  - `L1` What is the USE method? ↳ utilization, saturation, errors for every resource
+  - `L1` Which command shows the kernel ring buffer (OOM messages)?
+  - `L1` A server is slow — what commands do you run first?
+  - `L2` List Brendan Gregg's 60-second checklist and what each command tells you. ↳ uptime, dmesg, vmstat, mpstat, pidstat, iostat, free, sar ×2, top
+  - `L2` What do you look for in `dmesg -T | tail`? ↳ OOM kills, disk errors, TCP drops, segfaults
+  - `L2` Read `vmstat 1` output: r, b, si/so, us/sy/id/wa, cs.
+  - `L2` What do `mpstat -P ALL 1` and `pidstat 1` add?
+  - `L2` What does `sar -n DEV 1` and `sar -n TCP,ETCP 1` show?
+  - `L2` Scenario: the box is slow but CPU and memory look fine. What next? ↳ disk I/O, steal time, network, locks, downstream calls
+  - `L2` Scenario: one API endpoint is slow only on the VM, not locally. How do you narrow it down?
+  - `L3` Scenario: latency spikes every few minutes on an otherwise idle VM. List hypotheses and how to test each.
+
+**Learn:** Linux notes (`Linux Commands/`, `Docker/ShellScripting.md`, `Docker/Linux Quickstart V5.pdf`) ·
+linuxjourney.com · "The Missing Semester" (MIT, free)
+
+## 10.2 Docker
+- [ ] Image vs container; layers and caching; Dockerfile instructions (FROM, RUN, COPY, CMD vs ENTRYPOINT) ↳ https://docs.docker.com/build/building/best-practices/ · https://docs.docker.com/reference/dockerfile/ (CMD vs ENTRYPOINT) · LEH ch11 "Setting up the ZenML cloud" (pdf p453–455, Dockerfile and layer caching)
+  - `L1` Image vs container.
+  - `L1` What is a Dockerfile?
+  - `L1` What does `FROM` do? Can a Dockerfile have more than one?
+  - `L1` `RUN` vs `CMD` vs `ENTRYPOINT`.
+  - `L1` `COPY` vs `ADD`. Which do you use and why? ↳ COPY; ADD auto-extracts tars and fetches URLs (surprises)
+  - `L1` What does `WORKDIR` do?
+  - `L1` `ARG` vs `ENV`. ↳ ARG build-time only; ENV persists into running container
+  - `L1` Image or container: which is the running thing?
+  - `L1` Which instruction sets the default command?
+  - `L1` Which is preferred: `COPY` or `ADD`?
+  - `L1` Which survives into the running container: `ARG` or `ENV`?
+  - `L2` CMD vs ENTRYPOINT: how do they combine, and what does `docker run image arg` override?
+  - `L2` What do `STOPSIGNAL`, `LABEL`, `VOLUME` and `SHELL` do?
+  - `L2` What is `ONBUILD`, and why is it rarely used now?
+  - `L2` CMD vs ENTRYPOINT?
+  - `L3` `ENTRYPOINT` in exec form plus `CMD` as default args: design an image that works as both `image` and `image --help`.
+  - `L3` What does a `VOLUME` instruction in a base image do to later `RUN` steps that write there? ↳ changes after VOLUME are discarded
+  - `L3` Heredocs in Dockerfiles (`RUN <<EOF`): what do they enable?
+  - `L3` How does `ARG` before `FROM` work, and why is it not visible after `FROM` unless re-declared?
+- [ ] Multi-stage builds; small images (slim/alpine/distroless); `.dockerignore` ↳ https://docs.docker.com/build/building/multi-stage/ · https://docs.docker.com/build/building/best-practices/ · Docker docs "Build context" / .dockerignore (docs.docker.com/build)
+  - `L1` Why a multi-stage Dockerfile? What goes in each stage?
+  - `L1` What is a multi-stage build?
+  - `L1` What is `.dockerignore` and what goes in it?
+  - `L1` What file keeps `node_modules` and `.git` out of the build context?
+  - `L2` What base image did you use, and how big is the final image? ↳ distroless/alpine/slim; trade-offs with musl and debugging
+  - `L2` Why combine `apt-get update && apt-get install` in one `RUN`? ↳ stale cached update layer; clean lists in same layer
+  - `L2` What do `--no-install-recommends` and `rm -rf /var/lib/apt/lists/*` buy you?
+  - `L2` How do you make an image smaller and builds faster? List everything. ↳ slim base, multi-stage, ordering, .dockerignore, fewer layers, cache mounts
+  - `L2` alpine vs slim vs distroless vs scratch: trade-offs.
+  - `L2` What is musl vs glibc, and why can Alpine make Python builds slow or break? ↳ no manylinux wheels; compile from source; DNS/locale quirks
+  - `L2` What is a distroless image and how do you debug a container that has no shell? ↳ `:debug` tag, ephemeral debug container, `nsenter`
+  - `L2` How do you make an image smaller and builds faster?
+  - `L3` What tools do you use to see what is taking space in an image? ↳ `dive`, `docker history`, `docker image inspect`
+  - `L3` Multi-stage target (`--target`) for dev vs prod images from one Dockerfile: how and why?
+  - `L3` Your image is 2.5 GB because of PyTorch/CUDA. What can you actually do about it?
+- [ ] Volumes vs bind mounts; networks; port mapping ↳ `Docker/DockerCommands.md` "Docker Volumes & Mounts" + "Docker Networking" · Docker docs "Storage: volumes vs bind mounts" and "Networking overview" (docs.docker.com)
+  - `L1` Volume vs bind mount vs tmpfs.
+  - `L1` What happens to data written inside a container when it is removed?
+  - `L1` Where does Docker store named volumes on the host? ↳ `/var/lib/docker/volumes`
+  - `L1` Named volume or bind mount for a database's data?
+  - `L2` How do containers in Docker Compose find each other by name? (Tie to Docker DNS.)
+  - `L2` When do you use a bind mount and when a named volume?
+  - `L2` How do you run Postgres/Redis/Qdrant in Docker without losing data on recreate?
+  - `L2` Bind-mounting source code for hot reload: what problems come up on Mac? ↳ slow file sync, inotify events, permissions
+  - `L2` Files created in a bind mount are owned by root on the host. Why, and how do you fix it? ↳ container UID; run as matching UID, `--user`, user namespaces
+  - `L2` What is a read-only mount (`:ro`) and when do you use it?
+  - `L2` How do you back up and restore a named volume?
+  - `L2` What is tmpfs good for? ↳ secrets, scratch files, fast temp, read-only root FS
+  - `L2` `docker volume prune` deleted your database. How? How do you protect against it?
+  - `L2` `-v` vs `--mount`: how do they differ, and what happens if the host path doesn't exist?
+  - `L3` What are volume drivers / plugins (NFS, cloud disks) and what goes wrong with databases on network storage?
+  - `L3` Why should you not run a production database in a container on a single VM — or when is it fine?
+  - `L3` What happens when you mount a volume over a directory that already has files in the image? ↳ empty named volume copies image content; bind mount hides it
+  - `L3` Why do containers writing heavy logs or temp files to the writable layer hurt disk performance?
+- [ ] docker compose for local stacks ↳ `Docker/DockerCommands.md` "Docker Compose" · https://docs.docker.com/compose/ · DMLS ch10 "From Dev to Prod: Containers" (pdf p328–330)
+  - `L1` What is Docker Compose and what problem does it solve?
+  - `L1` `docker compose up`, `down`, `logs`, `ps`, `exec`, `build`: what does each do?
+  - `L1` What network do Compose services share by default, and how do they address each other?
+  - `L1` What does `docker compose down -v` remove?
+  - `L1` Does `depends_on` wait until a service is ready?
+  - `L2` What does `depends_on` guarantee, and what does it not? ↳ start order only; readiness needs healthcheck + `condition: service_healthy`
+  - `L2` Your API starts before Postgres is ready and crashes. Fix it in Compose and in the app. ↳ healthcheck + condition; app retries with backoff
+  - `L2` What are Compose profiles and when do you use them? ↳ optional services: debug tools, workers, GPU model
+  - `L2` How do you handle config and secrets in Compose? `.env`, `env_file`, `secrets:`.
+  - `L2` What does `docker compose down -v` do that `down` does not?
+  - `L2` How do you override Compose settings for dev vs prod? ↳ `compose.override.yaml`, `-f` multiple files, `extends`
+  - `L2` How do you scale a service in Compose, and what breaks with fixed host ports? ↳ `--scale`; port conflicts; put nginx in front
+  - `L2` What does `restart:` do in Compose, and how is it different from `deploy.restart_policy`?
+  - `L2` How does `docker compose watch` / bind mounts give you hot reload?
+  - `L3` How would you give the Llama container GPU access in Compose? ↳ NVIDIA Container Toolkit, `deploy.resources.reservations.devices`
+  - `L3` Is Compose OK for production on a single VM? What do you lose compared with Kubernetes or a managed container service?
+- [ ] Containers vs VMs (namespaces, cgroups) ↳ Liz Rice "Containers From Scratch" (GOTO 2018, YouTube) · https://docs.docker.com/get-started/docker-overview/ · DMLS ch10 "From Dev to Prod: Containers" (pdf p328–329)
+  - `L1` What is a container?
+  - `L1` Container vs VM: what is the difference? ↳ shared host kernel vs own kernel on a hypervisor; size, boot time, isolation
+  - `L1` What problem does Docker solve? "It works on my machine" — how exactly?
+  - `L1` What are namespaces? Name the main ones. ↳ pid, net, mnt, uts, ipc, user, cgroup
+  - `L1` What are cgroups?
+  - `L1` Which kernel feature isolates what a process sees?
+  - `L1` Which kernel feature limits CPU and memory?
+  - `L1` What is a namespace in Linux?
+  - `L1` What is a cgroup?
+  - `L1` Is a container a Linux kernel object?
+  - `L1` Container vs VM?
+  - `L2` Namespaces vs cgroups: which one limits what a process *sees* and which limits what it *uses*?
+  - `L2` A container is "just a process". How can you see it from the host? ↳ `ps aux` on host shows it; `docker top`, `/proc/<pid>`
+  - `L2` Can you run a Windows container on a Linux host? A Linux container on a Mac? How does Docker Desktop do it? ↳ shared kernel; Mac runs a Linux VM
+  - `L2` Why is a container less isolated than a VM? What does a kernel bug mean for containers?
+  - `L2` When would you still choose a VM over a container?
+- [ ] Running as non-root; secrets not baked into images ↳ https://docs.docker.com/build/building/secrets/ · https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html · https://docs.docker.com/build/building/best-practices/ (USER)
+  - `L1` Why run the container as non-root?
+  - `L1` Why non-root containers?
+  - `L1` Why should a container not run as root?
+  - `L1` How do you run a container as a non-root user?
+  - `L1` Why must secrets not be baked into images?
+  - `L2` What are the ways secrets leak in Docker images? ↳ ENV/ARG in layers, copied .env, build cache; use BuildKit secrets
+  - `L2` What does `USER` do and where in the Dockerfile do you put it?
+  - `L2` Why should you not put secrets in `ARG` or `ENV`? ↳ visible in `docker history` / `inspect`, baked in layers
+  - `L2` Root in the container — is it root on the host? When is it effectively the same?
+- [ ] Health checks; logs; graceful shutdown (PID 1, signals) ↳ https://docs.docker.com/reference/dockerfile/ (HEALTHCHECK, STOPSIGNAL, exec-form CMD) · tini README (github.com/krallin/tini) · Docker docs "Logging" (docs.docker.com/engine)
+  - `L1` Where should an app inside a container write logs? ↳ stdout/stderr
+  - `L1` What does `docker logs -f --tail 100` do?
+  - `L1` What signal does `docker stop` send first?
+  - `L1` How long does `docker stop` wait before SIGKILL by default?
+  - `L1` What does `--init` add?
+  - `L1` Where should containers write logs?
+  - `L1` Default logging driver?
+  - `L2` How should a backend service handle `SIGTERM` in Kubernetes? ↳ stop accepting, drain in-flight requests, close pools, exit before grace period
+  - `L2` What is PID 1's special job in a container, and why do people use `tini` or `dumb-init`?
+  - `L2` Shell form vs exec form (`CMD python app.py` vs `CMD ["python", "app.py"]`). Why does it matter for signals? ↳ shell form wraps in `/bin/sh -c`; sh is PID 1, swallows SIGTERM
+  - `L2` What does `HEALTHCHECK` do and how does Docker use the result? ↳ marks healthy/unhealthy; Compose `depends_on: service_healthy`; no auto-restart
+  - `L2` How do you write an entrypoint script that runs migrations then starts the app, and still forwards signals? ↳ `set -e`, then `exec "$@"`
+  - `L2` How does a container get a SIGTERM? What happens step by step on `docker stop`? ↳ SIGTERM to PID 1, wait 10 s, then SIGKILL
+  - `L2` Your container takes exactly 10 seconds to stop every time. Why? ↳ PID 1 ignores SIGTERM: shell form, no handler, no init
+  - `L2` Why is PID 1 special in Linux, and why does that bite containers? ↳ no default signal handlers; must reap zombies
+  - `L2` What is `tini` / `docker run --init`? What two jobs does it do? ↳ forwards signals, reaps zombies
+  - `L2` What is a zombie process and why do they pile up in containers that spawn subprocesses (e.g. Playwright/Chromium)?
+  - `L2` How do you implement graceful shutdown in a FastAPI/uvicorn or Node app inside a container? ↳ handle SIGTERM, stop accepting, drain, close pools, exit
+  - `L2` What logging drivers exist and what is the default? ↳ json-file default; local, journald, syslog, fluentd, awslogs, gcplogs
+  - `L2` Your VM's disk filled up with container logs. Why, and how do you stop it? ↳ json-file unbounded; `max-size`, `max-file`, or `local` driver
+  - `L2` `docker logs` returns nothing with some logging drivers. Why?
+  - `L2` How do you ship container logs to Azure Monitor / CloudWatch from a VM?
+  - `L2` Why should you run uvicorn/gunicorn directly as PID 1 (exec form) and not through `python -m` in a shell script?
+  - `L2` Why should you not use `npm start` as the container command? ↳ npm doesn't forward signals well; extra process
+  - `L2` How does a container get a SIGTERM?
+  - `L3` Your entrypoint is a bash script that starts the app. Signals don't reach the app. Fix it two ways. ↳ `exec` the app; or tini / trap and forward
+  - `L3` Why should a container run one process? When is a supervisor (s6, supervisord) acceptable?
+  - `L3` What does `--stop-timeout` change, and how should it relate to your app's drain time and the LB deregistration delay?
+  - `L3` The Playwright crawler container leaks Chromium processes and memory over hours. How do you find and fix it? ↳ init/tini, close browsers, `--shm-size`, restart policy, limits
+  - `L3` Why might a process ignore SIGTERM when it runs as PID 1 in a container?
+- [ ] Images and registries: layers on overlayfs, copy-on-write, tags vs digests, manifests and multi-arch, push/pull, OCI image spec
+  - `L1` What is a layer?
+  - `L1` What is a registry? Name a few. ↳ Docker Hub, GHCR, ECR, ACR, GCR/Artifact Registry
+  - `L1` What is a tag? What does `latest` actually mean? ↳ just a default tag name, not "newest"
+  - `L1` `docker pull`, `docker push`, `docker images`, `docker rmi`: what does each do?
+  - `L1` What filesystem driver does Docker use by default on Linux?
+  - `L1` Tag or digest: which is immutable?
+  - `L1` What does `latest` mean?
+  - `L2` How does a union filesystem (overlayfs) build one view from many layers? ↳ lowerdir read-only layers + upperdir writable + merged
+  - `L2` What is the container's writable layer, and what happens to it on `docker rm`?
+  - `L2` What is copy-on-write? What does it cost when a container modifies a big file from the image?
+  - `L2` You `RUN rm -rf /big-dir` in a later layer. Does the image get smaller? Why not? ↳ whiteout file; data still in earlier layer
+  - `L2` Tag vs digest. Why pin images by digest in production? ↳ tags are mutable; digest = content hash, immutable
+  - `L2` What is an image manifest? What is a multi-arch image (manifest list)?
+  - `L2` Your M1/M2 Mac builds an image that crashes on the x86 VM with "exec format error". Why, and how do you fix it? ↳ arm64 vs amd64; `--platform`, `buildx` multi-arch
+  - `L2` How do you tag images in CI so you can trace a running container back to a commit? ↳ git SHA tag + semver, labels, digest in deploy
+  - `L2` What is `docker image prune` / `docker system prune` and what can it delete that you did not mean to?
+  - `L2` Public vs private registry: how does a VM authenticate to ACR/ECR? ↳ managed identity / IAM role, short-lived token, `docker login`
+  - `L2` What is `docker history` and what can it reveal about an image?
+  - `L3` Why do Docker Hub rate limits break CI, and how do you avoid them? ↳ pull-through cache/mirror, authenticated pulls, own registry
+  - `L3` How are layers shared between images on disk and in a registry? What is cross-repo blob mounting?
+- [ ] Build cache and BuildKit: layer cache order, build context, cache mounts, build secrets, buildx, reproducible builds
+  - `L1` How does Docker's layer cache work? When is a layer rebuilt?
+  - `L1` What is the build context?
+  - `L2` Why do you copy `requirements.txt` / `package.json` before the rest of the source? ↳ deps layer cached until lockfile changes
+  - `L2` One changed line in `app.py` reinstalls all dependencies every build. What is wrong with the Dockerfile?
+  - `L2` What is BuildKit? What did it add over the old builder? ↳ parallel stages, cache mounts, secrets, SSH, better caching
+  - `L2` What is a cache mount (`RUN --mount=type=cache`) and how does it speed up pip/npm installs?
+  - `L2` How do you pass a secret (private PyPI token, npm token) to a build without it ending up in the image? ↳ `RUN --mount=type=secret`
+  - `L2` Sending a 2 GB build context makes every build slow. Why, and what fixes it?
+  - `L2` What is `docker buildx` and what is it for?
+  - `L3` How do you make builds reproducible? ↳ pinned base digest, lockfiles, pinned apt versions, SOURCE_DATE_EPOCH
+  - `L3` How does BuildKit decide which stages to build, and what does that mean for unused stages?
+  - `L3` What are Kaniko and Buildah, and why use them to build images without a Docker daemon?
+- [ ] Container lifecycle: docker run flags, states, start vs exec, stop vs kill, exit codes 137/143, restart policies
+  - `L1` What does `docker run -d -p 8080:80 --name web nginx` do, flag by flag?
+  - `L1` What are the container states? ↳ created, running, paused, restarting, exited, dead
+  - `L1` `docker stop` vs `docker kill`.
+  - `L1` `docker run` vs `docker start` vs `docker exec`.
+  - `L1` What does `--rm` do?
+  - `L1` Exit code 137 means?
+  - `L1` Exit code 143 means?
+  - `L2` What do exit codes 0, 1, 137 and 143 mean for a container? ↳ 137 = SIGKILL (often OOM), 143 = SIGTERM
+  - `L2` Restart policies: `no`, `on-failure`, `always`, `unless-stopped`. Which for a production API on a VM?
+  - `L2` What happens to containers when the Docker daemon or the VM reboots? What is `live-restore`?
+  - `L2` A container exits immediately after `docker run -d`. Why? ↳ main process ended; command finished, crashed, or ran in background
+  - `L2` How do you make Docker containers start on boot on a VM — systemd or restart policies?
+- [ ] Container resource limits: --memory and --cpus, OOM kills, CPU throttling, cgroup memory accounting, container-aware runtimes
+  - `L1` How do you limit a container's memory and CPU? ↳ `--memory`, `--cpus`, `--cpu-shares`, `--pids-limit`
+  - `L1` What happens when a container goes over its memory limit?
+  - `L1` What does `docker stats` show?
+  - `L1` Command to see live CPU and memory per container?
+  - `L2` What is exit code 137 and how do you confirm it was an OOM kill? ↳ `docker inspect` State.OOMKilled, `dmesg`
+  - `L2` `--cpus=1.5` vs `--cpu-shares`: hard quota vs relative weight.
+  - `L2` What is CPU throttling (CFS quota) and why can a container with "low CPU usage" still have bad p99 latency?
+  - `L2` What happens with no limits at all on a shared VM? ↳ noisy neighbour; one container OOMs the host
+  - `L2` Why does `free` or `top` inside a container show the host's memory, and what breaks because of it? ↳ /proc not namespaced; runtimes size heaps/workers wrong
+  - `L2` How many uvicorn/gunicorn workers should a container with `--cpus=2` run, and why does `os.cpu_count()` mislead you?
+  - `L2` What is `--memory-swap`, and should containers swap?
+  - `L2` What is `--pids-limit` and what attack does it stop? ↳ fork bomb
+  - `L2` Why does Node.js or the JVM need to know the container memory limit? ↳ heap sizing; `--max-old-space-size`, container-aware JVM
+  - `L3` Page cache counts toward a cgroup's memory. How can a container be OOM-killed while "the app only uses 300 MB"?
+  - `L3` What is `memory.high` vs `memory.max` in cgroup v2?
+  - `L3` How do you size memory limits for an LLM/embedding service that loads a model at start-up?
+  - `L3` How does the OOM killer choose a victim inside vs outside a cgroup? What is `oom_score_adj`?
+- [ ] Docker networking: bridge, host and overlay drivers, container DNS, published ports, veth and iptables NAT, firewall bypass
+  - `L1` Does `EXPOSE` publish a port?
+  - `L1` What network drivers does Docker have? ↳ bridge, host, none, overlay, macvlan
+  - `L1` What does `-p 8080:80` mean? Which side is the host?
+  - `L1` How do two containers talk to each other?
+  - `L1` `EXPOSE` vs `-p`.
+  - `L1` Does `EXPOSE` open a port on the host?
+  - `L1` Default network driver?
+  - `L1` Do containers on the default bridge resolve each other by name?
+  - `L2` Default bridge vs user-defined bridge: what do you get with a user-defined one? ↳ DNS by container name, isolation, connect/disconnect live
+  - `L2` How does container DNS work? What is the `127.0.0.11` resolver?
+  - `L2` What does `--network host` do, and when would you use it? Why doesn't it work the same on Docker Desktop for Mac?
+  - `L2` From inside a container, `localhost:5432` doesn't reach the Postgres container. Why, and what do you use instead? ↳ localhost is the container itself; use service name
+  - `L2` How does a container reach a service running on the host? ↳ `host.docker.internal`, `--add-host=host-gateway`, bridge gateway IP
+  - `L2` Your app inside the container listens on `127.0.0.1:8000` and `-p 8000:8000` doesn't work. Why? ↳ must bind 0.0.0.0
+  - `L2` `-p 8080:80` vs `-p 127.0.0.1:8080:80`. Why does the difference matter on a cloud VM?
+  - `L2` Docker publishes ports by editing iptables and can bypass `ufw`. What does that mean for your VM's security? ↳ published ports open despite ufw; bind to 127.0.0.1 or DOCKER-USER chain
+  - `L2` What is an overlay network and when do you need one? ↳ multi-host: Swarm; Kubernetes uses CNI instead
+  - `L2` A container can't resolve another service's name. What do you check?
+  - `L3` How does bridge networking work under the hood? ↳ veth pair, docker0 bridge, NAT via iptables MASQUERADE, DNAT for ports
+  - `L3` What is `docker-proxy` (userland proxy) and when is it used?
+  - `L3` How do you see a container's network namespace from the host and capture its traffic? ↳ `nsenter -t <pid> -n`, `tcpdump` on veth
+  - `L3` What is macvlan and when would a container need its own IP on the LAN?
+  - `L3` MTU inside containers on a VPN or overlay network is wrong and big requests hang. How does that happen?
+- [ ] Namespaces and cgroups by hand: unshare, nsenter, cgroup v2 files, user namespaces, chroot vs pivot_root, what runc adds
+  - `L2` What does the PID namespace do? Why is your app PID 1 inside the container?
+  - `L2` What does the network namespace give each container?
+  - `L2` What does the mount namespace plus a root filesystem (`pivot_root`) give you?
+  - `L2` What is the user namespace and how does it make "root in the container" not root on the host?
+  - `L2` List the namespace types and what each isolates.
+  - `L2` What do `unshare` and `nsenter` do?
+  - `L2` Where is the cgroup tree mounted, and how do you see a process's cgroup? ↳ `/sys/fs/cgroup`, `/proc/<pid>/cgroup`
+  - `L2` How do you limit a process to 512 MB of memory by hand with cgroup v2? ↳ mkdir group, write `memory.max`, write PID to `cgroup.procs`
+  - `L2` What do `memory.max`, `cpu.max` and `pids.max` control?
+  - `L2` What does `chroot` do, and why is it not a security boundary?
+  - `L2` How does systemd use cgroups for every service? ↳ slice per unit; `systemd-cgls`, `systemd-cgtop`
+  - `L3` cgroups v1 vs v2: what changed and why do some older tools break on v2?
+  - `L3` How would you build a "container" by hand with `unshare`, `chroot` and cgroups? What would it be missing?
+  - `L3` What is `clone()` and how do threads and containers both use it?
+  - `L3` How do you see which network namespace a container uses and run a command inside it? ↳ `nsenter -t <pid> -n`, `ip netns`
+  - `L3` Build a container by hand: list the steps from `unshare` to a shell in its own rootfs with limits. ↳ unshare pid/mnt/uts/net, mount proc, pivot_root, cgroup
+  - `L3` Why must you mount a new `/proc` after creating a PID namespace?
+  - `L3` How does a user namespace map container root to an unprivileged host UID?
+  - `L3` How do you connect a new network namespace to the host network? ↳ veth pair, bridge, IP, NAT rule
+  - `L3` What is `pivot_root` vs `chroot`?
+  - `L3` What does a container runtime (runc) do that your hand-built version doesn't? ↳ seccomp, capabilities, AppArmor, device rules, OCI config
+- [ ] Container hardening: capabilities, --privileged, docker.sock, seccomp/AppArmor, read-only root FS, rootless mode, escapes
+  - `L1` What does `--read-only` do?
+  - `L2` What does `--privileged` do and why is it dangerous?
+  - `L2` What are Linux capabilities? How do `--cap-drop ALL` and `--cap-add NET_BIND_SERVICE` work?
+  - `L2` What does mounting `/var/run/docker.sock` into a container give it? ↳ full root on the host
+  - `L2` What is a read-only root filesystem (`--read-only`) and what do you need to make apps work with it? ↳ tmpfs for /tmp, volumes for writable paths
+  - `L2` What do seccomp and AppArmor/SELinux profiles add?
+  - `L2` What is `no-new-privileges`?
+  - `L2` Why is being in the `docker` group equivalent to root?
+  - `L3` What is rootless Docker and how is it different from user-namespace remapping?
+  - `L3` What is a container escape? Name a real one (e.g. runc CVE-2019-5736) and what would have limited it.
+  - `L3` How do you secure the Docker daemon socket and remote API (TCP 2375/2376)?
+- [ ] Image supply chain: CVE scanning (Trivy), Hadolint, pinned and rebuilt bases, signing (cosign), SBOMs, provenance
+  - `L1` Name a tool that scans images for CVEs.
+  - `L1` Name a Dockerfile linter.
+  - `L2` What is image scanning? How do you use Trivy in CI and what do you do with 300 CVEs? ↳ fail on fixable HIGH/CRITICAL; smaller base; triage
+  - `L2` What does Hadolint catch? Give three rules.
+  - `L2` Why pin base images and rebuild regularly at the same time?
+  - `L3` What is image signing (cosign / Notary) and why would you verify signatures before deploy?
+  - `L3` What is an SBOM and how is it produced for an image?
+  - `L3` What is supply-chain security for images: provenance, signing, SBOMs, trusted base images?
+- [ ] Container runtimes: dockerd, containerd, shim and runc, OCI runtime spec, CRI and dockershim removal, Podman
+  - `L1` Docker Engine, Docker CLI, Docker Desktop: what is each?
+  - `L1` What is containerd? What is runc?
+  - `L1` What runs your container under dockerd?
+  - `L1` What does OCI stand for?
+  - `L2` Walk through what happens on `docker run`: CLI → dockerd → containerd → shim → runc. ↳ API call, image, bundle, runc creates namespaces/cgroups, exits
+  - `L2` What is OCI? Runtime spec vs image spec.
+  - `L2` Why did Kubernetes drop "dockershim", and did your Docker images stop working? ↳ CRI; containerd directly; images are OCI, still work
+  - `L2` Docker vs Podman: what is different? ↳ daemonless, rootless by default, pods, same CLI
+  - `L2` Kubernetes removed dockershim in 1.24. Did images built with Docker stop working? Why not? ↳ OCI images; containerd/CRI-O run them
+  - `L2` containerd vs CRI-O vs Docker Engine: what is each?
+  - `L3` What is the OCI image spec and why do Docker, Podman and Kubernetes all understand the same images?
+  - `L3` What is the containerd shim for, and why can dockerd restart without killing containers?
+- [ ] Debugging containers: exec, logs, inspect, events, entrypoint override, docker cp, nsenter, profiling, distroless debugging
+  - `L1` How do you get a shell inside a running container?
+  - `L1` How do you see logs of a container that already exited?
+  - `L1` What does `docker inspect` show you?
+  - `L1` How do you list all containers, including stopped ones?
+  - `L1` Command to get a shell in a running container?
+  - `L2` A container keeps restarting. Walk through your debugging steps. ↳ `ps -a`, `logs`, `inspect` exit code/OOMKilled, run with shell override
+  - `L2` How do you start a crashing image with a shell instead of its normal command? ↳ `docker run -it --entrypoint sh image`
+  - `L2` The app works locally but not in the container. What usual suspects do you check? ↳ bind address, env vars, paths, missing files via .dockerignore, arch
+  - `L2` How do you copy a file out of (or into) a container? ↳ `docker cp`
+  - `L2` How do you find which container is using all the CPU on a VM?
+  - `L2` How do you check the environment variables and mounts a container actually got?
+  - `L2` How do you debug a distroless or scratch container with no shell? ↳ `docker debug`, sidecar with `--pid/--net container:`, `nsenter`
+  - `L2` What does `docker events` show and when is it useful?
+  - `L2` The image builds fine in CI but `COPY` fails locally with "file not found". Why? ↳ .dockerignore, wrong context, case sensitivity
+  - `L2` Your VM disk is full of Docker data. How do you find what is taking space and clean it safely? ↳ `docker system df`, prune images/build cache, logs
+  - `L3` How do you attach a debugger or profiler (py-spy, Node inspector) to a process running in a container?
+  - `L3` How do you use `nsenter` to debug a container from the host?
+  - `L3` A container hangs during `docker stop` and the app logs nothing. How do you find out what it is doing? ↳ `docker top`, py-spy dump, strace the host PID
+- [ ] Dockerfiles for Python and Node: venv or wheels in multi-stage builds, pip/uv/Poetry, npm ci, PYTHONUNBUFFERED, NODE_ENV
+  - `L1` Write a basic Dockerfile for a FastAPI app.
+  - `L1` Write a basic Dockerfile for a Node/NestJS app.
+  - `L2` What do `PYTHONUNBUFFERED=1` and `PYTHONDONTWRITEBYTECODE=1` do, and why set them? ↳ logs appear immediately; no .pyc clutter
+  - `L2` How do you install Python dependencies in a multi-stage build? ↳ build wheels or venv in builder; copy venv to slim runtime
+  - `L2` pip vs Poetry vs uv in Docker: how do you keep the image small and the cache warm?
+  - `L2` Node: `npm ci` vs `npm install` in Docker. Why `npm ci`?
+  - `L2` Node: why `NODE_ENV=production` and `npm ci --omit=dev`?
+  - `L2` How do you build a TypeScript/NestJS app in one stage and run only `dist/` plus prod deps in another?
+  - `L2` Your Python image needs `psycopg2` / `numpy` and the build on Alpine takes 15 minutes. What do you do?
+  - `L3` How do you build one image that serves both the API and the background worker?
+- [ ] Deploying containers on VMs: build, push, pull and restart; zero-downtime swaps behind a load balancer; moving to managed platforms
+  - `L2` How did you deploy containers on Azure/AWS VMs at AiRA? Walk through build, push, pull and restart.
+  - `L2` What would you change to move that VM + Docker deployment to Azure Container Apps / ECS / Kubernetes?
+  - `L3` How do you drain long-lived WebSocket connections during a container redeploy on a single VM?
+  - `L3` How do you deploy a new version of one Compose service with minimal downtime?
+  - `L3` Design zero-downtime deploys for a Dockerised FastAPI + WebSocket service on two VMs behind a load balancer.
+
+**Learn:** Docker notes (`Docker/DockerCommands.md`) · docs.docker.com "Get started" + "Build best practices"
+
+## 10.3 Kubernetes
+- [ ] Pod, Deployment, ReplicaSet, Service (ClusterIP/NodePort/LoadBalancer), Ingress ↳ https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ · https://kubernetes.io/docs/concepts/services-networking/service/ · https://kubernetes.io/docs/concepts/services-networking/ingress/
+  - `L1` What does a network policy default-deny do?
+  - `L1` Pod vs Deployment: what is the difference? Why not create bare pods?
+  - `L1` What is a ReplicaSet? What is a Deployment? How are they related?
+  - `L1` Why do you almost never create a ReplicaSet directly?
+  - `L1` What is a Service and why do you need one if pods have IPs?
+  - `L1` Name the Service types. ↳ ClusterIP, NodePort, LoadBalancer, ExternalName (+ headless)
+  - `L1` What is a ClusterIP Service?
+  - `L1` What is a NodePort Service? What is the default port range? ↳ 30000–32767
+  - `L1` What is a LoadBalancer Service and who creates the actual load balancer?
+  - `L1` Smallest deployable unit in Kubernetes?
+  - `L1` Default Service type?
+  - `L1` NodePort range?
+  - `L1` Pod vs Deployment?
+  - `L2` What network policies did you write? ↳ default deny; gateway → Redis/Postgres/Qdrant/Kafka; egress to providers only
+- [ ] ConfigMaps and Secrets; namespaces ↳ https://kubernetes.io/docs/concepts/configuration/configmap/ · https://kubernetes.io/docs/concepts/configuration/secret/ · https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+  - `L1` What is a namespace for? Name the namespaces that exist in a new cluster.
+  - `L1` What is a ConfigMap? What is a Secret?
+  - `L1` What are the two ways to give a ConfigMap to a pod? ↳ env vars, mounted files
+  - `L1` Are Kubernetes Secrets encrypted? ↳ base64 only; plaintext in etcd unless encryption at rest
+  - `L1` What is the size limit of a ConfigMap or Secret? ↳ 1 MiB
+  - `L1` Are Secrets encrypted by default?
+  - `L1` Max size of a ConfigMap?
+  - `L2` How do Kubernetes Secrets work, and why are they "just base64" by default? ↳ enable etcd encryption, External Secrets / CSI driver
+  - `L2` What is a ResourceQuota and a LimitRange? Why put them on shared namespaces?
+  - `L2` How do you organise namespaces: per team, per environment, per app? Trade-offs.
+  - `L2` Are namespaces a security boundary? ↳ not by themselves; need RBAC, NetworkPolicy, quotas
+  - `L2` Env vars vs mounted files for config: what updates live and what doesn't? ↳ mounted files refresh (not subPath); env needs restart
+  - `L2` Why are Secrets "not really secret" by default, and what do you do about it? ↳ encryption at rest/KMS, RBAC, external store
+  - `L2` What is encryption at rest for Secrets with a KMS provider?
+  - `L2` Who can read a Secret? How do RBAC and `kubectl exec` widen that? ↳ anyone who can create pods in the namespace
+  - `L2` Why should you never commit a Secret manifest to Git? What are the alternatives? ↳ Sealed Secrets, SOPS, External Secrets
+  - `L2` Sealed Secrets vs SOPS vs External Secrets Operator.
+  - `L2` How does the Secrets Store CSI driver with Azure Key Vault work? ↳ mount Key Vault secrets as files via workload identity
+  - `L2` External Secrets Operator vs Secrets Store CSI driver: which would you choose?
+  - `L2` A secret is rotated in Key Vault. How does the running pod pick up the new value?
+  - `L2` What are immutable ConfigMaps and why do they help at scale?
+  - `L2` How do you roll pods automatically when a ConfigMap changes? ↳ hash annotation in pod template (Helm checksum), Reloader
+  - `L2` What are the Secret types (`Opaque`, `kubernetes.io/tls`, `dockerconfigjson`, service-account token)?
+  - `L3` Secret values leaked into logs and `kubectl describe` output. Where did they come from and how do you stop it?
+  - `L3` How would you separate per-environment config (dev/staging/prod) without copy-pasting manifests?
+  - `L3` Why might reading secrets from the store at runtime (SDK call) beat mounting them? And the reverse?
+- [ ] Liveness/readiness/startup probes; resource requests and limits ↳ https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/ · https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  - `L1` What are liveness, readiness and startup probes?
+  - `L1` What happens when a liveness probe fails? When a readiness probe fails? ↳ restart container vs removed from Service endpoints
+  - `L1` What probe types exist? ↳ HTTP GET, TCP socket, exec, gRPC
+  - `L1` Failed liveness probe does what? Failed readiness probe does what?
+  - `L2` What do your liveness, readiness and startup probes check?
+  - `L2` How did you choose CPU and memory requests and limits? What happens when a pod hits each limit? ↳ CPU throttled; memory OOM-killed
+  - `L2` What do `initialDelaySeconds`, `periodSeconds`, `timeoutSeconds` and `failureThreshold` control?
+  - `L2` Why is a startup probe better than a huge `initialDelaySeconds` for a slow-starting model server?
+  - `L2` Should a liveness probe check the database? Why is that a classic mistake? ↳ DB blip restarts every pod; cascading failure
+  - `L2` What should a readiness endpoint check, and what should a liveness endpoint check?
+  - `L2` Liveness and readiness pointing to the same endpoint: what can go wrong?
+  - `L2` A slow GC pause or a busy event loop fails the liveness probe under load. What happens to the cluster? ↳ restarts under load amplify outage
+  - `L2` Why do LLM serving pods need a startup probe with a long window?
+  - `L3` What does the OOM killer do, and how does a container memory limit trigger it?
+  - `L3` RSS vs virtual size vs heap used: which number do you watch for a Node service in Kubernetes?
+  - `L3` Readiness probes fail on every pod at once because a shared dependency is down. What happens to traffic, and is that good?
+  - `L3` How would you design health endpoints for an LLM gateway that depends on 3 model providers?
+  - `L3` What is pod readiness gating (readiness gates) and when do cloud load balancers need it?
+- [ ] Rolling updates and rollbacks; HPA autoscaling ↳ https://kubernetes.io/docs/concepts/workloads/controllers/deployment/ ("Updating", "Rolling Back") · https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/ · LEH ch10 "Autoscaling capabilities to handle spikes in usage" (pdf p422–427)
+  - `L1` HPA metric for an I/O-bound gateway?
+  - `L1` What are the two Deployment strategies? ↳ RollingUpdate (default), Recreate
+  - `L1` How do you roll back a Deployment? ↳ kubectl rollout undo; revisionHistoryLimit
+  - `L1` Default rolling-update `maxSurge` and `maxUnavailable`?
+  - `L1` Command to roll back a Deployment?
+  - `L2` Why autoscale on a custom metric (in-flight requests or queue depth) instead of CPU for an I/O-bound gateway?
+  - `L2` How do you expose a custom metric to the HPA? ↳ Prometheus Adapter or KEDA
+  - `L2` What is a PodDisruptionBudget, and why does the gateway need one?
+  - `L2` What happens during a rolling update, step by step? ↳ new RS scaled up, old down, gated by readiness
+  - `L2` What do `maxSurge` and `maxUnavailable` mean? What are the defaults? ↳ 25% each, rounded up/down
+  - `L2` 4 replicas, `maxSurge=1`, `maxUnavailable=0`. Walk through the rollout.
+  - `L2` When would you use `Recreate` instead of `RollingUpdate`? ↳ can't run two versions; RWO volume; schema conflict
+  - `L2` What triggers a new rollout? Does changing a ConfigMap trigger one? ↳ only pod template changes; checksum annotation trick
+  - `L2` What do `minReadySeconds` and `progressDeadlineSeconds` do?
+  - `L2` A rollout is stuck at "1 of 3 updated replicas are available". How do you debug it?
+  - `L2` What does `kubectl rollout status / history / pause / resume / restart` do?
+  - `L2` Why should you deploy images by digest or immutable tag, never `latest`?
+  - `L2` What is `imagePullPolicy` and how does it interact with `latest`?
+  - `L2` How would you do blue-green on plain Kubernetes? ↳ two Deployments, switch Service selector
+  - `L2` How would you do a canary on plain Kubernetes, and why is the traffic split crude? ↳ replica ratio only; need mesh/ingress weights
+  - `L2` What do Argo Rollouts or Flagger add on top of Deployments? ↳ weighted traffic, metric analysis, auto promote/abort
+  - `L2` What happens during a rolling update?
+  - `L3` Readiness passes but the new version returns 500s after 2 minutes. How do you make the rollout catch that? ↳ minReadySeconds, analysis on error rate, progressive delivery
+  - `L3` How many old ReplicaSets are kept and what do they cost?
+  - `L3` How would you roll out a change to 300 services safely across 3 clusters?
+- [ ] StatefulSets (know when); Jobs/CronJobs ↳ https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/ · https://kubernetes.io/docs/concepts/workloads/controllers/job/ · https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+  - `L1` What is a StatefulSet? How is it different from a Deployment?
+  - `L1` What is a Job? What is a CronJob?
+  - `L1` What is a DaemonSet? Give three real uses. ↳ log agent, node exporter, CNI/CSI node plugins
+  - `L1` Which restart policies are allowed for a Job's pods? ↳ OnFailure or Never
+  - `L1` Which object runs one pod per node?
+  - `L1` Which object gives pods stable names and per-pod disks?
+  - `L1` Which object runs a task to completion?
+  - `L2` What guarantees does a StatefulSet give? ↳ stable names, stable per-pod storage, ordered start/stop
+  - `L2` Why does a StatefulSet need a headless Service?
+  - `L2` What are `volumeClaimTemplates`? What happens to the PVCs when you scale down?
+  - `L2` What is `podManagementPolicy: Parallel` and when would you use it?
+  - `L2` How do StatefulSet rolling updates and `partition` work?
+  - `L2` Should you run Postgres on Kubernetes or use a managed database? Argue it.
+  - `L2` What do operators like CloudNativePG or Strimzi add over a raw StatefulSet?
+  - `L2` Where would Redis, Qdrant and Postgres live if AiRA moved to AKS? Why?
+  - `L2` What do `completions`, `parallelism` and `backoffLimit` do?
+  - `L2` What do `activeDeadlineSeconds` and `ttlSecondsAfterFinished` do?
+  - `L2` What are the CronJob `concurrencyPolicy` values and when do you use each? ↳ Allow, Forbid, Replace
+  - `L2` A CronJob scheduled every minute starts piling up pods. Why, and how do you fix it?
+  - `L2` What is `startingDeadlineSeconds` and what are missed schedules?
+  - `L2` Can a CronJob run twice for one schedule, or skip one? What must your job be? ↳ yes; idempotent
+  - `L2` What time zone does a CronJob use and how do you set it?
+  - `L2` What is an Indexed Job and when is it useful?
+  - `L2` CronJob vs an in-app scheduler (Celery beat, APScheduler) vs a cloud scheduler: trade-offs.
+  - `L2` How does a DaemonSet roll out an update, and how does it get onto tainted nodes?
+  - `L3` A StatefulSet pod is stuck because its node died and the volume is still attached. What happens and why won't Kubernetes just move it? ↳ at-most-one pod per identity; avoids split-brain
+  - `L3` How would you run a 3-node Qdrant or Kafka cluster on Kubernetes safely?
+  - `L3` How would you run 10,000 embedding jobs over a document corpus with retries and limited parallelism?
+  - `L3` A Job's pod failed 6 times and the Job is marked Failed. Where are the logs and what do you change?
+  - `L3` What is a pod failure policy and how does it avoid retrying non-retryable errors?
+  - `L3` When would you reach for Argo Workflows or Airflow instead of Jobs?
+- [ ] kubectl essentials (`get`, `describe`, `logs`, `exec`, `apply`) ↳ https://kubernetes.io/docs/reference/kubectl/quick-reference/ · https://kubernetes.io/docs/tutorials/kubernetes-basics/ · TechWorld with Nana "Kubernetes Crash Course for Absolute Beginners" (YouTube)
+  - `L1` Which kubectl commands do you run first on a broken pod? ↳ get, describe, logs (--previous), events
+  - `L1` What does `kubectl describe pod` show that `kubectl get pod` doesn't?
+  - `L1` How do you see the logs of the previous, crashed container? ↳ `kubectl logs --previous`
+  - `L1` How do you open a shell inside a running container?
+  - `L1` What does `kubectl port-forward` do and when do you use it?
+  - `L1` Command to get a shell in a pod?
+  - `L1` Command to see why a pod is Pending?
+  - `L2` How do you list recent events in a namespace sorted by time?
+  - `L2` What does `kubectl top` show and what does it need?
+  - `L2` How do you get logs from all pods of a Deployment at once? ↳ label selector `-l`, stern
+- [ ] Why Kubernetes: what an orchestrator solves, declarative model, Compose/Swarm/Nomad comparison, when not to use it
+  - `L1` What is Kubernetes, in one sentence?
+  - `L1` What problems does a container orchestrator solve that `docker run` on one VM does not? ↳ scheduling, self-healing, scaling, rollouts, service discovery, config
+  - `L1` What does "declarative" mean in Kubernetes, compared with running commands by hand?
+  - `L1` What is a cluster, a node and a namespace?
+  - `L1` Name one reason **not** to use Kubernetes.
+  - `L2` You run your API on 3 VMs with Docker and nginx today. List the pains that push teams toward Kubernetes. ↳ manual deploys, no self-heal, config drift, scaling, secrets, service discovery
+  - `L2` Docker Compose vs Kubernetes: where does Compose stop being enough?
+  - `L2` Kubernetes vs Docker Swarm vs Nomad: why did Kubernetes win?
+  - `L2` When should a team **not** use Kubernetes? ↳ small team, few services, no platform owner, managed PaaS fits
+  - `L2` What does Kubernetes **not** give you out of the box? ↳ CI/CD, logging/metrics stack, secrets manager, DB backups, ingress controller
+  - `L2` What is the operational cost of running Kubernetes for a 5-person startup?
+  - `L2` What is "cattle, not pets" and how does Kubernetes enforce it?
+  - `L3` Your CTO wants Kubernetes for 2 services and 200 requests/minute. What do you say?
+  - `L3` Where does the complexity of Kubernetes actually live — the API, networking, or day-2 operations?
+  - `L3` What did Borg and Omega teach the Kubernetes designers?
+- [ ] Control plane and nodes: API server, etcd, scheduler, controller manager, kubelet, kube-proxy, CRI/CNI/CSI, node failure
+  - `L1` Name the control-plane components and what each does. ↳ API server, etcd, scheduler, controller manager, cloud controller manager
+  - `L1` Name the components that run on every worker node. ↳ kubelet, kube-proxy, container runtime
+  - `L1` What is etcd and what does Kubernetes store in it?
+  - `L1` What does the kubelet do?
+  - `L1` What does kube-proxy do?
+  - `L1` What do CRI, CNI and CSI stand for, and what does each plug in?
+  - `L1` Where is cluster state stored?
+  - `L1` Which component picks the node for a pod?
+  - `L1` Which component starts containers on a node?
+  - `L2` Which component is the only one that talks to etcd directly? Why that design? ↳ API server; validation, auth, single gate
+  - `L2` Walk me through everything that happens after `kubectl apply -f deployment.yaml`. ↳ API server, etcd, Deployment and ReplicaSet controllers, scheduler, kubelet, CRI
+  - `L2` What does the scheduler actually decide, and how? ↳ filter feasible nodes, score them, bind pod to node
+  - `L2` What is the controller manager? Name four controllers that run inside it.
+  - `L2` What does the cloud controller manager do on AKS/EKS/GKE? ↳ nodes, routes, LoadBalancer services from cloud APIs
+  - `L2` What does a CNI plugin do when a pod starts? Name three CNI plugins. ↳ veth, IP from IPAM, routes; Calico, Cilium, Azure CNI
+  - `L2` What is the Kubernetes networking model? ↳ every pod gets an IP; pods reach each other without NAT
+  - `L2` What is a static pod and where are they used?
+  - `L2` What happens to running pods if the control plane goes down?
+  - `L2` What happens when a worker node dies? How long until its pods are recreated elsewhere? ↳ node lease, NotReady, taint-based eviction ~5 min default
+  - `L3` How do controllers watch the API server without polling it? ↳ list + watch, informers, shared cache, resourceVersion
+  - `L3` Why does etcd need an odd number of members? How many failures can 3 and 5 members tolerate? ↳ Raft quorum; 3 tolerates 1, 5 tolerates 2
+  - `L3` etcd is slow or full. What symptoms do you see in the cluster? ↳ slow API, leader elections, "database space exceeded", compaction/defrag
+  - `L3` What is the API server admission chain? Mutating vs validating admission webhooks.
+  - `L3` How does the API server handle optimistic concurrency on updates? ↳ resourceVersion; 409 Conflict on stale write
+  - `L3` How is a highly available control plane laid out across zones?
+  - `L3` What is the kubelet's node lease and why was it added?
+- [ ] Objects and reconciliation: spec vs status, labels and selectors, controllers, apply vs create, owner references, finalizers
+  - `L1` What fields does every Kubernetes object have? ↳ apiVersion, kind, metadata, spec, status
+  - `L1` What is the difference between `spec` and `status`?
+  - `L1` What are labels and selectors used for?
+  - `L1` Labels vs annotations: when do you use each?
+  - `L2` What is the reconciliation loop / controller pattern? Explain it with a thermostat. ↳ observe actual, compare desired, act, repeat
+  - `L2` Why is level-triggered reconciliation more robust than edge-triggered event handling?
+  - `L2` `kubectl apply` vs `kubectl create` vs `kubectl replace`: what is the difference?
+  - `L2` What is server-side apply and what problem does field ownership solve?
+  - `L2` What are owner references and how does garbage collection use them? ↳ delete Deployment → ReplicaSets → pods cascade
+  - `L2` What is a finalizer? Why does a namespace sometimes hang in `Terminating`? ↳ finalizer never removed by its controller
+  - `L2` Which objects are namespaced and which are cluster-scoped? Give examples.
+  - `L2` What are API groups and versions (`v1`, `apps/v1`, `v1beta1`)? What happens when an API version is removed?
+  - `L3` Two controllers fight over the same field (HPA and your Deployment manifest both set `replicas`). What happens and how do you fix it? ↳ omit replicas from manifest when HPA owns it
+  - `L3` How would you write a tiny controller that keeps a ConfigMap in sync with an external API?
+  - `L3` Why must a controller be idempotent?
+  - `L3` What are generation and observedGeneration, and how do tools know a rollout finished?
+- [ ] Pods in depth: shared network and volumes, init containers, sidecars, pause container, lifecycle hooks, phases, emptyDir
+  - `L1` What is a pod? Why is the smallest unit a pod and not a container?
+  - `L1` What do containers in the same pod share? ↳ network namespace (localhost), volumes, IPC; not filesystem by default
+  - `L1` What are the pod phases? ↳ Pending, Running, Succeeded, Failed, Unknown
+  - `L1` What are the restart policies and which is the default? ↳ Always (default), OnFailure, Never
+  - `L1` What is an init container?
+  - `L1` What is a sidecar container? Give three real examples. ↳ log shipper, service-mesh proxy, secrets agent, cloud SQL proxy
+  - `L2` Pod phase vs container state vs pod conditions: what does each tell you?
+  - `L2` Give real uses for init containers. ↳ wait for DB, run migrations, fetch config, fix permissions
+  - `L2` What are native sidecars (init container with `restartPolicy: Always`) and what did they fix? ↳ start order, Jobs never completing, shutdown order
+  - `L2` Sidecar vs ambassador vs adapter patterns.
+  - `L2` When do two processes belong in one pod, and when in two pods?
+  - `L2` What are `postStart` and `preStop` hooks?
+  - `L2` What is the pause (infra) container?
+  - `L2` What is an `emptyDir` volume and when does its data disappear?
+  - `L2` What is an ephemeral container and how does `kubectl debug` use it?
+  - `L2` How does a pod get its own name, namespace and IP inside the container? ↳ Downward API env vars / files
+  - `L2` Your agentic browser runs Chromium in a pod and it crashes randomly. What pod setting do you check first? ↳ /dev/shm size; emptyDir medium Memory; memory limit
+  - `L3` In what order do init containers, sidecars and app containers start and stop?
+  - `L3` A pod is stuck in `Terminating` for an hour. Why, and how do you clear it safely? ↳ finalizers, unreachable node, stuck volume; force delete risks
+  - `L3` What is the difference between a container restart and a pod being recreated? What survives each?
+  - `L3` How would you share a Unix socket or file between two containers in one pod?
+- [ ] Services and in-cluster DNS: selectors and EndpointSlices, port vs targetPort, kube-proxy modes, CoreDNS, headless, gRPC balancing
+  - `L1` What is a headless Service (`clusterIP: None`) and when do you use it?
+  - `L1` What is an ExternalName Service and when is it a trap? ↳ DNS CNAME only; no proxying, ports or TLS host fix
+  - `L1` What DNS name does a Service get? ↳ `<svc>.<namespace>.svc.cluster.local`
+  - `L1` DNS name of service `api` in namespace `prod`?
+  - `L2` How does a Service find its pods? ↳ label selector → EndpointSlices of ready pods
+  - `L2` What are Endpoints / EndpointSlices and why were EndpointSlices introduced?
+  - `L2` A pod is Running but receives no traffic from its Service. What do you check? ↳ labels vs selector, readiness, targetPort, NetworkPolicy
+  - `L2` `port` vs `targetPort` vs `nodePort` vs `containerPort`.
+  - `L2` How does kube-proxy in iptables mode route a packet to a pod?
+  - `L2` iptables vs IPVS vs nftables mode: why switch at large scale? ↳ O(n) rule chains vs hash tables
+  - `L2` What do eBPF data planes like Cilium replace, and why?
+  - `L2` Is a ClusterIP a real IP on some interface? Can you ping it?
+  - `L2` What is CoreDNS? How does a pod know which DNS server to use?
+  - `L2` What does `externalTrafficPolicy: Local` do, and what is the trade-off? ↳ keeps client IP, no extra hop; uneven load
+  - `L2` What is `sessionAffinity: ClientIP` and why is it weak stickiness?
+  - `L2` How does a pod reach a managed Postgres outside the cluster by a stable name?
+  - `L2` How does a Service find pods?
+  - `L3` What is the `ndots:5` problem and how does it slow down external DNS lookups?
+  - `L3` Service load balancing is per connection, not per request. Why does that hurt gRPC and HTTP/2? ↳ long-lived connections pin to one pod
+  - `L3` How would you load-balance gRPC properly inside the cluster? ↳ client-side LB via headless Service, or L7 proxy/mesh
+  - `L3` What is topology-aware routing and why does it save cross-zone cost?
+  - `L3` What does a service mesh (Istio, Linkerd) add on top of Services? When is it overkill?
+  - `L3` Conntrack table is full on a node. What symptoms do you see?
+- [ ] Ingress and Gateway API: controllers, host/path routing, TLS with cert-manager, WebSockets and timeouts, client IP
+  - `L1` What is an Ingress? What is an Ingress controller?
+  - `L1` Why does creating an Ingress object do nothing in a fresh cluster?
+  - `L1` Ingress vs LoadBalancer Service: when do you use each?
+  - `L1` Name three Ingress controllers. ↳ NGINX, Traefik, HAProxy, AGIC/App Gateway, AWS LB Controller
+  - `L2` How does host-based and path-based routing work in an Ingress?
+  - `L2` Where is TLS terminated with an Ingress, and how do certificates get there? ↳ controller; TLS Secret; cert-manager + Let's Encrypt
+  - `L2` What is cert-manager and how does it renew certificates?
+  - `L2` What is the Gateway API and what is wrong with Ingress that it fixes? ↳ role split, portable features, no annotation soup, TCP/gRPC
+  - `L2` GatewayClass vs Gateway vs HTTPRoute: who owns each?
+  - `L2` How do you do weighted canary traffic with Gateway API?
+  - `L2` On AKS, AGIC / Application Gateway for Containers vs an in-cluster NGINX: trade-offs.
+  - `L2` On EKS, what does the AWS Load Balancer Controller create for an Ingress vs a LoadBalancer Service? ↳ ALB vs NLB
+  - `L2` The community ingress-nginx controller has been retired. What would you migrate to and how?
+  - `L2` Your realtime-voice WebSocket drops every 60 seconds behind the Ingress. Why? ↳ proxy read/idle timeout; set timeouts, send pings
+  - `L2` What do you need to configure so WebSockets work through an Ingress?
+  - `L2` How do you get the real client IP in your app behind an Ingress and a cloud LB? ↳ X-Forwarded-For, proxy protocol, trusted proxies
+  - `L3` How would you do sticky sessions for a stateful WebSocket service, and why would you avoid needing them? ↳ cookie/hash affinity; better externalise session state (Redis)
+  - `L3` How do you expose one public IP for 20 services cheaply?
+  - `L3` Where would you put rate limiting and auth: Ingress, gateway, mesh or app?
+  - `L3` How do you run internal-only Ingress for admin tools?
+- [ ] Pod termination: SIGTERM and grace period, preStop hooks, the endpoint-removal race, draining long-lived connections
+  - `L1` What signal does Kubernetes send to stop a container, and what follows if it doesn't exit? ↳ SIGTERM, then SIGKILL after grace period
+  - `L1` What is `terminationGracePeriodSeconds` and its default? ↳ 30 s
+  - `L1` Default termination grace period?
+  - `L2` Walk me through the pod termination sequence step by step. ↳ Terminating, endpoints removed, preStop, SIGTERM, grace, SIGKILL
+  - `L2` Why do you still get 502s during a rolling deploy even with SIGTERM handling? ↳ endpoint removal races SIGTERM; proxies still route
+  - `L2` How does a `preStop` sleep fix the endpoint-removal race?
+  - `L2` Your Python app runs under `sh -c` and never receives SIGTERM. Why? ↳ shell is PID 1, doesn't forward; exec form, tini
+  - `L2` What should a FastAPI / Node.js app do when it gets SIGTERM? ↳ fail readiness, stop accepting, drain in-flight, close pools, exit
+  - `L2` Does the grace period include the preStop hook time?
+  - `L3` Your realtime voice service holds WebSocket calls up to 30 minutes. How do you deploy without cutting calls? ↳ long grace period, stop new, drain, client reconnect/resume
+  - `L3` How does a long-running Celery / queue worker shut down gracefully on Kubernetes?
+  - `L3` Scale-down killed pods mid-request. How do you make scale-down safe?
+- [ ] Requests and limits in depth: QoS classes, OOMKilled, CPU throttling, node-pressure eviction, overcommit, rightsizing
+  - `L1` What is a resource request? What is a resource limit?
+  - `L1` What units are CPU and memory measured in? What is `500m`? ↳ millicores; Mi/Gi bytes
+  - `L1` Which one does the scheduler use: requests or limits? ↳ requests
+  - `L1` What happens when a container exceeds its memory limit? Its CPU limit? ↳ OOMKilled vs throttled
+  - `L1` Name the QoS classes and how each is assigned. ↳ Guaranteed, Burstable, BestEffort
+  - `L1` Scheduler uses requests or limits?
+  - `L1` Three QoS classes?
+  - `L2` What does `OOMKilled` with exit code 137 mean? How do you confirm it?
+  - `L2` What is CPU throttling and why can a pod at 30% average CPU still be throttled? ↳ CFS quota per 100 ms period; bursts
+  - `L2` Should you set CPU limits? Argue both sides.
+  - `L2` Should memory request equal memory limit? Why do many teams do that?
+  - `L2` What is node-pressure eviction and which pods get evicted first?
+  - `L2` Container OOM kill vs kubelet eviction: what is the difference?
+  - `L2` What is allocatable vs capacity on a node?
+  - `L2` How do you choose requests and limits for a new service? ↳ load test, observe p95 usage, add headroom, iterate
+  - `L2` What happens if you set no requests at all on every pod?
+  - `L2` What is ephemeral-storage and how can a pod be evicted for writing logs to disk?
+  - `L2` Python worker memory grows slowly until OOMKilled every 6 hours. How do you debug it?
+  - `L2` What is overcommit and how does it make a cluster cheaper and riskier?
+  - `L3` A Node.js or JVM app doesn't respect the container memory limit. Why, and how do you fix it? ↳ heap flags (`--max-old-space-size`, MaxRAMPercentage)
+  - `L3` Why do Python apps with many workers (gunicorn/uvicorn) see the node's CPU count instead of the limit, and why does it matter?
+  - `L3` How does cgroup v2 change memory accounting and OOM behaviour?
+  - `L3` Your cluster is 80% "requested" but only 20% "used". What is wrong and how do you fix it?
+- [ ] Scheduling: nodeSelector, node and pod affinity, taints and tolerations, topology spread, priority and preemption, drain and PDBs
+  - `L1` What is a `nodeSelector`?
+  - `L1` What are taints and tolerations?
+  - `L1` What is node affinity? What is pod affinity / anti-affinity?
+  - `L1` Taints repel or attract?
+  - `L1` What does `kubectl drain` do?
+  - `L1` What is a PodDisruptionBudget?
+  - `L2` What is a PodDisruptionBudget and how does it protect you during node drains?
+  - `L2` Taints vs node affinity: which one keeps pods **off** a node and which pulls them **onto** it? ↳ taints repel; affinity attracts; often both
+  - `L2` `requiredDuringScheduling…` vs `preferredDuringScheduling…`: what does each mean?
+  - `L2` What do the taint effects `NoSchedule`, `PreferNoSchedule` and `NoExecute` do?
+  - `L2` How do you reserve GPU nodes so only GPU workloads land on them?
+  - `L2` How do you spread 6 replicas evenly across 3 availability zones? ↳ topologySpreadConstraints on topology.kubernetes.io/zone
+  - `L2` Pod anti-affinity vs topology spread constraints: why is spread usually better?
+  - `L2` What are PriorityClasses and preemption?
+  - `L2` What does `kubectl cordon`, `drain` and `uncordon` do?
+  - `L2` A drain hangs forever. Why? ↳ PDB can't be satisfied, pods without controllers, local storage
+  - `L2` A pod is `Pending` with "0/5 nodes are available: insufficient cpu". What are your options?
+  - `L2` What does `whenUnsatisfiable: DoNotSchedule` vs `ScheduleAnyway` do?
+  - `L3` Preemption killed your batch jobs during a traffic spike. Was that correct, and how do you control it?
+  - `L3` How does the scheduler score nodes, and what are bin-packing vs spreading strategies?
+  - `L3` Required pod anti-affinity with 3 replicas on a 2-node cluster: what happens?
+  - `L3` When would you write a custom scheduler or scheduler plugin?
+  - `L3` How does the descheduler differ from the scheduler, and why might you need it?
+- [ ] Autoscaling: HPA formula and custom metrics, KEDA, VPA, cluster autoscaler and Karpenter, scale-up delays
+  - `L1` What is the Horizontal Pod Autoscaler?
+  - `L1` What is the Vertical Pod Autoscaler?
+  - `L1` What is the cluster autoscaler?
+  - `L1` What is KEDA?
+  - `L1` What does HPA scale? What does the cluster autoscaler scale?
+  - `L2` How does HPA compute the desired replica count? ↳ ceil(current × currentMetric / targetMetric)
+  - `L2` HPA targets 70% CPU. Is that 70% of the request or the limit? ↳ request
+  - `L2` HPA isn't scaling. What do you check? ↳ metrics-server, missing requests, `kubectl describe hpa`, min/max
+  - `L2` What is metrics-server and how is it different from Prometheus?
+  - `L2` How do you scale on a custom metric like queue length or requests per second? ↳ custom/external metrics API, Prometheus Adapter, KEDA
+  - `L2` Why is CPU a bad scaling signal for an LLM gateway that mostly waits on API calls?
+  - `L2` How does KEDA scale a worker Deployment on Redis Streams / Service Bus / Kafka lag?
+  - `L2` What does scale-to-zero mean and which tools give it to you?
+  - `L2` What are HPA `behavior` stabilization windows and why do they stop flapping? ↳ scale-down window 300 s default
+  - `L2` Can you use HPA and VPA on the same Deployment? ↳ not on the same CPU/memory metric
+  - `L2` Cluster autoscaler vs Karpenter: how do they decide to add or remove nodes?
+  - `L2` Why does the cluster autoscaler react to Pending pods and not to high node CPU?
+  - `L3` Traffic spikes 10x in 30 seconds. List every delay before new pods serve traffic. ↳ metric scrape, HPA sync, node boot, image pull, startup, readiness
+  - `L3` How would you make scale-up faster for a service with a 5 GB image? ↳ overprovisioning pause pods, pre-pulled images, smaller images, warm pools
+  - `L3` What are the risks of autoscaling on spot / preemptible nodes?
+- [ ] Persistent storage: PV, PVC, StorageClass, dynamic provisioning, access modes, reclaim policies, zones, snapshots
+  - `L1` What is a PersistentVolume? A PersistentVolumeClaim? A StorageClass?
+  - `L1` What is dynamic provisioning?
+  - `L1` Name the access modes. ↳ ReadWriteOnce, ReadOnlyMany, ReadWriteMany, ReadWriteOncePod
+  - `L1` PV vs PVC in one line?
+  - `L2` What are the reclaim policies `Retain` and `Delete`? Which would you use for a production database?
+  - `L2` What does `volumeBindingMode: WaitForFirstConsumer` fix in a multi-zone cluster? ↳ disk created in the zone the pod lands
+  - `L2` A pod with an Azure Disk / EBS volume can't move to a node in another zone. Why?
+  - `L2` What is the CSI driver's job when a pod with a PVC is scheduled?
+  - `L3` How do you back up and restore persistent volumes? ↳ VolumeSnapshots, Velero, app-level backups
+  - `L3` How do you resize a PVC, and what has to support it?
+- [ ] Kubernetes security: RBAC, service accounts, workload identity, NetworkPolicies, Pod Security Admission, securityContext
+  - `L1` What is RBAC in Kubernetes?
+  - `L1` Role vs ClusterRole; RoleBinding vs ClusterRoleBinding.
+  - `L1` What is a ServiceAccount and how does a pod use it?
+  - `L1` What is a NetworkPolicy?
+  - `L1` What are the Pod Security Standards levels? ↳ Privileged, Baseline, Restricted
+  - `L1` Role vs ClusterRole in one line?
+  - `L1` Are pods isolated from each other on the network by default?
+  - `L1` What replaced PodSecurityPolicy?
+  - `L2` Authentication vs authorization vs admission in the API server.
+  - `L2` How do humans authenticate to AKS / EKS / GKE? ↳ Entra ID, IAM, Google identity via OIDC/exec plugins
+  - `L2` How do you check what a user or service account is allowed to do? ↳ `kubectl auth can-i --as`
+  - `L2` Why is the default service account token a risk, and how do you limit it? ↳ automountServiceAccountToken false; least-privilege roles
+  - `L2` What are projected / bound service-account tokens and why are they better than old secret tokens?
+  - `L2` What is workload identity (AKS) / IRSA or EKS Pod Identity / GKE Workload Identity? ↳ pod SA token federated to cloud identity; no keys
+  - `L2` By default, can every pod talk to every other pod? How do you change that?
+  - `L2` Write (in words) a default-deny NetworkPolicy plus one that lets only the API pods reach Postgres.
+  - `L2` A NetworkPolicy has no effect. Why? ↳ CNI doesn't enforce policies
+  - `L2` Why do egress NetworkPolicies often break DNS, and how do you allow it?
+  - `L2` What replaced PodSecurityPolicy, and how is Pod Security Admission enabled per namespace?
+  - `L2` What does the `securityContext` control? ↳ runAsNonRoot, readOnlyRootFilesystem, capabilities, privileged, seccomp
+  - `L2` Why is running a container as root or `privileged: true` dangerous?
+  - `L2` How do you make sure only signed, scanned images run in the cluster? ↳ admission policy (Kyverno/Gatekeeper), cosign verify
+  - `L2` OPA Gatekeeper vs Kyverno: what are they for?
+  - `L3` An attacker gets a shell in one pod. List the paths to the rest of the cluster and how you'd block each.
+  - `L3` Who can effectively become cluster-admin? Name RBAC verbs that are dangerous. ↳ create pods, escalate, bind, impersonate, secrets get/list
+  - `L3` How would you design multi-tenancy: namespace per tenant vs cluster per tenant?
+  - `L3` What are audit logs in Kubernetes and what would you alert on?
+- [ ] Helm, Kustomize, CRDs and operators: charts, values, releases and rollback, overlays, writing a controller
+  - `L1` What is Helm? What is a chart, a release and a values file?
+  - `L1` What is Kustomize?
+  - `L1` What is a CustomResourceDefinition (CRD)?
+  - `L1` What is an operator?
+  - `L1` What is a Helm release?
+  - `L1` What is a CRD?
+  - `L2` Walk me through a Helm chart's folder layout. ↳ Chart.yaml, values.yaml, templates/, _helpers.tpl, charts/
+  - `L2` How does Helm templating work? What are `.Values`, `.Release` and `include`?
+  - `L2` What does `helm upgrade --install` do, and how does `helm rollback` work? ↳ release revisions stored as Secrets in namespace
+  - `L2` How do you deploy the same chart to dev, staging and prod? ↳ values-dev/stage/prod.yaml; `--set` sparingly
+  - `L2` What are Helm hooks and when would you use a pre-upgrade hook?
+  - `L2` Helm vs Kustomize: when do you pick each? Can you use both?
+  - `L2` What are Kustomize bases and overlays?
+  - `L2` What does `helm template` / `helm diff` give you in CI?
+  - `L2` How do you version and publish an internal Helm chart? ↳ semver in Chart.yaml; OCI registry
+  - `L2` What happens to CRDs when you upgrade or uninstall a Helm chart?
+  - `L2` Give examples of operators you have seen and what they automate. ↳ cert-manager, Prometheus, CloudNativePG, Strimzi
+  - `L3` Your Helm templates became 2,000 lines of `if` and `range`. What went wrong and what do you do?
+  - `L3` A `helm upgrade` failed halfway and the release is stuck in `pending-upgrade`. How do you recover?
+  - `L3` Design a CRD and operator for "LLMEndpoint": what's in spec, what's in status, what does the controller reconcile?
+  - `L3` When is writing an operator the wrong answer?
+  - `L3` Helm's three-way merge: how does it treat manual `kubectl edit` changes on upgrade?
+- [ ] Debugging pods and clusters: CrashLoopBackOff, ImagePullBackOff, Pending, ContainerCreating, NotReady nodes, network checks
+  - `L2` A pod is in `CrashLoopBackOff`. Walk me through your debugging. ↳ logs --previous, exit code, describe, config/secrets, probes, OOM
+  - `L2` A pod is in `ImagePullBackOff`. List the possible causes. ↳ wrong tag, private registry auth, rate limit, network, arch mismatch
+  - `L2` A pod is stuck in `Pending`. List the possible causes. ↳ resources, taints, affinity, PVC unbound, quota
+  - `L2` A pod is stuck in `ContainerCreating`. What do you check? ↳ volume mount, secret missing, CNI IP exhaustion
+  - `L2` What does `CreateContainerConfigError` usually mean?
+  - `L2` What do exit codes 0, 1, 137 and 143 mean? ↳ success, app error, SIGKILL/OOM, SIGTERM
+  - `L2` How do you debug a distroless container that has no shell? ↳ `kubectl debug` ephemeral container, `--target`
+  - `L2` Service A can't reach Service B. Walk through DNS, Service, endpoints and NetworkPolicy checks.
+  - `L2` A node is `NotReady`. What do you look at? ↳ kubelet logs, disk/memory pressure, runtime, network
+  - `L2` Requests to your app are slow only in Kubernetes, not locally. What could cause it? ↳ CPU throttling, DNS ndots, cross-zone hops, noisy neighbours
+  - `L3` After a deploy, 1 in 20 requests fails with connection reset. Where do you look?
+  - `L3` Pods restart every few hours with no error in the logs. How do you find out why?
+  - `L3` The API server is slow and `kubectl` commands time out. What do you check?
+  - `L3` A pod runs fine but can't reach the internet. How do you narrow it down? ↳ egress policy, NAT/SNAT, DNS, firewall, UDR
+  - `L3` Describe a production incident you'd expect on Kubernetes and how you'd write its postmortem.
+- [ ] Cluster operations: logging agents, Prometheus and kube-state-metrics, version upgrades and skew, Velero backups, node pools
+  - `L1` Where do container logs go on a node, and why should apps log to stdout?
+  - `L1` What is Prometheus and how does it find pods to scrape?
+  - `L2` Node-level logging agent (DaemonSet) vs sidecar logging: trade-offs.
+  - `L2` What metrics would you put on a dashboard for a service on Kubernetes? ↳ RED metrics, restarts, throttling, memory vs limit, pending pods
+  - `L2` What do kube-state-metrics and node-exporter give you?
+  - `L2` Which alerts would you page on for a Kubernetes cluster?
+  - `L2` How do you trace a request across 5 services on Kubernetes? ↳ OpenTelemetry, context propagation, collector DaemonSet
+  - `L2` How do you upgrade a cluster's Kubernetes version safely? ↳ control plane first, node pools surge, drain, check deprecated APIs
+  - `L2` What is the version skew policy between the API server and kubelets?
+  - `L2` How do you find manifests using APIs removed in the next version?
+  - `L2` How do you back up a cluster? What does Velero back up and what does it not? ↳ objects + volume snapshots; not managed DBs
+  - `L2` How do you rotate cluster certificates and credentials?
+  - `L2` What is a node pool and why have several?
+  - `L3` Blue-green clusters vs in-place upgrades: when would you build a new cluster instead?
+  - `L3` How would you cut log costs for a chatty cluster without losing debuggability?
+  - `L3` How do you handle IP address exhaustion in a VNet-integrated cluster?
+  - `L3` Multi-cluster: when do you need more than one cluster, and how do you route between them?
+- [ ] GPU and LLM serving on Kubernetes: device plugins, GPU node pools, MIG and time-slicing, vLLM/KServe, model weights
+  - `L1` How does a pod request a GPU? ↳ `nvidia.com/gpu: 1` in limits via device plugin
+  - `L1` What is a device plugin?
+  - `L1` What does the NVIDIA GPU Operator install?
+  - `L2` Can two pods share one GPU? What are MIG and time-slicing? ↳ MIG hardware partitions; time-slicing no isolation
+  - `L2` How do you keep non-GPU pods off expensive GPU nodes?
+  - `L2` How would you deploy vLLM serving a 70B model on Kubernetes? ↳ GPU node pool, tensor parallel, model cache volume, startup probe
+  - `L2` Model weights are 40 GB. Bake them into the image, pull at startup, or mount a volume? Trade-offs.
+  - `L2` What metrics matter for autoscaling an LLM server? ↳ queue length, time-to-first-token, KV-cache use, tokens/s
+  - `L2` How does a GPU node pool on AKS/EKS/GKE differ from a CPU node pool? ↳ drivers, taints, quota, scale-to-zero, cost
+  - `L2` What is KServe and what does it add over a plain Deployment?
+  - `L2` Why is round-robin load balancing poor for LLM inference? ↳ uneven request lengths; prefix-cache locality; use least-load/KV-aware routing
+  - `L3` How would you autoscale GPU inference pods serving an LLM? Which metric? ↳ queue depth, KV-cache usage, tokens/s; not GPU util alone
+  - `L3` Scale-from-zero for a GPU model takes 6 minutes. Break down where the time goes and how to cut it.
+  - `L3` What is Dynamic Resource Allocation (DRA) and why is it replacing the simple device-plugin count?
+  - `L3` What is the Gateway API Inference Extension and what problem does it solve?
+  - `L3` Spot GPU nodes get reclaimed mid-generation. How do you protect users?
+  - `L3` How would you run batch embedding jobs and online inference on the same GPU pool without starving either?
+- [ ] Managed Kubernetes: AKS/EKS/GKE differences, pod IP models (Azure CNI, VPC CNI), node pools, registry identity, cost, cluster design
+  - `L1` What do you manage and what does the cloud manage in AKS / EKS / GKE?
+  - `L1` What is GKE Autopilot? What are EKS Fargate profiles? What are AKS virtual nodes?
+  - `L2` AKS vs EKS vs GKE: name one real difference in networking, identity or upgrades.
+  - `L2` Azure CNI vs Azure CNI Overlay vs kubenet: how do pods get IPs on AKS?
+  - `L2` What is the AWS VPC CNI and why can it run out of pod IPs?
+  - `L2` How does an AKS cluster pull from Azure Container Registry without a password? ↳ kubelet managed identity with AcrPull role
+  - `L2` Private cluster vs public API server endpoint: trade-offs.
+  - `L2` What do you pay for in a managed cluster? ↳ control plane fee, nodes, LBs, disks, egress, NAT
+  - `L2` System node pool vs user node pool on AKS.
+  - `L2` How do managed node upgrades and auto-upgrade channels work?
+  - `L2` How would you deploy AiRA's FastAPI backend, WebSocket voice service and workers on AKS? Draw it.
+  - `L2` How would you deploy AiRA's backend on EKS instead of AKS? What changes?
+  - `L3` How would you migrate AiRA's backend from VMs/containers on Azure to AKS in steps without downtime?
+  - `L3` Design a production cluster for a SaaS API: zones, node pools, ingress, secrets, observability, CI/CD.
+  - `L3` How would you make a Kubernetes-hosted service survive a full zone outage? A full region outage?
+  - `L3` How would you cut a managed cluster bill by 40%? ↳ rightsize requests, spot pools, autoscaling, bin-packing, egress
+  - `L3` Kubernetes vs Azure Container Apps for AiRA today: which would you choose and why?
+  - `L3` What is the minimum platform a team needs around a cluster before they put production on it?
+
+**Learn:** kubernetes.io "Tutorials: Learn Kubernetes basics" · TechWorld with Nana (YouTube)
+
+## 10.4 CI/CD
+- [ ] Pipeline stages: lint → test → build → scan → deploy ↳ LEH ch11 "LLM Twin's CI/CD pipeline flow" (pdf p463–466) · LEH ch11 "DevOps" (pdf p432–434) · https://martinfowler.com/articles/continuousIntegration.html
+  - `L1` Walk me through the pipeline from `git push` to production.
+  - `L1` What does Trivy scan, and when does it fail the build?
+  - `L1` What does Trivy scan?
+  - `L1` What is continuous integration?
+  - `L1` Continuous delivery vs continuous deployment: what is the difference?
+  - `L1` What are the usual pipeline stages? ↳ lint → test → build → scan → deploy (staging) → verify → prod
+  - `L1` What is a build artifact? Give three examples. ↳ container image, wheel/npm package, binary, Helm chart
+  - `L1` CI vs CD in one line each?
+  - `L2` What runs on every PR? ↳ lint, types, unit, Testcontainers integration, image build, Trivy, Terraform plan
+  - `L2` What should a container CI pipeline do? ↳ lint (Hadolint), build, test in container, scan (Trivy), push by SHA, deploy
+  - `L2` Walk me through your deploy pipeline
+  - `L2` Walk me through your deploy pipeline at AiRA, from `git push` to production.
+  - `L2` What goes in the PR pipeline vs the main-branch pipeline vs the release pipeline?
+  - `L2` Order these and justify: unit tests, integration tests, lint, type check, image build, security scan. ↳ cheap and fast first; fail early
+  - `L2` What is the test pyramid and how does it shape a pipeline?
+  - `L2` What is a smoke test after deploy, and what would yours check?
+  - `L2` What is a quality gate? Give examples you would block a merge on.
+  - `L2` How do you promote a build from staging to production? Manual approval, automatic, or time-based?
+  - `L3` Design a CI/CD pipeline for a FastAPI service with Postgres migrations, deployed to AKS, from scratch.
+  - `L3` Your pipeline deploys on merge to main with no staging. What risks do you accept and how do you limit them?
+  - `L3` What should **not** be automated in a deploy pipeline?
+- [ ] GitHub Actions: workflows, jobs, matrix, secrets, caching ↳ https://docs.github.com/en/actions/writing-workflows/quickstart · LEH ch11 "Quick overview of GitHub Actions" (pdf p466–473, CI + CD YAML) · GitHub Docs "Using secrets in GitHub Actions" + "Caching dependencies" (docs.github.com/actions)
+  - `L1` What are a workflow, a job, a step and an action in GitHub Actions?
+  - `L1` Where do workflow files live?
+  - `L1` Name five events that can trigger a workflow. ↳ push, pull_request, workflow_dispatch, schedule, release, workflow_call
+  - `L1` What is a runner? GitHub-hosted vs self-hosted.
+  - `L1` Do jobs in one workflow run in parallel or in sequence by default? How do you order them? ↳ parallel; `needs`
+  - `L1` Cache vs artifact: what is the difference?
+  - `L1` What is a reusable workflow?
+  - `L1` Where do GitHub Actions workflow files live?
+  - `L1` Key that makes one job wait for another?
+  - `L1` Cache or artifact for `node_modules`?
+  - `L2` How does CI authenticate to the cloud without long-lived keys?
+  - `L2` How do you reuse the build cache in CI where every runner starts empty? ↳ `--cache-from`/`--cache-to` registry or GHA cache
+  - `L2` How do you build and push an image in GitHub Actions with caching?
+  - `L2` Docker-in-Docker vs mounting the host socket in CI: risks of each.
+  - `L2` What is a matrix build? Give a real use. ↳ Python 3.11/3.12 × OS; `fail-fast`, `include`/`exclude`
+  - `L2` How do you pass data from one job to another? ↳ job outputs, artifacts; steps share the filesystem only within a job
+  - `L2` What do `if:` conditions and expressions like `${{ github.ref == 'refs/heads/main' }}` do?
+  - `L2` How do you run a workflow only when files in `backend/` change? ↳ `paths` filters; beware required checks
+  - `L2` What does `concurrency` with `cancel-in-progress` do, and why use it for deploys?
+  - `L2` What are `env`, `vars` and `secrets` contexts and the difference between them?
+  - `L2` How does `schedule` (cron) work in Actions, and what are its gotchas? ↳ UTC, delays under load, disabled on inactive repos
+  - `L2` What is `workflow_dispatch` and how do you add inputs to it?
+  - `L2` What is a composite action vs a JavaScript action vs a Docker action?
+  - `L2` How do you debug a failing workflow? ↳ logs, step debug logging, re-run with debug, act locally
+  - `L2` How do you build and push a Docker image to ACR / ECR / GHCR from Actions?
+  - `L2` What are required status checks and branch protection rules / rulesets?
+  - `L2` How does `actions/cache` decide a cache hit? What should the key be? ↳ hash of lockfile; restore-keys fallback
+  - `L2` How do you cache pip / npm / Poetry / uv dependencies? Why cache the lockfile hash, not the folder?
+  - `L2` Your cache never hits on PR branches. Why? ↳ cache scoping by branch; base-branch caches visible to PRs
+  - `L2` Reusable workflow vs composite action: when do you use each?
+  - `L2` How long are artifacts and logs kept, and why does that matter for compliance?
+  - `L3` GitHub Actions vs GitLab CI vs Jenkins vs Azure Pipelines: trade-offs.
+  - `L3` How would you share one deploy workflow across 15 repos without copy-paste drift?
+- [ ] Deployment strategies: rolling, blue-green, canary; feature flags; rollbacks ↳ https://martinfowler.com/bliki/BlueGreenDeployment.html · https://martinfowler.com/bliki/CanaryRelease.html · https://martinfowler.com/articles/feature-toggles.html
+  - `L1` Canary analysis metric?
+  - `L1` What is a rolling deployment?
+  - `L1` What is a blue-green deployment?
+  - `L1` What is a canary release?
+  - `L1` What is a shadow (dark) deployment?
+  - `L1` What is A/B testing and how is it different from a canary?
+  - `L1` Blue-green in one line?
+  - `L1` Canary in one line?
+  - `L1` Shadow deployment in one line?
+  - `L1` Name one thing that makes a deploy impossible to roll back.
+  - `L2` Why GitOps with ArgoCD instead of `kubectl apply` from GitHub Actions?
+  - `L2` How does your canary rollout work, and what metrics decide promote vs rollback? ↳ Argo Rollouts analysis: error rate, p95 added latency, 5xx from providers
+  - `L2` A deploy doubles p99 latency. How fast do you detect it and roll back?
+  - `L2` Blue-green vs canary?
+  - `L2` Blue-green vs canary: when do you pick each?
+  - `L2` What does blue-green cost you? ↳ double capacity, shared DB, session handling, switch timing
+  - `L2` Walk me through a canary: 10% → monitor → promote. What do you monitor and for how long? ↳ error rate, latency, saturation, business metric vs baseline
+  - `L2` What are automatic rollback triggers you would set?
+  - `L2` How do you route 10% of traffic to a canary: by replicas, by load balancer weights, or by user? Trade-offs.
+  - `L2` What is a sticky canary and why do users hate non-sticky ones?
+  - `L2` What is the "recreate" strategy and when is downtime acceptable?
+  - `L2` What does a shadow deployment need to be safe? ↳ no side effects, mirrored writes discarded, compare outputs offline
+  - `L2` How do you roll back a bad deploy? How long does yours take?
+  - `L2` Roll back vs fix forward: how do you decide in an incident?
+  - `L2` What makes a deploy impossible to roll back? ↳ destructive migrations, changed data formats, external side effects, sent emails
+  - `L2` How do you deploy a WebSocket / realtime voice service without dropping active sessions?
+  - `L2` How would you canary a prompt or model change for an LLM feature? ↳ flag by user cohort, eval metrics, cost/latency, thumbs-down rate
+  - `L2` What is progressive delivery?
+  - `L3` A bad canary shows higher cost per request but no errors. Would your analysis catch it?
+  - `L3` How do you deploy a change that spans the API, a worker and a mobile client released through the app store?
+  - `L3` A canary looks fine at 10% but fails at 100%. What kinds of bugs hide at low traffic? ↳ capacity, cache stampede, connection limits, rare paths
+  - `L3` Design zero-downtime deploys for a service behind an Azure / AWS load balancer on plain VMs.
+  - `L3` How do you avoid deploying on Friday evening without banning it? ↳ automated rollback, small changes, flags, freeze rules
+  - `L3` How do you coordinate deploys of 10 microservices that depend on each other's APIs? ↳ backward compatibility, contract tests, deploy order independence
+- [ ] Database migrations in CI/CD ↳ https://planetscale.com/blog/backward-compatible-databases-changes · https://martinfowler.com/bliki/ParallelChange.html (expand/contract) · DDIA ch4 "Data flow through databases" (pdf p147)
+  - `L1` What is a schema migration tool? Name two you have used. ↳ Alembic, Django migrations, Prisma, Flyway, Liquibase
+  - `L1` What is the expand / contract (parallel change) pattern?
+  - `L1` Expand/contract migration in one line?
+  - `L2` How do you run migrations safely with many gateway pods? ↳ expand/contract, run once as a job, backward-compatible code
+  - `L2` Should database migrations run in an init container? What goes wrong with 10 replicas? ↳ concurrent migrations; use a Job or migration lock
+  - `L2` How would you run a DB migration as a Job before a Deployment rolls out? ↳ Helm pre-upgrade hook, Argo sync wave, CI step
+  - `L2` How do you roll back a bad deploy that included a DB migration?
+  - `L2` Where do migrations run in your pipeline: app startup, init container, separate job, or CI step? Trade-offs.
+  - `L2` Why must a migration be backward compatible with the currently running code?
+  - `L2` Rename a column with zero downtime. List the deploys. ↳ add new, dual-write, backfill, switch reads, stop old writes, drop
+  - `L2` Add a NOT NULL column to a 100M-row Postgres table without locking it. ↳ nullable first, backfill in batches, then constraint (NOT VALID + VALIDATE)
+  - `L2` Why is `CREATE INDEX` dangerous in a migration on a busy table, and what is the fix? ↳ `CREATE INDEX CONCURRENTLY` outside a transaction
+  - `L2` Do you write down migrations? Do you ever run them in production?
+  - `L2` How do you test migrations in CI? ↳ apply to prod-like snapshot, up/down round trip, timing
+  - `L2` Two developers create migrations from the same parent. What breaks and how do you fix it? ↳ Alembic multiple heads; merge revision
+  - `L2` What is `lock_timeout` and why set it before a migration?
+  - `L2` MongoDB has no schema. Do you still need migrations? How do you handle old documents?
+  - `L3` How do you roll back when the release included a database migration?
+  - `L3` How do you run database migrations in a containerised deploy — at start-up, as a one-off job, or in CI? Trade-offs.
+  - `L3` During a rolling update both versions serve traffic. What must be true about your API and DB schema?
+  - `L3` A rollback restores old pods but your new version already ran a DB migration. What now? ↳ expand/contract migrations; backward-compatible schema
+  - `L3` How do you roll back a bad deploy with a DB migration?
+  - `L3` A migration locks a hot table for 3 minutes in production. Walk through the incident and the prevention.
+  - `L3` How do you backfill 500M rows without hurting production traffic?
+  - `L3` Blue-green deploy with one shared database: what constraints does that put on migrations?
+- [ ] Environments (dev/staging/prod) and config management (12-factor app) ↳ https://12factor.net · https://12factor.net/config
+  - `L1` What is the 12-factor app? Name four of its factors.
+  - `L1` Why should config live in environment variables and not in code?
+  - `L1` What are dev, staging and prod environments for?
+  - `L2` Why Helm? What do you template per environment?
+  - `L2` Why "build once, deploy many" — why must staging and prod run the same artifact? ↳ same digest; config injected per environment
+  - `L2` Where does configuration live in a 12-factor app, and why not in the image?
+  - `L3` How do you validate config at startup so a bad env var fails fast instead of at 3 a.m.?
+  - `L3` How do you promote the exact same image through environments, and why does it matter?
+  - `L3` How do you keep dev, staging and prod close enough that staging catches real bugs?
+- [ ] GitHub Actions security: OIDC federation to Azure/AWS, `GITHUB_TOKEN` permissions, environment approvals, fork PRs, self-hosted runner risks
+  - `L1` What is a GitHub environment and what protection rules can it have? ↳ required reviewers, wait timer, branch restrictions, env secrets
+  - `L1` How do you store a secret for a workflow? Repository vs environment vs organisation secrets.
+  - `L1` Which permission does a workflow need for OIDC? ↳ `id-token: write`
+  - `L2` What is the `GITHUB_TOKEN`? What can it do and how do you restrict it? ↳ per-run token; `permissions:` least privilege
+  - `L2` When would you use self-hosted runners? What are the risks? ↳ GPUs, private network, cost; untrusted PR code on persistent machine
+  - `L2` Why does a PR from a fork not get your secrets?
+  - `L2` What is OIDC federation from GitHub Actions to Azure / AWS / GCP, and why is it better than a stored key? ↳ short-lived token, no long-lived secret, scoped by repo/branch
+  - `L2` How do you set up OIDC to Azure? ↳ app registration/managed identity, federated credential on repo+env, `azure/login`
+  - `L2` What claims in the OIDC token should the cloud trust policy check? ↳ `sub` (repo, branch/environment), `aud`
+  - `L2` How do you require a manual approval before production deploys in Actions?
+  - `L2` A secret got printed in the logs. Why didn't masking catch it, and what do you do now? ↳ transformed/encoded value; rotate immediately
+  - `L2` How do you give CI access to production without storing long-lived cloud keys?
+  - `L2` What should the CI token be allowed to do, and what should it never be allowed to do?
+  - `L3` Why are self-hosted runners on a public repo dangerous? How do ephemeral runners help?
+  - `L3` What is the danger of `pull_request_target` with a checkout of the PR head? ↳ untrusted code runs with secrets and write token
+  - `L3` A misconfigured OIDC trust allows any branch to deploy to prod. How would you have caught it?
+  - `L3` What is cache poisoning in CI and how can a PR poison a cache used by `main`?
+- [ ] Versioning and releases: semver, Git tags, conventional commits, automated releases, image tags vs digests, breaking changes
+  - `L1` What is semantic versioning? What do MAJOR, MINOR and PATCH mean?
+  - `L1` What does `^1.4.2` vs `~1.4.2` allow in npm?
+  - `L1` What is a Git tag? Lightweight vs annotated tag.
+  - `L1` Semver: which part changes on a breaking change?
+  - `L2` What are conventional commits and how can they drive version bumps and changelogs?
+  - `L2` How do you automate releases? ↳ release-please / semantic-release / changesets on merge to main
+  - `L2` How do you version a monorepo with 4 packages: one version or one per package?
+  - `L2` What counts as a breaking change in a REST API? In an npm library?
+  - `L2` How do you version container images? Tags vs digests.
+  - `L2` What is a pre-release version (`2.0.0-rc.1`) and how does it sort?
+- [ ] Supply-chain security: CVE scanning (Trivy), SAST/DAST/SCA, SBOM, SLSA, signing with cosign/Sigstore, pinned actions, Dependabot
+  - `L1` What is a software supply-chain attack? Give a real example. ↳ SolarWinds, xz backdoor, tj-actions/changed-files, event-stream
+  - `L1` What is Trivy and what does it scan? ↳ images, filesystems, IaC, secrets, licenses
+  - `L1` What is SLSA?
+  - `L1` Why pin actions to a commit SHA?
+  - `L1` What does SBOM stand for?
+  - `L1` What does Trivy do?
+  - `L1` What does SLSA stand for?
+  - `L2` What does signing a release mean, and what attack does it stop? ↳ proves who built it; tampered artifact/registry compromise
+  - `L2` Lumen has a signed release workflow. What is signed, with which key, and how does a user verify it?
+  - `L2` What is Sigstore / cosign keyless signing? ↳ OIDC identity → short-lived Fulcio cert; Rekor transparency log
+  - `L2` What is npm provenance and how does `--provenance` from GitHub Actions work?
+  - `L2` GPG-signed commits vs signed tags vs signed artifacts: what does each prove?
+  - `L2` How do you block a deploy when an image has a critical CVE? ↳ Trivy `--severity CRITICAL --exit-code 1`, ignore file with expiry
+  - `L2` A critical CVE has no fix yet and you must ship today. What do you do?
+  - `L2` Why should you pin third-party actions to a full commit SHA instead of `@v4`? ↳ tags are mutable; compromised action steals secrets
+  - `L2` What happened in the tj-actions/changed-files compromise and what would have limited the damage?
+  - `L2` What do Dependabot / Renovate do, and how do you avoid drowning in their PRs?
+  - `L2` SAST vs DAST vs SCA vs secret scanning: what does each find?
+  - `L2` How do you stop developers committing secrets? ↳ pre-commit hooks (gitleaks), push protection, scanning, rotation
+  - `L2` A secret was committed and pushed 3 commits ago. What do you do, in order? ↳ rotate first, then purge history, audit usage
+  - `L2` How do you generate and store an SBOM for each image? ↳ syft/Trivy, attach as attestation, store with release
+  - `L2` Why do lockfiles and hash-pinned dependencies matter for supply-chain security?
+  - `L2` What is dependency confusion / typosquatting and how do you defend against it?
+  - `L3` A maintainer's npm token leaks. What stops an attacker from publishing a malicious version of your package? ↳ trusted publishing (OIDC), 2FA, provenance checks
+  - `L3` How would a consumer enforce "only run images signed by our CI" in Kubernetes?
+  - `L3` What do SLSA build levels require, roughly, and where would your pipeline land today?
+  - `L3` Design a pipeline where only images built by CI from `main`, scanned and signed, can reach production.
+  - `L3` Your CI runner was compromised. What could the attacker reach, and how do you contain it next time?
+- [ ] GitOps with Argo CD / Flux: pull vs push CD, drift and self-heal, app vs config repos, promotion and rollback through Git
+  - `L1` What is GitOps, in one sentence?
+  - `L1` What are the GitOps principles? ↳ declarative, versioned, pulled automatically, continuously reconciled
+  - `L1` What are Argo CD and Flux?
+  - `L1` GitOps: push or pull?
+  - `L1` What does Argo CD do on drift with self-heal on?
+  - `L2` Push-based CD vs pull-based (GitOps) CD.
+  - `L2` Push model (CI runs `kubectl apply`) vs pull model (agent in cluster syncs Git): trade-offs. ↳ no cluster creds in CI, drift correction, audit
+  - `L2` What is drift, and what does Argo CD do when someone runs `kubectl edit` in prod? ↳ OutOfSync; self-heal reverts
+  - `L2` What do "sync", "OutOfSync", "Healthy" and "Degraded" mean in Argo CD?
+  - `L2` App repo vs config (environment) repo: why separate them?
+  - `L2` How does a new image tag get from CI into the GitOps repo? ↳ CI commits/PRs tag bump, or Image Updater
+  - `L2` How do you promote a release from staging to prod in GitOps? ↳ PR changing prod overlay/values
+  - `L2` How do you roll back in GitOps? ↳ git revert; avoid manual rollback that drifts
+  - `L2` How do you handle secrets in a GitOps repo?
+  - `L2` What are sync waves and hooks in Argo CD? Give a use. ↳ migrations Job before Deployment
+  - `L2` What is the "app of apps" pattern / ApplicationSets?
+  - `L2` Argo CD vs Flux: how would you choose?
+  - `L2` Auto-sync with prune and self-heal: when would you turn those off?
+  - `L3` How do you manage 3 environments × 20 services × 2 regions in GitOps without a YAML explosion?
+  - `L3` Git is down or the GitOps repo is broken. Can you still deploy a hotfix? What's the break-glass process?
+  - `L3` Does GitOps apply to Terraform-managed cloud resources too? What tools try to do that?
+- [ ] CI speed and reliability: monorepo affected-only builds, remote and Docker layer caching, flaky tests, pipeline as code
+  - `L1` What is a monorepo? What is a polyrepo?
+  - `L1` First thing you do with a flaky test?
+  - `L2` How long should CI take on a PR? What do you do when it takes 25 minutes?
+  - `L2` How do you speed up Docker builds in CI? ↳ BuildKit, layer cache (type=gha/registry), multi-stage, order layers
+  - `L2` Monorepo vs polyrepo: trade-offs for CI, ownership and versioning.
+  - `L2` How do you run only the affected parts of a monorepo in CI? ↳ path filters, dependency graph (Nx, Turborepo, Bazel, pants)
+  - `L2` What is remote build caching and why does it matter for big monorepos?
+  - `L2` A test fails 1 time in 20. What do you do with it today, and what do you do this week? ↳ quarantine with ticket, find root cause, never blind retry
+  - `L2` List common causes of flaky tests. ↳ time, ordering, shared state, network, async waits, randomness, parallelism
+  - `L2` Why is "just add a retry" dangerous for flaky tests and pipelines?
+  - `L2` Your CI takes 30 minutes. How do you get it under 10? ↳ parallelise/shard, cache, affected-only, faster runners, move slow suites
+  - `L2` What is a pipeline as code and why prefer it over clicking in a UI?
+  - `L3` How would you run CI for 4 packages in the Lumen repo so only changed packages build and test?
+  - `L3` How do you stop a shared CI template change from breaking 40 repos at once?
+  - `L3` How do you test the pipeline itself?
+- [ ] DORA metrics: deploy frequency, lead time for changes, change failure rate, time to restore
+  - `L1` What are the four DORA metrics? ↳ deploy frequency, lead time for changes, change failure rate, time to restore
+  - `L1` Name the four DORA metrics.
+  - `L2` How do you measure lead time and change failure rate in practice?
+  - `L2` What DORA numbers separate "elite" from "low" performers, roughly?
+  - `L2` Your deploy frequency is high but change failure rate is 30%. What do you change?
+  - `L3` How would you improve DORA metrics for a team of 6 shipping weekly with manual QA?
+  - `L3` Can DORA metrics be gamed? How?
+
+**Learn:** docs.github.com/actions · 12factor.net
+
+## 10.5 Cloud services (Azure — your AiRA stack — and the AWS equivalents)
+- [ ] Compute: VMs (EC2 / Azure VM), containers (ECS, EKS / AKS, Azure Container Apps), serverless (Lambda / Azure
+      Functions) — trade-offs, cold starts ↳ DMLS ch10 "Storage and Compute" (pdf p317–321) · Microsoft Learn AZ-900 "Describe Azure compute and networking services" (learn.microsoft.com) · AWS Lambda docs "Lambda execution environment lifecycle" (cold starts, docs.aws.amazon.com/lambda)
+  - `L2` Serverless vs containers vs VMs: when does each become the cheaper option?
+  - `L2` Kubernetes vs ECS / Azure Container Apps / Cloud Run: when would you pick the simpler managed option?
+  - `L2` Kubernetes vs serverless functions for an API: trade-offs.
+  - `L2` Serverless vs containers for an API?
+  - `L2` App Service vs Container Apps vs AKS: how do you choose for a new API?
+  - `L2` ECS on EC2 vs ECS on Fargate vs EKS: trade-offs.
+  - `L2` Serverless vs containers for an API: trade-offs. ↳ cold starts, time limits, cost curve, connections, local dev
+  - `L3` What are burstable VM types (AWS T-series, Azure B-series) and how do CPU credits cause sudden slowness?
+  - `L3` How would you deploy AiRA's backend on AWS instead of Azure?
+  - `L3` When do you outgrow a PaaS and move to Kubernetes? What signals tell you?
+  - `L3` At what traffic level does Lambda become more expensive than a container? How would you estimate it?
+  - `L3` Serverless, containers or VMs: how does the cost curve of each change with traffic?
+- [ ] Storage: S3 / Blob Storage; presigned/SAS URLs; storage tiers ↳ https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html · Microsoft Learn "Grant limited access to data with shared access signatures (SAS)" (learn.microsoft.com) · https://aws.amazon.com/s3/storage-classes/
+  - `L1` Object storage vs block storage vs file storage.
+  - `L1` What are S3 storage classes and Azure Blob access tiers? ↳ Standard/IA/Glacier; Hot/Cool/Cold/Archive
+  - `L1` What is a presigned URL (S3) / SAS token (Azure)?
+  - `L1` What are LRS, ZRS, GRS and GZRS in Azure Storage?
+  - `L1` Presigned URL in one line?
+  - `L1` Coldest Azure Blob tier?
+  - `L2` Why upload files directly from the client with a presigned URL instead of through your API? ↳ no API bandwidth/memory, scales, short-lived scoped access
+  - `L2` What should a presigned / SAS URL be limited by? ↳ expiry, single object, permissions, content type/size, IP
+  - `L2` Account SAS vs service SAS vs user delegation SAS: which is safest and why? ↳ user delegation: Entra-backed, revocable, no account key
+  - `L2` A SAS URL leaked. How do you revoke it? ↳ stored access policy, rotate key, or short expiry by design
+  - `L2` What are lifecycle policies and how do they cut storage cost?
+  - `L2` Archive tier is cheap. What is the catch? ↳ hours to rehydrate, retrieval fees, minimum storage duration
+  - `L2` What consistency does S3 give today? ↳ strong read-after-write since 2020
+  - `L2` How do you make a bucket private but serve images publicly and fast? ↳ CDN with origin access control
+  - `L2` How would you store user-uploaded PDFs for a RAG pipeline? Layout, access, processing trigger.
+  - `L2` What is versioning and soft delete on buckets, and why turn it on?
+  - `L2` How do you upload a 5 GB file reliably? ↳ multipart / block upload, parallel parts, resume
+  - `L2` What are object lock / immutable storage (WORM) used for?
+  - `L3` Public S3 buckets are a top cause of leaks. What guardrails stop one from happening?
+  - `L3` Where would you store 40 GB of LLM weights so 20 GPU nodes can load them fast?
+  - `L3` How do you design a key / path layout for billions of objects?
+- [ ] Databases: RDS / Azure Database for PostgreSQL; DynamoDB / Cosmos DB; ElastiCache / Azure Cache for Redis ↳ Microsoft Learn "Azure for AWS professionals: service comparison" (learn.microsoft.com/azure/architecture/aws-professional) · https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html · LEH ch11 "Setting up MongoDB" (pdf p447, managed DB in practice)
+  - `L1` What does "managed database" take off your plate, and what is still yours?
+  - `L1` What are Azure Database for PostgreSQL Flexible Server, Amazon RDS and Aurora?
+  - `L1` What are Cosmos DB and DynamoDB?
+  - `L1` What are Azure Cache for Redis / Azure Managed Redis and ElastiCache?
+  - `L2` RDS Postgres vs Aurora Postgres: what does Aurora change? ↳ shared distributed storage, fast replicas/failover, cost model
+  - `L2` How does high availability work in Azure PG Flexible Server / RDS Multi-AZ? ↳ synchronous standby in another zone, automatic failover, DNS switch
+  - `L2` Read replica vs HA standby: what is each for?
+  - `L2` What happens to your app's connections during a managed DB failover, and how should it behave? ↳ drops ~30–120 s; retry with backoff, reconnect
+  - `L2` What is point-in-time restore and how far back can you go?
+  - `L2` Why put PgBouncer or RDS Proxy in front of a managed Postgres?
+  - `L2` How do you choose a DynamoDB partition key? What is a hot partition? ↳ high-cardinality, even access; one key hammered
+  - `L2` DynamoDB on-demand vs provisioned capacity.
+  - `L2` What are Cosmos DB request units (RUs) and the consistency levels? ↳ strong, bounded staleness, session, consistent prefix, eventual
+  - `L2` Cosmos DB / DynamoDB vs Postgres for a chat history store: which would you pick?
+  - `L2` What features do managed Redis tiers differ on? ↳ clustering, persistence, zone redundancy, geo-replication, VNet
+  - `L2` How do you connect to a managed DB without a password in the connection string? ↳ Entra ID / IAM database authentication with managed identity
+  - `L2` Self-host Qdrant on a VM, run it on AKS, or use a managed vector DB / pgvector? Trade-offs.
+  - `L3` How do you do a major-version Postgres upgrade on a managed service with minimal downtime?
+  - `L3` Your managed DB CPU hits 100% at 9 AM every day. Scale up, add replicas, or fix queries? How do you decide?
+- [ ] Messaging: SQS/SNS / Azure Service Bus, Event Grid; Kafka managed options ↳ Microsoft Learn "Compare Azure messaging services" (Event Grid vs Event Hubs vs Service Bus, learn.microsoft.com) · DDIA ch11 "Messaging systems" (pdf p449) · AWS docs "Amazon SQS" developer guide (docs.aws.amazon.com/sqs)
+  - `L1` What are SQS and SNS? How do they work together? ↳ queue vs pub/sub fan-out; SNS → many SQS queues
+  - `L1` Service Bus vs Event Hubs vs Event Grid: one line each.
+  - `L1` Service Bus or Event Hubs for a work queue?
+  - `L2` SQS standard vs FIFO: what do you give up for ordering? ↳ throughput limits; message group IDs; dedup window
+  - `L2` What is the SQS visibility timeout, and what happens if processing takes longer? ↳ message reappears; extend visibility
+  - `L2` Service Bus peek-lock vs receive-and-delete.
+  - `L2` What are Service Bus sessions and when do you need them? ↳ ordered processing per key
+  - `L2` Service Bus topics and subscriptions with filters: give a use.
+  - `L2` Event Hubs vs Kafka: what is the same and what is different? ↳ Kafka-compatible API, partitions; managed, retention limits
+  - `L2` What is Event Grid for, and how is it different from a queue? ↳ push event routing, reactive triggers; not work queues
+  - `L2` SQS long polling vs short polling.
+  - `L2` What is the max message size on SQS / Service Bus, and what do you do for bigger payloads? ↳ claim check: blob + pointer
+  - `L2` How do you scale queue consumers on cloud? ↳ KEDA, autoscale on queue length, Lambda event source
+  - `L2` AiRA uses Redis Streams. When would you swap to Service Bus or SQS instead?
+  - `L3` Design a reliable job pipeline on Azure: upload → parse → embed → index, with retries and a DLQ.
+  - `L3` How do you get exactly-once effects on top of an at-least-once cloud queue?
+- [ ] Secrets: Secrets Manager / Key Vault (your vault design); KMS and envelope encryption ↳ https://learn.microsoft.com/en-us/azure/key-vault/general/basic-concepts · https://cloud.google.com/kms/docs/envelope-encryption · AWS Secrets Manager docs "What is AWS Secrets Manager?" (docs.aws.amazon.com)
+  - `L1` What is Azure Key Vault? What are secrets, keys and certificates in it?
+  - `L1` What is AWS KMS? What is AWS Secrets Manager? How do they differ?
+  - `L1` Encryption at rest vs in transit.
+  - `L1` Envelope encryption in one line?
+  - `L1` KMS or Secrets Manager for a DB password?
+  - `L2` How do containers get secrets at runtime on a VM? ↳ env from Key Vault/Secrets Manager, mounted files, Docker secrets
+  - `L2` Env vars vs mounted secret files: which leaks more easily and why? ↳ env shows in inspect, child processes, crash dumps
+  - `L2` How do your services read secrets without storing them in code or images?
+  - `L2` How do your services read secrets without storing them in code?
+  - `L2` How do your services read secrets without storing them in code?
+  - `L2` Walk through envelope encryption step by step. ↳ random data key encrypts data; KEK in KMS wraps data key; store wrapped key
+  - `L2` Why not just send all your data to KMS / Key Vault to encrypt? ↳ size limits, latency, cost, throttling
+  - `L2` How do you rotate the key-encryption key without re-encrypting all data? ↳ re-wrap data keys only; keep key versions
+  - `L2` Service-managed keys vs customer-managed keys (CMK): when do customers ask for CMK?
+  - `L2` Key Vault access policies vs Azure RBAC: which should you use today?
+  - `L2` What are soft delete and purge protection in Key Vault, and why turn them on?
+  - `L2` Key Vault starts returning 429s under load. Why, and how do you design around it? ↳ throttling limits; cache secrets/keys, unwrap once
+  - `L2` Secrets Manager rotation: how does automatic rotation of a DB password work?
+  - `L2` App config in Key Vault vs App Configuration / Parameter Store: what goes where?
+  - `L2` HSM vs software keys: what is the difference and when do you need an HSM?
+- [ ] Networking: VPC/VNet, subnets, security groups, private endpoints, load balancers ↳ AWS VPC docs "How Amazon VPC works" (docs.aws.amazon.com/vpc) · Microsoft Learn "What is a private endpoint?" (learn.microsoft.com) · https://www.cloudflare.com/learning/performance/what-is-load-balancing/
+  - `L1` What is a VNet / VPC?
+  - `L1` What is a subnet? Public vs private subnet.
+  - `L1` What is a security group? What is a network security group (NSG)?
+  - `L1` What is a NAT gateway and why do private subnets need one?
+  - `L1` What is a private endpoint / PrivateLink?
+  - `L1` Security group: stateful or stateless?
+  - `L1` What does a NAT gateway do?
+  - `L1` Private endpoint in one line?
+  - `L1` Is VNet peering transitive?
+  - `L1` Usable addresses in a /24 subnet on AWS?
+  - `L2` Public subnet vs private subnet in a VPC/VNet: what makes a subnet "public"? ↳ route to internet gateway; private uses NAT gateway for egress
+  - `L2` How does a VM in a private subnet download packages from the internet?
+  - `L2` What is a security group vs a network ACL? Stateful vs stateless firewall. ↳ SG stateful per instance; NACL stateless per subnet
+  - `L2` What is a VPC peering / VNet peering, and why can't the two networks have overlapping CIDRs?
+  - `L2` What is a bastion host, and what do you use instead today? ↳ SSM Session Manager, Azure Bastion, VPN/Tailscale
+  - `L2` Choose CIDR ranges for a VPC with 3 AZs, public and private subnets, and room to grow.
+  - `L2` How do you open a port in the VM firewall and in the cloud security group / NSG? Why both?
+  - `L2` Security groups vs NACLs on AWS: stateful vs stateless. ↳ SG stateful, instance level; NACL stateless, subnet level
+  - `L2` What makes an AWS subnet "public"? ↳ route to an internet gateway
+  - `L2` How do you design a VNet for a web app with a database? ↳ public LB/app gateway subnet, private app subnet, private data subnet
+  - `L2` What is a CIDR block? How many addresses does a /24 give you, and how many can you use in Azure / AWS? ↳ 256; 5 reserved per subnet
+  - `L2` Private endpoint vs service endpoint in Azure: what is the difference?
+  - `L2` Why does a private endpoint need a private DNS zone, and what breaks without it? ↳ name resolves to public IP; traffic blocked
+  - `L2` What is VNet / VPC peering? Is it transitive? ↳ no; hub-and-spoke or transit gateway / virtual WAN
+  - `L2` What is a hub-and-spoke network and why do enterprises use it?
+  - `L2` VPN gateway vs ExpressRoute / Direct Connect: when each?
+  - `L2` What is a route table / user-defined route used for?
+  - `L2` What are VPC gateway endpoints for S3 and why do they save money? ↳ S3 traffic skips NAT gateway charges
+  - `L2` How do you give your outbound traffic a fixed IP so a partner can allowlist it? ↳ NAT gateway with static public IP
+  - `L2` What is SNAT port exhaustion and how does it show up in an app making many outbound calls? ↳ intermittent connection timeouts; NAT gateway, connection reuse
+  - `L2` Your container can't reach Azure Database for PostgreSQL. Walk through the checks. ↳ DNS, NSG, firewall rules, private endpoint, VNet integration
+  - `L3` What are private endpoints / PrivateLink and why use them for a managed Postgres or Redis?
+  - `L3` Design the network for AiRA on Azure: what is public, what is private, and how do the agentic browser pods reach the internet safely?
+  - `L3` How do you plan IP ranges so you can peer with other VNets and on-prem later without overlap?
+  - `L3` How does DNS resolution work across peered VNets, private DNS zones and on-prem?
+- [ ] IAM / managed identities; least privilege ↳ https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html · Microsoft Learn "What are managed identities for Azure resources?" (learn.microsoft.com) · LEH ch10 "Implementing the LLM microservice using AWS SageMaker" (pdf p403–404, IAM roles)
+  - `L1` What is IAM?
+  - `L1` IAM user vs IAM role vs IAM group on AWS.
+  - `L1` What is Microsoft Entra ID (formerly Azure AD)?
+  - `L1` What is a managed identity? System-assigned vs user-assigned.
+  - `L1` What is the principle of least privilege?
+  - `L1` System-assigned vs user-assigned managed identity?
+  - `L1` IAM role vs IAM user?
+  - `L2` Why should applications use roles / managed identities instead of access keys? ↳ no long-lived secrets, auto-rotated, nothing to leak
+  - `L2` How does an app on an Azure VM / Container App get a token with its managed identity? ↳ IMDS/identity endpoint; SDK DefaultAzureCredential
+  - `L2` What is `DefaultAzureCredential` and why does it work both locally and in Azure?
+  - `L2` Service principal vs managed identity vs app registration in Azure.
+  - `L2` Azure RBAC: what are a role definition, a role assignment and a scope?
+  - `L2` Azure RBAC vs Entra ID roles: what does each control?
+  - `L2` What does an AWS IAM policy look like? ↳ Effect, Action, Resource, Condition; identity vs resource policies
+  - `L2` How is an explicit Deny evaluated against an Allow in AWS?
+  - `L2` What is `sts:AssumeRole` and how do cross-account roles work?
+  - `L2` What are SCPs / Azure Policy and how do they differ from IAM permissions? ↳ guardrails on what's possible; don't grant access
+  - `L2` How do you give a developer temporary prod access? ↳ PIM / just-in-time, approval, time-bound, audited
+  - `L2` What is federated identity / workload identity federation (GitHub OIDC, Kubernetes)?
+  - `L3` An access key leaked on GitHub. Walk through your response in the first hour.
+  - `L3` How would you find over-privileged identities in an account and shrink them? ↳ access analyzer, last-used data, activity logs
+  - `L3` Design identity for AiRA: users, services, CI, admins. Who gets which role on which scope?
+- [ ] Monitoring: CloudWatch / Azure Monitor + App Insights ↳ Microsoft Learn "Application Insights overview" + "Azure Monitor overview" (learn.microsoft.com) · AWS CloudWatch user guide (docs.aws.amazon.com/cloudwatch) · LEH appendix "5. Monitoring" (pdf p497–502)
+  - `L1` What are Azure Monitor, Log Analytics and Application Insights?
+  - `L1` What do CloudWatch Metrics, Logs and Alarms do?
+  - `L1` What does CloudTrail / Activity Log record?
+  - `L2` What would you instrument in a FastAPI service with App Insights / OpenTelemetry?
+  - `L2` What is KQL, and write (in words) a query for p95 latency per endpoint over the last hour.
+  - `L2` What is a log retention policy and why does it drive cost?
+  - `L2` Metrics vs logs vs traces: what do you use each for in a cloud incident?
+  - `L2` How do you alert without paging people for noise? ↳ symptom-based SLO alerts, thresholds over windows, severity routing
+  - `L2` What is the activity log / CloudTrail, and what questions does it answer? ↳ who changed what control-plane resource and when
+  - `L2` How do you correlate a request across App Service, a queue and a worker? ↳ trace context / operation id propagation
+  - `L2` What are availability tests / synthetic monitoring?
+  - `L2` What is sampling in App Insights, and what can it hide?
+  - `L2` Vendor tools (Datadog, Grafana Cloud) vs native cloud monitoring: trade-offs.
+  - `L3` Your App Insights bill is bigger than your compute bill. What do you cut?
+  - `L3` Which dashboards and alerts would you set up for an LLM-backed product? ↳ tokens, cost per user, provider errors/429s, TTFT, latency
+- [ ] Cost awareness: what drives the bill (egress, idle instances, GPU) ↳ DMLS ch10 "Public Cloud Versus Private Data Centers" (pdf p320–321) · AWS Well-Architected "Cost Optimization Pillar" (docs.aws.amazon.com/wellarchitected)
+  - `L1` What are the biggest cost drivers in a typical web backend? ↳ compute, database, egress, storage, managed services, LLM tokens
+  - `L1` What drives a cloud bill? ↳ compute hours, storage, egress, managed services, idle resources, GPUs
+  - `L1` Reserved instances / savings plans vs on-demand vs spot.
+  - `L1` What is egress and why is it charged?
+  - `L1` Biggest hidden cloud cost?
+  - `L2` Why is data egress often a surprise cost, and how do you reduce it?
+  - `L2` Reserved / savings plans vs on-demand vs spot: when each?
+  - `L2` Managed service vs self-hosted: how do you compare total cost (including people)?
+  - `L2` Cross-AZ and cross-region traffic is billed. How does that shape where you place services?
+  - `L2` How do you right-size instances and find idle resources?
+  - `L2` What is cost per request, and how do you keep it flat as you scale?
+  - `L2` What is rightsizing and how do you find candidates? ↳ utilisation metrics, Advisor / Compute Optimizer recommendations
+  - `L2` When would you commit to a 1- or 3-year reservation, and when is it a mistake?
+  - `L2` What hidden costs surprise teams? ↳ NAT gateway data processing, cross-AZ traffic, logs, idle IPs, snapshots
+  - `L2` Why can cross-AZ or cross-region traffic be expensive, and how do you design around it?
+  - `L2` How do you tag resources so you can see cost per team, service and environment?
+  - `L2` What are budgets and cost alerts, and what would you set for a startup?
+  - `L2` How would you cut the cost of dev and staging environments? ↳ auto-shutdown schedules, smaller SKUs, spot, scale to zero
+  - `L2` GPU cost: what levers do you have for inference and fine-tuning workloads?
+  - `L2` What is unit economics in the cloud? ↳ cost per request / user / video, e.g. Lumen ~$1.60 per 3-min video
+  - `L2` What is FinOps?
+  - `L3` How would you attribute cost per tenant or per feature in a shared platform?
+  - `L3` What cost guardrails (budgets, alerts, quotas) stop one bug burning a month's budget?
+  - `L3` The bill jumped 3x this month. Walk through how you find the cause.
+- [ ] Cloud fundamentals: regions and zones, IaaS/PaaS/SaaS, shared responsibility, accounts, Azure↔AWS↔GCP mapping, Well-Architected
+  - `L1` What is a region? What is an availability zone?
+  - `L1` IaaS vs PaaS vs SaaS: give an Azure and an AWS example of each.
+  - `L1` What is the shared responsibility model? ↳ provider secures the cloud; you secure what you put in it
+  - `L1` Public vs private vs hybrid cloud.
+  - `L1` What are an Azure subscription, resource group and management group?
+  - `L1` What are an AWS account and AWS Organizations? What is a GCP project?
+  - `L1` Name the pillars of the AWS Well-Architected Framework. ↳ ops excellence, security, reliability, performance, cost, sustainability
+  - `L1` Name the pillars of the Azure Well-Architected Framework.
+  - `L1` Region vs availability zone in one line?
+  - `L1` IaaS, PaaS or SaaS: App Service? EC2? Microsoft 365?
+  - `L1` Who patches the OS on a VM: you or the cloud?
+  - `L1` Azure equivalent of S3? Of Lambda? Of SQS? Of IAM roles for apps?
+  - `L1` AWS equivalent of Key Vault? Of Cosmos DB? Of App Insights?
+  - `L1` GCP equivalent of S3? Of Lambda? Of a VM scale set?
+  - `L1` Name one thing the cloud provider is **not** responsible for.
+  - `L2` How does shared responsibility change between VMs, App Service / Fargate and a managed database?
+  - `L2` How do you choose a region? ↳ latency to users, data residency, service/model availability, price, paired region
+  - `L2` What is an edge location / point of presence?
+  - `L2` Why put dev, staging and prod in separate subscriptions / accounts / projects? ↳ blast radius, quotas, billing, access isolation
+  - `L2` Map these Azure services to AWS and GCP: VM, Blob, App Service, Functions, AKS, Key Vault, Service Bus, Entra ID.
+  - `L2` What are service quotas / limits, and how have they bitten you? ↳ vCPU per region, GPU quota, OpenAI TPM
+  - `L2` How would you deploy AiRA's backend on AWS instead of Azure? Walk through each piece.
+  - `L2` Which Well-Architected pillar is AiRA weakest on today, and what would you fix first?
+  - `L3` What is a landing zone, and what would yours include on day one?
+  - `L3` Multi-cloud vs single cloud for a startup: is multi-cloud worth it? When?
+  - `L3` Where does vendor lock-in really come from, and which lock-in is worth accepting?
+- [ ] VMs and scale sets: instance types, images and cloud-init, metadata service (IMDSv2), spot VMs, Bastion/SSM access
+  - `L1` What is a VM in the cloud? EC2 vs Azure VM vs Compute Engine.
+  - `L1` What are VM families / instance types (general purpose, compute, memory, GPU)?
+  - `L1` What is a VM image? What is a startup script / cloud-init / user data?
+  - `L1` What are Azure VM Scale Sets, AWS Auto Scaling Groups and GCP managed instance groups?
+  - `L1` Spot instance in one line?
+  - `L2` How do you pick a VM size for a FastAPI service? For an LLM model server?
+  - `L2` What is an instance template and why does a managed instance group need one?
+  - `L2` How does a VM learn its own name or credentials at runtime? ↳ instance metadata service at 169.254.169.254
+  - `L2` What is SSRF to the metadata endpoint and how does IMDSv2 defend against it? ↳ session token via PUT, hop limit
+  - `L2` What are spot / preemptible VMs, and what workloads fit them?
+  - `L2` Ephemeral OS disk vs managed disk: what survives a reboot, a stop, a redeploy?
+  - `L2` How do you SSH into a VM securely without opening port 22 to the internet? ↳ Bastion, SSM Session Manager, IAP tunnel, just-in-time access
+  - `L2` In your GCP labs you opened port 80 with a firewall rule and network tags. How do tags target rules?
+  - `L2` What is a health check and why must the firewall allow the load balancer's probe ranges?
+  - `L2` How do you roll out a new app version across a scale set / managed instance group?
+  - `L2` Baked images (Packer) vs configuring at boot: trade-offs for scale-out speed.
+  - `L3` You run the API on 3 VMs behind a load balancer. What breaks first as traffic grows 10x?
+  - `L3` A VM is at 100% CPU and you can't SSH in. What do you do? ↳ serial console, boot diagnostics, metrics, resize/redeploy
+  - `L3` What is a placement group / proximity placement group and when does it matter?
+- [ ] Container PaaS: App Service, Container Apps, ECS/Fargate, Cloud Run; registries (ACR/ECR), deployment slots, scale to zero
+  - `L1` What is Azure App Service?
+  - `L1` What is Azure Container Apps? What is Cloud Run?
+  - `L1` What is ECS? What is Fargate?
+  - `L1` What is a container registry? ACR vs ECR vs Artifact Registry.
+  - `L2` What do Container Apps give you over plain AKS, and what do they take away? ↳ KEDA scaling, revisions, Dapr; less control
+  - `L2` What are deployment slots in App Service and how do they give blue-green swaps?
+  - `L2` How do container platforms scale to zero, and what does that do to first-request latency?
+  - `L2` Does Cloud Run / Container Apps support WebSockets and long requests? What limits apply?
+  - `L2` Where does AiRA's realtime voice WebSocket service fit best: App Service, Container Apps, or AKS? Why?
+  - `L2` How does a container on Azure pull from ACR without a password?
+  - `L2` How would you run a background worker (queue consumer) on each platform?
+  - `L3` Your Container Apps bill doubled with no traffic change. Where do you look?
+  - `L3` Map AiRA's Azure container setup to ECS Fargate: networking, secrets, scaling, logs.
+- [ ] Serverless: Azure Functions / Lambda triggers, cold starts, limits, hosting plans, Durable Functions / Step Functions
+  - `L1` What is serverless? What is a function-as-a-service?
+  - `L1` What is a cold start?
+  - `L1` What is a trigger and a binding? Name five triggers. ↳ HTTP, queue, blob/S3, timer, event stream
+  - `L1` Max Lambda timeout?
+  - `L1` One way to cut serverless cold starts?
+  - `L2` What makes cold starts worse and what reduces them? ↳ package size, runtime, VNet attach; provisioned concurrency, premium plan
+  - `L2` What are Lambda's main limits (timeout, memory, payload, concurrency)?
+  - `L2` Azure Functions Consumption vs Flex Consumption vs Premium vs Dedicated plans.
+  - `L2` What is provisioned concurrency / always-ready instances and what does it cost you?
+  - `L2` Why do serverless functions exhaust Postgres connections, and how do you fix it? ↳ each instance opens connections; pooler (PgBouncer, RDS Proxy)
+  - `L2` How do you handle a task longer than 15 minutes in a serverless design? ↳ Step Functions / Durable Functions, queue + container job
+  - `L2` What are Durable Functions / Step Functions for?
+  - `L2` A Lambda triggered by a queue processes a message twice. Why, and what must your handler be? ↳ at-least-once delivery; idempotent
+  - `L2` How do you handle retries and poison messages for queue-triggered functions?
+  - `L2` Is serverless good for streaming LLM responses? What limits get in the way?
+  - `L3` A function's p99 latency spikes every morning. What is happening and what do you change?
+  - `L3` What is the concurrency "thundering herd" risk when a function scales to 1,000 instances against one downstream?
+- [ ] Cloud load balancing and edge: Azure LB / App Gateway / Front Door, ALB / NLB / CloudFront, WAF, TLS, idle timeouts
+  - `L1` Layer 4 vs layer 7 load balancer.
+  - `L1` Azure Load Balancer vs Application Gateway vs Front Door vs Traffic Manager: one line each.
+  - `L1` AWS NLB vs ALB vs CloudFront vs Route 53: one line each.
+  - `L1` What is a CDN and what do you put behind it?
+  - `L1` Layer 7 load balancer on Azure? On AWS?
+  - `L2` Which load balancer would you use for a REST API, for WebSockets, and for raw TCP?
+  - `L2` How do health checks on a cloud LB decide a backend is down?
+  - `L2` In your GCP lab you built backend service → URL map → target proxy → forwarding rule. What does each piece do?
+  - `L2` What is a WAF and where does it sit?
+  - `L2` Where do you terminate TLS, and how do certificates get renewed?
+  - `L2` What are idle timeouts on cloud LBs and why do they kill WebSocket connections? ↳ ALB/App Gateway idle timeout; ping/keepalive under it
+  - `L2` How do you invalidate a CDN cache after a deploy, and why prefer versioned file names?
+  - `L3` Why might a cloud LB return 502/504 while every backend looks healthy?
+- [ ] LLM platforms on cloud: Azure OpenAI, Bedrock, Vertex AI; TPM/RPM quotas, PTUs, deployment types, 429s, private access
+  - `L1` What is Azure OpenAI and how is it different from calling OpenAI directly?
+  - `L1` What are Amazon Bedrock and Vertex AI?
+  - `L1` What are TPM and RPM quotas?
+  - `L1` What is a PTU?
+  - `L1` What does a 429 from Azure OpenAI mean?
+  - `L2` Why do enterprises choose Azure OpenAI / Bedrock over direct provider APIs? ↳ data residency, private networking, enterprise auth, billing, compliance
+  - `L2` What are Azure OpenAI deployment types (standard, global, data zone, provisioned)? When each?
+  - `L2` What are PTUs (provisioned throughput units) and when do they beat pay-as-you-go?
+  - `L2` Your app gets 429s from Azure OpenAI at peak. List every fix. ↳ backoff with retry-after, more quota, multi-region/deployments, PTU, caching, queue
+  - `L2` A model you need isn't available in your region. What do you do?
+  - `L2` How do you load-balance across several Azure OpenAI deployments / regions? ↳ APIM / gateway, priority + fallback, health-aware routing
+  - `L2` How do you call Azure OpenAI with a managed identity instead of an API key?
+  - `L2` What do content filters do, and how do false positives show up in your product?
+  - `L2` What data-privacy guarantees do these platforms give about prompts and training?
+  - `L2` How do you reach Azure OpenAI over a private endpoint from your VNet?
+  - `L2` How do you track LLM cost per user or per feature on a cloud LLM platform?
+  - `L3` How does GPU capacity shortage affect your region strategy for inference?
+
+**Learn:** Google Cloud Digital Leader material (you're certified) · AWS "Cloud Practitioner Essentials" (free) ·
+Microsoft Learn AZ-900 path (free) · Syllabus (cloud/DevOps sections)
+
+## 10.6 Infrastructure as code (know the idea)
+- [ ] Terraform: providers, resources, state, plan/apply; Bicep/CloudFormation equivalents ↳ https://developer.hashicorp.com/terraform/tutorials · https://developer.hashicorp.com/terraform/language/state · Microsoft Learn "What is Bicep?" (learn.microsoft.com)
+  - `L1` Why Terraform remote state locking?
+  - `L1` What is a provider?
+  - `L1` What is a resource? What is a data source?
+  - `L1` Variables vs outputs vs locals: what is each for?
+  - `L1` What is HCL?
+  - `L1` What does `terraform init` do?
+  - `L1` Command that downloads providers and sets up the backend?
+  - `L1` Should you commit `.terraform.lock.hcl`?
+  - `L1` Resource vs data source in one line?
+  - `L1` Variable vs local in one line?
+  - `L1` Bicep compiles to what?
+  - `L1` Which command prints the outputs of the last apply? ↳ `terraform output`
+  - `L2` How do you structure Terraform for dev, staging and prod from the same modules?
+  - `L2` Why remote state with locking? What happens without locking?
+  - `L2` How do you stop drift between Terraform and what is actually running?
+  - `L2` What is the Bicep or CloudFormation equivalent of a Terraform resource, variable and state file? ↳ resources/params; no state file — ARM/CFN track deployments
+  - `L2` Resource vs data source: when do you read existing infrastructure instead of creating it?
+  - `L2` How do you pass a variable value? List the ways and their precedence. ↳ defaults, tfvars, *.auto.tfvars, -var-file, -var, TF_VAR_ env
+  - `L2` What are variable types and validation blocks?
+  - `L2` Why pin provider versions, and what is `.terraform.lock.hcl` for? ↳ reproducible provider builds; commit the lock file
+  - `L2` What does the version constraint `~> 4.0` allow?
+  - `L2` How do you use two Azure subscriptions or two AWS regions in one configuration? ↳ provider aliases
+  - `L2` What are implicit vs explicit dependencies? When do you need `depends_on`?
+  - `L2` What are the useful built-in functions you reach for? ↳ merge, lookup, try, format, cidrsubnet, jsonencode, templatefile
+  - `L2` What is a `for` expression and a splat expression?
+  - `L2` How do you read another stack's outputs? ↳ `terraform_remote_state`, or data sources, or a shared parameter store
+  - `L2` What do `check` blocks and resource preconditions / postconditions do?
+  - `L3` How do you rebuild a server reproducibly instead of hand-installing packages? ↳ cloud-init, Ansible, images (Packer), containers
+  - `L3` Why is `terraform_remote_state` coupling risky, and what would you use instead?
+  - `L3` What does a provider actually do under the hood when you run `apply`? ↳ plugin over gRPC, CRUD calls to cloud API
+- [ ] IaC concepts and tool choice: declarative vs imperative, Terraform vs Bicep/CloudFormation/Pulumi/Ansible, OpenTofu, drift
+  - `L1` What is infrastructure as code?
+  - `L1` What problems does IaC solve compared with clicking in the cloud console? ↳ repeatable, reviewed, versioned, documented, disaster recovery
+  - `L1` Declarative vs imperative IaC: what is the difference? Give an example of each.
+  - `L1` What is Terraform, in one sentence?
+  - `L1` What is drift?
+  - `L1` Terraform's open-source fork?
+  - `L1` Declarative or imperative: Terraform? Ansible?
+  - `L2` Terraform vs CloudFormation vs Bicep / ARM: when would you pick each?
+  - `L2` Terraform vs Pulumi: HCL vs a general-purpose language. Trade-offs.
+  - `L2` Terraform vs Ansible: provisioning vs configuration management. Can you use both?
+  - `L2` Mutable vs immutable infrastructure: what does Terraform push you toward?
+  - `L2` What is configuration drift and why does manual change in the console cause it?
+  - `L2` Terraform changed its licence and OpenTofu forked from it. What does that mean for a team choosing today?
+  - `L2` What should be in Terraform and what should not? ↳ infra yes; app deploys, DB rows, secrets values usually no
+  - `L2` AiRA's Azure resources were created by hand. How would you bring them under IaC without downtime?
+  - `L3` IaC for a 2-person startup: worth it on day one? What is the minimum you would codify?
+  - `L3` Terraform vs Crossplane (Kubernetes-native IaC): when does the Crossplane model make sense?
+  - `L3` What does IaC give you for disaster recovery, and what does it not give you? ↳ recreates infra; not data, not secrets values
+- [ ] Terraform plan/apply lifecycle: plan symbols, saved plans, refresh, dependency graph, `-target`, `-replace`, failed applies
+  - `L1` What do `terraform plan`, `apply` and `destroy` do?
+  - `L1` What do the plan symbols `+`, `-`, `~` and `-/+` mean?
+  - `L1` What does `terraform fmt` and `terraform validate` do?
+  - `L1` Command that shows what will change?
+  - `L1` What does `-/+` mean in a plan?
+  - `L1` Which command draws the resource dependency graph? ↳ `terraform graph` (DOT format)
+  - `L2` Why save a plan with `-out` and apply exactly that plan file in CI?
+  - `L2` What does Terraform do during refresh, and what does `-refresh-only` do?
+  - `L2` A plan shows "forces replacement" on your database. What does that mean and what do you do? ↳ immutable attribute changed; stop, reconsider, prevent_destroy
+  - `L2` How does Terraform build a dependency graph, and how does it decide what runs in parallel?
+  - `L2` What is `-target` for, and why is using it routinely a smell?
+  - `L2` What replaced `terraform taint`? ↳ `apply -replace=ADDRESS`
+  - `L2` An apply failed halfway through. What state are you in, and what do you do? ↳ partial state saved; fix cause, re-plan, re-apply
+  - `L2` The plan says "no changes" but you know someone changed the resource in the portal. Why might that be?
+  - `L2` What is `-parallelism` and when would you lower it?
+  - `L3` Why can a plan succeed but the apply fail? ↳ API-side validation, quotas, name conflicts, eventual consistency
+  - `L3` A value is "known after apply". How does that affect `count`, `for_each` and plans downstream?
+  - `L3` How do you destroy one environment safely without touching shared resources?
+  - `L3` Explain create-before-destroy ordering in the graph and why it can fail on unique names.
+- [ ] Terraform state: remote backends, locking, drift detection, import, `moved`/`removed` blocks, splitting state, secrets in state
+  - `L1` What is the Terraform state file and why does Terraform need it?
+  - `L1` What is remote state? What is a backend?
+  - `L1` What is state locking?
+  - `L1` Why should you never edit `terraform.tfstate` by hand or commit it to Git?
+  - `L1` Where should state live for a team?
+  - `L1` Does `sensitive = true` encrypt the value in state?
+  - `L1` Should you commit `terraform.tfstate`?
+  - `L1` Block that renames a resource without recreating it?
+  - `L1` Block that adopts an existing resource?
+  - `L2` What does state map? ↳ resource addresses to real cloud IDs, attributes, dependencies, metadata
+  - `L2` How does locking work with the `azurerm` backend? With the S3 backend? ↳ blob lease; S3 lockfile (`use_lockfile`) or DynamoDB
+  - `L2` Two engineers run `apply` at the same time without locking. What can happen?
+  - `L2` What is drift, and how do you detect it on a schedule? ↳ nightly `plan -detailed-exitcode` alerting on exit code 2
+  - `L2` Someone fixed prod by hand in the portal. Do you revert it with Terraform or codify it? How do you decide?
+  - `L2` How do you bring an existing resource under Terraform? ↳ `import` block (plan-able) or `terraform import`, then match config
+  - `L2` What do `terraform state list`, `state show`, `state mv` and `state rm` do?
+  - `L2` You renamed a resource in code and the plan wants to destroy and recreate it. How do you avoid that? ↳ `moved` block or `state mv`
+  - `L2` What do `moved` and `removed` blocks give you over `state mv` / `state rm`? ↳ reviewed in PR, applied by plan, no manual CLI
+  - `L2` What sensitive data ends up in state, and how do you protect the state file? ↳ passwords, keys; encrypted backend, RBAC, versioning
+  - `L2` Does `sensitive = true` keep a value out of the state file? ↳ no; only hides from CLI output
+  - `L2` How do you split one large state into several smaller states? Why would you?
+  - `L2` What is the blast radius of a single state file holding everything for prod?
+  - `L2` A lock is stuck after a CI job was killed. How do you clear it safely? ↳ confirm no run active, `force-unlock` with lock ID
+  - `L3` The state file was corrupted or deleted. How do you recover? ↳ backend versioning/backups; else re-import everything
+  - `L3` How do ephemeral values and write-only arguments keep secrets out of state?
+  - `L3` How would you move resources from one state (stack) to another without recreating them?
+  - `L3` How do you lay out state files for networking, platform and app layers, and who can read each?
+- [ ] Terraform meta-arguments: `count` vs `for_each`, dynamic blocks, lifecycle rules, provisioners and why to avoid them
+  - `L1` What do `count` and `for_each` do?
+  - `L1` What are the lifecycle rules? ↳ create_before_destroy, prevent_destroy, ignore_changes, replace_triggered_by
+  - `L1` What is a provisioner?
+  - `L1` `count` or `for_each` for a map of buckets?
+  - `L1` Lifecycle rule that blocks deleting a database?
+  - `L1` Lifecycle rule for zero-downtime replacement?
+  - `L1` Why avoid provisioners?
+  - `L2` `count` vs `for_each`: why does removing the first item of a `count` list hurt? ↳ index shift recreates later resources; keys are stable
+  - `L2` When is `count` still the right choice? ↳ on/off toggle: `count = var.enabled ? 1 : 0`
+  - `L2` What is a `dynamic` block and when should you avoid it?
+  - `L2` When would you use `prevent_destroy`? What does it not protect against? ↳ prod DB; removing the block or resource from code
+  - `L2` When do you need `create_before_destroy`? Give an example. ↳ certificates, LB backends, node pools; zero downtime replacement
+  - `L2` When is `ignore_changes` justified, and when is it hiding a problem? ↳ autoscaler-managed counts, tags set by policy
+  - `L2` Why do HashiCorp and most teams say provisioners are a last resort?
+  - `L2` What do you use instead of `remote-exec` to configure a VM? ↳ cloud-init, baked images (Packer), config management
+  - `L2` What are `null_resource` and `terraform_data` used for?
+  - `L2` What does `replace_triggered_by` do?
+  - `L3` You switched a resource from `count` to `for_each`. How do you migrate the state without recreating anything?
+  - `L3` `for_each` over a value that is only known after apply fails. Why, and how do you restructure it?
+  - `L3` What are the risks of `local-exec` scripts that call the cloud CLI inside Terraform?
+- [ ] Terraform modules: interface design, composition, versioning and pinning, registry modules, rolling out breaking changes
+  - `L1` What is a module? What is the root module?
+  - `L1` Where can a module come from? ↳ local path, Git URL with ref, Terraform Registry, private registry
+  - `L2` What makes a good module interface: inputs, outputs, defaults?
+  - `L2` How big should a module be? What is the "wrapper of one resource" anti-pattern?
+  - `L2` How do you version a shared module, and how do consumers pin it? ↳ semver Git tags; `?ref=v1.2.0` or registry `version`
+  - `L2` How do you roll out a breaking change in a module used by 12 stacks?
+  - `L2` Should modules configure providers? Why is that discouraged?
+  - `L2` How do you pass outputs from one module into another?
+  - `L2` Public registry modules (e.g. Azure Verified Modules, terraform-aws-modules): use them or write your own?
+  - `L2` What is the standard module structure? ↳ main.tf, variables.tf, outputs.tf, versions.tf, README, examples/
+  - `L2` What does module composition mean, and why prefer flat composition over deep nesting?
+  - `L2` How do you use `for_each` on a module block?
+  - `L3` Design the module layout for a platform: network, AKS, data stores, observability. What goes in each?
+  - `L3` Monorepo of modules vs one repo per module: trade-offs.
+  - `L3` How do you test that a module upgrade won't recreate resources in every stack?
+- [ ] Multiple environments in Terraform: per-env directories vs workspaces, separate subscriptions/accounts, Terragrunt, promotion
+  - `L1` What is a Terraform workspace (CLI)?
+  - `L1` What is Terragrunt?
+  - `L1` Workspaces or separate directories for prod isolation?
+  - `L2` How do you build dev, staging and prod from the same modules? ↳ per-env root dirs calling shared modules with env tfvars
+  - `L2` Workspaces vs separate directories for environments: why do many teams avoid workspaces for prod isolation? ↳ same backend/creds, easy wrong-workspace apply, hidden in code
+  - `L2` When are CLI workspaces a good fit? ↳ short-lived identical copies, e.g. per-PR preview envs
+  - `L2` HCP Terraform / Terraform Cloud workspaces vs CLI workspaces: are they the same thing?
+  - `L2` How do you keep environments from drifting apart in config? ↳ same module versions; promote versions dev→staging→prod
+  - `L2` Should each environment be in a separate cloud subscription / account? Why?
+  - `L2` What does Terragrunt add on top of Terraform? ↳ DRY backend/provider config, dependencies between stacks, run-all
+  - `L2` How do you promote an infra change from staging to prod?
+  - `L2` What should differ between environments and what must not?
+  - `L3` Design the repo layout for 3 environments × 2 regions with shared networking. Where does each state live?
+  - `L3` Terragrunt vs Terraform Stacks vs plain Terraform with a CI wrapper: which would you choose?
+  - `L3` How do you create a short-lived environment per pull request and make sure it is destroyed?
+  - `L3` Someone applied dev tfvars to prod. What guardrails would have stopped it?
+- [ ] Terraform security: secrets and credentials, OIDC from CI, least-privilege apply identity, tfsec/Checkov, who reads state
+  - `L1` Where must secrets **not** go in a Terraform repo?
+  - `L1` What credentials does Terraform itself need to talk to Azure / AWS?
+  - `L1` How does Terraform in CI log in to Azure without a secret?
+  - `L2` How do you give a database password to Terraform without committing it? ↳ generate in TF (random_password) to Key Vault, or env var/secret store
+  - `L2` Should Terraform generate secrets (`random_password`) or only reference them? Trade-offs with state.
+  - `L2` How do you let apps read secrets created by Terraform? ↳ store in Key Vault / Secrets Manager; grant identity access
+  - `L2` How does Terraform authenticate from CI without a stored client secret? ↳ OIDC federation to managed identity / IAM role
+  - `L2` What permissions should the CI identity running `apply` have? Should `plan` on PRs use the same identity?
+  - `L2` What do tfsec / Trivy config / Checkov catch in Terraform code? ↳ public buckets, open NSGs, unencrypted disks, wide IAM
+  - `L2` How do you stop an engineer from bypassing Terraform in the console?
+  - `L2` A secret was printed in a plan in CI logs. How did it get there and how do you prevent it?
+  - `L2` Who should be able to read the state file? Why is read access to state nearly admin access?
+  - `L3` How would you codify AiRA's credential vault setup (Key Vault, keys, access) in Terraform without any key material in state?
+  - `L3` How do you rotate a database password that Terraform manages without downtime?
+  - `L3` How do you prevent a malicious PR from running `plan` with a provider that exfiltrates credentials? ↳ plan runs code; restrict PR plans, read-only creds
+  - `L3` How do you audit who changed which piece of infrastructure and when?
+- [ ] Terraform in CI/CD: plan as a PR check, apply the saved plan, Atlantis/HCP Terraform, policy as code, terraform test
+  - `L1` What is policy as code? Name two tools. ↳ OPA/Conftest, Sentinel, Checkov, Azure Policy
+  - `L1` What does `terraform test` do?
+  - `L1` Tool that runs Terraform plan from PR comments?
+  - `L1` Name one policy-as-code tool.
+  - `L2` Design a GitHub Actions workflow for Terraform: what runs on PR and what runs on merge? ↳ fmt, validate, lint, scan, plan comment on PR; apply saved plan on merge
+  - `L2` Why post the plan as a PR comment, and what should reviewers look for in it?
+  - `L2` What do Atlantis and HCP Terraform runs give you over plain CI jobs?
+  - `L2` What is the risk if the plan reviewed on the PR is not the plan that gets applied?
+  - `L2` How do you require approval before a prod `apply`?
+  - `L2` Write (in words) three policies you would enforce on every plan. ↳ tags required, no public IPs on DBs, allowed regions/SKUs
+  - `L2` Sentinel vs OPA / Conftest: how do they evaluate a plan?
+  - `L2` What does Azure Policy / AWS SCPs enforce that Terraform policy checks cannot?
+  - `L2` How do you test Terraform code? List the levels. ↳ fmt/validate, static scan, plan assertions, `terraform test`, Terratest real deploy
+  - `L2` What does Terratest do and why is it slow and expensive?
+  - `L2` What is Infracost and why show cost diffs on PRs?
+  - `L2` How do you lint Terraform? ↳ tflint with provider rulesets
+  - `L3` Two PRs both pass plan, then both merge. Why can the second apply do something nobody reviewed?
+  - `L3` How would you detect and alert on drift across 30 stacks every night?
+  - `L3` How do you test a module that creates an AKS cluster without paying for a cluster on every PR?
+  - `L3` Who owns infra code in a product team — platform team, or the service team? How does CI enforce it?
+- [ ] Provisioning a real stack in Terraform: VNet/VPC and CIDR plan, AKS/EKS, managed Postgres/Redis, ACR, workload identity, tags
+  - `L1` Which resources make up a basic Azure network? ↳ resource group, VNet, subnets, NSGs, route tables, NAT gateway
+  - `L1` Which resources make up a basic AWS VPC? ↳ VPC, subnets, route tables, IGW, NAT gateway, security groups
+  - `L2` Walk through the Terraform for a VNet with public, private app and private data subnets.
+  - `L2` How do you plan CIDR ranges so pods, services, peered networks and on-prem don't overlap? ↳ `cidrsubnet`, address plan, pod CIDR sizing
+  - `L2` What do you need to create an AKS cluster with Terraform, and what is usually left to Helm/GitOps afterwards?
+  - `L2` What do you need to create an EKS cluster with Terraform? ↳ VPC, IAM roles, cluster, node groups, OIDC provider, add-ons
+  - `L2` How do you create Azure Database for PostgreSQL (Flexible Server) privately reachable only from the app subnet? ↳ delegated subnet or private endpoint, private DNS zone
+  - `L2` How do you create managed Redis and a container registry and wire them to the cluster?
+  - `L2` How do you grant the AKS kubelet identity `AcrPull` on the registry in Terraform?
+  - `L2` How do you set up workload identity for a pod in Terraform? ↳ user-assigned identity, federated credential, role assignment, SA annotation
+  - `L2` Should the Kubernetes and Helm providers live in the same stack that creates the cluster? Why not?
+  - `L2` What tags would you enforce on every resource, and why? ↳ env, owner, cost centre, service, managed-by
+  - `L2` How would you write least-privilege IAM / RBAC role assignments in Terraform?
+  - `L2` How do you manage DNS records and TLS certificates for the stack?
+  - `L3` Provision the full AiRA platform on Azure in Terraform: list stacks, their order and the outputs that flow between them.
+  - `L3` Same stack on AWS: map each Azure resource to its AWS equivalent.
+  - `L3` A Terraform change to the AKS node pool would recreate it. How do you roll the change out without downtime? ↳ new pool, cordon/drain old, delete old
+  - `L3` How do you rebuild the whole environment in a new region from code during a disaster? What is still manual?
+  - `L3` Postgres is managed by Terraform. Someone deletes the resource block by accident and merges. What protects the data?

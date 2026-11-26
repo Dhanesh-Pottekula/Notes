@@ -1,0 +1,1291 @@
+# 5. Databases (P0)
+
+You will be asked to **write SQL live** and to **explain why a query is slow**. Practise SQL on
+leetcode.com/studyplan/top-sql-50 and datalemur.com.
+
+---
+
+## 5.1 SQL querying
+- [ ] SELECT, WHERE, ORDER BY, LIMIT; NULL semantics (`IS NULL`, three-valued logic) ↳ https://www.postgresql.org/docs/current/tutorial-select.html · https://www.postgresql.org/docs/current/functions-comparison.html (IS NULL, IS DISTINCT FROM) · https://sqlbolt.com (lessons 1–4 and 8 "NULLs")
+  - `L1` `DELETE` vs `TRUNCATE` vs `DROP`.
+  - `L1` What is the logical order of execution of a `SELECT`? ↳ FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT, DISTINCT, ORDER BY, LIMIT
+  - `L1` In what logical order is a `SELECT` evaluated? ↳ FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT, DISTINCT, ORDER BY, LIMIT
+  - `L1` Why does `WHERE col = NULL` return no rows? ↳ three-valued logic; NULL = NULL is unknown; use IS NULL
+  - `L1` DELETE vs TRUNCATE vs DROP.
+  - `L2` What does `NULL = NULL` return? How do `NULL`s behave in `NOT IN`, `COUNT` and `ORDER BY`?
+  - `L2` What does `IS DISTINCT FROM` do and when do you need it?
+  - `L2` What does `DISTINCT ON` do in Postgres? Give a use.
+  - `L3` Why can `SELECT *` hurt beyond network bytes? ↳ blocks index-only scans, detoasts big columns, breaks on schema change
+- [ ] JOINs: inner, left, right, full, cross, self join; join on multiple keys ↳ https://www.postgresql.org/docs/current/tutorial-join.html · https://www.postgresql.org/docs/current/queries-table-expressions.html ("Joined Tables") · https://leetcode.com/problems/employees-earning-more-than-their-managers/ (self join)
+  - `L1` Inner, left, right, full outer and cross join: what does each return?
+  - `L1` INNER vs LEFT vs RIGHT vs FULL OUTER vs CROSS JOIN: which rows does each return?
+  - `L2` Delete duplicate rows, keeping the one with the lowest id.
+  - `L2` Find employees who earn more than their managers (self join).
+  - `L2` Write "employees who earn more than their manager" with a self join.
+  - `L2` You put a filter on the right table of a LEFT JOIN in WHERE instead of ON. What happens? ↳ NULL rows filtered out: it becomes an inner join
+  - `L2` Employees earning more than their manager
+  - `L3` A JOIN returns more rows than the left table has. Why, and how do you find the fan-out?
+- [ ] GROUP BY, HAVING, aggregate functions; COUNT(*) vs COUNT(col) ↳ https://www.postgresql.org/docs/current/tutorial-agg.html · https://www.postgresql.org/docs/current/functions-aggregate.html · https://leetcode.com/problems/duplicate-emails/
+  - `L1` `WHERE` vs `HAVING`.
+  - `L1` `COUNT(*)` vs `COUNT(col)` vs `COUNT(DISTINCT col)`.
+  - `L1` `HAVING` filters rows or groups?
+  - `L1` WHERE vs HAVING.
+  - `L2` Find duplicate emails in a `users` table.
+  - `L2` Departments with more than 5 employees and average salary above 50k (`GROUP BY` + `HAVING`).
+  - `L2` Find the median salary.
+  - `L3` Day-1 retention: share of users who came back the day after signup.
+  - `L3` `SUM(amount)` over orders joined to order items double-counts. How do you fix it? ↳ aggregate each side before joining, or use a subquery/CTE
+  - `L3` `percentile_cont` vs `percentile_disc`: compute the median order value.
+- [ ] Subqueries: scalar, IN, EXISTS, correlated subqueries ↳ https://www.postgresql.org/docs/current/functions-subquery.html · https://leetcode.com/problems/second-highest-salary/ · https://leetcode.com/problems/customers-who-never-order/
+  - `L2` Find the second highest salary. Handle the case where there is none.
+  - `L2` Find customers who never placed an order. ↳ LEFT JOIN … IS NULL, or NOT EXISTS; beware NOT IN with NULLs
+  - `L2` Correlated subquery vs join vs `EXISTS`: which is faster and when?
+  - `L2` Write "customers who never placed an order" with LEFT JOIN, NOT EXISTS and NOT IN. What is the NULL trap? ↳ NOT IN returns nothing if the subquery yields a NULL
+  - `L2` What is a correlated subquery? How does it execute, and how do you rewrite it as a join?
+  - `L2` Write "second highest salary"; return NULL when there is none.
+  - `L2` Second highest salary
+  - `L3` What is a `LATERAL` join? Give a real use.
+- [ ] CTEs (`WITH`), recursive CTEs (trees/hierarchies) ↳ https://www.postgresql.org/docs/current/queries-with.html (incl. recursive queries) · DDIA ch2 "Graph queries in SQL" (pdf p74–77)
+  - `L1` What is a CTE (`WITH` clause)?
+  - `L2` What is a CTE? When do you use a recursive CTE? Write one for an org chart.
+  - `L2` Recursive CTE: all reports under a manager, or a whole comment thread.
+  - `L2` How do you stop a recursive CTE from looping forever on cyclic data? ↳ track visited path in an array; CYCLE clause (PG14)
+  - `L3` How did you store a tree (comments, org chart, categories) in Postgres at work? ↳ adjacency list + recursive CTE, materialized path, closure table, ltree
+  - `L3` Before PG12 a CTE was an "optimisation fence". What changed, and what do `MATERIALIZED` / `NOT MATERIALIZED` do?
+- [ ] Window functions: ROW_NUMBER, RANK, DENSE_RANK, LAG/LEAD, running totals, `PARTITION BY` ↳ https://www.postgresql.org/docs/current/tutorial-window.html · https://mode.com/sql-tutorial/sql-window-functions/ · https://leetcode.com/problems/department-top-three-salaries/
+  - `L1` Which window function leaves no gaps after ties?
+  - `L1` What is a window function, and how is it different from GROUP BY?
+  - `L1` ROW_NUMBER vs RANK vs DENSE_RANK: what happens on ties?
+  - `L1` What do LAG and LEAD do?
+  - `L1` RANK vs DENSE_RANK in one line.
+  - `L2` Find the Nth highest salary. Write it with `LIMIT/OFFSET`, with `DENSE_RANK()`, and with a correlated subquery.
+  - `L2` Find the highest-paid employee in each department. ↳ window `RANK()` partitioned by dept, or join on max
+  - `L2` `ROW_NUMBER()` vs `RANK()` vs `DENSE_RANK()`: show the output on ties.
+  - `L2` Running total of daily revenue with a window function.
+  - `L2` 7-day moving average of orders. ↳ `AVG() OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)`
+  - `L2` Month-over-month growth with `LAG()`.
+  - `L2` Top 3 products by revenue in each category.
+  - `L2` Count users who logged in on consecutive days (gaps and islands). ↳ date minus ROW_NUMBER groups consecutive runs
+  - `L2` Top 3 salaries per department (top-N per group). Write it two ways. ↳ DENSE_RANK in a subquery; LATERAL join with LIMIT
+  - `L2` Running total of revenue per day, and per user.
+  - `L2` Month-over-month revenue growth in percent.
+  - `L2` 7-day moving average. What is the difference between a ROWS frame and a RANGE frame?
+  - `L2` Users active 3 or more days in a row (gaps and islands). ↳ date minus ROW_NUMBER is constant within a streak
+  - `L2` Find missing numbers in a sequence of invoice numbers.
+  - `L2` Top 3 per department
+  - `L2` Users active 3 days in a row
+  - `L2` Running total per day
+  - `L2` Delete duplicates keeping the lowest id
+  - `L2` Month-over-month growth
+  - `L3` Find users whose first order was in the last 30 days, with their first order's total.
+  - `L3` Sessionize a clickstream: a new session starts after 30 minutes of inactivity.
+  - `L3` Distinct users over a rolling 30-day window: why is it hard in SQL? ↳ no DISTINCT in window functions; self-join, date series, or HLL
+- [ ] UNION vs UNION ALL; CASE WHEN; COALESCE ↳ https://www.postgresql.org/docs/current/queries-union.html · https://www.postgresql.org/docs/current/functions-conditional.html (CASE, COALESCE, NULLIF)
+  - `L1` `UNION` vs `UNION ALL`.
+  - `L1` UNION vs UNION ALL: which is faster and why?
+  - `L1` What do `COALESCE` and `NULLIF` do?
+  - `L2` Pivot: turn rows of (month, category, amount) into one column per category. ↳ `SUM(CASE WHEN …)` or `FILTER`
+  - `L2` Swap the values of a `gender` column (`m` ↔ `f`) in one `UPDATE`.
+  - `L2` Pivot: orders per status per month as columns. ↳ SUM(CASE …) or COUNT(*) FILTER (WHERE …)
+- [ ] UPSERT (`INSERT … ON CONFLICT`), `RETURNING` ↳ https://www.postgresql.org/docs/current/sql-insert.html ("ON CONFLICT Clause") · https://www.postgresql.org/docs/current/dml-returning.html · DDIA ch7 "Preventing lost updates" (pdf p255–259)
+  - `L1` What must exist for `ON CONFLICT (email)` to work?
+  - `L2` `INSERT … ON CONFLICT DO UPDATE` vs `DO NOTHING`. What is `EXCLUDED`?
+  - `L2` Is `ON CONFLICT` race-free under concurrency? What does it require? ↳ a unique index or constraint matching the conflict target
+  - `L2` Upsert vs `MERGE` (PG15): when would you use `MERGE`?
+  - `L3` Write an upsert in PostgreSQL and MySQL. What race does it avoid? ↳ `INSERT … ON CONFLICT DO UPDATE` / `ON DUPLICATE KEY UPDATE`
+- [ ] Date/time handling and time zones (store UTC, `timestamptz`) ↳ https://www.postgresql.org/docs/current/datatype-datetime.html (timestamptz, time zones) · https://wiki.postgresql.org/wiki/Don%27t_Do_This (section "Date/Time storage")
+  - `L1` Which should you store, `timestamp` or `timestamptz`?
+  - `L3` `timestamp` or `timestamptz`? What breaks with the wrong choice?
+
+**Learn:** LC Top SQL 50 · DataLemur · Mode SQL tutorial (window functions) · PGDocs "Tutorial" + "Window functions"
+
+## 5.2 Data modelling
+- [ ] Keys: primary, foreign, candidate, composite, surrogate vs natural; UUID vs bigint ids (UUIDv7) ↳ https://www.postgresql.org/docs/current/ddl-constraints.html (primary keys, foreign keys) · https://www.rfc-editor.org/rfc/rfc9562 (UUIDv7) · DBI ch4 "Right-Only Appends" (pdf p130–131) — why sequential ids are cheap for a B-tree
+  - `L1` Surrogate key vs natural key.
+  - `L2` Why do random UUIDv4 primary keys hurt B-tree inserts, and what do UUIDv7 / ULID fix? ↳ random page splits, cache misses; time-ordered → right-edge appends
+  - `L2` Natural key vs surrogate key (auto-increment, UUID, UUIDv7, ULID). Trade-offs.
+  - `L2` bigint identity vs UUIDv4 vs UUIDv7 as primary key: effect on index size and insert locality. ↳ random UUIDs scatter B-tree inserts; v7 is time-ordered
+  - `L2` `SERIAL` vs `GENERATED ALWAYS AS IDENTITY`.
+  - `L2` Why are random UUIDv4 primary keys bad for B-tree indexes? ↳ random inserts, page splits, cache misses
+- [ ] Normalisation: 1NF, 2NF, 3NF, BCNF — and why ↳ DDIA ch2 "Many-to-one and many-to-many relationships" (pdf p53–57) · https://en.wikipedia.org/wiki/Database_normalization · Watch: Decomplexify "Learn Database Normalization – 1NF, 2NF, 3NF, 4NF, 5NF" (YouTube)
+  - `L1` What is normalization? Explain 1NF, 2NF and 3NF in one line each.
+  - `L2` Normalise this table: `orders(order_id, customer_name, customer_email, product_names_csv, total)`.
+  - `L2` Normalise this table
+- [ ] Denormalisation for reads; materialised views; counters ↳ DDIA ch3 "Aggregation: Data cubes and materialized views" (pdf p120–121) · https://www.postgresql.org/docs/current/rules-materializedviews.html · DDIA ch1 "Describing load" (pdf p31–33) — Twitter timelines as denormalised fan-out
+  - `L2` What is denormalization? When do you deliberately do it?
+  - `L2` When do you denormalise on purpose? Give an example and say how you keep the copy in sync.
+  - `L3` Count queries on big tables are slow. What are your options? ↳ estimates from pg_class, counter tables, approximate counts, cache
+- [ ] One-to-many, many-to-many (join table), polymorphic associations ↳ DDIA ch2 "Many-to-one and many-to-many relationships" (pdf p53–57) · DDIA ch2 "The object-relational mismatch" (pdf p50–52) · https://guides.rubyonrails.org/association_basics.html (section "Polymorphic Associations")
+  - `L2` Model a many-to-many relation (students and courses). What columns go on the join table?
+  - `L2` How would you model polymorphic associations (comments on posts, photos and videos)? Trade-offs.
+- [ ] Soft delete vs hard delete; audit columns; multi-tenancy (row-level `tenant_id`, schema per tenant, RLS) ↳ https://www.postgresql.org/docs/current/ddl-rowsecurity.html · https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/tenant-isolation.html · https://brandur.org/soft-deletion
+  - `L1` What is multi-tenancy?
+  - `L2` Soft delete with a `deleted_at` column: what breaks? ↳ every query needs the filter; unique constraints; use partial unique index
+  - `L2` Multi-tenancy: shared tables with `tenant_id`, schema per tenant, database per tenant, row-level security.
+  - `L2` Multi-tenancy: shared tables with `tenant_id` vs schema per tenant vs DB per tenant — trade-offs.
+  - `L2` How do you make sure no query forgets the tenant filter? ↳ enforce in repository layer, ORM plugin, row-level security
+  - `L2` Multi-tenancy: shared DB with tenant_id vs schema per tenant vs DB per tenant. Trade-offs.
+  - `L2` How do you make sure tenant A can never read tenant B's data? ↳ row-level security, scoped repositories, tests, per-tenant keys
+  - `L3` One big tenant is slowing everyone down (noisy neighbour). What do you do?
+  - `L3` How do you migrate one tenant from the shared DB to its own DB without downtime?
+- [ ] Constraints: NOT NULL, UNIQUE, CHECK, FK with ON DELETE ↳ https://www.postgresql.org/docs/current/ddl-constraints.html (NOT NULL, UNIQUE, CHECK, FK ON DELETE) · DDIA ch7 "The meaning of ACID" (pdf p237–241) — consistency = invariants you declare
+  - `L1` Primary key vs unique constraint vs unique index.
+  - `L1` What is a foreign key? What do `ON DELETE CASCADE`, `RESTRICT` and `SET NULL` do?
+  - `L1` Which constraints does Postgres support? ↳ NOT NULL, UNIQUE, PRIMARY KEY, FOREIGN KEY, CHECK, EXCLUDE
+  - `L2` What are `ON DELETE CASCADE`, `SET NULL` and `RESTRICT`? When is cascade dangerous?
+  - `L2` Does Postgres index foreign keys for you? Should you? ↳ no; index them for joins and parent DELETE checks
+  - `L3` Prevent overlapping room bookings in the database itself. ↳ EXCLUDE USING gist on room and tstzrange with &&
+  - `L3` Enforce "one active subscription per user" without application code. ↳ partial unique index WHERE status = 'active'
+  - `L3` What are deferrable constraints and when do you need them?
+- [ ] Schema migrations without downtime (expand → migrate → contract) ↳ https://planetscale.com/blog/backward-compatible-databases-changes · DDIA ch4 "Data flow through databases" (pdf p147–149) · https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts/
+  - `L1` What is expand → migrate → contract?
+  - `L2` How do you make a migration safe on a large table (add column with default, add index)? ↳ nullable first, backfill in batches, concurrent index
+  - `L2` Adding a nullable column to a 100M-row table: fast or slow? A column with a constant default? ↳ both metadata-only since PG11; volatile default rewrites
+  - `L2` Add a NOT NULL column to a 100M-row table without downtime. ↳ nullable, backfill in batches, CHECK NOT VALID, VALIDATE, SET NOT NULL
+  - `L2` Add a foreign key to a big table without blocking writes. ↳ ADD CONSTRAINT … NOT VALID, then VALIDATE CONSTRAINT
+  - `L2` Rename a column a live app uses. ↳ add new, dual-write, backfill, switch reads, drop old
+  - `L2` Change a column from `int` to `bigint` on a huge table. Why is it hard, and how do you do it? ↳ full rewrite under lock; new column, trigger, backfill, swap
+  - `L2` Backfill 50M rows safely. ↳ batches by primary key, pauses, watch replica lag, idempotent
+  - `L2` Why must code and schema stay backward compatible across a deploy?
+  - `L2` How do you drop a column safely? ↳ stop reading it in code first; ORMs that select every column
+  - `L2` How do you deploy a DB change and a code change that depend on each other? ↳ expand/contract: add, dual-write, migrate, remove
+  - `L2` How do you add a NOT NULL column to a 100M-row table without downtime?
+  - `L3` How do you roll back a migration that already ran a destructive step?
+- [ ] Storing JSON (JSONB) — when it's fine, when it hurts ↳ https://www.postgresql.org/docs/current/datatype-json.html (jsonb, jsonb indexing) · DDIA ch2 "Relational vs. document databases today" (pdf p60–63)
+  - `L1` `json` vs `jsonb`.
+  - `L1` What do `->`, `->>` and `@>` do on JSONB?
+  - `L2` JSONB column vs real columns: when is JSONB fine, and when does it hurt? ↳ no planner stats, no types or constraints, whole value rewritten
+  - `L2` How do you index a JSONB field you filter on often? ↳ GIN for containment; B-tree expression index on (data->>'key')
+  - `L2` What does updating one key inside a 1 MB JSONB value cost? ↳ new tuple version, TOAST rewrite, WAL for the whole value
+  - `L2` How do you validate the shape of JSONB data? ↳ CHECK with jsonb_typeof, generated columns, schema in the app
+  - `L3` EAV (entity–attribute–value) vs JSONB for user-defined attributes.
+  - `L3` How do generated columns help a JSONB-heavy schema?
+- [ ] Schema design practice: e-commerce orders, chat app, hiring platform (jobs, applications, stages)
+  - `L2` Design the schema for an e-commerce order system (orders, items, payments, inventory).
+  - `L2` Design the schema for a chat app (users, conversations, members, messages, read receipts).
+  - `L2` Design the schema for a hiring platform (jobs, candidates, applications, stages, referrals). Tie it to Jigsaw.
+  - `L2` Design the schema for an e-commerce order system / chat app / hiring platform
+- [ ] Column types: money as numeric or integer minor units (never float), text vs varchar, ENUM vs lookup table vs CHECK
+  - `L1` How do you store money amounts? ↳ integer minor units (paise/cents) + currency; never float
+  - `L1` Store ₹499.50 as what?
+  - `L2` Storing money: why not `float`? `numeric` vs integer cents.
+  - `L2` `varchar(n)` vs `text` in Postgres.
+  - `L3` Postgres `ENUM` vs lookup table vs CHECK constraint: what is the migration pain of each?
+
+**Learn:** DDIA ch2 (data models) · PGDocs (constraints, JSONB) · Syllabus (DB section)
+
+## 5.3 Indexes and query performance
+- [ ] B-tree index: structure, why O(log n), fanout, leaf pages linked for range scans ↳ DBI ch2 "Ubiquitous B-Trees" (pdf p69–85) · https://use-the-index-luke.com/sql/anatomy · DBI ch4 "Sibling Links" (pdf p114–115)
+  - `L1` What is the default index type in Postgres? Why a B-tree and not a binary search tree? ↳ high fan-out, few pages per lookup, sorted for ranges
+  - `L2` How do a B-tree point lookup and a range scan work? Why are leaf pages linked?
+  - `L3` What is B-tree deduplication (PG13), and when does it help?
+  - `L3` What happens on a B-tree page split? Why do random UUID keys cause more splits than sequential ids?
+- [ ] Composite indexes and the leftmost-prefix rule; column order ↳ https://use-the-index-luke.com/sql/where-clause/the-equals-operator/concatenated-keys · DDIA ch3 "Multi-column indexes" (pdf p106) · https://www.postgresql.org/docs/current/indexes-multicolumn.html
+  - `L1` What is a composite (multicolumn) index?
+  - `L2` Composite index `(a, b)`: which queries can use it, and why does column order matter? ↳ leftmost prefix; equality columns before range
+  - `L2` What is a composite index, and what is the leftmost-prefix rule?
+  - `L2` Index on `(a, b)`: which of `a = 1`, `b = 1`, `a = 1 AND b = 2`, `a > 1 AND b = 2` use it well? ↳ leftmost prefix; equality columns first, range column last
+  - `L2` How do you choose column order in a multicolumn index? ↳ equality before range, match ORDER BY, then selectivity
+  - `L2` Can an index serve `ORDER BY created_at DESC LIMIT 20`? What about `ORDER BY a ASC, b DESC`?
+  - `L2` Index on (a, b): does `WHERE b = 1` use it?
+  - `L2` What is a composite index, and why does column order matter?
+  - `L3` Separate indexes on `a` and `b` vs one on `(a, b)`: when does Postgres combine two indexes? ↳ BitmapAnd / BitmapOr of bitmap index scans
+- [ ] Covering indexes (`INCLUDE`), index-only scans ↳ https://www.postgresql.org/docs/current/indexes-index-only-scans.html · DDIA ch3 "Storing values within the index" (pdf p105–106) · https://use-the-index-luke.com/sql/clustering/index-only-scan-covering-index
+  - `L1` What does `INCLUDE` add to `CREATE INDEX`?
+  - `L1` What does an index-only scan avoid reading?
+  - `L2` What is a covering index / index-only scan, and what does Postgres also need for it? ↳ visibility map
+  - `L2` What is a covering index (index-only scan)?
+  - `L2` What is a covering index (`INCLUDE`), and how does it enable index-only scans?
+  - `L2` What is a covering index?
+- [ ] Partial indexes, expression indexes, unique indexes ↳ https://www.postgresql.org/docs/current/indexes-partial.html · https://www.postgresql.org/docs/current/indexes-expressional.html · https://www.postgresql.org/docs/current/indexes-unique.html
+  - `L1` Partial index in one line.
+  - `L2` What is a partial index? Give two real uses. ↳ WHERE status = 'pending'; unique among non-deleted rows
+  - `L2` What is an expression index? Example: case-insensitive email lookup. ↳ index on lower(email); query must use the same expression
+  - `L3` An index on a boolean column: useless or useful? When is it useful? ↳ as a partial index on the rare value
+- [ ] Hash, GIN (JSONB, full-text, arrays), GiST, BRIN — when each ↳ https://www.postgresql.org/docs/current/indexes-types.html · DDIA ch3 "Hash indexes" (pdf p92–96) · DDIA ch3 "Other indexing structures" (pdf p104–107)
+  - `L1` Name the Postgres index types and one use for each.
+  - `L1` What is a GIN index, and what data is it for? ↳ inverted index: arrays, JSONB, tsvector full-text
+  - `L1` What is a BRIN index? ↳ min/max summary per block range; huge, physically ordered tables
+  - `L1` Which index type serves JSONB `@>` queries?
+  - `L1` Which index type suits a huge append-only table filtered by time?
+  - `L2` Hash index vs B-tree: when is hash worth it, and what can't it do? ↳ equality only: no ranges, sorting, uniqueness or multicolumn
+  - `L2` Why did people avoid hash indexes before PG10? ↳ not WAL-logged, so not crash-safe or replicated
+  - `L2` GIN on JSONB: `jsonb_ops` vs `jsonb_path_ops`. ↳ path_ops is smaller and faster but supports only containment
+  - `L2` Why are GIN inserts slow, and what do `fastupdate` and the pending list do?
+  - `L2` What is GiST good for? ↳ ranges, geometry/PostGIS, exclusion constraints, nearest-neighbour, trigrams
+  - `L2` GIN vs GiST for full-text search. ↳ GIN faster lookups, slower updates; GiST smaller, lossy, needs rechecks
+  - `L2` A 2 TB append-only events table is queried by time range. B-tree or BRIN? Why?
+  - `L2` When does a BRIN index stop helping? ↳ column not correlated with physical row order; scattered updates
+  - `L3` Postgres B-tree vs hash vs GIN vs GiST vs BRIN: give one query for each.
+  - `L3` BRIN index: why is it tiny, and when does it work? ↳ min/max per block range; needs physical ordering, e.g. append-only time
+  - `L3` What is SP-GiST, and what data suits it? ↳ space-partitioned trees: quadtrees, k-d trees, radix tries
+  - `L3` How does `ORDER BY location <-> point LIMIT 10` use a GiST index (KNN search)?
+  - `L3` What is the `bloom` index extension for?
+- [ ] Clustered vs non-clustered (MySQL InnoDB vs Postgres heap) ↳ DDIA ch3 "Storing values within the index" (pdf p105) · DBI ch1 "Index Files" + "Primary Index as an Indirection" (pdf p48–51) · https://use-the-index-luke.com/sql/clustering (chapter "Clustering Data": index-organized tables)
+  - `L2` Clustered vs secondary index: Postgres heap + TID vs InnoDB clustered primary key. ↳ InnoDB secondary entries store the primary key
+  - `L2` Postgres heap plus secondary indexes vs MySQL InnoDB clustered index: what differs on a lookup?
+  - `L2` What does `CLUSTER` do in Postgres, and why doesn't the table stay clustered?
+  - `L2` Postgres vs MySQL (InnoDB): MVCC, clustered index, replication, features you'd miss.
+- [ ] Cost of indexes: slower writes, more storage, bloat ↳ https://use-the-index-luke.com/sql/dml (chapter "Modifying Data": insert/delete/update cost) · DBI ch4 "Vacuum and Maintenance" (pdf p134–138) · DDIA ch3 "Comparing B-trees to LSM-trees" (pdf p103–104)
+  - `L1` What is an index, and what does it cost you?
+  - `L1` What does an index do, and what does it cost on writes?
+  - `L2` How does each extra index slow down writes? Think of a table with 8 indexes.
+  - `L2` When can adding an index make the whole system slower? ↳ write-heavy table, lost HOT updates, bloat, memory pressure
+  - `L2` How do you find unused and duplicate indexes? ↳ pg_stat_user_indexes idx_scan = 0; overlapping leading columns
+  - `L2` When would an index make things slower?
+  - `L2` How do you insert 1 million rows quickly? ↳ batch inserts, COPY, drop/rebuild indexes, unlogged staging table
+  - `L3` Postgres index bloat: how does it happen and how do you fix it without downtime? ↳ REINDEX CONCURRENTLY, pg_repack
+  - `L3` What are HOT (heap-only tuple) updates, and how do indexes prevent them? ↳ no indexed column changed and free space on page; fillfactor
+- [ ] Why an index isn't used: functions on columns, low selectivity, type mismatch, `LIKE '%x'`, OR ↳ https://use-the-index-luke.com/sql/where-clause (sections "Functions", "Searching for Ranges" → LIKE, "Obfuscated Conditions") · https://www.postgresql.org/docs/current/indexes-bitmap-scans.html (OR → bitmap) · https://www.postgresql.org/docs/current/indexes-types.html
+  - `L1` You created an index and `EXPLAIN` still shows a Seq Scan. Name five reasons. ↳ low selectivity, tiny table, function on column, type mismatch, stale stats
+  - `L1` Why is a sequential scan sometimes faster than an index scan? ↳ sequential vs random I/O when many rows match
+  - `L2` A `created_at` range query is fast but `LIKE '%term%'` is slow. Explain with data structures. ↳ B-tree needs a prefix; trigram GIN for infix
+  - `L2` When does the database not use your index? ↳ low selectivity, function on column, leading wildcard, type mismatch, stats
+  - `L2` Why can't a normal B-tree help `LIKE '%phone%'`, yet it can help `LIKE 'phone%'`? ↳ leading wildcard leaves no sorted prefix to seek
+  - `L2` `WHERE lower(email) = $1` with an index on `email`. Is it used? How do you fix it?
+  - `L2` `WHERE created_at::date = '2026-01-01'`: why no index, and how do you rewrite it as a range?
+  - `L2` `WHERE phone = 9876543210` on a `text` column. What happens?
+  - `L2` `WHERE a = 1 OR b = 2`: how can Postgres use indexes here, and when does it give up? ↳ BitmapOr if both indexed; otherwise rewrite as UNION
+  - `L2` Why are `!=`, `NOT IN` and `NOT LIKE` rarely index-friendly?
+  - `L2` `WHERE deleted_at IS NULL`: can a B-tree help? ↳ yes, Postgres B-trees store NULLs; partial index is better
+  - `L2` Index on `(tenant_id, created_at)` but the query filters only on `created_at`. What happens?
+  - `L2` Why doesn't a normal B-tree index help `LIKE '%phone%'`?
+  - `L3` Why might a B-tree on a `text` column not serve `LIKE 'abc%'`? ↳ non-C collation; use text_pattern_ops
+  - `L3` `data->>'type' = 'x'` vs `data @> '{"type":"x"}'` on JSONB: which index does each need?
+  - `L3` When is an index not used even though it exists? ↳ functions on column, type mismatch, low selectivity, leading wildcard, OR
+- [ ] `EXPLAIN` / `EXPLAIN ANALYZE`: seq scan, index scan, bitmap scan, nested loop vs hash vs merge join ↳ https://www.postgresql.org/docs/current/using-explain.html · https://explain.dalibo.com (paste a plan) · Watch: CMU 15-445 lectures "Query Execution" and "Join Algorithms" (Andy Pavlo, YouTube)
+  - `L1` `EXPLAIN` vs `EXPLAIN ANALYZE`. What is the danger of `EXPLAIN ANALYZE DELETE …`? ↳ ANALYZE really runs it; wrap in BEGIN … ROLLBACK
+  - `L1` What do the two numbers in `cost=0.43..8.45` mean? ↳ startup cost and total cost, in planner units
+  - `L1` What does `rows=` mean in the estimate part vs the actual part?
+  - `L1` Seq Scan, Index Scan, Index Only Scan, Bitmap Heap Scan: one line each.
+  - `L2` What does the `BUFFERS` option add? Explain `shared hit`, `read`, `dirtied` and `written`.
+  - `L2` When does Postgres pick a bitmap scan over a plain index scan? ↳ medium selectivity; sorts row locations to read heap pages in order
+  - `L2` What is "Rows Removed by Filter" telling you?
+  - `L2` What is a lossy bitmap heap scan, and why is there a `Recheck Cond`? ↳ bitmap exceeds work_mem, keeps pages not rows
+  - `L2` An Index Only Scan shows `Heap Fetches: 50000`. Why, and how do you fix it? ↳ visibility map not set; run VACUUM
+  - `L2` Nested loop vs hash join vs merge join: when does the planner pick each?
+  - `L2` What does `loops=` mean, and how do you get the total time of a node?
+  - `L2` What do `Sort Method: external merge Disk` and `HashAggregate … Batches: 8` mean? ↳ spilled to disk; raise work_mem for that query
+  - `L2` Read a plan aloud: which node is the slowest, and is it the one with the highest cost?
+  - `L2` A plan shows Seq Scan on 40M rows with `Rows Removed by Filter: 39999990`. Fix it.
+  - `L2` A plan shows a nested loop with 2 million loops of an inner index scan. What went wrong? ↳ outer side row count badly underestimated
+  - `L2` Why is this query slow? (given EXPLAIN)
+  - `L2` How do you read `EXPLAIN ANALYZE`? What do seq scan, index scan, index-only scan and bitmap scan mean?
+  - `L2` Which queries are on the hot path, and how did you verify them with `EXPLAIN ANALYZE`?
+  - `L3` Where did you add an index at work that changed the plan? How did you confirm it with `EXPLAIN ANALYZE`?
+  - `L3` Why can `EXPLAIN ANALYZE` time differ from the real query time? ↳ per-row timing overhead; excludes network and client time
+  - `L3` What does a Memoize node (PG14) cache?
+  - `L3` A query is fast in staging and slow in production with the same plan. Why? ↳ data volume, cache cold, bloat, lock waits, parameter skew
+- [ ] N+1 queries in ORMs and fixes (eager loading, batching, DataLoader) ↳ https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html (selectinload, joinedload) · https://github.com/graphql/dataloader (README) · https://www.prisma.io/docs/orm/prisma-client/queries/query-optimization-performance
+  - `L1` What is the N+1 query problem?
+  - `L1` How does eager loading fix N+1?
+  - `L1` What is the N+1 query problem? Show an ORM example.
+  - `L1` What is the N+1 problem in one line?
+  - `L1` Batch-loading library for N+1 in GraphQL?
+  - `L2` Prisma / TypeORM: how do `include` and relations become SQL, and where does N+1 hide?
+  - `L2` How do you find N+1 queries in a running app? ↳ queries per request, APM traces, SQL logging, pg_stat_statements calls
+  - `L2` What is DataLoader, and how does it batch?
+  - `L2` How do you find N+1 queries in a running app?
+  - `L2` How do you detect N+1 queries? ↳ query count per request in logs/traces, ORM debug logging, APM, tests asserting query count
+  - `L2` How do you fix N+1? ↳ JOIN / eager load, `WHERE id IN (...)`, DataLoader batching, denormalise
+  - `L2` How does DataLoader batch and cache within one request?
+- [ ] Statistics, `ANALYZE`, slow query log / `pg_stat_statements` ↳ https://www.postgresql.org/docs/current/planner-stats.html · https://www.postgresql.org/docs/current/pgstatstatements.html · https://www.postgresql.org/docs/current/runtime-config-logging.html (log_min_duration_statement)
+  - `L1` What does the `ANALYZE` command update?
+  - `L1` Postgres extension for top slow queries?
+  - `L2` Estimated rows=1, actual rows=200000. What does that cause, and what do you do? ↳ bad join choice; ANALYZE, raise statistics target, extended stats
+  - `L2` What does the `ANALYZE` command do, and when does autovacuum run it?
+  - `L2` What is `default_statistics_target`, and when do you raise it for one column?
+  - `L2` What are `most_common_vals` and `histogram_bounds` in `pg_stats` used for?
+  - `L2` An endpoint went from 50 ms to 4 s after a big data import. No code changed. Where do you start? ↳ stale statistics: ANALYZE, then compare plans
+  - `L2` A query is fast in staging and slow in prod. What differences do you check? ↳ data size and skew, stats, settings, cache, concurrency, plan
+  - `L2` Estimated rows vs actual rows are way off. What does that mean and what do you do? ↳ stale stats → ANALYZE, extended statistics
+  - `L2` How do you find the slowest queries in Postgres? ↳ pg_stat_statements by total time, auto_explain, slow query log
+  - `L3` Correlated columns (city and zip) make the planner underestimate rows. How do you fix it? ↳ CREATE STATISTICS with dependencies, ndistinct or mcv
+  - `L3` How does the planner estimate `WHERE a = 1 AND b = 2`, and why is it often wrong? ↳ assumes independence and multiplies selectivities
+  - `L3` How do you capture plans of slow queries in production automatically? ↳ auto_explain with log_min_duration
+  - `L3` A query got slow right after a Postgres major upgrade. Why, and how do you check? ↳ planner stats not carried over: run ANALYZE; compare plans
+- [ ] Planner settings and plan choice: random_page_cost, generic vs custom plans, prepared statements, parallel query, JIT, hints
+  - `L2` A query is fast in psql but slow from the app with bound parameters. Why? ↳ generic plan after 5 executions; plan_cache_mode
+  - `L2` How do `random_page_cost` and `seq_page_cost` change index choice? Why lower `random_page_cost` on SSDs?
+  - `L2` `WHERE status = 'x' ORDER BY id LIMIT 10` walks the primary key index and is slow. Why? ↳ planner assumes matches are spread evenly; they cluster at the end
+  - `L2` What do prepared statements save?
+  - `L2` The same query takes 20 ms sometimes and 9 s other times. What do you suspect? ↳ lock waits, cold cache, generic plan, parameter skew, checkpoints
+  - `L3` How do you test "would this index help?" without building it on prod? ↳ hypopg hypothetical indexes; a prod-sized copy
+  - `L3` How do you discourage a plan while debugging? ↳ SET enable_seqscan = off in your session; pg_hint_plan; never globally
+  - `L3` What is a Gather node? Which settings control parallel query?
+  - `L3` What is JIT compilation in Postgres, and when does it make short queries slower?
+  - `L3` What are `join_collapse_limit` and GEQO, and when do they matter?
+- [ ] Query rewrites and bulk work: correlated subquery to join, ANY(array) for big IN lists, COPY and batched writes, fast counts
+  - `L2` One INSERT per row vs multi-row VALUES vs `COPY`: rough speed difference?
+  - `L2` Update 1M rows in one statement or in batches? ↳ one statement: long locks, WAL burst, replica lag; batch by key range
+  - `L2` `SELECT count(*)` on a big table is slow. Why, and what are the alternatives? ↳ MVCC visibility checks; reltuples estimate, counter table
+  - `L2` Aggregation in application code vs in SQL: when is each right?
+  - `L2` The COUNT(*) for "total pages" is slower than fetching the page itself. What do you do?
+  - `L3` Rewrite a correlated subquery that runs once per row into one join plus GROUP BY.
+  - `L3` `WHERE id IN (…10,000 ids…)`: problems and alternatives. ↳ = ANY($1::bigint[]), join a VALUES list or temp table
+
+**Learn:** UTIL (whole site — the best source) · DBI ch2, ch4, ch6 (B-trees in depth) · DDIA ch3 · PGDocs
+"Using EXPLAIN" · explain.dalibo.com (visualise plans)
+
+## 5.4 Storage engines
+- [ ] Page-based B-tree storage vs log-structured (LSM tree: memtable, SSTables, compaction, bloom filters) ↳ DDIA ch3 "SSTables and LSM-trees" + "B-trees" (pdf p96–103) · DBI ch7 "LSM Trees" (pdf p222–240) · DBI ch7 "Bloom Filters" (pdf p246–248)
+  - `L1` What is an LSM tree in one sentence? ↳ buffer writes in memory, flush sorted immutable files, merge in background
+  - `L1` What are the memtable, the WAL and SSTables?
+  - `L1` Which databases use LSM trees, and why are their writes fast? ↳ RocksDB, LevelDB, Cassandra, ScyllaDB, HBase; sequential I/O
+  - `L1` An LSM memtable is usually which structure?
+  - `L2` Walk through a write: WAL append → memtable → flush to an SSTable.
+  - `L2` Walk through a point read. What makes it slow, and what helps? ↳ memtable, then SSTables newest first; Bloom filters, sparse index
+  - `L2` What data structure is the memtable usually built on? ↳ skip list in LevelDB and RocksDB
+  - `L2` How is a delete done? ↳ tombstone; physically removed during compaction
+  - `L2` What is compaction, and why is it needed? ↳ merge files, drop overwritten/deleted keys, bound read cost
+  - `L2` What is inside an SSTable besides the data? ↳ block index, Bloom filter, compressed blocks, footer
+  - `L3` What is key-value separation (WiscKey / BlobDB), and why? ↳ big values outside the tree → less write amplification
+  - `L3` List the pieces of a toy LSM key-value store you could build in a weekend.
+- [ ] Write-ahead log (WAL): why, crash recovery, checkpoints ↳ DBI ch5 "Recovery" (pdf p157–165: log semantics, steal/force, ARIES) · DDIA ch3 "B-trees" (pdf p102, making B-trees reliable) · https://www.postgresql.org/docs/current/wal-intro.html
+  - `L1` What is the write-ahead log (WAL), and why does it exist?
+  - `L1` What does "durable" mean when `COMMIT` returns? ↳ the commit's WAL record is flushed to disk first
+  - `L1` What does WAL stand for?
+  - `L2` What data structure is a Postgres WAL? A Kafka partition? ↳ append-only log
+  - `L2` Walk through crash recovery after a power cut. ↳ replay WAL from the last checkpoint's redo point
+  - `L2` What is a checkpoint? What do `checkpoint_timeout` and `max_wal_size` control?
+  - `L2` Why do too-frequent checkpoints hurt write performance? ↳ more full-page writes inflate WAL; I/O spikes
+  - `L2` What are full-page writes, and what problem do they solve? ↳ torn 8 KB pages after a partial write
+  - `L2` What does `synchronous_commit = off` trade away? ↳ may lose the last few hundred ms of commits; no corruption
+  - `L2` Why is `fsync = off` never acceptable in production?
+  - `L2` What is the WAL and why does it make commits durable?
+  - `L3` What are the `wal_level` values (minimal, replica, logical), and what needs each?
+  - `L3` The WAL disk fills up. What are the usual causes? ↳ failing archive_command, inactive replication slot, huge max_wal_size
+  - `L3` How does group commit (`commit_delay`) share one fsync among many transactions?
+  - `L3` How does the WAL tie together crash recovery, streaming replication and logical decoding?
+- [ ] Read vs write amplification; B-tree vs LSM trade-offs (Postgres vs Cassandra/RocksDB) ↳ DBI ch7 "Read, Write, and Space Amplification" + "RUM Conjecture" (pdf p241–242) · DDIA ch3 "Comparing B-trees to LSM-trees" (pdf p103–104)
+  - `L2` Size-tiered vs leveled compaction: trade-offs. ↳ tiered: less write amp, more space/read amp; leveled: opposite
+  - `L2` Define read, write and space amplification. ↳ RUM trade-off: can't minimise all three
+  - `L2` Why are range scans costlier on an LSM tree than on a B-tree?
+  - `L2` B+ tree vs LSM tree: read vs write trade-offs.
+  - `L2` B-tree vs LSM tree — which for write-heavy logs?
+  - `L3` Tombstones pile up in Cassandra. What goes wrong and how do you fix it? ↳ slow reads, query failures; gc_grace, compaction, data model change
+  - `L3` Compaction falls behind the write rate. Symptoms and fixes. ↳ write stalls, growing L0; more compaction threads, throttle writes
+  - `L3` B-tree vs LSM tree: which suits write-heavy logs, and why does Postgres stay with B-trees? ↳ LSM: sequential writes, compaction; B-tree: predictable reads, in-place pages
+- [ ] Row stores vs column stores (OLTP vs OLAP) ↳ DDIA ch3 "Column-oriented storage" (pdf p115–120) · DBI ch1 "Column- Versus Row-Oriented DBMS" (pdf p37–44) · DDIA ch3 "Transaction Processing or Analytics?" (pdf p109–110)
+  - `L1` Row store vs column store: which for which workload?
+  - `L2` Why are column stores fast for analytics?
+  - `L3` Why do column stores compress so well and scan so fast? ↳ same-type values, run-length/dictionary encoding, vectorized reads
+- [ ] Buffer pool / page cache ↳ DBI ch5 "Buffer Management" (pdf p144–156) · Watch: CMU 15-445 lecture "Buffer Pools" (Andy Pavlo, YouTube) · https://www.postgresql.org/docs/current/runtime-config-resource.html (shared_buffers)
+  - `L1` Default Postgres page (block) size? ↳ 8 KB
+  - `L2` What is CLOCK (second chance), and why does the Postgres buffer manager use clock sweep? ↳ approximate LRU without list moves on hit
+  - `L3` A sequential scan flushes your LRU cache. How do databases protect against that? ↳ Postgres ring buffers for big scans; InnoDB midpoint insertion
+
+**Learn:** DDIA ch3 · DBI ch1, ch3, ch5, ch7
+
+## 5.5 Transactions and concurrency
+- [ ] ACID — what each letter really means ↳ DDIA ch7 "The meaning of ACID" (pdf p237–241) · DDIA ch7 "Single-object and multi-object operations" (pdf p241–245)
+  - `L1` What does ACID stand for? What does each letter really mean?
+  - `L2` What is autocommit? What happens when your driver silently opens a transaction and never commits?
+- [ ] Isolation levels: read uncommitted, read committed, repeatable read, serializable ↳ DDIA ch7 "Weak isolation levels" (pdf p246–255) · https://www.postgresql.org/docs/current/transaction-iso.html · DBI ch5 "Isolation Levels" (pdf p172–173)
+  - `L1` Name the four SQL isolation levels.
+  - `L1` What is the default isolation level in Postgres? ↳ read committed
+  - `L1` Which isolation level do you get if you don't choose one?
+  - `L2` Read committed vs repeatable read in Postgres: what does each statement see? ↳ RC: new snapshot per statement; RR: one per transaction
+  - `L2` Does Postgres support read uncommitted? ↳ accepted, but behaves as read committed
+  - `L2` The SQL standard allows phantoms at repeatable read. Why doesn't Postgres show them? ↳ its repeatable read is snapshot isolation
+  - `L2` At repeatable read, two transactions update the same row. What happens to the second one? ↳ serialization failure error after the first commits; retry
+  - `L2` Read committed vs repeatable read in Postgres?
+- [ ] Anomalies: dirty read, dirty write, non-repeatable read, phantom, lost update, write skew ↳ DDIA ch7 "Read committed" → "Preventing write skew and phantoms" (pdf p247–264) · DBI ch5 "Read and Write Anomalies" (pdf p170–171) · https://jepsen.io/consistency
+  - `L1` Define dirty read, non-repeatable read and phantom read.
+  - `L2` Define lost update and write skew, with an example of each. ↳ two concurrent increments; two doctors both go off call
+  - `L2` Give a write-skew example that repeatable read in Postgres does NOT prevent.
+  - `L2` What is write skew? Give an example
+  - `L3` Why can't `SELECT … FOR UPDATE` stop write skew when the conflicting row doesn't exist yet? ↳ phantom: nothing to lock; materialize conflicts or serializable
+  - `L3` What does "materializing conflicts" mean? Give an example.
+- [ ] MVCC in Postgres: tuple versions, xmin/xmax, snapshots, VACUUM and bloat ↳ https://www.postgresql.org/docs/current/mvcc-intro.html · DDIA ch7 "Implementing snapshot isolation" + "Visibility rules" (pdf p252–254) · https://www.postgresql.org/docs/current/routine-vacuuming.html
+  - `L1` What is MVCC, in one sentence?
+  - `L1` What does "readers don't block writers, writers don't block readers" mean in Postgres?
+  - `L1` What are the `xmin` and `xmax` system columns on a row?
+  - `L1` What does MVCC stand for?
+  - `L1` What is TOAST?
+  - `L2` What physically happens on an `UPDATE`? ↳ new tuple version written; old version gets xmax; indexes may get entries
+  - `L2` What physically happens on a `DELETE`? Is the space freed?
+  - `L2` What is a snapshot, and what does it contain? ↳ xmin, xmax and the list of in-progress transaction ids
+  - `L2` How does Postgres decide whether a tuple version is visible to your transaction?
+  - `L2` What is the commit log (`pg_xact`, CLOG) used for?
+  - `L2` What are hint bits, and why can a plain `SELECT` cause disk writes? ↳ first reader sets hint bits and dirties the page
+  - `L2` What is the visibility map, and what uses it? ↳ index-only scans and VACUUM skipping all-visible pages
+  - `L2` Postgres vs MySQL InnoDB: where do old row versions live? ↳ Postgres in the table heap; InnoDB in undo logs
+  - `L2` How does MVCC let readers not block writers?
+  - `L3` What is a dead tuple, and who might still need it? ↳ older snapshots: long transactions, replication slots, standby feedback
+  - `L3` What is a subtransaction (SAVEPOINT), and why can heavy use slow Postgres down? ↳ subxid cache overflow (64 per backend), SLRU contention
+  - `L3` What is a MultiXact, and when does Postgres create one? ↳ several transactions lock one row, e.g. FK checks, FOR SHARE
+  - `L3` Updating a non-indexed column still adds entries to every index. When, and why? ↳ non-HOT update when the page has no room
+  - `L3` What is TOAST, and how does it interact with updates to large values?
+- [ ] Locks: row locks, `SELECT … FOR UPDATE`, `SKIP LOCKED` (job queues), table locks, advisory locks ↳ https://www.postgresql.org/docs/current/explicit-locking.html (row, table, advisory locks) · https://www.postgresql.org/docs/current/sql-select.html ("The Locking Clause": FOR UPDATE, SKIP LOCKED) · DDIA ch7 "Explicit locking" (pdf p257–258)
+  - `L1` Row-level locks vs table-level locks.
+  - `L1` What does `SELECT … FOR UPDATE` do?
+  - `L1` What does `SKIP LOCKED` skip?
+  - `L2` `FOR UPDATE` vs `FOR NO KEY UPDATE` vs `FOR SHARE` vs `FOR KEY SHARE`. ↳ FK checks take KEY SHARE; NO KEY UPDATE doesn't block them
+  - `L2` `NOWAIT` vs `SKIP LOCKED`: what does each do and when do you use it?
+  - `L2` How do you implement a job queue in Postgres? ↳ SELECT … FOR UPDATE SKIP LOCKED LIMIT n, mark taken, commit
+  - `L2` Postgres as a queue vs Redis vs RabbitMQ/Kafka: when is Postgres enough?
+  - `L2` What are advisory locks? Session-level vs transaction-level. ↳ app-chosen lock ids; xact locks release at commit
+  - `L2` Does inserting a child row lock the parent row? ↳ yes, FOR KEY SHARE on the referenced row
+  - `L2` A single-row `UPDATE` by primary key takes 30 s. Why? ↳ waiting on a row lock; check pg_locks
+  - `L2` How do you implement a job queue in Postgres?
+  - `L2` Postgres as a queue (`FOR UPDATE SKIP LOCKED`): when is it good enough?
+  - `L3` A delayed-task queue consumed by many worker processes: how do you claim jobs safely? ↳ Redis ZSET + Lua claim, or Postgres SKIP LOCKED
+  - `L3` Which table lock modes exist, and which one blocks a plain `SELECT`? ↳ only ACCESS EXCLUSIVE
+  - `L3` A SKIP LOCKED worker crashes mid-job. What happens to the row? How do you handle jobs that hang? ↳ lock released on disconnect; lease/visible_after column
+  - `L3` How does `LISTEN/NOTIFY` help a Postgres queue, and what are its limits? ↳ not durable, 8000-byte payload, needs a session connection
+  - `L3` In read committed, the row you `SELECT … FOR UPDATE` changed while you waited. What does Postgres do? ↳ re-checks WHERE on the newest version (EvalPlanQual)
+  - `L3` Many sessions update one hot counter row. What happens, and how do you redesign it? ↳ lock contention; sharded counter rows, batched increments
+- [ ] Deadlocks: how they happen, detection, consistent lock ordering ↳ https://www.postgresql.org/docs/current/explicit-locking.html (section "Deadlocks") · DBI ch5 "Deadlocks" (pdf p179–180) · DDIA ch7 "Implementation of two-phase locking" (pdf p271–272)
+  - `L2` Two transactions update rows A and B in opposite order. What happens in PostgreSQL? How do you fix it in code?
+  - `L2` How does Postgres detect deadlocks? What is `deadlock_timeout`?
+  - `L2` Two transactions update rows A and B in opposite order. Fix it. ↳ consistent lock order, e.g. ORDER BY id FOR UPDATE
+  - `L3` Why does a concurrent `UPDATE … WHERE id IN (subquery)` without ordering deadlock?
+- [ ] Optimistic concurrency (version column) vs pessimistic locking ↳ DDIA ch7 "Compare-and-set" + "Automatically detecting lost updates" (pdf p258–259) · DBI ch5 "Optimistic Concurrency Control" → "Pessimistic Concurrency Control" (pdf p174–178)
+  - `L2` How do you prevent a lost update on a counter? Give three ways. ↳ atomic SET x = x + 1, SELECT FOR UPDATE, version-column compare-and-set
+  - `L2` Optimistic concurrency with a `version` column: write the UPDATE and explain the retry.
+- [ ] Serializable snapshot isolation (SSI) ↳ DDIA ch7 "Serializable snapshot isolation (SSI)" (pdf p274–279) · https://www.postgresql.org/docs/current/transaction-iso.html ("Serializable Isolation Level") · https://wiki.postgresql.org/wiki/SSI
+  - `L2` How does serializable (SSI) work in Postgres? ↳ tracks read-write dependencies with SIRead locks; aborts dangerous cycles
+  - `L2` Why must an app using serializable have a retry loop? Which SQLSTATE codes do you retry? ↳ 40001 serialization_failure; 40P01 deadlock_detected
+  - `L2` What does serializable cost in Postgres?
+  - `L3` Snapshot isolation vs true serializability: show an anomaly that snapshot isolation allows.
+  - `L3` What are `SERIALIZABLE READ ONLY DEFERRABLE` transactions for?
+- [ ] Two-phase commit and why it's avoided across services ↳ DDIA ch9 "Atomic commit and two-phase commit (2PC)" (pdf p366–372) · DDIA ch9 "Distributed transactions in practice" (pdf p372–377) · https://microservices.io/patterns/data/saga.html
+  - `L3` What is a distributed transaction, and why is two-phase commit (2PC) not the same as two-phase locking?
+  - `L3` What does `PREPARE TRANSACTION` (two-phase commit) do, and why avoid 2PC across services?
+
+**Learn:** DDIA ch7 (the key chapter) · DBI ch5, ch13 · PGDocs "Concurrency Control" (MVCC, isolation, explicit
+locking) · Hussein (isolation levels, locking)
+
+## 5.6 Scaling databases
+- [ ] Connection pooling (PgBouncer); why too many connections hurts ↳ https://www.pgbouncer.org/features.html (session vs transaction pooling) · https://www.postgresql.org/docs/current/runtime-config-connection.html (max_connections)
+  - `L1` Why does Postgres need a connection pooler? ↳ one OS process per connection: memory, fork cost, contention
+  - `L1` What is PgBouncer?
+  - `L1` What is `max_connections`, and what is its default? ↳ 100
+  - `L1` Default Postgres port? ↳ 5432
+  - `L1` Which PgBouncer pool mode do most web apps use?
+  - `L1` Why does a connection pool help?
+  - `L1` PgBouncer mode most apps use?
+  - `L1` PgBouncer mode used?
+  - `L2` PgBouncer session vs transaction vs statement pooling.
+  - `L2` What breaks in transaction pooling mode? ↳ session state: SET, temp tables, session advisory locks, LISTEN
+  - `L2` Prepared statements behind PgBouncer: what was the problem, and what did PgBouncer 1.21 change? ↳ now tracks protocol-level prepared statements (max_prepared_statements)
+  - `L2` How do you size a connection pool? ↳ start near cores × 2; measure; small pools usually beat big ones
+  - `L2` 10 pods × 20 connections × 3 services hit one database. What goes wrong at deploy time?
+  - `L2` App-side pool (SQLAlchemy, HikariCP, Prisma) vs PgBouncer vs both.
+  - `L2` The pool is exhausted. What do users see, and how do you notice? ↳ waits then pool timeout errors; pool metrics, pg_stat_activity
+  - `L2` Why do you need a connection pooler (PgBouncer) when you scale out app servers?
+  - `L2` How do you size a connection pool? Why is a bigger pool often slower? ↳ ~cores×2 per DB; contention; Little's law
+  - `L2` What is PgBouncer? Session vs transaction vs statement pooling, and what breaks in transaction mode?
+  - `L2` Why do serverless or many-pod deployments exhaust database connections?
+  - `L2` Why PgBouncer? Which mode, and what features did you give up? ↳ transaction mode; no session state, prepared statement care
+  - `L3` Async SQLAlchemy / asyncpg under load: what changes about connection usage?
+  - `L3` Serverless functions (Lambda) hitting Postgres directly: what goes wrong and how do you fix it? ↳ connection storms; RDS Proxy, PgBouncer, HTTP data APIs
+  - `L3` Why does throughput fall when active connections go from 100 to 1000? ↳ context switches, lock contention, snapshot cost, cache thrashing
+  - `L3` PgBouncer is single-threaded. How do you scale it? ↳ several instances with so_reuseport; or PgCat, Supavisor, Odyssey
+  - `L3` Where do connection leaks come from in async Python apps, and how do you catch them?
+- [ ] Read replicas; replication lag and read-your-writes ↳ DDIA ch5 "Problems With Replication Lag" (pdf p177–183) · DDIA ch5 "Synchronous vs. asynchronous replication" (pdf p169–171) · DBI ch11 "Session Models" (pdf p368–369)
+  - `L1` What is a read replica (hot standby)?
+  - `L1` What is a read replica?
+  - `L2` What is replication lag, and how do you measure it? ↳ pg_stat_replication write/flush/replay_lag; LSN difference
+  - `L2` A user updates their profile, refreshes, and sees the old value. Why, and how do you fix it? ↳ read-your-writes: read from primary briefly, or wait for LSN
+  - `L2` What does `hot_standby_feedback` do, and what is the trade-off? ↳ fewer query cancels on replica vs bloat on primary
+  - `L2` A replica query fails with "canceling statement due to conflict with recovery". Why?
+  - `L2` How do you scale reads in Postgres? ↳ replicas, caching, materialized views, read routing
+  - `L2` How do you handle replication lag after a user updates their profile?
+  - `L2` Read replicas for performance: what problem do they solve and what do they introduce? ↳ read scaling; replication lag, read-your-writes
+  - `L2` How do you scale reads vs scale writes in the database?
+- [ ] Vertical scaling, partitioning tables (range/list/hash in Postgres) ↳ https://www.postgresql.org/docs/current/ddl-partitioning.html · DDIA ch6 "Partitioning by key range" + "by hash of key" (pdf p216–218) · DDIA ch1 "Approaches for coping with load" (pdf p37–38)
+  - `L1` Partitioning vs sharding.
+  - `L1` Range vs list vs hash partitioning in Postgres: one use each.
+  - `L1` Vertical vs horizontal scaling.
+  - `L1` Why partition the usage table?
+  - `L2` What is partition pruning, and when does it fail? ↳ needs partition key in WHERE; casts or functions on the key break it
+  - `L2` What do you gain by partitioning a 2 TB events table by month? ↳ pruning, instant drop of old data, smaller indexes, per-partition vacuum
+  - `L2` What are the limits of declarative partitioning? ↳ unique keys must include partition key; many partitions slow planning
+  - `L2` How do you turn an existing large table into a partitioned one without downtime?
+  - `L2` How do you create future partitions automatically? ↳ pg_partman or a scheduled job; watch the default partition
+  - `L2` How do you scale writes in Postgres? ↳ batching, fewer indexes, partitioning, bigger machine, then sharding
+  - `L2` Why partition the usage table? By what key and range? ↳ by month on created_at; drop old partitions; prune scans
+  - `L2` How does partition pruning work, and how did you check it happens?
+  - `L3` What signs tell you single-node Postgres is no longer enough, and what do you try first?
+  - `L3` A nightly DELETE of old rows runs for hours and slows everything. Redesign it. ↳ partition by time and drop partitions; or small batches
+- [ ] Sharding: shard key choice, hot shards, resharding, cross-shard queries/joins ↳ DDIA ch6 "Skewed workloads and relieving hot spots" + "Partitioning and secondary indexes" (pdf p218–223) · DDIA ch6 "Rebalancing partitions" (pdf p223–227) · https://www.notion.com/blog/sharding-postgres-at-notion
+  - `L1` What does Citus add to Postgres?
+  - `L2` What is Citus? Distributed tables vs reference tables. ↳ coordinator + workers; distribution column; co-located joins
+  - `L2` Pick a shard key for a multi-tenant SaaS, and for a chat app. ↳ tenant_id; conversation_id keeps a chat's messages together
+  - `L2` What breaks when you shard: joins, transactions, unique constraints, sequences? How do you handle each?
+  - `L2` How do you choose a shard key for a chat app?
+  - `L2` How do you choose a shard key? What makes a bad one? ↳ high cardinality, even load, matches queries; bad: timestamp, low-cardinality
+  - `L2` Why is a timestamp a bad shard key for writes?
+  - `L2` How do you do a join or a transaction across two shards?
+  - `L3` How did Instagram, Notion or Figma shard Postgres, and what did they do about ids?
+  - `L3` Move one hot tenant to its own shard with no downtime.
+  - `L3` Why create many small logical shards on a few physical hosts?
+  - `L3` Distributed SQL (CockroachDB, YugabyteDB, Spanner) vs Citus vs sharding in the application.
+  - `L3` How do you reshard a live Postgres database with no downtime? ↳ double-write or logical replication, backfill, verify, cut over reads then writes
+  - `L3` How do Vitess / Citus shard MySQL / Postgres? What do they hide from the app?
+  - `L3` How would you shard a multi-tenant SaaS where one tenant is 40% of all data?
+  - `L3` At what point do you shard, and what do you try first?
+- [ ] Caching in front of the DB (see Redis) ↳ https://aws.amazon.com/caching/best-practices/ · DDIA ch11 "Keeping systems in sync" (pdf p459–461) — why dual writes to cache and DB drift
+- [ ] Archiving cold data ↳ https://www.postgresql.org/docs/current/ddl-partitioning.html (detach and drop old partitions) · DDIA ch3 "Data warehousing" (pdf p110–112)
+
+**Learn:** DDIA ch5, ch6 · Xu1 ch1 (scale from zero to millions) · Figma/Notion/Instagram engineering blogs on
+sharding Postgres
+
+## 5.7 NoSQL
+- [ ] Types: key-value (Redis, DynamoDB), document (MongoDB), wide-column (Cassandra), graph (Neo4j), search
+      (Elasticsearch), time-series, vector ↳ DDIA ch2 "Relational Model vs. Document Model" (pdf p48–63) · DDIA ch2 "Graph-like Data Models" (pdf p70–77) · DBI ch1 "Wide Column Stores" (pdf p42–44)
+  - `L1` What is a document database?
+  - `L1` Name the NoSQL families and one database for each. ↳ key-value, document, wide-column, graph, search, time-series, vector
+- [ ] SQL vs NoSQL decision: schema flexibility, joins, transactions, scale pattern, access patterns ↳ DDIA ch2 "Relational vs. document databases today" (pdf p60–63) · DDIA ch2 "The birth of NoSQL" (pdf p49–50)
+  - `L1` SQL vs NoSQL: what are the real differences, beyond "schema"?
+  - `L1` SQL vs NoSQL: what is the real difference?
+  - `L2` When would you pick MongoDB over Postgres? When would you not?
+  - `L2` You run both Postgres and MongoDB in production. Which data went where, and why?
+  - `L2` Postgres JSONB vs MongoDB for flexible-schema data: what does each do better?
+  - `L2` Postgres vs MongoDB for a chat app's message history.
+  - `L2` When would you pick MongoDB over Postgres?
+  - `L2` When does a document model fit better than relational, and when does it hurt? ↳ one-to-many trees fit; many-to-many and joins hurt
+  - `L2` Schema-on-read vs schema-on-write.
+  - `L3` Plan a migration from MongoDB to Postgres (or back) with no downtime. ↳ CDC or dual-write, backfill, verify, switch reads, then writes
+  - `L3` Why do teams end up with "Postgres for everything" (queues, search, vectors, JSON)? Where does it break?
+  - `L3` MongoDB vs PostgreSQL (with JSONB) for a new product: how do you decide?
+- [ ] MongoDB: document modelling (embed vs reference), indexes, aggregation pipeline, transactions ↳ https://www.mongodb.com/docs/manual/data-modeling/ (embed vs reference) · https://www.mongodb.com/docs/manual/aggregation/ · DDIA ch2 "Data locality for queries" (pdf p62)
+  - `L1` What are MongoDB's equivalents of a table, a row and a join? ↳ collection, document, $lookup
+  - `L1` What is MongoDB's maximum document size?
+  - `L1` What is a document database? How is a MongoDB document stored? ↳ BSON
+  - `L1` Collection vs table, document vs row: what is different?
+  - `L1` What is `_id`, and what is inside an ObjectId?
+  - `L1` Embed vs reference: what is the basic rule?
+  - `L1` What is the maximum document size? ↳ 16 MB
+  - `L1` Maximum MongoDB document size?
+  - `L2` Embed or reference comments in a blog-post document? ↳ unbounded growth means reference; 16 MB document limit
+  - `L2` "Schemaless" in MongoDB: where does the schema actually live? ↳ in application code and every reader: schema-on-read
+  - `L2` When do you embed and when do you reference? ↳ read together, bounded size → embed; unbounded or shared → reference
+  - `L2` What is the "unbounded array" anti-pattern, and how does it hurt?
+  - `L2` Name schema design patterns: bucket, subset, extended reference, computed, outlier, polymorphic. Where would you use two of them?
+  - `L2` How did you model orders, menu items and restaurants for StreetDine? What did you embed?
+  - `L2` Copying a menu item's price into the order: denormalisation bug or correct design? ↳ correct: order is a snapshot at purchase time
+  - `L2` Embed or reference comments in a blog post document?
+  - `L3` How do you handle schema changes in a "schemaless" database? ↳ schema version field, lazy migration, backfill jobs, JSON schema validation
+  - `L3` You chose MongoDB at a previous job. Defend that choice or say what you'd pick now.
+  - `L3` MongoDB aggregation pipelines: how do `$match` placement, indexes and `$lookup` affect performance?
+- [ ] DynamoDB: partition key + sort key, single-table design, GSIs ↳ https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html · https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html · DDIA ch6 "Partitioning secondary indexes by term" (pdf p222–223)
+  - `L2` DynamoDB: partition key, sort key, GSIs, single-table design. When does it beat Postgres?
+  - `L2` In DynamoDB you design for access patterns first. What hurts when a new query arrives later?
+  - `L3` DynamoDB single-table design: why do people do it and what is the catch?
+- [ ] Cassandra: write path, tunable consistency (ONE/QUORUM/ALL) ↳ DDIA ch5 "Leaderless replication" (pdf p193–200: quorums) · DBI ch11 "Tunable Consistency" (pdf p371–372) · https://cassandra.apache.org/doc/latest/cassandra/architecture/dynamo.html
+  - `L2` When would you use a wide-column store like Cassandra or DynamoDB? What do you give up?
+  - `L3` Cassandra or ScyllaDB for write-heavy time series vs partitioned Postgres or TimescaleDB.
+- [ ] Elasticsearch: inverted index, analyzers, BM25 ↳ https://www.elastic.co/blog/found-elasticsearch-from-the-bottom-up · https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-its-variables · DDIA ch3 "Other indexing structures" → full-text and fuzzy indexes (pdf p107)
+  - `L1` What is an inverted index?
+  - `L1` Why not just use `LIKE '%term%'` in SQL?
+  - `L1` What is Elasticsearch / OpenSearch? What is an index, shard and replica in it?
+  - `L2` What is an inverted index, and how do Elasticsearch and Postgres GIN use it? ↳ term → sorted posting list
+  - `L2` How do you intersect two sorted posting lists fast? ↳ two pointers; galloping; skip pointers
+  - `L2` How does an inverted index work?
+  - `L2` What happens at index time: tokenising, lowercasing, stemming, stop words?
+  - `L2` What is "near real-time" search, and what is a refresh interval?
+- [ ] MongoDB indexes: compound (ESR rule), multikey, TTL, partial/sparse/unique, covered queries, reading explain()
+  - `L1` Which Mongo index type expires documents?
+  - `L1` Compound index field order rule?
+  - `L2` MongoDB indexes vs Postgres indexes: compound-index prefix rule, multikey indexes on arrays.
+  - `L2` What is a compound index, and why does field order matter? ↳ ESR rule: equality, sort, range
+  - `L2` What is a multikey index? What limits does it have?
+  - `L2` What is a TTL index? Give a use (sessions, OTPs).
+  - `L2` What is a text index, and when do you move to Atlas Search or Elasticsearch?
+  - `L2` What are partial, sparse and unique indexes? How do you enforce "unique email if present"?
+  - `L2` How do you read `explain("executionStats")`? What do COLLSCAN, IXSCAN and `totalDocsExamined` tell you?
+  - `L2` What is a covered query?
+  - `L2` What is the cost of having too many indexes?
+  - `L3` A query sorts on a field that is not in the index. What happens, and what limit can you hit? ↳ in-memory sort; 100 MB limit without disk use
+  - `L3` How do you add an index to a big collection in production without hurting traffic?
+- [ ] MongoDB aggregation pipeline: $match early, $group, $lookup, $unwind, $facet, per-stage memory limit and allowDiskUse
+  - `L1` What is the aggregation pipeline?
+  - `L1` What do `$match`, `$group`, `$project`, `$sort`, `$lookup`, `$unwind` and `$facet` do?
+  - `L1` Which aggregation stage does a join?
+  - `L2` MongoDB aggregation pipeline vs SQL GROUP BY and window functions.
+  - `L2` Why should `$match` come as early as possible in a pipeline? ↳ uses indexes, shrinks documents for later stages
+  - `L2` What does `$lookup` cost, and when is it a sign your model is wrong?
+  - `L2` What does `$facet` give you? Use it to return a page of results plus the total count.
+  - `L2` What is the 100 MB per-stage memory limit, and what does `allowDiskUse` do?
+  - `L3` An aggregation that ran in 50 ms now takes 8 s. Walk through how you debug it.
+- [ ] MongoDB replica sets: write concern, read concern, read preference, failover and retryable writes, multi-document transactions
+  - `L1` What is a replica set?
+  - `L1` Write concern that survives a primary failover?
+  - `L2` MongoDB multi-document transactions: since when, and what do they cost vs Postgres? ↳ replica sets since 4.0, sharded clusters since 4.2
+  - `L2` MongoDB write concern and read concern: what do `w: "majority"` and `readConcern: "majority"` give you?
+  - `L2` Does MongoDB support multi-document transactions? What do they need and cost? ↳ replica set; 4.0+; slower; 60 s default limit
+  - `L2` When can you avoid a transaction by using a single-document atomic update (`$inc`, `findOneAndUpdate`)?
+  - `L2` What do write concern `w:1`, `w:"majority"` and `j:true` mean?
+  - `L2` What do read concern `local`, `majority` and `linearizable` mean?
+  - `L2` What is read preference? Why can reading from secondaries return stale data?
+  - `L2` What happens during a primary failover? What does the driver do with in-flight writes? ↳ election; retryable writes once
+  - `L3` MongoDB replica-set election vs Patroni failover: what happens to in-flight writes? ↳ w:1 writes can roll back; majority writes survive
+- [ ] MongoDB sharding: shard key choice, hashed vs ranged, chunks and the balancer, scatter-gather queries
+  - `L1` What is sharding? What is a shard key?
+  - `L2` What makes a good shard key? What makes a bad one? ↳ high cardinality, even writes, query isolation; avoid monotonic keys
+  - `L2` Hashed vs ranged sharding: trade-offs.
+  - `L2` What is a scatter-gather query in a sharded cluster?
+  - `L3` MongoDB sharding: shard key choice, chunks, the balancer, jumbo chunks, scatter-gather queries.
+  - `L3` What is a jumbo chunk, and how does the balancer move chunks?
+
+**Learn:** DDIA ch2, ch3 · MongoDB University (free, data modelling) · AWS DynamoDB docs "best practices" ·
+Elastic docs "inverted index"
+
+## 5.8 Redis
+- [ ] Data types: strings, hashes, lists, sets, sorted sets, streams, bitmaps, HyperLogLog, geo ↳ https://redis.io/docs/latest/develop/data-types/ (one page per type) · Do: free course at https://university.redis.io
+  - `L1` Name the Redis data types. ↳ string, list, hash, set, sorted set, stream, bitmap, HyperLogLog, geo, JSON
+  - `L1` Maximum size of a string value? ↳ 512 MB
+  - `L1` List vs set vs sorted set.
+  - `L1` What is a hash, and when do you use it instead of a JSON string?
+  - `L1` What does `INCR` do, and why is it safe under concurrency?
+  - `L1` Max size of one Redis string?
+  - `L2` Which data structures sit under each Redis type? ↳ SDS strings, quicklist lists, listpack/hashtable, intset, skiplist zsets
+  - `L2` Storing a user object: JSON string vs hash vs the JSON type. Trade-offs. ↳ partial updates, per-field ops, memory, nested queries
+  - `L2` What is a sorted set, and what is it used for? ↳ leaderboards, delayed jobs, sliding windows, priority queues
+  - `L2` Time complexity of `ZADD`, `ZRANK` and `ZRANGE`. ↳ O(log N); ZRANGE O(log N + M)
+  - `L2` What is a bitmap? Track daily active users with one. ↳ SETBIT by user id per day; BITCOUNT; BITOP AND/OR
+  - `L2` What is a Redis Stream, and how is it different from a list?
+  - `L2` Can you set a TTL on one field of a hash? ↳ yes, since Redis 7.4 (HEXPIRE)
+  - `L2` Pick a type for: shopping cart, who's online, recent-items feed, unique tags, a rate-limit counter.
+  - `L2` What are the JSON type and the Redis Query Engine (RediSearch) for?
+  - `L2` Count page views at 50k/s: `INCR` per view vs batching in the app vs HyperLogLog for uniques.
+  - `L3` Daily active users as a Redis bitmap: memory for 100M users? ↳ 100M bits ≈ 12.5 MB per day
+  - `L3` Model a many-to-many relation (users and groups) in Redis and keep both sides consistent. ↳ two sets updated together in MULTI or Lua
+  - `L3` Which data would you never keep only in Redis?
+  - `L3` When would you pack many small counters into one string with `BITFIELD`?
+- [ ] Single-threaded command execution; why it's fast; pipelining; Lua scripts / `MULTI` for atomicity ↳ DDIA ch7 "Actual serial execution" (pdf p265–270) · https://redis.io/docs/latest/develop/use/pipelining/ · https://redis.io/docs/latest/develop/interact/transactions/ (MULTI/EXEC; Lua under "Programmability")
+  - `L1` What does `MULTI` / `EXEC` do?
+  - `L1` What is pipelining?
+  - `L1` Does Redis roll back a transaction when one command fails? ↳ no; the other commands still run
+  - `L1` Does `MULTI/EXEC` roll back on error?
+  - `L1` What does pipelining save?
+  - `L2` Pipelining vs `MULTI/EXEC` vs Lua: what does each guarantee? ↳ pipeline: fewer round trips; MULTI: no interleaving; Lua: atomic with logic
+  - `L2` What does `WATCH` do? Build an optimistic check-and-set with it.
+  - `L2` A syntax error vs a runtime error inside `MULTI`: what happens in each case? ↳ queueing error aborts EXEC; runtime error fails only that command
+  - `L2` Why is a Lua script atomic, and what is the downside? ↳ runs on the main thread; everyone waits while it runs
+  - `L2` `EVAL` vs `EVALSHA` vs Redis Functions (7.0). ↳ script cache vs named libraries persisted and replicated
+  - `L2` Why must scripts list their keys in `KEYS[]`? ↳ Cluster routes by those keys' slots
+  - `L2` A Lua script runs for 10 seconds. What happens, and how do you stop it? ↳ others get BUSY; SCRIPT KILL works only before any write
+  - `L2` How much does pipelining speed things up, and why? ↳ removes a round trip per command; fewer syscalls
+  - `L2` Pipelining a million commands in one batch: what goes wrong? ↳ reply buffers grow on server and client; send in chunks
+  - `L3` How are Lua scripts replicated: the script or its effects? ↳ effects replication, the default since Redis 5
+  - `L3` Can a script read a key, call an external service, then write? Why not?
+  - `L3` Would you put business logic in Lua? Where do you draw the line?
+  - `L3` What are the limits of transactions and scripts in Redis Cluster?
+- [ ] Caching patterns: cache-aside, read-through, write-through, write-behind ↳ https://docs.aws.amazon.com/whitepapers/latest/database-caching-strategies-using-redis/caching-patterns.html · https://aws.amazon.com/caching/best-practices/ · DDIA ch11 "Keeping systems in sync" (pdf p459–461)
+  - `L1` What is cache-aside (lazy loading)?
+  - `L1` Read-through vs write-through vs write-behind (write-back) vs write-around.
+  - `L1` What is the cache hit ratio, and what is a good one?
+  - `L1` Cache-aside in one line.
+  - `L1` Cache-aside vs write-through?
+  - `L1` Cache-aside: who loads the cache on a miss?
+  - `L1` Cache-aside vs read-through vs write-through vs write-behind: define each.
+  - `L1` Cache-aside in one line?
+  - `L2` Cache-aside vs write-through: which for a user profile, and why?
+  - `L2` On update, do you delete the cache key or overwrite it? Why do most teams delete? ↳ concurrent writers can leave an older value in the cache
+  - `L2` Show a cache-aside race that leaves the cache stale until the TTL. ↳ reader loads old row; writer updates and deletes; reader sets old
+  - `L2` How do you fix that race? ↳ short TTL, delayed second delete, versioned values, CDC-driven invalidation
+  - `L2` How do you invalidate a cache when the database changes? ↳ delete after commit, outbox/CDC events, TTL as safety net
+  - `L2` Write-behind: what can you lose, and when is it acceptable? ↳ unflushed writes on crash; fine for counters and analytics
+  - `L2` How do you pick a TTL?
+  - `L2` Cache DB rows, query results, whole responses or computed aggregates? Trade-offs.
+  - `L2` Cache key design: naming, version prefix (`v2:user:42`), tenant prefix.
+  - `L2` Cached value format: JSON vs MessagePack vs protobuf vs pickle. ↳ pickle can execute code on load: security risk
+  - `L2` In-process cache plus Redis (two levels): how do you keep the local layer fresh? ↳ short TTL, pub/sub invalidation, client-side caching
+  - `L2` How do you invalidate a cache when the DB changes?
+  - `L2` Cache-aside vs read-through vs write-through vs write-behind vs write-around: explain each.
+  - `L2` Which caching pattern would you use for a user profile, a product catalogue, a leaderboard, a session?
+  - `L2` What do you cache in Redis (tenant config, API key lookups), with what TTL and invalidation?
+  - `L3` What is Redis client-side caching (tracking with RESP3 invalidation messages)?
+  - `L3` Delete the cache key before or after the DB commit? What breaks in each order?
+  - `L3` What are leases in Facebook's memcache paper, and which two problems do they solve? ↳ stale sets and thundering herds
+  - `L3` Cache and DB disagree in production. How do you detect and measure staleness?
+  - `L3` When should you not add a cache at all? ↳ low hit rate, strict consistency, DB already fast, invalidation too complex
+- [ ] TTL, eviction policies (LRU/LFU, `allkeys-lru`), memory limits ↳ https://redis.io/docs/latest/develop/reference/eviction/ · https://redis.io/docs/latest/commands/expire/ (how keys expire) · DBI ch5 "Page Replacement" (pdf p151–156: LRU, CLOCK, LFU)
+  - `L1` What does `EXPIRE` do? What do `TTL` results -1 and -2 mean? ↳ -1: no expiry; -2: key does not exist
+  - `L1` What is `maxmemory`?
+  - `L1` Name the eviction policies. ↳ noeviction; allkeys/volatile × lru/lfu/random; volatile-ttl
+  - `L1` What does `PERSIST` do?
+  - `L1` Default `maxmemory-policy`? ↳ noeviction
+  - `L1` Eviction policy for a pure cache?
+  - `L1` What is TTL?
+  - `L1` Redis eviction policy for a pure cache?
+  - `L2` How does Redis do LRU, and why approximate? ↳ sample keys, evict oldest; 24-bit clock per object
+  - `L2` Redis `allkeys-lru` vs `volatile-lru` vs `allkeys-lfu` vs `noeviction`: which for a cache, which for sessions?
+  - `L2` How does Redis expire keys? Lazy vs active expiry. ↳ checked on access, plus a periodic random sample of keys with TTL
+  - `L2` A million keys get the same TTL. What happens when they expire together? ↳ expiry CPU spike and a stampede on the DB; add jitter
+  - `L2` Does `SET` on an existing key keep its TTL? ↳ no, it clears it unless you pass KEEPTTL
+  - `L2` Which of `PERSIST`, `SET`, `INCR`, `RENAME` clear or keep a TTL?
+  - `L2` `allkeys-lru` vs `volatile-lru` vs `allkeys-lfu`: which for a pure cache, and which when Redis also holds data that must stay? ↳ volatile-* evicts only keys with a TTL
+  - `L2` What happens under `noeviction` when memory is full? ↳ writes fail with an OOM error; reads still work
+  - `L2` Is Redis LRU exact? How does the approximation work? ↳ samples maxmemory-samples keys (default 5); keeps an eviction pool
+  - `L2` LRU vs LFU: when does LFU win? ↳ one-off scans no longer push out frequently used keys
+  - `L2` How does Redis count access frequency for LFU in so few bits? ↳ 8-bit logarithmic counter that decays over time
+  - `L2` Do replicas expire keys on their own? ↳ no; the primary sends DEL when a key expires
+  - `L2` LRU vs LFU vs TTL-only eviction: when each?
+  - `L2` How do you choose a TTL? What goes wrong with very long and very short TTLs?
+  - `L2` What is Redis's `maxmemory-policy`, and which policy for a pure cache?
+  - `L3` Which cache did you use at AiRA, what eviction policy, and what hit ratio?
+  - `L3` Memory is at `maxmemory`, evictions are zero and writes fail. Why? ↳ noeviction, or volatile-* policy with no keys carrying TTL
+  - `L3` Why might expired keys still hold memory, and how do you see it? ↳ active expiry falls behind; check expired_keys and INFO keyspace
+  - `L3` Why can RSS be much larger than `used_memory`? ↳ fragmentation, copy-on-write during fork, allocator overhead
+  - `L3` A cache and a durable job queue share one Redis instance. What goes wrong under memory pressure? ↳ eviction drops queue keys; use separate instances
+- [ ] Cache problems: stampede/thundering herd (locks, early refresh), penetration (cache nulls / bloom filter),
+      avalanche (jittered TTLs), invalidation strategies ↳ https://en.wikipedia.org/wiki/Cache_stampede (locks, probabilistic early expiration) · https://www.usenix.org/conference/nsdi13/technical-sessions/presentation/nishtala ("Scaling Memcache at Facebook": leases) · DBI ch7 "Bloom Filters" (pdf p246–248)
+  - `L1` What is a cache stampede (thundering herd, dogpile)?
+  - `L1` What is cache penetration?
+  - `L1` What is cache avalanche?
+  - `L1` What is a hot key? What is a big key?
+  - `L1` Cache penetration fix in one line.
+  - `L1` Stampede fix in one line.
+  - `L1` What is a thundering herd?
+  - `L1` What is a cache stampede?
+  - `L2` What is a cache stampede, and how do you prevent it? ↳ request coalescing, lock, jittered TTL, early refresh
+  - `L2` How do you prevent a cache stampede? Give three ways. ↳ lock / single-flight, serve stale while refreshing, probabilistic early refresh
+  - `L2` Use `SET NX` so only one request rebuilds a key. What do the other requests do meanwhile?
+  - `L2` What is probabilistic early expiration (XFetch)?
+  - `L2` Requests for ids that don't exist keep hitting the DB. Fix it. ↳ cache nulls with short TTL, Bloom filter, validate input
+  - `L2` Many keys expire at once, or Redis restarts empty. How do you protect the DB? ↳ jittered TTLs, warm-up, circuit breaker, replicas
+  - `L2` What are the risks of caching "not found" results?
+  - `L2` How do you find hot keys? ↳ redis-cli --hotkeys with an LFU policy, client-side metrics, sampling
+  - `L2` How do you fix a hot key? ↳ local cache, read from replicas, split into N copies of the key
+  - `L2` How do you find big keys? ↳ redis-cli --bigkeys / --memkeys, MEMORY USAGE with SCAN
+  - `L2` Why are big keys dangerous? ↳ blocking deletes, slow commands, uneven cluster slots, slow migration
+  - `L2` Delete a 10 GB hash without blocking Redis. ↳ UNLINK, or HSCAN plus HDEL in batches
+  - `L2` How do you prevent a cache stampede?
+  - `L2` What is a cache stampede (thundering herd)? Three ways to prevent it. ↳ request coalescing/locks, early probabilistic refresh, stale-while-revalidate
+  - `L2` What is cache penetration (requests for keys that don't exist)? Fix? ↳ cache negatives, bloom filter
+  - `L2` What is cache avalanche (many keys expire at once)? Fix? ↳ jittered TTLs, warmup, multi-level cache
+  - `L2` What is a negative cache, and what TTL do you give it?
+  - `L2` What is a cache stampede (thundering herd), and three ways to prevent it? ↳ single-flight/locks, early probabilistic refresh, stale-while-revalidate
+  - `L2` What is cache penetration, and how does caching negatives or a Bloom filter help?
+  - `L2` Why add jitter to TTLs?
+  - `L2` What is request coalescing (single-flight)?
+  - `L3` Redis is down. Does the app fail or go straight to the DB? How do you protect the DB? ↳ circuit breaker, rate limit, degrade, stale local cache
+  - `L3` Single-flight inside the app vs a Redis lock for rebuilds: when each?
+  - `L3` After a full cache flush or a cold deploy, how do you warm the cache safely?
+  - `L3` Can a cache make your system *less* available? How? ↳ cold cache after restart overloads DB
+  - `L3` How do you warm a cache after a deploy or failover?
+- [ ] Distributed lock (`SET NX PX`), Redlock and its critique, fencing tokens ↳ https://redis.io/docs/latest/develop/use/patterns/distributed-locks/ · https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html · DDIA ch8 "The truth is defined by the majority" → fencing tokens (pdf p314–317)
+  - `L1` What is a distributed lock, and why would you need one?
+  - `L1` How do you take a lock in Redis with one command? ↳ SET key random_token NX PX 30000
+  - `L1` Why `SET … NX PX` and not `SETNX` followed by `EXPIRE`? ↳ two commands; a crash between them leaves a lock forever
+  - `L1` Which command takes a lock with expiry in one step?
+  - `L1` Who wrote the Redlock critique?
+  - `L1` What is a fencing token, in one line?
+  - `L2` What is a distributed lock, and why is it harder than a local mutex? ↳ network partitions, clock drift, process pauses; fencing tokens
+  - `L2` Why must the lock value be a unique random token?
+  - `L2` Why release with a Lua script instead of `GET` then `DEL`? ↳ check-and-delete must be atomic, or you delete someone else's lock
+  - `L2` Say the Lua release script out loud.
+  - `L2` How do you choose the lock TTL? What if the work runs longer? ↳ watchdog extends with token check; keep work shorter than TTL
+  - `L2` Lock for efficiency vs lock for correctness: why does the difference matter? ↳ efficiency tolerates a rare double run; correctness needs fencing
+  - `L2` What is a fencing token, and who must check it? ↳ increasing number per lock grant; the protected resource rejects older ones
+  - `L2` One Redis primary with async replication: show how two clients can both hold the lock after failover.
+  - `L2` How does Redlock work? ↳ 5 independent primaries; majority acquired within the validity time
+  - `L2` What is Kleppmann's critique of Redlock? ↳ GC pauses, network delays, clock jumps; no fencing tokens
+  - `L2` What was antirez's reply? ↳ monotonic clocks, check elapsed time after acquiring, fencing rarely available anyway
+  - `L2` Who is right? What would you use for a lock that protects money? ↳ consensus store (etcd, ZooKeeper) or DB constraints, plus fencing
+  - `L2` Redis lock vs Postgres advisory lock vs `SELECT FOR UPDATE` vs etcd/ZooKeeper lease.
+  - `L2` What do Redisson, redis-py `Lock` and node-redlock add over raw `SET NX`? ↳ watchdog renewal, retries, reentrancy (Redisson)
+  - `L2` Is a Redis lock safe? What can go wrong?
+  - `L2` Redis `SET NX PX` lock: what can go wrong? What is Redlock and why does Kleppmann criticise it?
+  - `L2` Where do you need a distributed lock, and how did you implement it? ↳ SET NX PX + token; release via Lua compare-and-delete
+  - `L2` Why is Redlock controversial, and what are fencing tokens?
+  - `L3` Implement a Redis distributed lock. What can still go wrong? ↳ SET NX PX + token; expiry during GC pause; fencing tokens
+  - `L3` Walk through the GC-pause scenario that breaks a lock even with a single Redis node.
+  - `L3` How could you get fencing tokens from Redis? ↳ INCR a counter on each acquire; resource keeps the highest seen
+  - `L3` The protected resource (an email API) can't check tokens. What do you do instead? ↳ idempotency keys, dedupe at the resource, accept rare duplicates
+  - `L3` A Redlock node restarts without persistence. What breaks? ↳ it forgets locks; antirez: delayed restart or fsync always
+  - `L3` Reentrant and read-write locks on Redis: how would you build them, and why are they rarely needed?
+- [ ] Rate limiting with Redis (fixed window `INCR`, sliding window with sorted sets, token bucket in Lua) ↳ https://redis.io/docs/latest/commands/incr/ (pattern: rate limiter) · https://redis.io/docs/latest/develop/data-types/sorted-sets/ · https://stripe.com/blog/rate-limiters
+  - `L1` Name the common rate-limiting algorithms. ↳ fixed window, sliding log, sliding window counter, token bucket, leaky bucket
+  - `L1` Sliding window log vs sliding window counter vs token bucket: which did you choose?
+  - `L1` Redis structure for a sliding-window log?
+  - `L1` Why a Lua script for the limiter?
+  - `L2` Make your rate limiter work across 10 API servers with Redis. ↳ INCR + EXPIRE, or sorted set in a Lua script
+  - `L2` Make the token bucket thread-safe, then distributed with Redis. ↳ lock refill+take; atomic Lua script in Redis
+  - `L2` Fixed window with `INCR` + `EXPIRE`. What is the boundary-burst problem? ↳ up to 2× the limit across a window edge
+  - `L2` Sliding log with a sorted set. What does it cost in memory? ↳ ZREMRANGEBYSCORE, ZADD, ZCARD; one member per request
+  - `L2` Sliding window counter: how does weighting the previous window approximate a true sliding window?
+  - `L2` Token bucket in Lua: what state do you keep, and why must it be one script? ↳ tokens and last refill time; atomic read-modify-write
+  - `L2` `INCR` then `EXPIRE` as two calls: what is the bug, and the fix? ↳ crash between them leaves a key without TTL; use Lua
+  - `L2` Limits per user, per IP, per API key and per route: how do you design the keys?
+  - `L2` Build a rate limiter with Redis
+  - `L2` Show the Redis data structure and the Lua script for your sliding window. ↳ ZSET of timestamps or two fixed-window counters weighted
+  - `L2` Why a Lua script instead of separate Redis commands from Node?
+  - `L2` What does one rate-limit check cost in latency, and how many Redis round-trips?
+  - `L3` How do you rate-limit per user in FastAPI across several workers?
+  - `L3` Rate limiting across three regions with separate Redis clusters: options and trade-offs.
+  - `L3` Redis is down: does the rate limiter fail open or fail closed?
+  - `L3` Rate-limit LLM calls by tokens consumed instead of request count. How?
+  - `L3` Redis Cluster: how do you keep a tenant's keys on one slot? ↳ hash tags `{tenant}`
+  - `L3` How accurate is your limiter under clock skew between pods?
+  - `L3` How did you test the limiter for correctness under concurrency?
+  - `L3` Clock skew breaks your sliding-window limiter on one pod. What symptoms would you see?
+- [ ] Pub/Sub vs Streams (consumer groups, acks) ↳ https://redis.io/docs/latest/develop/interact/pubsub/ · https://redis.io/docs/latest/develop/data-types/streams/ (consumer groups, XACK) · DDIA ch11 "Messaging systems" (pdf p449–454)
+  - `L1` What is Redis Pub/Sub?
+  - `L1` What happens to a Pub/Sub message when no subscriber is connected? ↳ it is dropped: fire-and-forget
+  - `L1` What is a Redis Stream? What does an entry ID look like? ↳ `<milliseconds>-<sequence>`, e.g. 1700000000000-0
+  - `L1` Which command acknowledges a stream entry?
+  - `L1` Which command takes over stuck pending stream entries automatically?
+  - `L1` Does Pub/Sub keep messages for offline subscribers?
+  - `L2` Pub/Sub vs Streams: delivery guarantee, persistence, replay.
+  - `L2` What do `XADD`, `XRANGE` and `XREAD BLOCK` do?
+  - `L2` What is a consumer group? ↳ XREADGROUP; each entry goes to one consumer in the group
+  - `L2` What is the Pending Entries List (PEL)?
+  - `L2` What does `XACK` do? What happens if a consumer crashes before acking?
+  - `L2` `XCLAIM` vs `XAUTOCLAIM`: how do you recover stuck messages? ↳ take entries idle longer than min-idle-time; XAUTOCLAIM scans (6.2+)
+  - `L2` `XREADGROUP … >` vs `XREADGROUP … 0`. ↳ new entries vs re-reading your own pending entries
+  - `L2` How do you cap a stream's size? `MAXLEN ~` vs `MINID`. ↳ ~ trims approximately at node boundaries, cheaper
+  - `L2` Build a dead-letter queue on Streams. ↳ delivery count from XPENDING; move after N attempts
+  - `L2` Redis Streams vs Kafka: when is Redis Streams enough?
+  - `L2` Is order guaranteed in a stream? And with several consumers in one group?
+  - `L2` What are pattern subscriptions (`PSUBSCRIBE`), and what do they cost?
+  - `L3` What happens to stream entries on a failover with async replication? ↳ acknowledged XADDs can vanish; consumers may see gaps
+  - `L3` How do you make stream consumers idempotent?
+  - `L3` A Pub/Sub subscriber is slow. What does Redis do with its output buffer? ↳ client-output-buffer-limit pubsub; client disconnected
+  - `L3` How would you spread one high-volume stream across a Redis Cluster?
+  - `L3` What are keyspace notifications, and why are they unreliable for business logic? ↳ Pub/Sub-based, lost on disconnect; expiry events fire late
+  - `L3` Why did AiRA use SSE → Redis Streams → WebSocket instead of Kafka? What would make you switch?
+- [ ] Persistence: RDB snapshots vs AOF; replication, Sentinel, Cluster (hash slots) ↳ https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/ · https://redis.io/docs/latest/operate/oss_and_stack/management/scaling/ (Cluster, hash slots) · DDIA ch6 "Strategies for rebalancing" (pdf p223–226) — fixed partitions = hash slots
+  - `L1` Number of hash slots in Redis Cluster?
+  - `L1` Does Redis lose data on restart? What persistence options exist?
+  - `L1` What is an RDB snapshot? What is the AOF?
+  - `L1` RDB or AOF for the smaller backup file?
+  - `L1` `appendfsync` value most people use?
+  - `L2` Redis Cluster does not use a ring. What does it use, and why? ↳ 16384 hash slots via CRC16; explicit slot migration
+  - `L2` RDB vs AOF: durability, file size, restart time. ↳ RDB compact but loses data since last snapshot; AOF more durable, bigger
+  - `L2` `appendfsync always` vs `everysec` vs `no`: what can you lose with each? ↳ almost nothing; about 1 s; whatever the OS hasn't flushed
+  - `L2` How does `BGSAVE` snapshot without stopping writes? ↳ fork; child writes the file while copy-on-write protects pages
+  - `L2` Why can `BGSAVE` nearly double memory use on a write-heavy instance?
+  - `L2` What is AOF rewrite, and why is it needed?
+  - `L2` What changed with multi-part AOF in Redis 7? ↳ base file, incremental files and a manifest
+  - `L2` What is the RDB preamble in the AOF (`aof-use-rdb-preamble`)?
+  - `L2` Which persistence for a pure cache? For a job queue? For sessions?
+  - `L2` `SAVE` vs `BGSAVE`: why never run `SAVE` in production?
+  - `L3` With `appendfsync everysec`, Redis acknowledged a write and the machine lost power. Is the write safe?
+  - `L3` Can Redis be your primary database? What must you accept? ↳ dataset fits RAM, async replication loss window, fsync cost
+  - `L3` The disk is slow and AOF fsync falls behind. What happens to latency? ↳ main thread can stall writes when fsync lags over 2 s
+  - `L3` A 50 GB instance restarts. How long is it down, and how do you avoid that? ↳ data load time; fail over to a replica instead
+  - `L3` How do you back up Redis and test a restore?
+- [ ] Leaderboards with sorted sets; delayed jobs with sorted sets ↳ https://redis.io/docs/latest/develop/data-types/sorted-sets/ (leaderboard example) · https://docs.bullmq.io (Guide → Jobs → "Delayed": delayed jobs on a sorted set)
+  - `L1` How do you build a leaderboard with Redis? ↳ ZINCRBY, ZREVRANGE … WITHSCORES, ZREVRANK
+  - `L1` Which data type backs a leaderboard?
+  - `L2` Delayed jobs with a sorted set: how? ↳ score = run-at time; ZRANGEBYSCORE due jobs; claim atomically
+  - `L2` Two workers poll the same delayed-job sorted set. How does only one take a job? ↳ ZREM returns 1 only to the winner, or Lua
+  - `L2` Equal scores: how do you rank the player who got there first higher? ↳ composite score: points plus a fraction from inverse timestamp
+  - `L2` "Show my rank and the 5 players around me" in a 10M-player leaderboard.
+  - `L3` Daily, weekly and all-time leaderboards without recomputing. ↳ key per period, ZUNIONSTORE to combine, TTL on old periods
+- [ ] Threading model: event loop with epoll, io-threads, commands that block, lazy freeing (UNLINK), fork for persistence
+  - `L1` What is Redis, in one sentence?
+  - `L1` Why is Redis so fast? ↳ in memory, single-threaded execution, I/O multiplexing, compact data structures, simple protocol
+  - `L1` Is Redis single-threaded? Be precise. ↳ commands run on one thread; helper threads for I/O, freeing memory, fsync
+  - `L1` Rough latency and throughput of one Redis instance? ↳ sub-millisecond; around 100k+ simple ops/s per instance
+  - `L1` What is RESP? ↳ the Redis wire protocol; RESP3 arrived in Redis 6
+  - `L1` Default Redis port? ↳ 6379
+  - `L1` `DEL` or `UNLINK` for a huge key?
+  - `L2` What is I/O multiplexing (epoll / kqueue), and how does the Redis event loop use it?
+  - `L2` Why did Redis choose one thread for commands? What does that buy you? ↳ no locks, every command atomic, simple; CPU rarely the bottleneck
+  - `L2` What do `io-threads` in Redis 6+ do, and what do they not do? ↳ socket reads/writes and parsing; commands still run on one thread
+  - `L2` One command takes 2 seconds. What happens to every other client?
+  - `L2` Name commands that can block the event loop. ↳ KEYS, sync FLUSHALL, DEL of huge keys, HGETALL/SMEMBERS on huge keys, long Lua
+  - `L2` `UNLINK` vs `DEL`. What is lazy freeing? ↳ UNLINK reclaims memory in a background thread
+  - `L2` Redis uses 100% of one core on a 16-core box. What are your options? ↳ shard with Cluster, read replicas, io-threads, fix slow commands
+  - `L2` What runs in child processes or background threads? ↳ fork for RDB and AOF rewrite; threads for fsync and lazy free
+  - `L3` Why does `fork()` cause latency spikes on a big instance? ↳ copying page tables; transparent huge pages make copy-on-write worse
+  - `L3` How does one thread serve 10,000 client connections?
+  - `L3` Is Redis usually CPU-bound, memory-bound or network-bound? How would you show it?
+  - `L3` KeyDB and Dragonfly are multi-threaded. Why didn't Redis go fully multi-threaded?
+- [ ] Internal encodings: SDS strings, listpack, intset, quicklist, skip list + dict for sorted sets, incremental rehashing
+  - `L1` What does `OBJECT ENCODING key` show you?
+  - `L1` What data structure holds the keyspace? ↳ a hash table (dict) with incremental rehashing
+  - `L1` Encoding for a small hash in Redis 7?
+  - `L1` Data structure behind a large sorted set?
+  - `L2` What is SDS, and why not plain C strings? ↳ O(1) length, binary safe, preallocated space
+  - `L2` What is a listpack, and which types use it for small values? ↳ compact contiguous encoding: small hashes, lists, sets, sorted sets
+  - `L2` Why did Redis 7 replace ziplist with listpack? ↳ ziplist had the cascading-update problem
+  - `L2` What is an intset? When does a set stop being one? ↳ small all-integer set; a non-integer or too many members converts it
+  - `L2` What do `hash-max-listpack-entries` and `hash-max-listpack-value` control?
+  - `L2` How is a list stored internally (quicklist)?
+  - `L2` How is a large sorted set stored? Why a skip list plus a hash table? ↳ skip list for order and ranges; dict for O(1) score lookup
+  - `L2` How does a skip list work, and why did antirez pick it over a balanced tree? ↳ random levels; simpler code, easy range scans, similar speed
+  - `L2` How does Redis grow its dict without a long pause? ↳ incremental rehash across two tables, a few buckets per operation
+  - `L3` How is a Stream stored internally? ↳ radix tree of listpacks keyed by entry ID
+  - `L3` `int` vs `embstr` vs `raw` string encodings.
+  - `L3` 100 small string keys vs one hash with 100 fields: memory difference, and why? ↳ per-key overhead (dict entry, object, expiry) vs packed listpack
+  - `L3` How does the dict handle hash collisions? ↳ chaining
+  - `L3` Why does Redis keep shared objects for small integers?
+- [ ] Replication and Sentinel: async replication, PSYNC and backlog, WAIT, lost writes on failover, SDOWN/ODOWN quorum
+  - `L1` How does Redis replication work, in a few sentences?
+  - `L1` Is Redis replication synchronous or asynchronous? ↳ asynchronous
+  - `L1` What is Redis Sentinel?
+  - `L1` Default Redis Sentinel port? ↳ 26379
+  - `L1` Is replication sync or async by default?
+  - `L2` Full sync vs partial resync: what are the replication ID, offset and backlog? ↳ PSYNC continues from offset if backlog has it; else full RDB
+  - `L2` What does `WAIT` do? Does it make Redis strongly consistent? ↳ waits for N replica acks; still not strongly consistent
+  - `L2` How can you lose acknowledged writes during a failover?
+  - `L2` What do `min-replicas-to-write` and `min-replicas-max-lag` do?
+  - `L2` How does Sentinel decide the primary is down? SDOWN vs ODOWN and quorum.
+  - `L2` How does a client find the new primary after a Sentinel failover?
+  - `L2` Why run at least three Sentinels, on separate machines?
+  - `L2` What can go wrong when you read from replicas? ↳ stale reads, no read-your-writes, lag spikes
+  - `L2` A replica keeps restarting full sync in a loop. What is happening? ↳ backlog too small or output buffer limit hit during transfer
+  - `L3` A network partition leaves the old primary taking writes. What is lost, and how do you limit it?
+  - `L3` What is diskless replication, and when would you enable it?
+  - `L3` Sentinel vs Cluster vs a managed service's failover for a 5 GB dataset: which and why?
+  - `L3` Why chain replicas (a replica of a replica)?
+- [ ] Redis Cluster: 16,384 hash slots, hash tags, MOVED/ASK redirects, resharding, cross-slot limits, cluster failover
+  - `L1` What is Redis Cluster?
+  - `L1` How many hash slots are there, and how does a key map to one? ↳ 16,384; CRC16(key) mod 16384
+  - `L1` What is a hash tag? ↳ only the part inside {…} is hashed, so keys share a slot
+  - `L1` How many hash slots in Redis Cluster?
+  - `L1` What does a `MOVED` error tell the client?
+  - `L1` What do curly braces in a key do in Cluster?
+  - `L2` Why fixed hash slots instead of consistent hashing? ↳ easy to move whole slots; simple routing table
+  - `L2` `MOVED` vs `ASK` redirect. ↳ MOVED: slot lives elsewhere now; ASK: one-time, during migration
+  - `L2` What does a cluster-aware ("smart") client do?
+  - `L2` Multi-key commands, MULTI and Lua in Cluster: what is the rule? ↳ all keys in one slot, else CROSSSLOT error
+  - `L2` Use hash tags to keep one user's keys together. What is the risk? ↳ `{user:42}:cart`; one huge tag makes a hot slot
+  - `L2` How does resharding work, and what do clients see during it?
+  - `L2` How does failover work in Cluster without Sentinel? ↳ gossip detects failure; majority of primaries vote; replica promoted
+  - `L2` What does `cluster-require-full-coverage` do?
+  - `L2` Does Cluster support `SELECT 1` (multiple databases)? ↳ no, only database 0
+  - `L3` Why 16,384 slots and not 65,536? ↳ slot bitmap in heartbeats stays 2 KB; clusters stay under ~1,000 nodes
+  - `L3` Can Redis Cluster lose acknowledged writes? Describe the window.
+  - `L3` Why is classic Pub/Sub expensive in Cluster, and what does sharded Pub/Sub (`SSUBSCRIBE`) fix? ↳ messages broadcast to every node; sharded routes by slot
+  - `L3` Migrate a single 40 GB Redis to a 6-node cluster with no downtime.
+  - `L3` Twemproxy / Envoy / client-side sharding vs Redis Cluster.
+- [ ] Queues on Redis: LPUSH + BRPOP, reliable queue with BLMOVE, priority queues, lists vs streams vs sorted sets
+  - `L1` How do you build a simple queue with a Redis list? ↳ LPUSH to add, BRPOP to take
+  - `L1` What does `BLPOP` do?
+  - `L2` Why is `LPUSH` + `BRPOP` not reliable? ↳ a worker crash after pop loses the job
+  - `L2` Explain the reliable queue pattern with `BLMOVE` (formerly `BRPOPLPUSH`). ↳ atomically move to a processing list; remove when done; reaper re-queues
+  - `L2` Lists vs Streams vs sorted sets as a job queue: trade-offs.
+  - `L2` How do you build a priority queue in Redis?
+  - `L2` Redis queue vs RabbitMQ vs SQS vs Postgres `SKIP LOCKED`: when each?
+  - `L3` How do you monitor a Redis queue? ↳ length, age of oldest job, processing-list size, failure rate
+  - `L3` Queue keys disappeared under memory pressure. Why, and how do you prevent it?
+- [ ] Memory and latency debugging: SCAN vs KEYS, SLOWLOG, MEMORY USAGE, fragmentation, swap, output buffers, big replies
+  - `L1` Why should you never run `KEYS *` in production? ↳ O(N) over the whole keyspace; blocks every other client
+  - `L1` What is `SCAN`, and what does it guarantee? ↳ cursor-based; may return duplicates; keys present throughout are returned
+  - `L1` What is the `SLOWLOG`? ↳ commands slower than slowlog-log-slower-than; excludes network time
+  - `L1` `KEYS` or `SCAN` in production?
+  - `L2` How do you see how much memory one key uses? ↳ MEMORY USAGE key
+  - `L2` What does `INFO memory` show? `used_memory` vs `used_memory_rss` vs fragmentation ratio.
+  - `L2` The fragmentation ratio is 1.8. What do you do? ↳ enable activedefrag; or restart / fail over
+  - `L2` The fragmentation ratio is below 1. What does that mean? ↳ memory is being swapped to disk: bad
+  - `L2` How do you cut memory for 100M tiny keys? ↳ bucket into small hashes (listpack), shorter key names, TTLs
+  - `L2` Latency spikes every few minutes. List the suspects. ↳ fork for RDB/AOF rewrite, mass expiry, big deletes, slow commands, swap
+  - `L2` What do the latency monitor and `LATENCY DOCTOR` give you?
+  - `L2` How do you measure the host's own latency floor? ↳ redis-cli --intrinsic-latency
+  - `L2` The app says Redis is slow but the SLOWLOG is empty. Where is the time going? ↳ network, client pool waits, queueing behind others, serialization
+  - `L2` Why must Redis never swap, and how do you check for it?
+  - `L2` What is `client-output-buffer-limit`, and when does it disconnect clients?
+  - `L2` `HGETALL` on a hash with 2M fields: what happens, and how should you read it? ↳ blocks and builds a huge reply; use HSCAN
+  - `L3` Why disable transparent huge pages for Redis? ↳ copy-on-write after fork copies 2 MB pages; latency spikes
+  - `L3` Connections jump to 50,000. What breaks, and how do you fix it? ↳ per-client buffers, maxclients, missing pooling
+  - `L3` How do you find what is using memory in a production keyspace? ↳ offline RDB analysis; sampled SCAN with MEMORY USAGE
+- [ ] Operating Redis: ACLs and protected mode, monitoring, upgrades, managed Redis, Memcached / Valkey / Dragonfly
+  - `L1` What is protected mode? ↳ refuses outside connections when no password is set and bound to all interfaces
+  - `L1` What are ACLs in Redis 6+?
+  - `L1` Redis vs Memcached: three differences. ↳ data types, persistence and replication, multi-threaded Memcached
+  - `L1` What is Valkey?
+  - `L2` How do you secure a Redis instance? ↳ private network, ACL users, TLS, restrict dangerous commands, no public port
+  - `L2` Why is an internet-facing Redis with no password a full server compromise? ↳ CONFIG SET dir + SAVE can write files like SSH keys
+  - `L2` Which commands would you block with ACLs for application users? ↳ FLUSHALL, KEYS, CONFIG, DEBUG, MODULE
+  - `L2` What happened to the Redis licence in 2024, and what is Valkey? ↳ moved off BSD to RSAL/SSPL; Linux Foundation fork
+  - `L2` Redis 8 added AGPL as a licence option in 2025. Does the licence change your choice?
+  - `L2` What do Dragonfly and KeyDB promise, and what are the trade-offs?
+  - `L2` When would you still choose Memcached today?
+  - `L2` Azure Cache for Redis vs AWS ElastiCache vs Redis Cloud vs self-hosted: what do you gain and lose?
+  - `L2` ElastiCache "cluster mode enabled" vs "disabled": what changes for the application?
+  - `L2` How do you upgrade Redis without downtime?
+  - `L2` What do you monitor on Redis? ↳ memory, evictions, hit ratio, clients, ops/s, latency, replication lag, blocked clients
+  - `L3` Azure Cache for Redis tiers (Basic, Standard, Premium, Enterprise): what does each give for HA, persistence, clustering?
+  - `L3` Multi-tenant Redis: prefixes, ACL key patterns, separate instances. How do you isolate tenants?
+  - `L3` Running Redis on Kubernetes: StatefulSets and operators, and why many teams use a managed service instead.
+- [ ] Redis for LLM apps: semantic cache (threshold, cache key, invalidation, tenant isolation), vector search, agent memory
+  - `L1` What is semantic caching for LLM calls?
+  - `L1` Exact-match cache vs semantic cache.
+  - `L2` How does a semantic cache work end to end? ↳ embed prompt, vector search, similarity threshold, return cached answer or call LLM
+  - `L2` How do you choose the similarity threshold? What breaks if it is too loose? ↳ different questions get the wrong cached answer
+  - `L2` Which LLM requests must never come from a semantic cache? ↳ personal data, time-sensitive answers, tool calls with side effects
+  - `L2` What goes into the cache key besides the prompt? ↳ model, system-prompt version, tenant/user, tools, temperature
+  - `L2` Redis vector search: FLAT vs HNSW indexes, and the distance metrics.
+  - `L2` Redis vs Qdrant vs pgvector for a semantic cache.
+  - `L2` How do you invalidate a semantic cache when the prompt or model changes? ↳ version in the namespace; TTL
+  - `L2` Storing chat history or agent memory in Redis: data type, TTL, size cap.
+  - `L2` Caching embeddings: key design and what you save.
+  - `L3` How do you prove a semantic cache helps? ↳ hit rate, false-hit rate from sampled evals, latency, cost saved
+  - `L3` Multi-tenant semantic cache: how do you stop answers leaking between users? ↳ tenant tag filter inside the vector query
+  - `L3` How do you cache and replay a streamed LLM response?
+  - `L3` Redis as short-term memory and tool-result cache for an agent loop: what do you store, with which TTLs?
+
+**Learn:** Redis docs (data types, patterns, distributed locks) · Kleppmann's "How to do distributed locking"
+(martin.kleppmann.com, 2016) · Xu1 ch4 (rate limiter) · BBG cache articles
+
+## 5.9 Vector databases
+- [ ] Embeddings recap; similarity metrics (cosine, dot, L2) ↳ HOL ch2 "Text Embeddings (for Sentences and Whole Documents)" (pdf p83–85) · AIE ch3 "Similarity Measurements Against Reference Data" + "Introduction to Embedding" (pdf p151–159: cosine) · LEH ch4 "What are embeddings?" (pdf p136–144)
+  - `L1` Cosine vs dot product vs Euclidean: when do they rank the same? ↳ on normalised vectors
+  - `L1` Cosine similarity vs dot product vs Euclidean (L2) distance. ↳ same ranking when vectors are normalized
+  - `L1` Cosine similarity equals dot product when vectors are ___? ↳ normalized to unit length
+  - `L1` What is an embedding, and what is cosine similarity?
+  - `L3` pgvector operators `<->`, `<#>`, `<=>`: what does each compute, and why must the index opclass match? ↳ L2, negative inner product, cosine distance
+- [ ] Exact (flat) vs approximate nearest neighbour search ↳ AIE ch6 "Retrieval Algorithms" → embedding-based retrieval (pdf p285–288) · HOL ch8 "Dense Retrieval" (pdf p250–262) · LEH ch4 "More on vector DBs" (pdf p144–146)
+  - `L1` What is nearest-neighbour search on vectors, and why is exact search slow at scale? ↳ brute force is O(n·d) per query
+  - `L1` What does "approximate" in ANN mean? What is recall@k?
+  - `L1` What is a vector database, and what does it add on top of a plain array of vectors?
+  - `L1` What is k-nearest-neighbour (kNN) search? What is approximate nearest neighbour (ANN)?
+  - `L1` What is a flat (brute-force) index, and when is it the right choice?
+  - `L2` Why approximate search? What do you lose?
+- [ ] Indexes: HNSW (graph, `M`, `ef`), IVF (clusters, `nprobe`), PQ (compression) ↳ https://www.pinecone.io/learn/series/faiss/hnsw/ · https://www.pinecone.io/learn/series/faiss/product-quantization/ · AIE ch6 "Retrieval Algorithms" (pdf p286–287: HNSW, IVF, PQ)
+  - `L1` What is HNSW in one sentence? ↳ layered proximity graph; greedy search from sparse top layer down
+  - `L1` Which index does Qdrant use for vectors?
+  - `L1` What does HNSW stand for?
+  - `L1` What does `efSearch` trade?
+  - `L1` What does `nprobe` control in IVF?
+  - `L2` How does an HNSW search move through the layers? ↳ greedy descent above; beam search of width ef at layer 0
+  - `L2` How is a node's top layer chosen, and why is that like a skip list? ↳ exponentially decaying random level
+  - `L2` What do `M`, `ef_construct` and `ef` control? ↳ links per node; build quality; query recall vs latency
+  - `L2` HNSW vs IVF vs flat index vs product quantisation: trade-offs.
+  - `L2` Why is deleting from HNSW hard? ↳ tombstones; connectivity degrades; periodic rebuild
+  - `L2` pgvector HNSW vs IVFFlat: build time, recall, memory, updates. ↳ HNSW: better recall, slower build; IVFFlat needs data before building
+  - `L2` How does HNSW work?
+  - `L2` HNSW vs IVF vs flat search: trade-offs in recall, memory and build time.
+  - `L2` How does HNSW work? ↳ layered proximity graph; greedy search from sparse top layer down
+  - `L2` What do the HNSW parameters `M`, `efConstruction` and `efSearch` control? ↳ links per node; build quality; search breadth vs latency
+  - `L2` What happens to recall, latency, memory and build time when you raise `M`?
+  - `L2` What are Qdrant's and pgvector's default HNSW settings? ↳ Qdrant m=16, ef_construct=100; pgvector m=16, ef_construction=64, ef_search=40
+  - `L2` How does IVF (inverted file) work? What are `nlist` and `nprobe`? ↳ k-means clusters; search only nprobe nearest clusters
+  - `L2` HNSW vs IVF: when would you choose each? ↳ HNSW: fast, high recall, RAM-heavy; IVF: cheaper build, disk-friendly
+  - `L2` Why are deletes and updates awkward for HNSW? ↳ tombstones, graph repair, periodic rebuild/optimization
+  - `L3` How do vector indexes (HNSW, IVF) differ from B+ trees in what "lookup" means?
+  - `L3` How do pgvector's HNSW and IVFFlat fit into Postgres's index access method model?
+  - `L3` What are `halfvec` and binary quantization in pgvector for?
+  - `L3` How would you implement a tiny HNSW insert and search in pseudocode?
+  - `L3` What is the HNSW index in Qdrant, and what do `m` and `ef` trade off?
+- [ ] Recall vs latency vs memory trade-off ↳ https://ann-benchmarks.com · https://github.com/pgvector/pgvector (README: HNSW vs IVFFlat options) · AIE ch6 "Retrieval Algorithms" (pdf p288–290: comparing retrieval algorithms)
+  - `L1` What is recall@k for an ANN index?
+  - `L2` Estimate memory for 10M vectors of 1536 float32 dims plus the graph. ↳ ~61 GB of vectors + M links per node
+  - `L2` Scalar, product and binary quantisation: memory saved vs recall lost. ↳ rescore top candidates with full vectors
+  - `L2` How much RAM do 10M vectors of 768 dims in float32 take, before index overhead? ↳ 10M × 768 × 4 B ≈ 30 GB
+  - `L2` How do you measure recall of your production index? ↳ compare ANN results with exact flat search on a sample
+  - `L3` How do you evaluate a vector index offline? ↳ brute-force ground truth; recall@k vs QPS curve
+  - `L3` Why does HNSW recall degrade as dimensionality grows ("curse of dimensionality")?
+- [ ] Metadata filtering (pre- vs post-filtering), payload indexes in Qdrant ↳ https://qdrant.tech/documentation/concepts/filtering/ · https://qdrant.tech/documentation/concepts/indexing/ (payload index) · LEH ch9 "Advanced RAG retrieval optimization: filtered vector search" (pdf p361–363)
+  - `L1` What is a payload / metadata on a vector point?
+  - `L2` How does a filter like `tenant_id = X` interact with HNSW? ↳ strict filters break graph walks; payload index, filter-aware search
+  - `L2` Vector search filtered by `user_id`: what goes wrong with an HNSW index plus WHERE? ↳ post-filtering returns too few rows; iterative scans, partial indexes
+  - `L2` How do you filter by user_id efficiently in vector search?
+  - `L2` How do you combine vector search with filters (price, category, in stock)? ↳ pre-filter vs post-filter vs filtered HNSW (Qdrant payload index)
+  - `L2` What is a payload index in Qdrant, and why must you create one for filtered fields?
+  - `L3` Multi-tenant vector search: one collection with a tenant filter vs one collection per tenant.
+  - `L3` Filtered vector search: pre-filter vs post-filter vs filter-during-search. What breaks with each?
+  - `L3` Your filter keeps only 0.1% of points and HNSW returns fewer than k results. Why, and how do databases fix it? ↳ graph disconnected under filter; payload index, brute-force fallback, filterable HNSW
+- [ ] Hybrid search (BM25 + vectors), sparse vectors ↳ https://qdrant.tech/articles/hybrid-search/ · AIE ch6 "Retrieval Algorithms" (pdf p283–290: term-based, embedding-based, hybrid) · HOL ch8 "Reranking" (pdf p262–266)
+  - `L2` Hybrid search in Postgres: combine full-text rank and vector similarity. ↳ run both, merge with reciprocal rank fusion
+  - `L2` Keyword search vs vector (semantic) search vs hybrid: when each?
+- [ ] Options: Qdrant, pgvector, Pinecone, Weaviate, Milvus, Elasticsearch kNN — and when pgvector is enough ↳ https://github.com/pgvector/pgvector · LEH ch4 "More on vector DBs" (pdf p144–146) · https://qdrant.tech/documentation/overview/
+  - `L1` What is pgvector?
+  - `L1` Name five vector databases or libraries. ↳ Qdrant, pgvector, Pinecone, Weaviate, Milvus, FAISS, Chroma, Elasticsearch/OpenSearch
+  - `L1` Qdrant REST port?
+  - `L2` pgvector HNSW vs IVFFlat: when is Postgres enough?
+  - `L2` pgvector vs Qdrant: when is pgvector enough? ↳ few million vectors, need joins and transactions; Qdrant for heavy filtering, scale
+  - `L2` pgvector vs a dedicated vector DB?
+  - `L2` Qdrant vs pgvector vs Pinecone vs Weaviate vs Milvus: when would you pick each?
+  - `L2` When is pgvector enough, and when do you outgrow it? ↳ few million vectors, transactional joins; outgrow on scale/filter perf
+  - `L2` FAISS is a library, not a database. What does that mean in practice?
+  - `L2` What are Qdrant's ports and APIs? ↳ 6333 REST, 6334 gRPC
+  - `L2` Why Qdrant and not Redis vector search, pgvector or Pinecone?
+  - `L3` How do you benchmark two vector DBs fairly for your data? ↳ same recall target, filters, concurrency, dataset size; ann-benchmarks style
+- [ ] Operating a vector DB: sharding, replication, snapshots, aliases for zero-downtime re-indexing, storage modes, sync with Postgres
+  - `L2` How do you shard a vector collection, and what does a query do across shards? ↳ scatter to all shards, merge top-k
+  - `L2` How does replication work in Qdrant / Milvus, and what consistency do writes get?
+  - `L2` How do you back up and restore a vector collection? ↳ snapshots; or rebuild from source of truth
+  - `L2` Should the vector DB be your source of truth? Why not?
+  - `L2` How do you migrate from one vector DB to another with no downtime? ↳ dual-write, backfill, shadow-read compare, switch alias
+  - `L2` What is a collection alias, and how does it allow zero-downtime re-indexing?
+  - `L3` How do you design a 1-billion-vector search system? Memory, sharding, quantization, cost.
+  - `L3` Vector search p99 jumped from 20 ms to 400 ms after a bulk upload. What happened? ↳ segments not optimized/indexed yet, merging, memory pressure, mmap paging
+  - `L3` In-memory vs mmap vs on-disk storage for vectors: trade-offs.
+  - `L3` How do you keep the vector DB consistent with Postgres when either write can fail? ↳ outbox/CDC; idempotent upserts keyed by doc id
+  - `L3` Design semantic search over 100M product descriptions with filters on price, brand and stock.
+- [ ] Vector compression: scalar and binary quantization, PQ, oversampling + rescoring, DiskANN, Matryoshka truncation
+  - `L1` What does PQ stand for in vector search?
+  - `L2` What is product quantization (PQ), and what does it trade? ↳ split vector into sub-vectors, store centroid codes; less memory, lower recall
+  - `L2` What is scalar quantization (int8) and binary quantization of vectors?
+  - `L3` What is oversampling + rescoring with quantized vectors?
+  - `L3` What is DiskANN / Vamana, and why do disk-based indexes matter at a billion vectors?
+  - `L3` What is Matryoshka embedding truncation, and how does it pair with a two-stage search?
+
+**Learn:** HOL ch8 · AIE ch6 · LEH ch4 · Qdrant docs (concepts: indexing, filtering) · Pinecone learning center
+(HNSW, IVF, PQ articles — free)
+
+## 5.10 Search inside your database
+- [ ] Postgres full-text search: `tsvector`, `tsquery`, GIN index, ranking (`ts_rank`), languages ↳ https://www.postgresql.org/docs/current/textsearch-intro.html · https://www.postgresql.org/docs/current/textsearch-controls.html (ts_rank) · https://www.postgresql.org/docs/current/textsearch-indexes.html (GIN vs GiST)
+  - `L1` What are `tsvector` and `tsquery`?
+  - `L2` How does an inverted index work, and how is a GIN index one?
+  - `L2` How does Postgres full-text search work? ↳ parser, dictionaries, stemming, stop words, ts_rank
+  - `L2` How do you keep a `tsvector` up to date? ↳ stored generated column plus a GIN index
+- [ ] Trigram search (`pg_trgm`) for fuzzy / `LIKE '%x%'` queries ↳ https://www.postgresql.org/docs/current/pgtrgm.html · DDIA ch3 "Other indexing structures" → full-text and fuzzy indexes (pdf p107)
+  - `L2` What is `pg_trgm`, and how does it let an index serve `LIKE '%phone%'`? ↳ trigram GIN/GiST index
+  - `L2` Typo-tolerant search and autocomplete in Postgres. ↳ pg_trgm similarity; prefix tsquery with :*
+  - `L2` `ILIKE '%term%'` over 5M rows is slow. What are your options?
+- [ ] When to move to Elasticsearch/OpenSearch; keeping it in sync (CDC, outbox) ↳ DDIA ch11 "Keeping systems in sync" + "Change data capture" (pdf p459–464) · https://microservices.io/patterns/data/transactional-outbox.html · https://debezium.io/documentation/reference/stable/architecture.html
+  - `L2` Search over a 1M-row product catalogue: Postgres full-text or Elasticsearch? ↳ start with Postgres FTS + trigram; ES for relevance tuning, facets
+  - `L2` Add search to a product catalogue of 1M rows — Postgres or Elasticsearch?
+  - `L2` How do you keep Elasticsearch in sync with your primary database? ↳ CDC/outbox → indexer; never dual-write from request
+  - `L2` Why is Elasticsearch not a primary database?
+  - `L3` You move search to Elasticsearch. How do you keep it in sync with Postgres? ↳ outbox or CDC (Debezium), idempotent indexer, full reindex path
+- [ ] Relevance basics: TF-IDF, BM25; autocomplete with prefix indexes / edge n-grams ↳ https://www.elastic.co/blog/practical-bm25-part-2-the-bm25-algorithm-and-its-variables · AIE ch6 "Retrieval Algorithms" (pdf p283–285: TF-IDF, BM25) · https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-edgengram-tokenizer.html
+  - `L2` How is relevance scored? What is TF-IDF and BM25?
+  - `L3` How do you do typo tolerance and autocomplete in a search engine? ↳ n-grams, edge n-grams, fuzzy/Levenshtein, FST
+
+## 5.11 Running Postgres in production
+- [ ] Backups: logical (`pg_dump`) vs physical; point-in-time recovery (WAL archiving); testing restores ↳ https://www.postgresql.org/docs/current/continuous-archiving.html (PITR) · https://www.postgresql.org/docs/current/backup-dump.html · https://sre.google/sre-book/data-integrity/
+  - `L1` Logical backup (`pg_dump`) vs physical backup (`pg_basebackup`).
+  - `L1` What is point-in-time recovery (PITR)?
+  - `L2` How does PITR work end to end? ↳ base backup + archived WAL + recovery_target_time
+  - `L2` Someone ran `DELETE FROM orders` with no `WHERE` in prod. How do you recover? ↳ PITR to a new instance just before; copy rows back
+  - `L2` Which backup tools would you use in production? ↳ pgBackRest, WAL-G, Barman, managed snapshots
+  - `L2` Define RPO and RTO. What numbers does your backup setup give?
+  - `L2` How do you know your backups actually work? ↳ scheduled automated restore tests
+  - `L2` Someone ran `DELETE` without `WHERE` in prod — how do you recover?
+  - `L2` A backup you have never restored is not a backup. How do you test restores?
+  - `L3` Why is `pg_dump` consistent while writes continue? ↳ it runs inside one repeatable read snapshot
+- [ ] Replication: streaming (physical) vs logical replication; failover tools (Patroni, managed services) ↳ DDIA ch5 "Handling node outages" + "Implementation of replication logs" (pdf p172–177) · https://www.postgresql.org/docs/current/logical-replication.html · https://patroni.readthedocs.io
+  - `L1` What is streaming (physical) replication?
+  - `L1` Synchronous vs asynchronous replication.
+  - `L1` Physical vs logical replication in one line.
+  - `L1` What is Patroni for?
+  - `L2` Streaming vs logical replication: what is copied, and when do you use each? ↳ physical: whole cluster, same version; logical: row changes per table
+  - `L2` What is a replication slot, and how can an abandoned one take down the primary? ↳ WAL retained forever until the disk fills
+  - `L2` With synchronous replication, what do `remote_write`, `on` and `remote_apply` mean?
+  - `L2` The only synchronous standby dies. What happens to writes on the primary? ↳ commits hang; use quorum ANY 1 (s1, s2)
+  - `L2` How does automatic failover work with Patroni? ↳ leader key with TTL in etcd/Consul; replica promoted; old primary demoted
+  - `L2` What is split-brain, and how does a Postgres HA setup prevent it?
+  - `L2` What does `pg_rewind` do?
+  - `L2` After failover, how does the app find the new primary? ↳ DNS/VIP, HAProxy with health checks, target_session_attrs in libpq
+  - `L2` Statement-based vs WAL shipping vs logical (row-based) replication.
+  - `L3` With asynchronous replication, what data can a failover lose, and how do you bound it?
+  - `L3` What does logical replication not copy? ↳ DDL, sequence values, large objects; schema must pre-exist on subscriber
+  - `L3` Managed HA (RDS Multi-AZ, Aurora, Azure Flexible Server, Cloud SQL): how is Aurora's storage different?
+  - `L3` Why keep a delayed replica 1 hour behind (`recovery_min_apply_delay`)?
+  - `L3` Postgres primary fails over. What does the gateway do during the 30 seconds?
+- [ ] VACUUM / autovacuum, bloat, transaction ID wraparound (know what it is) ↳ https://www.postgresql.org/docs/current/routine-vacuuming.html (incl. "Preventing Transaction ID Wraparound Failures") · DBI ch4 "Vacuum and Maintenance" (pdf p134–138)
+  - `L1` What does VACUUM do?
+  - `L1` VACUUM vs VACUUM FULL. ↳ FULL rewrites the table under an ACCESS EXCLUSIVE lock
+  - `L1` What is table bloat? What is index bloat?
+  - `L1` What is autovacuum?
+  - `L1` Why is xid wraparound dangerous, in one line?
+  - `L1` Which lock mode does `VACUUM FULL` take?
+  - `L2` Why does an update-heavy table grow on disk while its row count stays flat?
+  - `L2` When does autovacuum start on a table? ↳ dead tuples > threshold + scale_factor × table rows
+  - `L2` Why is the default `autovacuum_vacuum_scale_factor = 0.2` bad for a 500M-row table? What do you set? ↳ waits for 100M dead rows; lower it per table
+  - `L2` Autovacuum can't keep up. Which settings do you change? ↳ cost_limit/cost_delay, more workers, per-table settings, maintenance_work_mem
+  - `L2` How do you measure bloat? ↳ n_dead_tup in pg_stat_user_tables, pgstattuple, estimate queries
+  - `L2` How do you remove bloat without locking the table for hours? ↳ pg_repack or pg_squeeze; REINDEX CONCURRENTLY for indexes
+  - `L2` Does VACUUM give disk space back to the operating system? ↳ only empty pages at the end; otherwise reused
+  - `L2` What is transaction ID wraparound? Why are 32-bit xids a problem? ↳ ~2 billion usable ids; old rows would look like future rows
+  - `L2` What is freezing, and what does `VACUUM FREEZE` do?
+  - `L2` What happens if you ignore wraparound warnings? ↳ Postgres stops assigning xids and refuses writes
+  - `L2` What is an anti-wraparound autovacuum, and why shouldn't you keep cancelling it?
+  - `L3` Why does one long-running transaction cause bloat in every table of the database? ↳ holds back the global xmin horizon
+  - `L3` Name four things that stop VACUUM from removing dead tuples. ↳ long or idle-in-transaction sessions, stale slots, prepared transactions, standby feedback
+  - `L3` `age(datfrozenxid)` is at 1.5 billion. Walk me through what you do right now.
+  - `L3` A queue-like table (insert, update, delete all day) is bloated and slow. Fix it. ↳ aggressive per-table autovacuum, fillfactor, short transactions, partition and drop
+  - `L3` Why do mass DELETEs hurt more than dropping a partition or TRUNCATE?
+  - `L3` Why vacuum an insert-only table at all? ↳ sets visibility map, freezes rows; PG13 added insert-triggered autovacuum
+- [ ] Monitoring: `pg_stat_statements`, `pg_stat_activity`, locks view, slow query log, connection counts ↳ https://www.postgresql.org/docs/current/monitoring-stats.html (pg_stat_activity) · https://www.postgresql.org/docs/current/pgstatstatements.html · https://www.postgresql.org/docs/current/view-pg-locks.html
+  - `L1` What is `pg_stat_statements`?
+  - `L1` What is `pg_stat_activity`?
+  - `L1` How do you log slow queries in Postgres? ↳ log_min_duration_statement
+  - `L1` Which view shows currently running queries?
+  - `L1` Which extension shows the most expensive queries over time?
+  - `L2` How do you see who is blocking whom? ↳ pg_blocking_pids(), pg_locks joined with pg_stat_activity
+  - `L2` Your Postgres is at 90% CPU. What do you check, in order? ↳ pg_stat_statements by total time, missing indexes, connections, vacuum, then scale
+  - `L2` Which `pg_stat_statements` column do you sort by first, and why total time before mean time?
+  - `L2` What do `wait_event_type` and `wait_event` in `pg_stat_activity` tell you?
+  - `L2` What goes on a Postgres dashboard? ↳ connections, TPS, p95 latency, cache hit ratio, replica lag, dead tuples, locks, disk
+  - `L2` What is the buffer cache hit ratio, and what value worries you?
+  - `L2` How do you find tables that get many sequential scans? ↳ seq_scan and seq_tup_read in pg_stat_user_tables
+  - `L2` `pg_cancel_backend` vs `pg_terminate_backend`.
+  - `L2` What do `log_lock_waits` and `log_temp_files` log?
+  - `L2` Your Postgres is at 90% CPU — what do you check, in order?
+  - `L3` How do you find the queries that cause the most disk I/O? ↳ shared_blks_read and temp_blks_written in pg_stat_statements
+  - `L3` What does `track_io_timing` add to plans and statistics?
+  - `L3` pganalyze, pgBadger, PMM, Datadog DBM: what does each add over the built-in views?
+  - `L3` Disk I/O is at 100%, CPU is low, and queries crawl. Walk through your investigation.
+- [ ] Major version upgrades; long-running migrations; `CREATE INDEX CONCURRENTLY` ↳ https://www.postgresql.org/docs/current/sql-createindex.html ("Building Indexes Concurrently") · https://www.postgresql.org/docs/current/pgupgrade.html · https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts/
+  - `L1` Can you run `CREATE INDEX CONCURRENTLY` inside `BEGIN … COMMIT`?
+  - `L2` How do you add an index to a busy table? ↳ CREATE INDEX CONCURRENTLY, outside a transaction block
+  - `L2` `CREATE INDEX CONCURRENTLY` failed halfway. What state is the table in? ↳ an INVALID index remains; drop it and retry
+  - `L2` Why should each migration set `lock_timeout` and be retried?
+  - `L2` How do you add an index to a busy table?
+  - `L2` How do you add an index to a 100M-row table without locking it? ↳ `CREATE INDEX CONCURRENTLY`
+  - `L3` Zero-downtime major-version upgrade with logical replication: walk through the steps.
+  - `L3` An `int` primary key is about to hit 2^31. What do you do under time pressure?
+  - `L3` How do you test a migration against production-sized data first?
+  - `L3` Major upgrade (14 → 17): `pg_upgrade --link` vs logical replication vs dump and restore.
+  - `L3` MySQL needs gh-ost and pt-osc for online changes. Why does Postgres need them less?
+- [ ] Statement timeouts, lock timeouts, idle-in-transaction timeouts ↳ https://www.postgresql.org/docs/current/runtime-config-client.html (statement_timeout, lock_timeout, idle_in_transaction_session_timeout) · https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts/ (lock_timeout on DDL)
+  - `L2` The ORM opens a transaction per request and holds it during an HTTP call to another service. What breaks?
+  - `L2` Why can an "instant" `ALTER TABLE ADD COLUMN` freeze the whole app? ↳ ACCESS EXCLUSIVE waits behind a long query; all new queries queue behind it
+  - `L2` What is `lock_timeout`, and why set it on every migration?
+  - `L2` What is "idle in transaction", and why is it dangerous? Which timeout fixes it? ↳ holds locks and xmin; idle_in_transaction_session_timeout
+  - `L2` `statement_timeout`: where do you set it (role, database, session) and why?
+  - `L2` Why can an `ALTER TABLE` lock the whole app?
+  - `L3` A transaction calls an external API for 5 seconds between two statements. What problems does that cause?
+- [ ] Memory and tuning: shared_buffers, work_mem, maintenance_work_mem, effective_cache_size, huge pages; benchmarking with pgbench
+  - `L1` Is `work_mem` per connection, per query, or per operation?
+  - `L2` What is `shared_buffers`, and what is a typical starting value? ↳ about 25% of RAM; OS page cache does the rest
+  - `L2` What is `work_mem`, and why is setting it to 1 GB dangerous? ↳ per sort/hash node, per query, times connections
+  - `L2` What do `maintenance_work_mem` and `effective_cache_size` do? ↳ effective_cache_size is only a planner hint; allocates nothing
+  - `L2` Postgres double-buffers through `shared_buffers` and the OS page cache. Why does that matter for sizing?
+  - `L2` What is pgbench, and how do you run a benchmark that means something? ↳ scale factor, clients, threads, duration, custom scripts, warm cache
+  - `L2` You raise `shared_buffers` from 128 MB to 8 GB. How do you prove it helped?
+  - `L2` Which settings do you change first on a fresh install? ↳ shared_buffers, effective_cache_size, work_mem, maintenance_work_mem, max_wal_size, random_page_cost
+  - `L3` Why enable huge pages for a large `shared_buffers`?
+  - `L3` A load test shows p99 spikes every 5 minutes. What is your hypothesis? ↳ checkpoints, autovacuum, cron jobs; check logs and checkpoint stats
+  - `L3` Why are pgbench numbers from a laptop misleading for production?
+  - `L3` A hash join spills to disk in 64 batches. What are your options? ↳ more work_mem for that query, fewer columns, earlier filters
+
+## 5.12 Views, triggers and ORMs
+- [ ] Views vs materialised views (refresh strategies) ↳ https://www.postgresql.org/docs/current/rules-materializedviews.html · https://www.postgresql.org/docs/current/sql-refreshmaterializedview.html (CONCURRENTLY) · DDIA ch3 "Aggregation: Data cubes and materialized views" (pdf p120–121)
+  - `L1` Materialized view vs view in one line.
+  - `L2` What is a materialized view? How do you refresh it, and what does `REFRESH … CONCURRENTLY` need? ↳ a unique index on the view
+  - `L3` What is a materialised view, and when would you pre-aggregate instead of computing on read?
+- [ ] Triggers and stored procedures/functions — when they help, why teams avoid business logic in them ↳ https://www.postgresql.org/docs/current/plpgsql-trigger.html · DDIA ch7 "Actual serial execution" → stored procedures, pros and cons (pdf p266–268) · DDIA ch5 "Trigger-based replication" (pdf p176–177)
+  - `L2` Triggers and stored functions: when do they help, and why do teams keep business logic out of them?
+- [ ] ORMs: SQLAlchemy, Prisma, TypeORM, Django ORM — lazy vs eager loading, sessions/units of work ↳ https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html (lazy vs eager loading) · https://docs.sqlalchemy.org/en/20/orm/session_basics.html (unit of work) · DDIA ch2 "The object-relational mismatch" (pdf p50–52)
+  - `L2` SQLAlchemy `joinedload` vs `selectinload`: when each? ↳ joinedload for many-to-one; selectinload for collections avoids row explosion
+  - `L2` An ORM query joins 7 tables and selects 120 columns for a list view. Fix it without rewriting the app.
+  - `L2` Mongoose pitfalls: what do `lean()`, missing `await`, and `strictQuery` do to you?
+  - `L2` Mongoose middleware (`pre('save')`) does not run on `updateOne`. Why, and how did that bite?
+  - `L2` What is the object-relational impedance mismatch?
+  - `L3` How do you stop lazy loading inside serializers from reaching production? ↳ lazy='raise', query-count assertions in tests
+- [ ] Migration tools: Alembic, Prisma Migrate, TypeORM migrations; reviewing generated SQL ↳ https://alembic.sqlalchemy.org/en/latest/tutorial.html · https://alembic.sqlalchemy.org/en/latest/autogenerate.html (what autogenerate misses) · https://www.prisma.io/docs/orm/prisma-migrate
+  - `L1` What is a schema migration? Which tools have you used? ↳ Alembic, Prisma Migrate, TypeORM, Django migrations
+  - `L2` How do you run Alembic migrations safely in deployment?
+  - `L2` What does Alembic autogenerate miss or get wrong? ↳ renames seen as drop + add, server defaults, some type changes
+- [ ] Raw SQL vs query builder vs ORM trade-off; SQL injection with raw queries ↳ https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html · https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html · DDIA ch2 "Query Languages for Data" (pdf p64–67)
+  - `L2` When would you drop down from the ORM to raw SQL?
+  - `L2` Raw SQL: how do you avoid SQL injection? Why can't you bind a table name or ORDER BY column? ↳ bind params for values; allow-list identifiers
+  - `L2` When would you drop down from the ORM to raw SQL?
+
+## 5.13 Analytics stores (know the idea)
+- [ ] OLTP vs OLAP; column stores (ClickHouse, BigQuery, Snowflake, Redshift) ↳ DDIA ch3 "Transaction Processing or Analytics?" (pdf p109–112) · DDIA ch3 "Column-oriented storage" (pdf p115–120) · https://clickhouse.com/docs/en/intro
+  - `L1` OLTP vs OLAP: what is the difference?
+  - `L3` Why are column stores (ClickHouse, BigQuery, Redshift) fast for analytics, and when do reports move there?
+- [ ] Star/snowflake schema, fact and dimension tables ↳ DDIA ch3 "Stars and snowflakes: schemas for analytics" (pdf p112–115) · https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/
+  - `L2` What is a data warehouse? Star schema vs snowflake schema.
+  - `L3` Normalised OLTP vs star schema in OLAP: why are they designed so differently?
+- [ ] Moving data from Postgres to a warehouse (ETL/ELT, CDC); dashboards without hurting the primary DB ↳ DDIA ch11 "Change data capture" (pdf p461–464) · DDIA ch3 "Data warehousing" (pdf p110–112: ETL) · https://debezium.io/documentation/reference/stable/architecture.html
+  - `L2` Dashboard reports are slowing down the production database. What do you do? ↳ replica, rollup tables or materialized views, then a warehouse
+  - `L2` The reports are slowing down the production DB — what do you do? (read replica → warehouse)
+  - `L3` Summary tables vs materialized views vs a data warehouse for dashboards: how do you choose?
+  - `L3` How would you keep an OLAP store fresh from an OLTP database without hurting production?
+  - `L3` How would you move usage analytics out of Postgres when it grows to billions of rows? ↳ ClickHouse / TimescaleDB / data warehouse via Kafka

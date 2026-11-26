@@ -1,0 +1,1614 @@
+# 4. Backend engineering (P0)
+
+---
+
+## 4.1 Networking for backend engineers
+- [ ] What happens when you type a URL: DNS → TCP → TLS → HTTP request → server → response → render ↳ https://github.com/alex/what-happens-when · MDN "How the web works" https://developer.mozilla.org/en-US/docs/Learn_web_development/Getting_started/Web_standards/How_the_web_works · ByteByteGo "What Happens When You Type a URL Into Your Browser?" (YouTube)
+  - `L1` What happens when you type google.com and press Enter? Give the short version.
+  - `L2` What happens when you type a URL into the browser and press Enter? ↳ DNS, TCP, TLS, HTTP request, server, response, render
+  - `L2` What happens when you type a URL?
+  - `L2` What happens when you type google.com and press Enter?
+  - `L2` Now the deep version: walk me from the keypress to pixels, naming every lookup and handshake. ↳ cache/HSTS, DNS, TCP, TLS+ALPN, HTTP, server, render, keep-alive
+  - `L2` Before any network call, which local caches does the browser and OS check for the name? ↳ browser DNS cache, OS cache, `/etc/hosts`, HSTS preload list
+  - `L2` How many round trips does it take before the first byte of the response on a cold HTTPS/1.1 connection? On TLS 1.3? On HTTP/3?
+  - `L2` Where in this path can a CDN, a load balancer and a reverse proxy sit?
+  - `L3` Which steps of the URL journey can be skipped on the second visit, and why? ↳ DNS cache, connection reuse, TLS resumption, HTTP cache
+- [ ] DNS: resolvers, record types (A, AAAA, CNAME, MX, TXT, NS), TTL, caching ↳ https://www.cloudflare.com/learning/dns/what-is-dns/ · https://www.cloudflare.com/learning/dns/dns-records/ · https://www.cloudflare.com/learning/cdn/glossary/time-to-live-ttl/
+  - `L1` What is DNS?
+  - `L1` Name the common record types and what each is for. ↳ A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, CAA, PTR
+  - `L1` What is TTL in DNS?
+  - `L1` What is `/etc/hosts` and when does it win over DNS?
+  - `L1` What does a CNAME record point to?
+  - `L1` What does TTL mean in DNS?
+  - `L2` Walk through a full resolution of `api.example.com` from a cold cache. ↳ stub → recursive resolver → root → .com TLD → authoritative
+  - `L2` Recursive resolver vs authoritative name server.
+  - `L2` A vs CNAME: why can't you put a CNAME on the zone apex, and what do providers do instead? ↳ CNAME can't coexist with SOA/NS; ALIAS/ANAME/flattening
+  - `L2` What are TXT records used for in practice? ↳ domain verification, SPF, DKIM, DMARC, ACME DNS-01
+  - `L2` Where is DNS cached along the way? ↳ browser, OS, resolver, app runtime (JVM!), connection pools
+  - `L2` You changed a DNS record and half the users still hit the old server an hour later. Why? ↳ TTL caches, resolvers ignoring TTL, long-lived connections
+  - `L2` How do you lower risk before migrating a domain to new servers? ↳ drop TTL days before, switch, raise TTL after
+  - `L2` What is DNS-based load balancing (round-robin, weighted, latency-based, geo)? What are its weaknesses? ↳ client caching, no health awareness, uneven
+  - `L2` What is negative caching (NXDOMAIN cached)? How can it bite you right after you create a record?
+  - `L2` What do `dig +short`, `dig +trace` and `dig @8.8.8.8` show?
+  - `L2` What is reverse DNS (PTR) and who uses it? ↳ mail servers, logs
+  - `L3` What is DNSSEC and what does it not protect?
+  - `L3` DNS over HTTPS / over TLS: why did they appear, and how do they change enterprise visibility?
+  - `L3` What is DNS cache poisoning (Kaminsky attack) and what mitigates it? ↳ random source port + txn ID, DNSSEC
+  - `L3` Your service gets intermittent 5-second delays on outbound calls in Kubernetes/Docker. Suspect DNS — why? ↳ `ndots`, search domains, conntrack race, A+AAAA parallel lookups
+  - `L3` What happens to your service when the DNS provider goes down (Dyn 2016)? How do you design for it?
+  - `L3` What is the HTTPS/SVCB record type and what does it add?
+  - `L3` Why should your app re-resolve DNS for long-lived connection pools, and what breaks if it never does?
+- [ ] TCP: 3-way handshake, reliability, ordering, flow control, congestion control, TIME_WAIT ↳ https://hpbn.co/building-blocks-of-tcp/ · DDIA ch8 "Timeouts and unbounded delays" (pdf p295–297, TCP queueing and congestion) · https://vincent.bernat.ch/en/blog/2014-tcp-time-wait-state-linux
+  - `L1` What does TCP guarantee that IP does not? ↳ reliable, ordered, byte stream, flow and congestion control
+  - `L1` Walk me through the 3-way handshake.
+  - `L1` Why three steps and not two?
+  - `L1` TCP is a byte stream, not a message stream. What does that mean for your application code? ↳ need framing: length prefix or delimiter; reads can split/merge
+  - `L2` Why is the initial sequence number random?
+  - `L2` How does TCP retransmit lost data? What is RTO?
+  - `L2` What are duplicate ACKs and fast retransmit?
+  - `L2` What is SACK (selective acknowledgment)?
+  - `L3` What are TCP slow start and Nagle's algorithm, and when do they hurt latency?
+  - `L3` What is TCP Fast Open and why is it rarely used?
+- [ ] UDP: when to use (voice, video, DNS, QUIC) ↳ https://hpbn.co/building-blocks-of-udp/ · https://www.cloudflare.com/learning/ddos/glossary/user-datagram-protocol-udp/ · https://www.cloudflare.com/learning/performance/what-is-http3/
+  - `L1` What is UDP? What does it give up compared with TCP?
+  - `L1` Name four protocols that run on UDP. ↳ DNS, QUIC/HTTP3, RTP/WebRTC media, DHCP, NTP, syslog
+  - `L1` TCP vs UDP — which for a voice app, and why?
+  - `L1` Does UDP have connections or a handshake? Does it have ports?
+  - `L1` TCP or UDP: DNS queries?
+  - `L1` What is jitter?
+  - `L2` TCP vs UDP — which for a voice app?
+  - `L2` Why is UDP better for live voice and video even though packets can be lost? ↳ late packet is useless; no HOL blocking; codec hides loss
+  - `L2` What does an app built on UDP have to do itself? ↳ ordering, retransmit if needed, congestion control, framing, NAT keepalive
+  - `L2` What is a jitter buffer?
+  - `L2` How does a receiver notice lost UDP packets when there are no ACKs? ↳ app sequence numbers + timestamps (RTP), receiver reports
+  - `L2` What is the max UDP datagram size, and why keep payloads near 1,200 bytes? ↳ avoid IP fragmentation; QUIC/DNS stay under path MTU
+  - `L2` Why does DNS use UDP, and when does it fall back to TCP?
+  - `L2` Why can UDP be blocked or throttled on corporate networks, and what do realtime apps do then? ↳ fall back to TCP/TLS on 443 (TURN over TLS)
+  - `L3` What is a UDP amplification attack? Which protocols have been abused for it?
+  - `L3` How does NAT handle UDP when there is no connection? What is a NAT binding timeout?
+  - `L3` Design a simple reliable protocol over UDP. What do you need to add?
+- [ ] TLS 1.2 vs 1.3 handshake, certificates, chain of trust, SNI, mTLS ↳ https://www.cloudflare.com/learning/ssl/what-happens-in-a-tls-handshake/ · https://hpbn.co/transport-layer-security-tls/ (TLS 1.3, chain of trust, SNI) · https://www.cloudflare.com/learning/access-management/what-is-mutual-tls/
+  - `L1` What does TLS give you? ↳ confidentiality, integrity, server authentication
+  - `L1` HTTPS = HTTP + ? Which port?
+  - `L1` How does TLS prove the server's identity?
+  - `L1` What is a certificate? What is inside it? ↳ subject/SAN, public key, issuer, validity, signature
+  - `L1` What is a certificate authority (CA)?
+  - `L1` What does SNI stand for?
+  - `L1` How many round trips is a full TLS 1.3 handshake?
+  - `L1` How does HTTPS use both asymmetric and symmetric crypto?
+  - `L1` What is a certificate, a CA and a chain of trust?
+  - `L2` How does TLS prove the server's identity?
+  - `L2` Walk through the TLS 1.2 handshake.
+  - `L2` Walk through the TLS 1.3 handshake. What got faster and what got removed? ↳ 1-RTT, key share in ClientHello, no RSA key exchange, AEAD only
+  - `L2` Asymmetric vs symmetric crypto in TLS: which is used for what, and why both?
+  - `L2` What is the chain of trust? Leaf, intermediate, root.
+  - `L2` What is SNI and why is it needed? ↳ many HTTPS sites on one IP; hostname in ClientHello
+  - `L2` What is forward secrecy and which key exchange gives it? ↳ ephemeral (EC)DHE
+  - `L2` What is ALPN?
+  - `L2` Walk through a TLS 1.3 handshake. What did it improve over 1.2? ↳ 1-RTT, forward secrecy mandatory, removed weak ciphers
+  - `L2` What is SNI, and what does it leak?
+  - `L3` What is TLS session resumption? Session IDs vs tickets vs PSK. What is 0-RTT and why can it be replayed?
+  - `L3` What is Encrypted Client Hello (ECH) and what does it hide that SNI leaks?
+  - `L3` How does a corporate TLS-inspecting proxy work, and why does it break pinned clients?
+  - `L3` What does TLS cost in CPU and latency today, and is "TLS is slow" still true?
+  - `L3` What is forward secrecy and how does ephemeral Diffie-Hellman give it?
+  - `L3` What is 0-RTT in TLS 1.3 and why is it a replay risk?
+- [ ] Keep-alive and connection pooling; head-of-line blocking ↳ https://hpbn.co/http1x/ ("Benefits of keepalive connections", "HTTP pipelining") · https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x · https://hpbn.co/http2/ (head-of-line blocking)
+  - `L1` Why does a connection pool help?
+  - `L1` What is HTTP keep-alive and why does it matter for performance?
+  - `L1` What does HTTP keep-alive save?
+  - `L1` What is head-of-line blocking in TCP?
+  - `L2` How does HTTP keep-alive (agent `keepAlive`, `maxSockets`) affect outbound call performance?
+  - `L2` What is the cost of a new TCP + TLS connection? Why reuse connections to downstream APIs? ↳ 1–3 RTTs handshake; plus slow start
+  - `L2` How do you enable connection reuse in Node (`http.Agent` keepAlive, undici) and Python (httpx/aiohttp sessions)?
+  - `L2` Why is creating a new HTTP client per request a classic performance bug?
+  - `L2` Why does reusing connections matter so much for latency? Tie it to slow start and handshakes.
+  - `L2` What is HTTP keep-alive (persistent connection)? What did it fix?
+  - `L2` Why does a connection pool help? What are its knobs? ↳ skip handshakes/slow start; max size, idle timeout, max lifetime
+  - `L3` What is Little's law and how does it size a connection pool?
+- [ ] IP, ports, NAT, private vs public subnets ↳ https://www.cloudflare.com/learning/network-layer/what-is-a-subnet/ · https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html · https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html
+  - `L1` What are `127.0.0.1` and `0.0.0.0`? What does binding a server to each mean?
+  - `L1` What is NAT? Why does almost every home and cloud network use it?
+  - `L1` Public IP vs private IP: which one does your VM in Azure/AWS have?
+  - `L1` Default port for HTTP? HTTPS? SSH? DNS? Postgres? Redis?
+  - `L2` Your app works on your laptop but nobody can reach it in Docker or on the VM. You bound to `127.0.0.1`. Why does that matter?
+  - `L2` SNAT vs DNAT vs port forwarding. Give an example of each.
+  - `L3` How does NAT break inbound connections and peer-to-peer traffic? (sets up WebRTC)
+  - `L3` How many connections can one NAT gateway hold to the same destination, and why can it run out? ↳ ports per destination IP:port tuple; SNAT port exhaustion
+- [ ] TCP connection lifecycle: flags, sequence numbers, states, 4-way close, TIME_WAIT, CLOSE_WAIT, RST, half-open
+  - `L1` Walk me through closing a TCP connection (the 4-way close).
+  - `L1` What is a sequence number? What is an ACK number?
+  - `L1` Which side of a TCP connection ends up in TIME_WAIT?
+  - `L1` What does CLOSE_WAIT usually mean?
+  - `L1` What does RST mean?
+  - `L2` What do SYN, ACK, FIN, RST and PSH flags mean?
+  - `L2` Name the TCP states a connection passes through on the client and on the server.
+  - `L2` What is TIME_WAIT? Which side ends up in it, and for how long? ↳ side that closes first; 2×MSL, 60 s on Linux
+  - `L2` Why does TIME_WAIT exist at all? ↳ late duplicate packets; final ACK may need resending
+  - `L2` What is CLOSE_WAIT? You see 5,000 sockets in CLOSE_WAIT on your server. What is the bug? ↳ peer closed; your app never called close(); leak
+  - `L2` Lots of TIME_WAIT on a server that calls an upstream API. Is it a problem? What do you do? ↳ connection reuse/pooling; not usually harmful
+  - `L2` What is a RST? When does the kernel send one? ↳ no listener on port, abort, data to closed socket, SO_LINGER 0
+  - `L2` "Connection refused" vs "connection timed out" vs "connection reset by peer": what does each tell you?
+  - `L2` What is a half-open connection? How can one side not know the other is gone?
+  - `L3` Why is `net.ipv4.tcp_tw_recycle` gone, and what is the safe `tcp_tw_reuse` alternative?
+  - `L3` What is a half-close (`shutdown(SHUT_WR)`), and which protocols rely on it?
+  - `L3` What is a simultaneous open / simultaneous close, and does it happen in real life?
+- [ ] Server sockets at scale: listen backlog, SYN/accept queues, SYN floods, epoll and C10K, ephemeral ports, FD and conntrack limits
+  - `L2` What happens on the server side once the SYN arrives, up to your FastAPI handler running? ↳ kernel accept queue, accept(), event loop, worker, ASGI app
+  - `L2` What is the listen backlog? What are the SYN queue and the accept queue?
+  - `L3` What is a SYN flood and how do SYN cookies defend against it?
+  - `L3` What do `SO_REUSEADDR` and `SO_REUSEPORT` do? When do you need each?
+  - `L3` Accept queue overflows under load. What symptoms do clients see and which counters do you check? ↳ SYN drops, timeouts; `ss -lnt` Recv-Q, `netstat -s` overflows
+  - `L3` What is the C10K problem and how do epoll / kqueue solve it?
+  - `L3` Ephemeral port exhaustion: what is it, when does a client hit it, and how do you fix it? ↳ many short outbound conns to one dst; pooling, range, more dst IPs
+  - `L3` What is the default ephemeral port range on Linux, and where do you see/change it? ↳ 32768–60999; `net.ipv4.ip_local_port_range`
+  - `L3` How many concurrent TCP connections can one server hold? What actually limits it? ↳ FDs, memory per socket, not the 65k port myth
+  - `L3` Which kernel settings would you look at for a server holding 200k idle WebSockets? ↳ ulimit nofile, somaxconn, tcp_mem, rmem/wmem, conntrack
+  - `L3` What are conntrack table limits and how does "nf_conntrack: table full" show up?
+- [ ] Nagle, delayed ACK, TCP_NODELAY; TCP keepalive vs HTTP keep-alive vs WebSocket ping; idle timeouts
+  - `L1` What does `TCP_NODELAY` disable?
+  - `L2` What is Nagle's algorithm? What problem did it solve?
+  - `L2` What is `TCP_NODELAY` and why do most realtime and RPC libraries turn it on?
+  - `L2` What is delayed ACK, and why do Nagle and delayed ACK together cause 40–200 ms stalls?
+  - `L2` What is TCP keepalive? Default timing on Linux? ↳ off by default; 2 hours idle, then 9 probes 75 s apart
+  - `L2` TCP keepalive vs HTTP keep-alive vs WebSocket ping/pong: three different things — explain each.
+  - `L2` Your WebSocket connections die after exactly 60 s idle behind a cloud load balancer. Why? ↳ LB idle timeout; send app-level pings below it
+- [ ] Certificates in operation: ACME/Let's Encrypt, renewal and expiry, chain errors, revocation, Certificate Transparency, pinning
+  - `L1` Which record type does Let's Encrypt DNS-01 use? ↳ TXT
+  - `L2` Your service works in the browser but `curl` / Python `requests` says "unable to get local issuer certificate". Why? ↳ server not sending intermediate cert; incomplete chain
+  - `L2` What is Let's Encrypt? How does the ACME protocol prove you own a domain? ↳ HTTP-01, DNS-01, TLS-ALPN-01 challenges
+  - `L2` HTTP-01 vs DNS-01 challenge: when do you need DNS-01? ↳ wildcard certs, no public port 80
+  - `L2` Your cert expired at 3 am and the site is down. How do you prevent this forever? ↳ auto-renewal (certbot/cert-manager), expiry monitoring alerts
+  - `L2` What is a wildcard certificate and what are its risks?
+  - `L2` How do you inspect a server's certificate from the command line? ↳ `openssl s_client -connect host:443 -servername host`
+  - `L2` What is certificate pinning in mobile apps? Pros and cons.
+  - `L2` Your service gets `CERT_HAS_EXPIRED` from a partner API at 3 a.m. What do you do, and what do you never do? ↳ never set `rejectUnauthorized: false` in prod
+  - `L2` How do you automate certificate renewal (Let's Encrypt, cert-manager)?
+  - `L3` How is a certificate revoked? CRL vs OCSP vs OCSP stapling, and why revocation is "broken".
+  - `L3` What is Certificate Transparency and how does it catch mis-issued certificates?
+  - `L3` What is certificate pinning, and why did browsers drop HPKP?
+  - `L3` How would you rotate the private key and certificate of a high-traffic service with zero downtime?
+  - `L3` What is Certificate Transparency and how can you use it to detect mis-issued certs for your domain?
+- [ ] Latency vs bandwidth vs throughput; RTT, round trips per request and geography
+  - `L1` Latency vs bandwidth vs throughput.
+  - `L1` What is RTT?
+  - `L2` What is the speed-of-light limit for Mumbai ↔ US-East and what RTT do you see in practice?
+  - `L3` A user in India hits your API hosted in us-east. Estimate the time to first byte and name what you would do about it.
+- [ ] Network debugging scenarios: intermittent slowness, resets under load, 502s from keep-alive races, MTU hangs
+  - `L3` Users say the API is "slow sometimes". Walk through your network investigation from client to server.
+  - `L3` Requests from one AZ to the DB intermittently take 3 s. 3 s exactly. What does that number suggest? ↳ SYN retransmit timeout (1 s, 3 s); packet loss / backlog
+  - `L3` Large file uploads hang but small ones work, only over the VPN. What do you suspect? ↳ MTU/PMTUD black hole
+  - `L3` Your service gets "connection reset by peer" under load but not at low traffic. List the causes you check. ↳ backlog overflow, LB idle timeout, keep-alive mismatch, conntrack
+  - `L3` Upstream returns 502 from nginx only every few minutes. Suspect keep-alive timeouts — explain the race. ↳ upstream closes idle conn as nginx reuses it; upstream timeout > proxy's
+  - `L3` How would you find which hop adds 200 ms of latency between your VM and a third-party API?
+- [ ] mTLS and TLS termination: where to terminate, re-encrypting behind the load balancer, service mesh mTLS
+  - `L2` What is mTLS? Where would you use it? ↳ service-to-service auth, zero trust, service mesh
+  - `L2` What is TLS termination? Where do you terminate TLS in your stack and is traffic re-encrypted behind it?
+  - `L2` What is mTLS and where would you use it?
+  - `L2` TLS termination at the load balancer: is the traffic behind it still encrypted? Should it be?
+  - `L3` What is a service mesh (Istio/Linkerd) doing for mTLS between pods?
+
+**Learn:** MDN "How the web works" · Hussein (*Fundamentals of Backend Engineering* — TCP, TLS, HTTP videos) ·
+Cloudflare Learning Center (DNS, TLS) · High Performance Browser Networking (hpbn.co, free)
+
+## 4.2 HTTP
+- [ ] Methods and semantics: GET/POST/PUT/PATCH/DELETE; safe vs idempotent ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods · https://developer.mozilla.org/en-US/docs/Glossary/Idempotent · https://www.rfc-editor.org/rfc/rfc9110#section-9.2
+  - `L1` PUT vs PATCH? Which are idempotent?
+  - `L1` GET, POST, PUT, PATCH, DELETE: what does each mean?
+  - `L1` Which methods are safe? Which are idempotent? ↳ safe: GET/HEAD/OPTIONS; idempotent: plus PUT/DELETE
+  - `L1` PUT vs PATCH: what is the difference?
+  - `L1` Is PUT idempotent?
+  - `L1` Is PATCH idempotent by definition?
+  - `L1` List the HTTP methods and what each means.
+  - `L1` What is a safe method? What is an idempotent method? Which methods are each?
+  - `L1` PUT vs PATCH — which is idempotent?
+  - `L1` POST vs PUT.
+  - `L1` Is PUT idempotent? Is POST?
+  - `L2` Is DELETE idempotent if the second call returns 404? Explain.
+  - `L2` Why should a GET never change state? What breaks if it does? ↳ crawlers, prefetchers, caches, retries
+  - `L2` What is the `OPTIONS` method used for?
+  - `L2` What is `HEAD` used for?
+  - `L3` Can a GET request have a body? Why is relying on it a bad idea?
+- [ ] Status codes: 200, 201, 202, 204, 301/302/304, 400, 401 vs 403, 404, 409, 422, 429, 500, 502, 503, 504 ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Status · https://www.rfc-editor.org/rfc/rfc9110#section-15
+  - `L1` 401 vs 403? 502 vs 504?
+  - `L1` 200 vs 201 vs 202 vs 204: when do you return each?
+  - `L1` 401 vs 403: what is the difference?
+  - `L1` 400 vs 422: when do you use each?
+  - `L1` 502 vs 503 vs 504: what does each tell you?
+  - `L1` Status code for "created"?
+  - `L1` Status code for "not logged in"?
+  - `L1` Status code for "logged in but not allowed"?
+  - `L1` Status code for "too many requests"?
+  - `L1` Status code for "accepted, processing later"?
+  - `L1` What are the five classes of status codes?
+  - `L1` 401 vs 403.
+  - `L1` 502 vs 503 vs 504.
+  - `L1` 301 vs 302 vs 307 vs 308. ↳ permanent/temporary; 307/308 keep method and body
+  - `L1` Which status code means "too many requests"?
+  - `L1` 401 or 403 for a logged-in user without permission?
+  - `L1` What does a 304 mean?
+  - `L1` What is a 502 Bad Gateway, in one line?
+  - `L1` Status code for "not logged in" vs "logged in but not allowed"? ↳ 401 vs 403
+  - `L2` When do you return 404 vs 403 for a resource the user is not allowed to see? ↳ 404 hides existence; prevents enumeration
+  - `L2` When do you use 409 Conflict? And 412 Precondition Failed?
+  - `L2` 400 vs 422: which do you return for a validation error, and what does FastAPI return by default?
+  - `L2` When do you return 409 Conflict? 410 Gone? 412 Precondition Failed? 415? 429?
+  - `L3` Why do some APIs return 200 with an error body, and why is that bad for monitoring and caches?
+- [ ] Headers: Content-Type, Accept, Authorization, Cookie/Set-Cookie, ETag/If-None-Match, Cache-Control ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers · https://developer.mozilla.org/en-US/docs/Web/HTTP/Conditional_requests
+  - `L2` What does a `Location` header on a 201 response contain?
+  - `L2` What are `Content-Type` and `Accept`? What is content negotiation?
+  - `L2` What is `Content-Length`, and what happens when it lies?
+  - `L2` What are the `Authorization` header schemes you have used? ↳ Bearer, Basic, API key headers
+  - `L2` Which headers carry the client's real IP through proxies, and why can't you trust them blindly? ↳ X-Forwarded-For, Forwarded; trust only your proxy's hop
+  - `L3` What is `Expect: 100-continue` and when does it help?
+  - `L3` What are trailers in HTTP, and which protocol depends on them? ↳ gRPC status in HTTP/2 trailers
+- [ ] Caching: `max-age`, `no-cache` vs `no-store`, ETag, CDN caching, `Vary` ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching · https://web.dev/articles/http-cache · https://www.cloudflare.com/learning/cdn/what-is-caching/
+  - `L1` What does `Cache-Control: max-age=3600` do?
+  - `L1` `no-cache` vs `no-store`. ↳ no-cache = revalidate every time; no-store = never store
+  - `L1` What is an ETag?
+  - `L1` What is a `304 Not Modified` and how does the client get one?
+  - `L1` Which header tells a CDN response varies by encoding?
+  - `L2` HTTP caching: `Cache-Control`, ETag, CDN. When do you cache at the edge instead of in Redis?
+  - `L2` `If-None-Match` vs `If-Modified-Since`. Strong vs weak ETags.
+  - `L2` `private` vs `public`, and `s-maxage`: browser cache vs shared cache (CDN).
+  - `L2` What does the `Vary` header do, and how can it destroy your CDN hit rate? ↳ cache key includes those headers; Vary: User-Agent / Cookie
+  - `L2` What is `stale-while-revalidate` and `stale-if-error`?
+  - `L2` How do you cache static assets "forever" but still ship new versions? ↳ content hash in filename + immutable, short TTL HTML
+  - `L2` `Cache-Control` for authenticated responses: why `no-store`, and what can a CDN leak otherwise?
+  - `L3` An authenticated API response got cached by the CDN and shown to another user. How did it happen and how do you prevent it?
+  - `L3` Why do heuristic caches cache responses with no `Cache-Control` at all? ↳ Last-Modified heuristic (10%)
+  - `L3` What is web cache deception / cache poisoning, and how does `Vary` relate?
+- [ ] CORS: same-origin policy, preflight `OPTIONS`, `Access-Control-Allow-*`, credentials ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS · https://web.dev/articles/cross-origin-resource-sharing
+  - `L1` What is the same-origin policy? What counts as the same origin? ↳ scheme + host + port
+  - `L1` What is CORS?
+  - `L1` What does `Access-Control-Allow-Origin` control?
+  - `L2` Explain CORS preflight
+  - `L2` What is CORS preflight, and why does `Access-Control-Allow-Origin: *` not work with credentials?
+  - `L2` Explain CORS preflight: when does the browser send `OPTIONS`, and what must the server answer?
+  - `L2` What is a "simple request" in CORS?
+  - `L2` Why can't you use `Access-Control-Allow-Origin: *` with credentials?
+  - `L2` Is CORS a server-side security feature? Can `curl` ignore it? ↳ browser-enforced; protects users, not your API
+  - `L2` Your frontend gets a CORS error but the server log shows 200. What happened?
+  - `L3` What does `Access-Control-Max-Age` do and why does it matter for latency?
+- [ ] Cookies: `HttpOnly`, `Secure`, `SameSite` ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies · https://web.dev/articles/samesite-cookies-explained
+  - `L1` What do the `HttpOnly`, `Secure` and `SameSite` cookie flags do?
+  - `L1` Which cookie flag blocks JavaScript access?
+  - `L1` What do `HttpOnly`, `Secure` and `SameSite` do on a cookie?
+  - `L1` Which cookie flag stops JavaScript from reading it?
+  - `L1` What do the cookie flags `HttpOnly`, `Secure`, `SameSite`, `Domain`, `Path` do?
+  - `L1` Which cookie flag hides it from JavaScript?
+  - `L1` Which cookie flag limits cross-site sending?
+  - `L2` `SameSite=Strict` vs `Lax` vs `None`. Which does the browser default to?
+  - `L2` Cookie `Domain` and `Path` attributes: how do they scope a cookie? First-party vs third-party cookies.
+  - `L2` `SameSite=Strict` vs `Lax` vs `None`: what does each allow, and what is the default today?
+  - `L3` What is a cookie prefix (`__Host-`, `__Secure-`)?
+  - `L3` How does CHIPS / partitioned cookies change third-party cookies?
+  - `L3` What are `__Host-` and `__Secure-` cookie prefixes?
+- [ ] HTTP/1.1 vs HTTP/2 (multiplexing, header compression) vs HTTP/3 (QUIC over UDP) ↳ https://hpbn.co/http2/ · https://www.cloudflare.com/learning/performance/what-is-http3/ · Hussein Nasser "HTTP/1 vs HTTP/2 vs HTTP/3" (YouTube)
+  - `L1` What changed from HTTP/1.0 to HTTP/1.1? ↳ persistent connections, Host header, chunked encoding, pipelining
+  - `L1` Why is the `Host` header mandatory in HTTP/1.1?
+  - `L1` How does HTTP/2 improve on HTTP/1.1?
+  - `L2` How does HTTP/2 improve on 1.1?
+  - `L2` HTTP/1.1 vs HTTP/2 vs HTTP/3 for performance: what does each fix?
+  - `L2` What is HTTP pipelining and why did browsers never really use it? ↳ responses must be in order; HOL blocking; broken proxies
+  - `L2` Why did browsers open 6 connections per host on HTTP/1.1? What hacks did that cause? ↳ domain sharding, sprites, concatenation
+  - `L2` HTTP/2 streams, frames and multiplexing: how do many requests share one connection?
+  - `L2` What is HPACK and why do headers need compressing? ↳ repeated cookies/user-agent; static + dynamic table, Huffman
+  - `L2` HTTP/2 fixed HTTP-level head-of-line blocking. Which head-of-line blocking is still left? ↳ TCP-level: one lost packet stalls all streams
+  - `L2` What is HTTP/2 server push and why was it removed from browsers? What replaced it? ↳ wasted bytes, cache misses; 103 Early Hints
+  - `L2` What is `h2c` and when do you see it? ↳ HTTP/2 cleartext, behind proxies, gRPC internally
+  - `L3` How does the browser decide to use HTTP/2 or HTTP/3 for a site? ↳ ALPN in TLS; Alt-Svc header / HTTPS DNS record for h3
+  - `L3` What is HTTP/2 flow control and how is it different from TCP's?
+  - `L3` What are HTTP/2 stream priorities and why did they get simplified in RFC 9218?
+  - `L3` What is the "HTTP/2 rapid reset" attack (2023) and how did servers fix it?
+  - `L3` Should your internal service-to-service traffic use HTTP/1.1, HTTP/2 or HTTP/3? Defend it.
+  - `L3` What is request smuggling and how do HTTP/1.1 proxies and `Content-Length`/`Transfer-Encoding` disagreements cause it?
+- [ ] Compression (gzip/br), chunked transfer, range requests ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Compression · https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding · https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+  - `L1` What does gzip / brotli compression save, and what does it cost?
+  - `L2` When should you not compress? ↳ tiny payloads, already compressed media, CPU-bound servers, BREACH-sensitive pages
+  - `L2` What is chunked transfer encoding? When does a server use it?
+  - `L2` What are range requests and `206 Partial Content`? Name a use. ↳ resume downloads, video seeking
+  - `L2` What is compression with `Accept-Encoding`/`Content-Encoding` (gzip, br, zstd)? When is it not worth it?
+- [ ] QUIC and HTTP/3: streams over UDP, no TCP head-of-line blocking, connection migration, QPACK, fallbacks
+  - `L1` What is HTTP/3 and what runs underneath it?
+  - `L1` What transport does HTTP/3 use?
+  - `L2` How does QUIC remove TCP head-of-line blocking? ↳ independent streams over UDP; loss only stalls its stream
+  - `L2` What is connection migration in QUIC and why does it matter on mobile? ↳ connection ID, survives Wi-Fi → 4G switch
+  - `L3` Why did QUIC choose UDP instead of a new transport protocol? ↳ middleboxes/OS kernels ossified; userspace deployment
+  - `L3` What is QPACK and why couldn't HTTP/3 reuse HPACK? ↳ HPACK assumes in-order delivery; QUIC streams arrive out of order
+  - `L3` Why might HTTP/3 be slower than HTTP/2 on some networks? ↳ UDP throttling, userspace CPU cost, fallback races
+
+**Learn:** MDN HTTP guide (caching, CORS, cookies) · Hussein (HTTP/2, HTTP/3)
+
+## 4.3 API design
+- [ ] REST: resources, nouns, nesting, plural URLs, status codes, HATEOAS (know it) ↳ https://github.com/microsoft/api-guidelines (Azure guidelines) · https://martinfowler.com/articles/richardsonMaturityModel.html (HATEOAS) · DDIA ch4 "Data flow through services: REST and RPC" (pdf p149)
+  - `L1` What is REST? What are its main constraints?
+  - `L1` What is a resource? Why do URLs use nouns, not verbs?
+  - `L1` Plural or singular collection names (`/users` vs `/user`)?
+  - `L2` Design the API for a todo/booking/payment service
+  - `L2` How do you name nested resources (`/users/42/orders`)? How deep should nesting go?
+  - `L2` How do you model an action that is not CRUD, like "cancel order" or "resend OTP"? ↳ sub-resource or state change: `POST /orders/42/cancel` or PATCH status
+  - `L2` What is HATEOAS, and why do few real APIs use it?
+  - `L2` What is the Richardson maturity model?
+  - `L2` Design the REST API for a food-ordering app (restaurants, menus, orders, payments).
+  - `L2` How do you design a bulk create endpoint? What do you return when 3 of 100 items fail? ↳ per-item results, 207 or 200 with statuses
+  - `L2` What makes an API "RESTful"? Resources, representations, statelessness, uniform interface.
+  - `L2` What does "stateless" mean in REST, and does using JWT/cookies break it?
+  - `L2` What is HATEOAS, and does anyone actually do it?
+  - `L3` What makes an API "good" to you? Name five rules you enforce in code review.
+  - `L3` How do you keep API response times flat as the data grows 100×?
+- [ ] Pagination: offset/limit vs cursor (keyset) — trade-offs ↳ https://use-the-index-luke.com/no-offset · https://docs.stripe.com/api/pagination · HelloInt "API design" https://www.hellointerview.com/learn/system-design/core-concepts/api-design
+  - `L1` OFFSET vs keyset pagination in one line.
+  - `L1` Offset/limit pagination vs cursor pagination: what is the difference?
+  - `L1` Which pagination stays fast on deep pages?
+  - `L1` Why is `OFFSET` pagination slow on big tables?
+  - `L2` Offset vs cursor pagination — why does offset get slow?
+  - `L2` OFFSET pagination vs keyset (seek) pagination: why is `OFFSET 100000` slow? ↳ reads and throws away every skipped row
+  - `L2` Write keyset pagination ordered by `created_at DESC` with ties. ↳ row comparison (created_at, id) < ($1, $2) plus matching index
+  - `L2` Page 1 of a list API is fast; page 5000 is slow. Fix it.
+  - `L2` Why does offset pagination get slow on page 10,000? ↳ DB still scans and skips all earlier rows
+  - `L2` What goes wrong with offset pagination when rows are inserted while the user pages? ↳ duplicates or skipped items
+  - `L2` How do you build a cursor? What is inside it, and why encode it? ↳ last sort key + id; opaque base64
+  - `L2` How do you paginate when sorting by a non-unique field like `created_at`? ↳ tie-breaker: `(created_at, id)`
+  - `L2` Should you return a total count? What does it cost on a big table?
+  - `L2` How do you paginate a large Mongo collection efficiently? ↳ range on indexed `_id`/sort key, not `skip`
+  - `L2` Why does `OFFSET 100000` get slow, and how does keyset (cursor) pagination fix it?
+  - `L3` Paginate 10 million rows: why is `OFFSET` slow, and how does keyset pagination fix it?
+  - `L3` Keyset pagination cannot jump to page 50. How do you design the API and UI around that?
+  - `L3` How do you paginate a feed that merges results from two sources?
+  - `L3` How do you support "jump to page N" with cursor pagination, or do you not?
+- [ ] Filtering, sorting, sparse fields ↳ https://jsonapi.org/format/ (sorting, sparse fieldsets, filtering) · https://github.com/microsoft/api-guidelines (Azure "Collections": filter, orderby, select)
+  - `L2` How do you design filtering and sorting query params safely? ↳ whitelist fields, validate operators, avoid injection
+  - `L2` What are sparse fieldsets (`?fields=id,name`), and when are they worth it?
+  - `L2` How do you shrink API payloads? ↳ sparse fields, pagination, compression, avoid over-fetching, binary formats
+- [ ] Versioning: URL vs header; backward-compatible changes ↳ https://stripe.com/blog/api-versioning · https://docs.stripe.com/api/versioning · DDIA ch4 "Data flow through services: REST and RPC" (pdf p153, API versioning)
+  - `L1` Why version an API at all?
+  - `L1` URL versioning vs header versioning: pros and cons.
+  - `L2` How do you version an API without breaking mobile clients?
+  - `L2` Which API changes are backward compatible, and which are breaking? ↳ adding optional fields safe; removing/renaming/tightening breaking
+  - `L2` How do you version an API without breaking mobile clients that never update?
+  - `L2` How does Stripe do date-based API versions?
+  - `L2` How do you deprecate and remove an endpoint? ↳ announce, `Deprecation`/`Sunset` headers, usage metrics, migration window
+  - `L2` What is a tolerant reader, and why should clients ignore unknown fields?
+  - `L2` A field rename breaks old app versions. How should you have shipped it?
+  - `L2` How do you version internal service APIs without breaking callers?
+  - `L3` How do you test that a change is backward compatible before deploying? ↳ OpenAPI diff in CI, contract tests
+  - `L3` How do you design an API that third-party developers will use for years?
+  - `L3` How do you deprecate and remove an API version without breaking clients?
+- [ ] Idempotency keys for POST (payments); retries ↳ https://stripe.com/blog/idempotency · https://brandur.org/idempotency-keys · https://docs.stripe.com/api/idempotent_requests
+  - `L1` What does idempotent mean for an API call?
+  - `L1` What is an `Idempotency-Key` header?
+  - `L1` Why is a POST not idempotent by default?
+  - `L1` Which header carries an idempotency key?
+  - `L2` How do you make a payment POST safe to retry?
+  - `L2` How do you make a "create payment" POST safe to retry? ↳ client key; store key + request hash + response; replay response
+  - `L2` Where do you store idempotency keys, and for how long? ↳ DB or Redis with TTL, e.g. 24 hours
+  - `L2` The same key arrives with a different request body. What do you return? ↳ 422/409; key reuse with different payload is an error
+  - `L2` Two requests with the same key arrive at the same moment. How do you stop both running? ↳ insert key row first with unique constraint or lock
+  - `L2` How do you make a POST (e.g. "create payment") safe to retry? ↳ Idempotency-Key header + stored result
+  - `L3` The server finished the work but the response was lost. How does the client learn the result safely?
+  - `L3` Design idempotency middleware for an Express or NestJS app. What are its states? ↳ started, completed with stored response, failed-retryable
+  - `L3` Why is "exactly once" over HTTP impossible, and what do you build instead? ↳ at-least-once retries + idempotent server
+  - `L3` What happens to a POST if the client times out after the server committed? Design for it.
+- [ ] Error format (RFC 7807 problem+json), validation errors ↳ https://www.rfc-editor.org/rfc/rfc9457 · https://github.com/microsoft/api-guidelines (Azure "Handling errors")
+  - `L2` What should an error response contain? ↳ stable code, message, field errors, request id; RFC 9457 problem+json
+  - `L2` How do you return validation errors for several fields at once?
+  - `L2` How do validation errors avoid leaking internal details? What format do you return? ↳ RFC 9457 problem+json, field-level messages
+  - `L3` Should internal error details or stack traces ever reach the client? How do you link the error to logs?
+- [ ] Rate limiting headers (`429`, `Retry-After`) ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429 · https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After · https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+  - `L1` What does 429 mean, and which header tells the client when to retry? ↳ `Retry-After`
+  - `L1` What HTTP status means "rate limited"?
+  - `L1` Header telling a client when to retry?
+  - `L1` What status code and headers do you return when rate limited? ↳ 429, `Retry-After`, `RateLimit-*`
+  - `L1` What status code for rate limited?
+  - `L2` What does the API return when a client is limited? ↳ 429, Retry-After, X-RateLimit-* headers
+  - `L2` What rate-limit headers do you send (`X-RateLimit-Limit`, `Remaining`, `Reset`)?
+  - `L2` What should a rate-limited response look like? ↳ 429, Retry-After, X-RateLimit headers
+  - `L2` What headers do you return to clients? ↳ 429, `Retry-After`, `X-RateLimit-Limit/Remaining/Reset`
+  - `L2` What headers should a 429 or 503 response carry? ↳ `Retry-After`, rate-limit headers
+- [ ] Long-running jobs: 202 Accepted + status URL / webhooks ↳ https://google.aip.dev/151 (long-running operations) · https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/202 · https://github.com/microsoft/api-guidelines (Azure "Long-running operations")
+  - `L1` What does a 202 Accepted response mean?
+  - `L1` Async job API: what three endpoints?
+  - `L2` A report takes 2 minutes to generate. Design the API. ↳ 202 + job id + status URL; or webhook when done
+  - `L2` Polling vs webhook vs SSE for telling the client a job is done: when each?
+  - `L2` Move work off the request path: when do you return 202 and use a queue?
+  - `L3` What does a long-running operation resource look like (status, progress, result, error, cancel)?
+- [ ] gRPC: protobuf, HTTP/2, streaming types; when to choose over REST ↳ https://grpc.io/docs/what-is-grpc/core-concepts/ · DDIA ch4 "Thrift and Protocol Buffers" (pdf p135) and "Current directions for RPC" (pdf p151) · https://protobuf.dev/programming-guides/proto3/
+  - `L1` What is gRPC? What does it run on? ↳ HTTP/2 + protobuf
+  - `L1` What are the four gRPC call types? ↳ unary, server streaming, client streaming, bidirectional
+  - `L1` What does gRPC use for transport and encoding?
+  - `L2` REST vs gRPC vs GraphQL for internal services?
+  - `L2` REST vs gRPC vs GraphQL for internal services: which and why?
+  - `L2` Why is calling gRPC from a browser hard? What is gRPC-Web?
+  - `L2` How do deadlines and cancellation work in gRPC?
+  - `L2` What are gRPC status codes, and how do they map to HTTP ones?
+  - `L2` How do you load balance gRPC? Why does a normal L4 balancer pin traffic? ↳ long-lived HTTP/2 connection; need L7 or client-side LB
+  - `L2` What are interceptors in gRPC (auth, logging, retries)?
+  - `L2` Why does gRPC need HTTP/2? ↳ multiplexed streams, binary framing, trailers for status
+  - `L2` What are unary, server-streaming, client-streaming and bidirectional gRPC calls?
+  - `L2` gRPC vs REST/JSON between services: trade-offs.
+  - `L2` Why is gRPC awkward to load-balance with an L4 load balancer? ↳ one long HTTP/2 conn pins to one backend; need L7/client-side LB
+  - `L2` What is gRPC-Web and why does the browser need it?
+  - `L2` What are gRPC deadlines and how do they propagate?
+  - `L3` When would you use bidirectional streaming (e.g. realtime voice) instead of a WebSocket?
+  - `L3` How does a "remote call looks like a local call" abstraction mislead developers? ↳ network fails, latency, partial failure, retries
+  - `L3` How would you expose a gRPC service to public REST clients as well (gateway / transcoding)?
+- [ ] GraphQL: schema, resolvers, N+1 and DataLoader, when it fits ↳ https://graphql.org/learn/ · https://github.com/graphql/dataloader (README: batching, N+1) · https://graphql.org/learn/execution/
+  - `L1` What is GraphQL? What problem does it solve compared with REST?
+  - `L1` What are a schema, a type, a query, a mutation and a subscription?
+  - `L1` What is a resolver?
+  - `L1` What fixes N+1 in GraphQL?
+  - `L2` What is over-fetching and under-fetching, and how does GraphQL address them?
+  - `L2` What is the N+1 problem in GraphQL resolvers?
+  - `L2` How does DataLoader fix N+1? ↳ batches keys per tick into one query; per-request cache
+  - `L2` Why must a DataLoader be created per request, not globally?
+  - `L2` How do you handle errors in GraphQL? Why does it often return 200 with an `errors` array?
+  - `L2` Why is HTTP caching harder with GraphQL? What are persisted queries?
+  - `L2` How do you protect a GraphQL API from a huge nested query? ↳ depth limit, complexity cost, timeouts, persisted queries
+  - `L2` How do you paginate in GraphQL (connections, edges, cursors)?
+  - `L2` Where do you do authorization in GraphQL — resolvers, schema directives, or the business layer?
+  - `L2` When would you choose GraphQL, and when is REST better?
+  - `L3` How do you evolve a GraphQL schema without versions? ↳ add fields, `@deprecated`, field usage tracking
+  - `L3` What is GraphQL federation, and when do you need it?
+- [ ] Webhooks: signing (HMAC), retries, ordering ↳ https://docs.stripe.com/webhooks (signatures, retries, event ordering) · https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries · https://webhooks.fyi/
+  - `L1` What is a webhook?
+  - `L1` Webhook vs polling: what is the trade-off?
+  - `L2` You are the sender. How do you design retries? ↳ exponential backoff, max attempts, DLQ, manual replay UI
+  - `L2` As a sender, how do you sign payloads and rotate secrets?
+  - `L2` What should a webhook payload contain: the full object, or just an id to fetch? Trade-offs.
+  - `L3` Design a webhook delivery system for 10,000 customers where one slow customer cannot block others. ↳ per-tenant queues, timeouts, circuit breaker, backoff
+- [ ] OpenAPI/Swagger ↳ https://learn.openapis.org/ · https://swagger.io/specification/ · https://fastapi.tiangolo.com/tutorial/first-steps/ (auto OpenAPI docs)
+  - `L1` What is OpenAPI / Swagger?
+  - `L2` How do you make the OpenAPI schema good enough to generate a TypeScript client?
+  - `L2` Code-first vs spec-first OpenAPI: which have you used and why?
+
+**Learn:** Microsoft REST API Guidelines (GitHub) · Stripe API docs (idempotency, pagination — the gold
+standard) · grpc.io "Core concepts" · HelloInt "API design" · Syllabus (API section)
+
+## 4.4 Authentication and authorization
+- [ ] Password storage: bcrypt/argon2, salts, why not SHA-256 ↳ https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html · Computerphile "How NOT to Store Passwords!" (YouTube)
+  - `L1` How do you store user passwords?
+  - `L1` How should you store user passwords? Why not SHA-256? ↳ bcrypt/argon2 with salt; slow on purpose
+  - `L1` How do you store user passwords?
+  - `L1` What is a salt and why is it per user?
+  - `L1` Password hashing algorithm you would pick today?
+  - `L1` What does a salt prevent? ↳ rainbow tables, identical hashes for identical passwords
+  - `L2` bcrypt vs scrypt vs argon2id: what makes each slow, and which would you pick today?
+  - `L2` What is the bcrypt cost factor and how do you pick it? ↳ tune to ~100–300 ms per hash on your hardware
+  - `L2` What is a pepper, and where would you keep it?
+  - `L2` What is the 72-byte bcrypt limit and why does it matter?
+  - `L2` How do you upgrade from MD5 hashes to argon2 without forcing every user to reset? ↳ rehash on next login, or wrap: argon2(md5(pw))
+- [ ] Sessions (server-side store, cookie id) vs JWT (stateless, signed) ↳ https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html · https://jwt.io/introduction · https://developer.okta.com/blog/2017/08/17/why-jwts-suck-as-session-tokens
+  - `L1` Session cookie vs bearer token: how does each work?
+  - `L1` Session-based auth vs JWT-based auth: how does each work?
+  - `L2` Session vs JWT — which and why?
+  - `L2` Session store in Redis: data type, TTL, sliding expiry, "log out everywhere".
+  - `L2` Server sessions in Redis vs JWTs: trade-offs.
+  - `L2` Server-side sessions vs JWT: which would you pick for a web app, and why?
+  - `L2` How do you handle user sessions with 20 app servers? ↳ sticky sessions, shared session store (Redis), stateless JWT
+  - `L2` Server-side sessions in Redis vs JWT: trade-offs for logout, revocation and size.
+  - `L2` At the design level, how do you handle passwords, sessions and token refresh?
+  - `L2` Session vs JWT: which would you choose for a web app with a mobile client, and why?
+  - `L2` What is session fixation, and why do you regenerate the session id at login?
+  - `L2` Idle timeout vs absolute timeout: what is each for?
+  - `L3` What is "stateless" about JWT, and why does every real system add state back? ↳ revocation lists, refresh token store, token versions
+- [ ] JWT structure, signing (HS256 vs RS256), expiry, revocation problem, refresh tokens + rotation ↳ https://jwt.io/introduction · https://auth0.com/docs/secure/tokens/refresh-tokens/refresh-token-rotation · https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html (token sidejacking, revocation)
+  - `L1` What are the three parts of a JWT?
+  - `L1` Is a JWT encrypted? Who can read its payload?
+  - `L1` Is a JWT payload encrypted?
+  - `L1` What are the three parts of a JWT? Is the payload encrypted? ↳ header.payload.signature; base64url, only signed, readable by anyone
+  - `L1` Access token vs refresh token: why have two?
+  - `L1` HS256 vs RS256 vs ES256: what is the difference? ↳ shared secret HMAC vs private/public key signatures
+  - `L2` How do you log out a user with JWT?
+  - `L2` Why use a short-lived access token plus a long-lived refresh token?
+  - `L2` What is refresh token rotation, and how does it detect token theft? ↳ one-time refresh tokens; reuse → revoke the whole family
+  - `L2` How do you log a user out when you use JWTs? ↳ short expiry, revoke refresh token, denylist `jti`, token version
+  - `L2` HS256 vs RS256: when do you need asymmetric signing?
+  - `L2` Which JWT claims do you always validate? ↳ signature, `exp`, `iss`, `aud`, `alg` pinned
+  - `L2` How do you log out a user when you use JWTs? ↳ short expiry, revoke refresh token, denylist by `jti`, token version per user
+  - `L2` What is refresh token rotation, and how does reuse detection catch a stolen refresh token?
+  - `L2` What should go into a JWT and what should never go into one?
+  - `L2` A user changes their password. Which sessions and tokens must die, and how do you kill them?
+  - `L3` What is the JWT `alg: none` attack, and the RS256→HS256 confusion attack?
+  - `L3` A user changes their password. How do you kill all their other sessions?
+  - `L3` How would you implement "log out of all devices" with JWTs and refresh tokens?
+  - `L3` What is token binding / DPoP / sender-constrained tokens, and what problem do they solve? ↳ stolen bearer tokens unusable without the client's key
+  - `L3` "Log out from all devices": design it for sessions and for JWTs.
+  - `L3` How do you rotate JWT signing keys without logging everyone out? ↳ JWKS with multiple keys, `kid`, overlap window
+  - `L3` Why is it a bad idea to put permissions/roles in a long-lived JWT?
+  - `L3` JWE vs JWS: when would you encrypt a token?
+  - `L3` What is PASETO and why do some people prefer it to JWT?
+- [ ] Where to store tokens in the browser (HttpOnly cookie vs localStorage; XSS/CSRF trade-off) ↳ https://auth0.com/docs/secure/security-guidance/data-security/token-storage · https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html (Local Storage) · https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+  - `L2` Where do you store tokens in the browser — localStorage or an HttpOnly cookie? XSS vs CSRF trade-off.
+  - `L2` How do mobile apps store tokens, and how is that different from the web?
+  - `L2` Cookies vs `Authorization` header vs localStorage for tokens: trade-offs.
+  - `L2` Where do you store tokens in the browser: localStorage, sessionStorage, memory or an HttpOnly cookie? Trade-offs.
+  - `L2` What is the BFF (backend-for-frontend) pattern for tokens, and why is it now the recommended SPA approach?
+  - `L2` Where do you store tokens in a mobile app? ↳ iOS Keychain / Android Keystore, not plain storage
+- [ ] OAuth 2.0 flows: authorization code + PKCE, client credentials; scopes; access vs refresh token ↳ https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce · https://www.oauth.com/ · OktaDev Nate Barbettini "OAuth 2.0 and OpenID Connect (in plain English)" (YouTube)
+  - `L1` What is OAuth 2.0 for? Is it an authentication protocol?
+  - `L1` What does PKCE protect?
+  - `L1` What problem does OAuth 2.0 solve? Is it authentication or authorization?
+  - `L1` Name the OAuth roles: resource owner, client, authorization server, resource server.
+  - `L1` What is a scope?
+  - `L1` What does PKCE stand for?
+  - `L2` Walk through OAuth authorization code flow with PKCE
+  - `L2` Walk through the authorization code flow with PKCE step by step.
+  - `L2` What is the `state` parameter for? ↳ CSRF protection on the callback; bind request to session
+  - `L2` What is PKCE, and why do mobile and single-page apps need it?
+  - `L2` Client credentials flow: when do you use it?
+  - `L2` What are scopes? How are they different from roles?
+  - `L2` Walk me through the authorization code flow with PKCE, step by step.
+  - `L2` What attack does PKCE stop? Why is it now recommended even for confidential clients? ↳ authorization code interception
+  - `L2` What is the `state` parameter for? What is the `nonce` in OIDC for?
+  - `L2` Why is the implicit flow deprecated? Why is the password grant deprecated?
+  - `L2` What is the device authorization flow (TV / CLI login)?
+  - `L2` Why must redirect URIs be exact-match registered?
+  - `L2` What is token introspection vs local JWT validation?
+  - `L3` What are the classic OAuth implementation bugs? ↳ open redirect in redirect_uri, missing state, token leakage via Referer, mix-up attacks
+  - `L3` What is token exchange (RFC 8693) and how does it relate to an agent acting on behalf of a user?
+- [ ] OpenID Connect: ID token, userinfo ↳ https://openid.net/developers/how-connect-works/ · https://auth0.com/docs/secure/tokens/id-tokens · OktaDev Nate Barbettini "OAuth 2.0 and OpenID Connect (in plain English)" (YouTube)
+  - `L1` What does OpenID Connect add on top of OAuth? ↳ ID token (JWT) about the user, userinfo endpoint
+  - `L2` ID token vs access token: which one do you send to your API?
+- [ ] SSO, SAML (know the idea) ↳ https://www.cloudflare.com/learning/access-management/what-is-sso/ · https://auth0.com/docs/authenticate/protocols/saml
+  - `L2` What is SSO? How does SAML work at a high level, and SAML vs OIDC? ↳ XML assertions via browser POST vs JSON/JWT over OAuth
+  - `L3` What is SAML / SSO, and how would you add enterprise SSO to a SaaS app?
+- [ ] API keys, HMAC request signing ↳ https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html (API keys) · https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv.html (HMAC request signing, SigV4)
+  - `L2` How do API keys differ from user tokens? How do you store and rotate them? ↳ store hash, show once, prefix for lookup, scopes
+  - `L2` API keys vs OAuth tokens: when is an API key enough? How do you store API keys on the server? ↳ hash them like passwords; show once; prefix for lookup
+  - `L2` How do you sign requests with HMAC (like AWS SigV4 or webhook signatures), and what stops replay? ↳ timestamp + nonce in signed string
+- [ ] Authorization: RBAC vs ABAC vs ReBAC; enforcing in middleware/guards; multi-tenancy (tenant id on every query) ↳ https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html · https://www.osohq.com/academy (RBAC, ReBAC, multi-tenancy) · https://docs.nestjs.com/security/authorization
+  - `L1` Authentication vs authorization: what is the difference?
+  - `L1` What is RBAC?
+  - `L1` Authentication vs authorization.
+  - `L1` RBAC vs ABAC vs ReBAC (relationship-based, like Google Zanzibar).
+  - `L1` What is RBAC? What is ABAC? What is ReBAC?
+  - `L1` What is a permission vs a role vs a policy?
+  - `L1` RBAC vs ABAC in one line each?
+  - `L2` RBAC vs ABAC vs ReBAC: when do you need more than roles?
+  - `L2` Where do you enforce authorization — gateway, middleware/guard, service layer, or DB query? ↳ coarse at edge; object-level in service layer
+  - `L2` Should roles and permissions go inside the JWT? What happens when they change?
+  - `L2` Where does auth happen in a microservice system: gateway, each service, or both? ↳ gateway authenticates, services authorise, propagate identity (JWT/mTLS)
+  - `L2` Where do you enforce authorization in NestJS / FastAPI / Express? Guards, dependencies, middleware, or the service layer?
+  - `L2` RBAC vs ABAC: give a requirement RBAC cannot express cleanly. ↳ "edit own documents in own department during business hours"
+  - `L2` What is role explosion and how do you avoid it?
+  - `L2` What is ReBAC (Zanzibar-style relations), and when does Google Docs-style sharing need it?
+  - `L2` What is a policy engine (OPA/Rego, Cedar, Casbin, OpenFGA)? Why move policy out of code?
+  - `L2` Design the data model for RBAC with organisations, roles and permissions.
+  - `L2` Where should authorization decisions be cached, and what is the risk?
+  - `L2` Coarse checks at the gateway vs fine checks in the service: why both?
+  - `L3` How do you store per-restaurant roles (owner of A, staff at B) for one user?
+  - `L3` How do you test that every endpoint enforces authorization? ↳ permission matrix tests, deny by default
+  - `L3` How do you cache permission checks without serving stale permissions after a role change?
+  - `L3` How do you test authorization exhaustively? ↳ permission matrix tests: every role × every endpoint × own/other tenant
+  - `L3` How do you audit "who could access what, when"?
+  - `L3` Super-admin / support impersonation: how do you build it safely? ↳ separate audited flow, time-boxed, banner, read-only by default
+- [ ] MFA, account lockout, rate limiting login ↳ https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html (lockout, login throttling) · https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html · https://cheatsheetseries.owasp.org/cheatsheets/Credential_Stuffing_Prevention_Cheat_Sheet.html
+  - `L1` What is MFA? Name the factor types.
+  - `L2` How do you rate-limit and lock out login attempts without letting attackers lock real users out?
+  - `L2` What is credential stuffing vs brute force vs password spraying? Defence for each.
+  - `L2` Account lockout vs throttling vs CAPTCHA: trade-offs. How can lockout be abused?
+  - `L2` TOTP vs SMS OTP vs push vs WebAuthn/passkeys: which are phishable?
+  - `L2` You see thousands of failed logins from many IPs against many accounts. What is happening and what do you do?
+  - `L3` How do you add OTP / TOTP-based MFA to an existing login?
+  - `L3` How do passkeys (WebAuthn) work at a high level, and why do they stop phishing? ↳ origin-bound key pair; private key never leaves device
+  - `L3` Password hashing is CPU heavy. How do you stop login from being a DoS vector on your API? ↳ rate limit before hashing, worker pool, per-IP/per-account limits
+- [ ] JWT attacks: alg none, RS256→HS256 confusion, weak HMAC secrets, kid/jku injection, claims to validate
+  - `L1` What is the `alg: none` attack?
+  - `L2` What is the algorithm confusion (RS256 → HS256) attack and how does it work? ↳ verifier uses public key as HMAC secret
+  - `L2` How do you configure a JWT library so these attacks are impossible? ↳ pin allowed algorithms, never trust header `alg`
+  - `L2` What happens if the HS256 secret is weak? How fast can it be cracked offline? ↳ hashcat; use ≥256-bit random secret
+  - `L2` What is `kid` header injection (path traversal or SQL injection through the key id)?
+  - `L2` What are `jku` and `x5u` header attacks?
+  - `L2` Which claims must you always validate? ↳ signature, `exp`, `nbf`, `iss`, `aud`, algorithm
+  - `L2` Why does `aud` matter when several services accept tokens from the same issuer?
+  - `L2` `jwt.decode()` vs `jwt.verify()`: what is the bug when someone uses the first?
+  - `L2` How much clock skew do you allow, and why?
+- [ ] Multi-tenant isolation: tenant id vs schema vs DB per tenant, Postgres row-level security, tenant filters you can't forget
+  - `L1` What is row-level security?
+  - `L2` Multi-tenancy: shared DB with tenant id vs schema per tenant vs DB per tenant — security trade-offs.
+  - `L2` What is Postgres row-level security? Show how you set the current tenant per request. ↳ `SET LOCAL app.tenant_id`, policy `USING (tenant_id = current_setting(...))`
+  - `L2` RLS with a connection pooler like PgBouncer in transaction mode: what can go wrong? ↳ session settings leak; use `SET LOCAL` inside the transaction
+  - `L3` How do you make "forgot to add the tenant filter" impossible instead of just unlikely? ↳ repository layer forcing tenant id, Postgres RLS, lint rules
+
+**Learn:** auth0.com/docs (OAuth flows, PKCE) · oauth.com (free book) · OWASP Cheat Sheets (Authentication,
+Session Management, Password Storage) · jwt.io introduction
+
+## 4.5 Realtime communication
+- [ ] Polling vs long polling vs SSE vs WebSockets vs WebRTC — when each ↳ https://ably.com/blog/websockets-vs-sse · https://hpbn.co/xmlhttprequest/ (polling, long polling, streaming) · https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API
+  - `L1` Short polling vs long polling vs SSE vs WebSockets: what is each?
+  - `L1` What is WebRTC and when do you need it instead of WebSockets? ↳ peer-to-peer media, UDP, low latency audio/video
+  - `L1` SSE or WebSocket for LLM token streaming to a browser?
+  - `L1` What is Server-Sent Events (SSE)? What does the wire format look like? ↳ `text/event-stream`; `data:` lines; blank line ends an event
+  - `L1` SSE vs WebSockets for an LLM chat: which and why?
+  - `L1` What is SSE? Why do LLM APIs stream with SSE rather than WebSockets?
+  - `L1` What does an SSE event look like on the wire? ↳ `data:` lines, blank line terminator, optional `event:`/`id:`
+  - `L1` SSE event terminator?
+  - `L1` Short polling vs long polling vs SSE vs WebSockets vs WebRTC: one line each.
+  - `L1` What is Server-Sent Events (SSE)? What content type does it use? ↳ `text/event-stream`
+  - `L2` SSE vs WebSocket for streaming LLM output: which and why?
+  - `L2` SSE vs WebSocket for streaming LLM tokens?
+  - `L2` Polling vs long polling vs SSE vs WebSocket: when each?
+  - `L2` When do you choose SSE over WebSockets? ↳ server→client only, plain HTTP, auto-reconnect; LLM token streaming
+  - `L2` SSE vs WebSocket for streaming LLM tokens: which and why?
+  - `L2` What is the 6-connections-per-domain limit problem with SSE on HTTP/1.1?
+  - `L2` How does long polling work, and what does it cost the server?
+  - `L3` What are STUN and TURN, and why does WebRTC need them?
+  - `L3` What is an SFU vs an MCU in video calls?
+  - `L3` What is WebTransport and when might it replace WebSockets?
+- [ ] WebSocket handshake (HTTP Upgrade), frames, ping/pong heartbeats ↳ https://hpbn.co/websocket/ · https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers · https://www.rfc-editor.org/rfc/rfc6455
+  - `L1` How does a WebSocket connection start? ↳ HTTP Upgrade handshake, 101 Switching Protocols
+  - `L1` What is a WebSocket? How is it different from HTTP request/response?
+  - `L1` `ws://` vs `wss://`.
+  - `L1` Is a WebSocket full-duplex?
+  - `L1` Text vs binary frames: which did you use for audio?
+  - `L1` What status code does a WebSocket upgrade return?
+  - `L2` How do heartbeats (ping/pong) detect dead connections?
+  - `L2` How do you detect dead WebSocket connections? ↳ ping/pong heartbeats, idle timeouts
+  - `L2` Walk through the opening handshake headers. ↳ Upgrade, Connection, Sec-WebSocket-Key, Version 13, Sec-WebSocket-Accept
+  - `L2` How is `Sec-WebSocket-Accept` computed, and what does it prove? ↳ base64(SHA-1(key + fixed GUID)); server speaks WebSocket, not cache
+  - `L2` What are ping and pong frames for? Who sends them, and what if a pong never comes?
+  - `L2` What are subprotocols (`Sec-WebSocket-Protocol`)? Give an example.
+  - `L2` How do you authenticate a WebSocket when browsers can't set custom headers on it? ↳ cookie, short-lived token in query/first message, subprotocol hack
+  - `L2` How do you detect a dead client connection on the server side? ↳ app-level ping with timeout; TCP alone may not notice
+  - `L3` Why does a WebSocket start as HTTP, and at which layer does it live?
+  - `L3` How do you keep a WebSocket alive and clean up on half-open connections? ↳ ping/pong, idle timeouts, finally cleanup
+  - `L3` What is `permessage-deflate`, and why might you disable it for audio or at scale? ↳ binary audio barely compresses; per-connection memory
+  - `L3` WebSocket over HTTP/2 (RFC 8441): what changes? ↳ extended CONNECT; many WS on one connection
+- [ ] Reconnection with backoff; resuming state (last event id) ↳ https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events (Last-Event-ID, retry) · https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ · https://socket.io/docs/v4/connection-state-recovery
+  - `L2` How do you handle reconnects without losing events? ↳ resend from last seen id, state recovery, refetch on reconnect
+  - `L2` How do clients reconnect without losing messages? ↳ last event id / sequence numbers, server-side buffer, resume
+  - `L2` How does SSE reconnect, and what are `id:` and `Last-Event-ID` for?
+  - `L2` How do clients reconnect safely? ↳ exponential backoff + jitter, resume token / last-seen id
+  - `L2` How does SSE reconnect and resume? ↳ `id:` field, `Last-Event-ID` header, `retry:`
+  - `L3` How do you design ordering, acks and resume for messages over WebSocket when TCP already guarantees order? ↳ order only per connection; reconnect loses in-flight; app seq numbers
+  - `L3` How would you stream LLM output to a mobile app on a flaky network with no lost or duplicated tokens?
+- [ ] Scaling WebSockets: sticky sessions, pub/sub fan-out (Redis), connection limits per node ↳ https://socket.io/docs/v4/using-multiple-nodes/ · https://socket.io/docs/v4/redis-adapter/ · https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users
+  - `L1` What lets socket.io scale across nodes?
+  - `L2` Why do WebSockets need sticky sessions or a shared pub/sub when you scale out?
+  - `L2` How do you send a message to a user connected to a different server?
+  - `L2` You run 3 Node instances. How does an event reach a client connected to another instance? ↳ Redis adapter pub/sub
+  - `L2` Why do you need sticky sessions with socket.io, and when can you avoid them? ↳ polling transport needs same node; WebSocket-only avoids it
+  - `L2` How do you emit a socket event from a REST handler or a background job?
+  - `L2` How many WebSocket connections can one server hold, and what limits it? ↳ memory per connection, file descriptors, CPU for heartbeats
+  - `L2` What is a stateful service you cannot easily make stateless? How do you scale it? ↳ WebSocket servers, game servers; shard by user/room
+  - `L2` How do you load-balance WebSocket connections? What happens to them on deploy?
+  - `L2` User A is connected to server 1 and user B to server 7. How does A's message reach B? ↳ pub/sub (Redis), connection registry, routing
+  - `L2` How do you scale WebSocket fan-out to a room of 100k listeners?
+  - `L2` What happens to 50k open WebSockets when you deploy? How do you drain them?
+  - `L2` Where does session or WebSocket state live when you scale out?
+  - `L2` What is backpressure on a WebSocket? What happens when the client reads slower than you send? ↳ send buffer grows, `bufferedAmount`; drop, pause or disconnect
+  - `L2` How do you send a message to a user connected to a different server? ↳ pub/sub (Redis), connection registry, routing
+  - `L2` Why do WebSockets need sticky sessions (or not) behind a load balancer?
+  - `L2` What happens to open WebSockets when you deploy a new version? How do you drain? ↳ stop accepting, send close 1001/1012, client reconnects elsewhere
+  - `L3` How would you run 1 lakh concurrent WebSocket connections on Node? ↳ many pods, file descriptors, memory per socket, Redis adapter, LB
+  - `L3` How do you scale to 1M concurrent connections?
+  - `L3` What are the limits of the Redis adapter at scale, and what replaces it? ↳ every node gets every message; sharded pub/sub, Streams adapter
+  - `L3` How would you scale to 1M concurrent connections? ↳ file descriptors, memory per socket, horizontal nodes, LB limits
+  - `L3` How do you scale a WebSocket service where each server holds 50k long-lived connections and deploys drop them?
+  - `L3` Redis pub/sub vs Redis Streams for cross-instance WebSocket fan-out: which loses messages and when?
+  - `L3` 100K concurrent WebSocket connections: how many per node, what limits do you hit? ↳ file descriptors, memory per connection, ephemeral ports, LB limits
+  - `L3` How do you scale to 1M concurrent WebSocket connections? ↳ epoll, FDs/ulimit, memory per conn, many nodes, LB, pub/sub fan-out
+  - `L3` How much memory does one idle WebSocket cost in Python/Node, and what dominates it?
+- [ ] Socket.io extras (rooms, acks, fallbacks) ↳ https://socket.io/docs/v4/rooms/ · https://socket.io/docs/v4/emitting-events/ (acknowledgements) · https://socket.io/docs/v4/how-it-works/ (long-polling fallback)
+  - `L1` Is socket.io the same as WebSocket? What does it add?
+  - `L1` What is a room? What is a namespace?
+  - `L1` What is an acknowledgement in socket.io?
+  - `L2` How does socket.io connect — long polling first, then upgrade? Why?
+  - `L2` How do you authenticate a socket.io connection (handshake `auth`, middleware)?
+  - `L2` What do volatile events, broadcast and `to(room).emit` do?
+  - `L2` socket.io vs raw WebSocket: what does socket.io add, and why might you avoid it? ↳ rooms, acks, reconnect, fallback; custom protocol, not plain WS
+- [ ] WebSocket frame format: opcodes, masking, payload lengths, fragmentation, close codes; a server from raw TCP
+  - `L1` What is WebSocket opcode 9?
+  - `L1` What close code means "normal closure"?
+  - `L2` What does a WebSocket frame look like? ↳ FIN, opcode, mask bit, payload length (7/16/64-bit), masking key
+  - `L2` List the opcodes. ↳ continuation 0, text 1, binary 2, close 8, ping 9, pong A
+  - `L2` Why must the client mask frames, and why doesn't the server? ↳ cache-poisoning attack on intermediaries
+  - `L2` Walk through the closing handshake. What do close codes 1000, 1001, 1006, 1008, 1011 mean? ↳ 1006 = abnormal, never sent on wire
+  - `L2` What is fragmentation (continuation frames) and when is it used?
+  - `L3` Build a WebSocket server from scratch on a raw TCP socket, without libraries. What steps do you implement? ↳ parse HTTP upgrade, compute accept, frame parse/unmask, ping, close
+  - `L3` How do you parse a frame whose payload length is 126 or 127?
+- [ ] WebRTC: signaling, SDP, ICE/STUN/TURN and NAT traversal, SRTP/DTLS, mesh vs SFU vs MCU
+  - `L1` What is WebRTC?
+  - `L1` What does STUN discover?
+  - `L1` What does TURN do?
+  - `L2` WebRTC: what are ICE, STUN and TURN?
+  - `L2` What is signaling in WebRTC, and why is it not part of the standard? ↳ exchange SDP + ICE candidates over your own channel (often WebSocket)
+  - `L2` What is SDP?
+  - `L2` When does WebRTC need a TURN server, and what does TURN cost you? ↳ symmetric NAT/firewalls; relays all media, bandwidth bill
+  - `L3` What do SRTP and DTLS do in WebRTC?
+  - `L3` Mesh vs SFU vs MCU for group calls.
+  - `L3` What are ICE candidate types (host, srflx, relay) and how is the best pair chosen?
+
+**Learn:** MDN (WebSockets, SSE) · Hussein (WebSockets) · Ably blog "WebSockets vs SSE" · your AiRA voice work
+
+## 4.6 Background jobs and messaging
+- [ ] Why async work: email, reports, LLM calls, video ↳ DDIA ch4 "Message passing data flow" (pdf p154) · https://docs.bullmq.io/ (What is BullMQ) · https://docs.celeryq.dev/en/stable/getting-started/introduction.html
+  - `L1` Why move work to a background queue instead of doing it in the request?
+  - `L2` How would you use Kafka to decouple a slow LLM call from an HTTP request?
+  - `L2` How would you decouple a slow LLM call from an HTTP request? ↳ job queue, worker, status endpoint or SSE/WebSocket push
+- [ ] Job queues: BullMQ (Redis), Celery, SQS; workers, concurrency, priorities, delays, cron jobs ↳ https://docs.bullmq.io/guide/workers/concurrency · https://docs.bullmq.io/guide/jobs/delayed · https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html
+  - `L1` What is Celery? What are the broker, the worker and the result backend?
+  - `L1` What is BullMQ, and what does it store in Redis?
+  - `L2` How do you wire Celery into a Django project (`autodiscover_tasks`, settings, `.delay()` after commit, separate worker)?
+  - `L2` Celery vs RQ vs arq vs Dramatiq: when would you pick each? ↳ arq is asyncio-native; RQ simple; Celery full-featured
+  - `L2` What should you pass to a task: a model object or an id? Why?
+  - `L2` What is `prefetch_multiplier`, and why set it to 1 for long tasks?
+  - `L2` What are chains, groups and chords in Celery?
+  - `L2` How do you monitor Celery (Flower, queue length, task failures)?
+  - `L2` How do BullMQ / RQ / Celery-on-Redis handle retries, backoff and failed jobs?
+  - `L2` What are queues, workers, jobs and job states in BullMQ? ↳ waiting, active, delayed, completed, failed
+  - `L2` What is a stalled job, and how does BullMQ recover it? ↳ worker lock expires; job moved back to wait
+  - `L2` How do you set worker concurrency, and what limits it (CPU, DB pool, API rate limits)?
+  - `L2` How do you run delayed and repeatable (cron) jobs?
+  - `L2` How do you rate-limit a queue to respect a third-party API's limits?
+  - `L2` How do you stop the same job from being added twice? ↳ deterministic `jobId`
+  - `L2` A worker crashes mid-job. What happens to the job?
+  - `L2` How do you build delayed or scheduled messages? ↳ delay queues, sorted set by time, scheduler table
+  - `L2` Priority queues in messaging: how do you avoid starvation?
+  - `L3` Can you call async code from a Celery task? What are the options?
+  - `L3` How would you run LLM jobs (e.g. AiRA reminders or long agent runs) in the background with retries and status polling?
+  - `L3` node-cron inside the API vs a scheduled queue job vs a Kubernetes CronJob: which and why?
+  - `L3` BullMQ vs SQS vs RabbitMQ vs Kafka for background jobs: how do you choose?
+  - `L3` What is head-of-line blocking at the application level, and how do you avoid it in a job queue?
+- [ ] Retries with exponential backoff + jitter; max attempts; dead-letter queue ↳ https://docs.bullmq.io/guide/retrying-failing-jobs · https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ · https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+  - `L1` What is a dead-letter queue?
+  - `L1` What is a dead-letter queue (DLQ)?
+  - `L2` How do you configure retries with exponential backoff in Celery?
+  - `L2` How do you set retries with exponential backoff on a job?
+  - `L2` Why add jitter to retries?
+- [ ] Delivery semantics: at-most-once, at-least-once, "exactly-once" = at-least-once + idempotent consumer ↳ DDIA ch11 "Fault tolerance" (pdf p482–484, idempotence p483) · DBI ch8 "Exactly-once delivery" (pdf p300) · https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
+  - `L1` What does `acks_late` do in Celery?
+  - `L1` Define at-most-once, at-least-once and exactly-once.
+  - `L1` Which one is Kafka's default in practice?
+  - `L1` At-most-once, at-least-once, exactly-once: define each.
+  - `L1` How is the usage consumer idempotent?
+  - `L2` What does `acks_late` change, and why does it matter for crashes? ↳ ack after run → redelivery on crash; needs idempotent tasks
+  - `L2` Why must Celery tasks be idempotent?
+  - `L2` The queue redelivers a job. How do you make the job idempotent?
+  - `L2` What is an idempotent consumer? Give two ways to build one. ↳ dedupe table keyed by event id; upsert / natural idempotent writes
+  - `L2` Why is "exactly-once delivery" a myth, and what do you do instead? ↳ at-least-once + idempotent consumers
+  - `L2` How do you make the usage consumer idempotent? ↳ unique request id; insert ON CONFLICT DO NOTHING / dedupe table
+  - `L3` How do you get exactly-once processing?
+  - `L3` A Kafka consumer rebalance replays an hour of usage events. Do tenants get double-billed?
+- [ ] Message brokers: RabbitMQ (queues, exchanges, acks) vs Kafka (log, partitions, consumer groups, offsets) ↳ DDIA ch11 "Messaging systems" and "Partitioned logs" (pdf p449–457) · https://kafka.apache.org/documentation/#introduction · https://www.rabbitmq.com/tutorials/amqp-concepts
+  - `L1` Queue vs log vs pub/sub: what is the difference?
+  - `L1` Name message brokers and one use for each. ↳ Kafka, RabbitMQ, SQS/SNS, Redis Streams, NATS, Pub/Sub
+  - `L1` Why send usage events to Kafka instead of writing to Postgres on the request path?
+  - `L2` Kafka vs RabbitMQ vs SQS — when?
+  - `L2` Message queue vs log: what is the difference in how messages are consumed and deleted? ↳ queue deletes on ack; log keeps, consumers track position
+  - `L2` Kafka vs RabbitMQ: when would you pick each? ↳ replay, throughput, ordering per partition vs routing, per-message ack, priorities
+  - `L3` Why Kafka and not Redis Streams, SQS or a direct Postgres insert for this volume? Defend it.
+- [ ] Ordering guarantees (per partition / per key) ↳ DDIA ch11 "Partitioned logs" (pdf p454) · https://kafka.apache.org/documentation/#intro_concepts_and_terms · DDIA ch9 "Total order broadcast" (pdf p360)
+  - `L1` Kafka key for usage events?
+  - `L2` How do you keep order for events of the same user?
+  - `L2` How do you get ordering with many consumers? ↳ partition by key; one consumer per partition
+  - `L2` What is the message key for usage events, and why? ↳ tenant id: per-tenant ordering and aggregation locality
+  - `L3` Message ordering vs parallelism: how do you get both?
+- [ ] Outbox pattern (DB write + event publish atomically); inbox/dedupe table ↳ https://microservices.io/patterns/data/transactional-outbox.html · DDIA ch11 "Change data capture" (pdf p461) · https://microservices.io/patterns/communication-style/idempotent-consumer.html
+  - `L1` What is the outbox table for?
+  - `L2` How do you enqueue a task only after the DB transaction commits? ↳ `transaction.on_commit` or an outbox
+  - `L2` How do you publish an event only if the DB transaction commits?
+  - `L2` How do you enqueue a job only if the DB write committed? ↳ transactional outbox, or enqueue after commit and accept the gap
+  - `L2` What is the dual-write problem? ↳ DB write and message publish can't be atomic
+  - `L2` Explain the transactional outbox pattern. Who reads the outbox?
+  - `L2` Outbox relay by polling vs by CDC (Debezium): trade-offs.
+  - `L2` What is the inbox (idempotent consumer) pattern?
+  - `L2` What is the transactional outbox pattern, and which problem does it solve?
+  - `L3` The database write succeeded but the Kafka send failed. Now what? ↳ dual-write problem → transactional outbox / CDC
+  - `L3` What is the transactional outbox pattern? Draw it. ↳ write row + outbox in one DB txn; relay/CDC publishes
+  - `L3` Outbox relay crashes after publishing but before marking the row sent. What happens downstream?
+- [ ] Poison messages; visibility timeout (SQS) ↳ https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html · DDIA ch11 "Acknowledgements and redelivery" (pdf p453) · https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
+  - `L2` A consumer crashes mid-job — what happens?
+  - `L2` What is a poison message, and how do you stop it from blocking the queue?
+  - `L2` What is visibility timeout (SQS) and what happens if processing takes longer?
+  - `L2` Poison message: what is it and how do you stop it blocking the queue?
+  - `L3` A task is stuck and the queue is backing up. How do you debug it? ↳ time limits, worker logs, poison message, concurrency, broker visibility timeout
+  - `L3` Celery with a Redis broker: what is the visibility-timeout problem? ↳ unacked long tasks are redelivered after the timeout and run twice
+- [ ] Saga pattern (choreography vs orchestration) for multi-service workflows ↳ https://microservices.io/patterns/data/saga.html · https://learn.microsoft.com/en-us/azure/architecture/patterns/saga · DDIA ch9 "Distributed transactions in practice" (pdf p372, why not 2PC)
+  - `L1` What is a saga?
+  - `L1` What is a saga's compensating action?
+  - `L2` What is a saga, and when do you need one instead of a transaction?
+  - `L2` Choreography vs orchestration sagas: trade-offs. When would you pick each?
+  - `L2` What is a compensating transaction? Give one for "charge card", "reserve seat", "send email".
+  - `L2` Some steps cannot be compensated (email sent). How do you order saga steps? ↳ pivot transaction; reversible steps first, irreversible last
+  - `L2` What isolation does a saga give you? What anomalies can users see? ↳ none; dirty reads of intermediate state; use semantic locks
+  - `L3` Design a saga for checkout (order → payment → inventory) with Kafka, including compensations.
+  - `L3` Design an orchestrated saga for order → payment → inventory → shipping with timeouts and retries.
+  - `L3` What is write skew across services, and how can a saga cause it?
+  - `L3` Where would you use Temporal (or a workflow engine) instead of hand-written sagas?
+
+**Learn:** DDIA ch11 (stream processing) · Kafka docs "Introduction" + Confluent Developer courses (free) ·
+RabbitMQ tutorials · BullMQ docs · microservices.io (outbox, saga) · your AiRA reminders work
+
+## 4.7 Frameworks you list
+- [ ] FastAPI: async endpoints, dependency injection (`Depends`), Pydantic validation, background tasks, middleware, lifespan events, running with uvicorn workers ↳ https://fastapi.tiangolo.com/async/ · https://fastapi.tiangolo.com/tutorial/dependencies/ · https://fastapi.tiangolo.com/deployment/server-workers/ (also Advanced "Lifespan Events")
+  - `L1` What is `Depends`, and what problem does it solve?
+  - `L1` `def` vs `async def` endpoint: how does FastAPI run each? ↳ `def` in threadpool; `async def` on the event loop
+  - `L1` What are background tasks in FastAPI?
+  - `L1` What are lifespan events, and what do you do in them?
+  - `L1` Where does FastAPI run a plain `def` endpoint?
+  - `L2` `def` vs `async def` endpoints in FastAPI: how does each run? ↳ `def` goes to threadpool; `async def` on loop
+  - `L2` What is a dependency with `yield`, and when does the code after `yield` run?
+  - `L2` Are dependencies cached within one request? How do you turn that off? ↳ yes per request; `use_cache=False`
+  - `L2` How do you apply a dependency to a whole router or app (e.g. auth)?
+  - `L2` How do you override a dependency in tests? ↳ `app.dependency_overrides`
+  - `L2` You call a blocking SDK inside an `async def` endpoint. What happens to other requests? ↳ whole worker's loop stalls; use `def` or `to_thread`
+  - `L2` How big is the default threadpool for `def` endpoints, and what happens when it is full? ↳ AnyIO limiter, 40 threads; requests queue
+  - `L2` Background tasks vs Celery/arq: when is `BackgroundTasks` not enough? ↳ no retries, lost on crash, same process
+  - `L2` How do you write a middleware that adds a request id and logs latency?
+  - `L2` Middleware vs dependency: which do you use for auth, logging, DB sessions?
+  - `L2` How do you register a custom exception handler and a handler for `RequestValidationError`?
+  - `L2` How do you configure CORS in FastAPI?
+  - `L2` You add three middlewares with `app.add_middleware(A)`, then B, then C. Which sees the request first, and which sees the response last? ↳ onion: the last added is outermost, so C → B → A → endpoint → A → B → C
+  - `L2` How does dependency injection work in FastAPI/NestJS?
+  - `L3` How would you map domain exceptions to HTTP status codes in one place in a web app?
+  - `L3` Why is `@app.on_event("startup")` deprecated in favour of `lifespan`, and how do you share state from it?
+  - `L3` What is the order of execution: middleware, dependencies, endpoint, response serialisation, background tasks?
+  - `L3` Why can `BaseHTTPMiddleware` hurt streaming responses and performance? What is the pure ASGI alternative?
+- [ ] NestJS: modules, providers, DI container, controllers, guards, interceptors, pipes, exception filters ↳ https://docs.nestjs.com/faq/request-lifecycle · https://docs.nestjs.com/fundamentals/custom-providers · https://docs.nestjs.com/guards
+  - `L1` What is NestJS, and what does it add on top of Express or Fastify?
+  - `L1` What are modules, providers and controllers?
+  - `L1` What does `@Injectable()` mean?
+  - `L1` What are guards, interceptors, pipes and exception filters, in one line each?
+  - `L1` Which runs first in NestJS: guard or interceptor?
+  - `L1` Which NestJS pipe validates DTOs?
+  - `L2` How do NestJS exception filters relate to this?
+  - `L2` Why can't NestJS inject by interface, and what do you use instead? ↳ interfaces erased; injection tokens with `@Inject`
+  - `L2` What are provider scopes (singleton, request, transient) and what does request scope cost?
+  - `L2` What is a circular dependency in NestJS, and how does `forwardRef` work? Why is it a smell?
+  - `L2` Order of middleware/guards/interceptors in NestJS?
+  - `L2` What is the request lifecycle order in NestJS? ↳ middleware → guards → interceptors (before) → pipes → handler → interceptors (after) → filters
+  - `L2` How does the DI container resolve a provider? What does `reflect-metadata` do?
+  - `L2` What are provider scopes (singleton, request, transient)? What does request scope cost? ↳ new instance per request, bubbles up the chain, slower
+  - `L2` What are custom providers (`useValue`, `useClass`, `useFactory`, `useExisting`)? Give a use of each.
+  - `L2` What is a circular dependency in Nest, and how do you fix it (`forwardRef`, or redesign)?
+  - `L2` What do `exports` and `imports` do in a module? What is a global module?
+  - `L2` What is a dynamic module (`forRoot` / `forRootAsync`)?
+  - `L2` How do you build a role guard with a custom `@Roles()` decorator and `Reflector`?
+  - `L2` Write an interceptor that logs latency or wraps every response in `{ data }`.
+  - `L2` What does `ValidationPipe` do with class-validator and class-transformer? What does `whitelist` do?
+  - `L2` How do you write a global exception filter that maps domain errors to HTTP errors?
+  - `L2` What are lifecycle hooks (`onModuleInit`, `onApplicationShutdown`), and how do you enable shutdown hooks?
+  - `L2` How do you test a Nest service with mocked providers (`Test.createTestingModule`)?
+  - `L3` What microservice transports does Nest support, and which did Jigsaw use? ↳ TCP, Redis, NATS, RabbitMQ, Kafka, gRPC
+  - `L3` `@MessagePattern` vs `@EventPattern`: request-response vs fire-and-forget.
+  - `L3` NestJS request lifecycle: middleware vs guard vs interceptor vs pipe vs exception filter — which pattern is each?
+- [ ] Express: middleware chain, error middleware, routers ↳ https://expressjs.com/en/guide/using-middleware.html · https://expressjs.com/en/guide/error-handling.html · https://expressjs.com/en/guide/routing.html
+  - `L1` What is middleware in Express? What does `next()` do?
+  - `L1` How do you write error-handling middleware? ↳ four arguments `(err, req, res, next)`
+  - `L1` What is `express.Router` for?
+  - `L1` How many arguments does Express error middleware take?
+  - `L2` How does Express handle errors thrown in an async route handler (Express 4 vs 5)? ↳ 4 needs `next(err)`/wrapper; 5 catches rejected promises
+  - `L2` In what order does Express run middleware and routes?
+  - `L2` What happens if middleware neither calls `next()` nor sends a response?
+  - `L2` What happens when an `async` route handler throws in Express 4? In Express 5? ↳ 4: unhandled rejection, request hangs; 5: forwarded to error handler
+  - `L2` How do you catch async errors in Express 4 (wrapper or `express-async-errors`)?
+  - `L2` "Cannot set headers after they are sent" — what causes it?
+  - `L2` How do you validate request bodies in Express (zod, Joi, express-validator)?
+  - `L2` What do `helmet`, `cors`, `compression` and body size limits protect against?
+  - `L2` How do you structure a large Express app (routes, controllers, services, repositories)?
+  - `L3` Express vs Fastify vs NestJS: what would you choose for a new service?
+- [ ] Django/DRF basics: ORM, migrations, serializers, viewsets; Django's sync vs async story ↳ https://www.django-rest-framework.org/tutorial/quickstart/ · https://docs.djangoproject.com/en/stable/topics/async/ · https://docs.djangoproject.com/en/stable/topics/migrations/
+  - `L1` What is Django's MTV pattern, and how does it map to MVC?
+  - `L1` What is a QuerySet? What does "QuerySets are lazy" mean?
+  - `L1` What is a migration? `makemigrations` vs `migrate`.
+  - `L1` What is the Django admin good for?
+  - `L1` What is a DRF serializer? A viewset? A router?
+  - `L1` `select_related` or `prefetch_related` for a many-to-many?
+  - `L1` Are Django QuerySets lazy?
+  - `L2` When does a QuerySet actually hit the database? ↳ iteration, `len`, `list`, slicing with step, `bool`, `repr`
+  - `L2` What is the N+1 problem in Django, and how do you spot it? ↳ debug toolbar, `assertNumQueries`, query logs
+  - `L2` `select_related` vs `prefetch_related`: what does each do? ↳ SQL JOIN for FK/one-to-one; separate query for many
+  - `L2` What do `only`, `defer`, `values` and `values_list` do?
+  - `L2` What are `F()` expressions and `Q()` objects? Why does `F()` avoid a race?
+  - `L2` What do `annotate` and `aggregate` do?
+  - `L2` How do you run code in a transaction (`transaction.atomic`), and what is `on_commit` for?
+  - `L2` How does Django middleware work? In what order does it run on request and response?
+  - `L2` What are Django signals? Why do many teams avoid them? ↳ hidden control flow; hard to trace; not async-aware
+  - `L2` `ModelSerializer` vs `Serializer`; how does DRF validation work (`validate_fieldname`, `validate`)?
+  - `L2` How do authentication, permissions and throttling work in DRF?
+  - `L3` What is Django's async story: async views, async ORM, ASGI — and what is still sync? ↳ ORM async wraps sync via threads; `sync_to_async`
+  - `L3` A DRF list endpoint does 300 queries. Fix it step by step.
+  - `L3` Django vs FastAPI: what do you give up and what do you get when moving between them?
+- [ ] FastAPI request handling: ASGI scope/receive/send, path vs query vs body, `response_model`, status codes, `APIRouter`, OpenAPI
+  - `L1` What is FastAPI built on? ↳ Starlette (web) + Pydantic (data)
+  - `L1` What are path parameters, query parameters and the request body in FastAPI?
+  - `L1` What does `response_model` do?
+  - `L1` Where do the `/docs` and `/redoc` pages come from?
+  - `L1` How does FastAPI generate the OpenAPI spec?
+  - `L1` What status code does FastAPI return for a validation error?
+  - `L2` How does FastAPI know a parameter is path vs query vs body? ↳ in path template → path; Pydantic model → body; else query
+  - `L2` What status code does FastAPI return on validation failure, and what does the body look like? ↳ 422 with error list
+  - `L2` How do you return 201, 204 or a custom header?
+  - `L2` What do `Query`, `Path`, `Body`, `Header`, `Cookie` and `Form` do?
+  - `L2` How do you split routes with `APIRouter`, prefixes and tags?
+  - `L2` What is the ASGI interface (`scope`, `receive`, `send`)?
+  - `L2` Walk through everything that happens when a client calls a FastAPI endpoint, from socket to response. ↳ uvicorn parses HTTP → builds `scope` → middleware stack → router match → dependencies + validation → endpoint → serialise → middleware back out → uvicorn sends
+  - `L2` What does `scope["type"]` hold, and which events flow through `receive` and `send` for one HTTP request? ↳ `http`/`websocket`/`lifespan`; `http.request` in; `http.response.start` + `http.response.body` out
+  - `L2` Input model vs output model: why have separate `UserCreate` and `UserOut` schemas? ↳ don't leak password hash; different required fields
+  - `L2` How do you upload a file in FastAPI (`UploadFile` vs `bytes`)?
+  - `L2` How do you version a FastAPI API (`/v1`, `/v2` routers)?
+  - `L3` Write a minimal ASGI app by hand, with no framework, that returns "hello". ↳ `async def app(scope, receive, send)`; send start (status, headers) then body
+  - `L3` What does FastAPI do at startup with your function signatures? ↳ inspects them, builds dependency graph and validators once
+  - `L3` What does `response_model` cost at runtime, and when would you return a `Response` directly?
+  - `L3` Why is FastAPI "fast", and when is it not faster than Django or Flask?
+- [ ] FastAPI auth, WebSockets and streaming: `OAuth2PasswordBearer`, JWT `get_current_user`, role dependencies, SSE, disconnects
+  - `L1` What does `OAuth2PasswordBearer` do? Does it validate the token?
+  - `L1` What is `StreamingResponse`?
+  - `L1` How do you open a WebSocket endpoint in FastAPI?
+  - `L2` Walk through JWT auth in FastAPI: login route, token creation, `get_current_user` dependency.
+  - `L2` How do you implement role checks (RBAC) as a reusable dependency? ↳ dependency factory: `require_role("admin")`
+  - `L2` How do you authenticate a WebSocket connection? ↳ token in query/subprotocol/first message; browsers can't set headers
+  - `L2` How do you stream LLM tokens with SSE from FastAPI? What headers and format do you need?
+  - `L2` How do you detect a client disconnect during a stream and stop the LLM call? ↳ `request.is_disconnected()`, `WebSocketDisconnect`, cancel task
+- [ ] FastAPI in production: per-request async SQLAlchemy sessions, pool sizing, app structure, testing, latency tuning, framework choice
+  - `L1` How do you test a FastAPI app? ↳ `TestClient`, or `httpx.AsyncClient` with ASGI transport
+  - `L2` How do you give each request its own SQLAlchemy `AsyncSession` and close it safely? ↳ dependency with `yield`; session per request
+  - `L2` Why must you not share one `AsyncSession` across concurrent tasks?
+  - `L2` What is lazy loading in async SQLAlchemy, and why does it raise `MissingGreenlet`? ↳ implicit IO not allowed; use `selectinload`/`joinedload`
+  - `L2` How do you configure the DB connection pool size against the number of workers? ↳ workers × pool_size ≤ DB max_connections
+  - `L2` How do you structure a large FastAPI app (routers, services, repositories, schemas, settings)?
+  - `L2` How do you test an endpoint that calls OpenAI or another external API? ↳ dependency override or respx mock
+  - `L2` How do you use a test database and roll back after each test?
+  - `L3` p99 latency on a FastAPI endpoint jumped. Walk through how you find the cause.
+  - `L3` List performance tuning steps for FastAPI. ↳ uvloop/httptools, orjson, pool sizes, avoid sync calls, cache, workers
+  - `L3` FastAPI vs Django vs Flask vs NestJS for a new AI product backend: what would you choose and why?
+
+**Learn:** fastapi.tiangolo.com (Tutorial + Advanced) · docs.nestjs.com · expressjs.com guide
+
+## 4.8 Reliability patterns in code
+- [ ] Timeouts on every outbound call ↳ https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ · DDIA ch8 "Timeouts and unbounded delays" (pdf p295)
+  - `L1` Why must every network call have a timeout?
+  - `L1` Why does every outbound call need a timeout?
+  - `L1` Why do you always set a timeout on network calls?
+  - `L2` How do you set the timeout for a call chain A → B → C? What is deadline propagation?
+  - `L2` What is deadline propagation, and why is it better than fixed timeouts per hop?
+  - `L2` What timeouts did you set: connect, TTFT, idle-between-chunks, total? Why separate ones? ↳ TTFT timeout catches stuck providers before the long tail
+  - `L2` Connect timeout vs read timeout vs total timeout. How do you pick values?
+  - `L3` Deadline propagation: how do you stop downstream work after the caller has given up?
+- [ ] Retries (only idempotent ops) with backoff + jitter; retry budgets ↳ https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ · https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ · https://sre.google/sre-book/handling-overload/ (retry budgets)
+  - `L1` What is exponential backoff? What is jitter, and why add it? ↳ spreads retries, avoids synchronized retry storms
+  - `L1` Why add jitter to retries?
+  - `L1` Why exponential backoff, and why add jitter?
+  - `L1` Why jitter on retries?
+  - `L1` Which status codes do you retry?
+  - `L1` Which status codes do you never retry?
+  - `L2` Why add jitter to retries?
+  - `L2` Which errors should a client retry, and which must it never retry? ↳ retry 429/503/timeouts; never 400/401/403/422
+  - `L2` Which errors should you retry and which should you never retry? ↳ retry 5xx/timeouts/429 with backoff; never 4xx validation
+  - `L2` Why are retries dangerous without idempotency?
+  - `L2` What is a retry storm, and how do retries multiply across layers? ↳ 3 layers × 3 retries = 27×; retry at one layer, retry budgets
+  - `L2` What is a retry budget?
+  - `L2` How can retries make an outage worse? What is a retry budget? ↳ retry storms multiply load; cap retries as % of traffic
+  - `L2` Which errors do you retry and which never? ↳ retry 429/5xx/timeouts; never 400/401/content-filter
+  - `L2` How do you honour a provider's `Retry-After` header?
+  - `L2` Full jitter vs equal jitter vs decorrelated jitter: which did you use?
+  - `L2` What is a retry budget, and do you have one?
+  - `L2` Did you use a library (opossum, cockatiel, tenacity) or write it yourself? Why?
+  - `L2` What is exponential backoff with jitter, and why jitter? ↳ avoid synchronized retry storms
+  - `L2` What is a retry storm / retry amplification across layers? ↳ 3 layers × 3 retries = 27× load
+  - `L2` Which errors are safe to retry and which are not?
+  - `L3` Retries + fallback + client retries can multiply one request into nine calls. How do you prevent retry storms?
+  - `L3` How do retries at the load balancer interact with non-idempotent methods? ↳ LBs/proxies should not retry POST after bytes sent
+  - `L3` What is hedging (backup requests), and when is it worth the extra load?
+- [ ] Circuit breaker (closed/open/half-open) ↳ https://martinfowler.com/bliki/CircuitBreaker.html · https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker · DBI ch8 "Cascading Failures" (pdf p292)
+  - `L1` What is a circuit breaker? Name its three states. ↳ closed, open, half-open
+  - `L1` Circuit breaker states?
+  - `L1` Three states of a circuit breaker?
+  - `L1` How does a circuit breaker work? Explain closed, open and half-open.
+  - `L1` Three circuit-breaker states?
+  - `L2` How does a circuit breaker work?
+  - `L2` What is a circuit breaker and how does it help latency, not just errors?
+  - `L2` Design a circuit breaker class: states, thresholds, half-open probe, the public API. ↳ closed/open/half-open; failure count/rate; cooldown; `call(fn)`
+  - `L2` Retry, timeout, bulkhead and circuit breaker as composable decorators: in what order do you wrap them?
+  - `L2` What trips your breaker: error rate, consecutive failures, latency, or 429s? Over what window?
+  - `L2` Is the breaker per provider, per model, per region or per API key? Why that granularity?
+  - `L2` Is breaker state per pod or shared in Redis? Trade-offs. ↳ local is fast and simple; shared reacts consistently but adds dependency
+  - `L2` What is a circuit breaker? States?
+  - `L3` How do you tune a circuit breaker (thresholds, window, half-open probes)? What goes wrong with bad values?
+  - `L3` How do you make a circuit breaker work across many instances of a service? ↳ shared state in Redis vs per-instance; trade-off freshness vs dependency
+  - `L3` Half-open sends a probe request. Do you use real user traffic or synthetic probes? Why?
+  - `L3` How did you test the breaker and fallback? ↳ fault injection: mock provider returning 500/429/slow streams, chaos tests
+- [ ] Bulkheads; rate limiting (token bucket, sliding window); load shedding ↳ https://aws.amazon.com/builders-library/using-load-shedding-to-avoid-overload/ · https://stripe.com/blog/rate-limiters · https://learn.microsoft.com/en-us/azure/architecture/patterns/bulkhead
+  - `L1` What is the bulkhead pattern?
+  - `L1` What is load shedding?
+  - `L2` What is a bulkhead, and how does it protect a service from one slow dependency?
+  - `L2` What is load shedding, and how do you decide what to shed?
+  - `L2` Fixed window vs sliding window vs token bucket vs leaky bucket: compare.
+  - `L2` Build a rate limiter from scratch with Redis. How do you make it atomic? ↳ Lua script or MULTI; INCR + EXPIRE; sorted set for sliding log
+  - `L3` A downstream service is slow and your API threads/connections pile up. What patterns protect you? ↳ timeouts, circuit breaker, bulkheads, load shedding
+  - `L3` Load shedding by priority: how do you decide which requests to drop first?
+  - `L3` Your rate limiter's Redis is down. Fail open or fail closed? Defend your choice.
+- [ ] Graceful degradation and fallbacks ↳ https://aws.amazon.com/builders-library/avoiding-fallback-in-distributed-systems/ · https://sre.google/sre-book/addressing-cascading-failures/
+  - `L2` What is "graceful degradation"? Give an example from a product you built.
+  - `L2` Graceful degradation: give three ways a product can degrade instead of failing. ↳ cached/stale data, disable non-core features, smaller model, queue the work
+  - `L2` What is a fallback, and when is a fallback worse than an error?
+  - `L2` How does the fallback chain work, and how do you stop fallbacks from overloading the backup provider?
+  - `L3` Redis is down. Does your app go down with it? How should cache failures degrade?
+  - `L3` What is your graceful degradation when every provider is failing?
+- [ ] Health checks: liveness vs readiness ↳ https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/ · https://aws.amazon.com/builders-library/implementing-health-checks/
+  - `L1` Liveness vs readiness probe?
+  - `L1` Liveness vs readiness probe: what is the difference?
+  - `L1` Liveness or readiness: which removes a pod from the load balancer?
+  - `L1` Liveness vs readiness vs startup probe: what does each do?
+  - `L1` What is synthetic monitoring?
+  - `L1` Liveness vs readiness in one line?
+  - `L2` What should a readiness check test? Should it check the database? ↳ own ability to serve; careful: shared dependency can fail all pods
+  - `L2` Why should a liveness probe never depend on the database?
+  - `L2` Should the liveness probe check the database? Why is that dangerous? ↳ DB blip → all pods restart → cascading outage
+  - `L2` What should a readiness check include, and what happens when it fails?
+  - `L2` Shallow vs deep health checks: when do you use each?
+  - `L2` What would a synthetic check for a login flow or a chat reply look like?
+  - `L2` What is real user monitoring (RUM), and what does it catch that synthetics miss?
+  - `L3` Health checks pass but users get 500s. How can that happen, and how do you design better health checks? ↳ shallow /health; check dependencies carefully, avoid cascading failure
+  - `L3` A deep health check that pings the database takes all servers out when the DB blips. How do you avoid that?
+  - `L3` How do you health-check a service that depends on an LLM provider without paying for a call every 10 seconds?
+  - `L3` How can health checks cause an outage? ↳ fail-open thresholds, all hosts failing at once, LB removing everything
+- [ ] Graceful shutdown; zero-downtime deploys (rolling, blue-green, canary) ↳ https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/ (pod termination) · https://martinfowler.com/bliki/BlueGreenDeployment.html · https://martinfowler.com/bliki/CanaryRelease.html
+  - `L1` Which signal does Kubernetes send before killing a pod?
+  - `L1` What is graceful shutdown?
+  - `L2` How do Kubernetes `terminationGracePeriodSeconds` and a `preStop` hook fit into this?
+  - `L2` What do you do with long-lived WebSocket or SSE connections during a deploy?
+  - `L2` Readiness vs liveness probe: what should each return while the pod is shutting down?
+  - `L2` How do you deploy without dropping requests?
+  - `L2` Walk through graceful shutdown of a Node API on SIGTERM. ↳ fail readiness, stop accepting, finish in-flight, close DB/queues, exit
+  - `L2` What happens to open WebSocket / socket.io connections during a deploy?
+  - `L2` How do you deploy without dropping requests (rolling, blue-green, canary)?
+  - `L2` What is connection draining and why does it matter for rolling deploys?
+  - `L2` How do you shut down gracefully without cutting off streaming responses? ↳ SIGTERM → stop readiness → drain streams → close → exit; terminationGracePeriod
+  - `L2` How do you deploy without dropping requests? ↳ readiness gate, preStop drain, graceful SIGTERM, rolling/blue-green/canary
+  - `L3` During a rolling deploy you see a burst of 502s. What is happening, and how do you fix it? ↳ endpoints removal lag; sleep in preStop before closing
+  - `L3` Design graceful shutdown for a realtime voice service with active calls (tie to AiRA).
+  - `L3` How do you shut down FastAPI gracefully under Kubernetes (SIGTERM, in-flight requests, open WebSockets)?
+  - `L3` How do you drain workers safely during a deploy?
+  - `L3` How would you do a canary release at the load balancer?
+  - `L3` After moving to Kubernetes, 1 % of requests get 502s during deploys. How do you debug it? ↳ readiness timing, preStop sleep, keep-alive vs LB timeouts
+- [ ] Feature flags ↳ https://martinfowler.com/articles/feature-toggles.html · https://openfeature.dev/docs/reference/intro
+  - `L1` What is a feature flag?
+  - `L1` What is a feature flag kill switch?
+  - `L2` What kinds of feature flags exist (release, ops kill switch, experiment, permission)?
+  - `L2` How do you evaluate flags without adding latency to every request? ↳ cached rules in memory, streamed updates
+  - `L2` What is flag debt, and how do you clean up old flags?
+  - `L2` How do you ship half-finished work to main safely? ↳ feature flags, branch by abstraction, dark launch
+  - `L2` What kinds of feature flags are there? ↳ release, experiment, ops/kill switch, permission
+  - `L2` What is the cost of feature flags, and how do you stop them piling up? ↳ flag debt; owners, expiry dates, cleanup tickets
+  - `L2` Feature flag vs config value vs environment variable.
+  - `L2` Build your own flags in Redis/Postgres or buy LaunchDarkly / Unleash / GrowthBook? Trade-offs.
+  - `L2` How do you test code that has several flags on and off?
+  - `L3` How do you use a feature flag as a kill switch for an LLM feature that starts misbehaving in prod?
+  - `L3` How do you roll out a flag to 1% of users consistently (same users each request)? ↳ hash(user id) into buckets
+
+**Learn:** AWS Builders' Library ("Timeouts, retries and backoff with jitter", "Avoiding fallback") ·
+*Release It!* (Nygard) · Hussein
+
+## 4.9 Observability
+- [ ] Structured logging (JSON), log levels, correlation/request ids ↳ https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html · https://www.structlog.org/en/stable/why.html · https://opentelemetry.io/docs/concepts/signals/logs/
+  - `L1` What is structured logging? Why JSON instead of plain text lines?
+  - `L1` Name the log levels and when you use each. ↳ trace, debug, info, warn, error, fatal
+  - `L1` What should every log line contain? ↳ timestamp, level, service, env, message, request/trace id, user/tenant id
+  - `L2` How do you add a request id to every log line (AsyncLocalStorage)?
+  - `L2` What fields should every structured log line have? ↳ timestamp, level, service, trace id, request/user id, message
+  - `L2` Why should logs be structured JSON with a request id?
+  - `L2` Why is Pino much faster than Winston? ↳ minimal sync work, JSON only, transports in worker threads
+  - `L2` What is a child logger, and how do you use it to attach request context?
+  - `L2` Logging in Python: stdlib `logging` vs structlog vs loguru. How do you get JSON out of FastAPI + uvicorn?
+  - `L2` Why should logging be asynchronous, and what do you lose if the process crashes?
+  - `L2` What is wrong with `console.log` in production Node?
+  - `L2` What do you log at info level for an HTTP request, and what do you never log? ↳ method, route, status, duration; no bodies with secrets/PII
+  - `L2` What is log sampling? How do you sample without losing errors? ↳ keep all errors/slow requests; sample successes
+  - `L2` How do you change log level in production without a redeploy?
+  - `L2` What is the difference between an error log and an exception tracker like Sentry?
+  - `L2` Log in the app and ship with an agent (Fluent Bit, Vector, Promtail), or ship directly from the app? Why?
+  - `L3` Your logging bill doubled this month. How do you find and cut the waste?
+  - `L3` Logs vs events vs audit logs: should they share one pipeline?
+- [ ] Metrics: counters, gauges, histograms; RED (rate, errors, duration) and USE methods ↳ https://prometheus.io/docs/concepts/metric_types/ · https://grafana.com/blog/2018/08/02/the-red-method-how-to-instrument-your-services/ · https://www.brendangregg.com/usemethod.html
+  - `L1` Logs vs metrics vs traces: what is each for?
+  - `L1` What are the four golden signals? ↳ latency, traffic, errors, saturation
+  - `L1` What is the RED method? ↳ rate, errors, duration — per service/endpoint
+  - `L1` RED vs USE: which for a service and which for a resource like CPU, disk or a connection pool?
+  - `L1` RED stands for?
+  - `L1` USE stands for?
+  - `L2` RED vs USE methods: which for services, which for resources?
+  - `L2` What would you put on the dashboard for the system you just designed?
+  - `L2` What is high cardinality in metrics and why does it blow up cost?
+  - `L2` Black-box (synthetic) monitoring vs white-box monitoring: when each?
+  - `L2` What is saturation, and why is it often the most useful early warning? Give examples. ↳ queue length, pool waiters, event-loop lag, run queue
+  - `L2` What RED metrics would you put on an API's front page dashboard?
+  - `L2` What USE metrics would you collect for Postgres, Redis and a Node process?
+  - `L2` What business metrics belong next to technical ones? Give three for an AI assistant.
+  - `L2` What is event-loop lag in Node and why is it a key saturation metric?
+  - `L2` Should errors include 4xx? Which 4xx count as your fault? ↳ 429/499 nuances; usually 5xx for SLO, 4xx tracked separately
+  - `L2` What is a leading vs lagging indicator?
+  - `L3` Apply USE to a connection pool: what are its utilisation, saturation and errors?
+  - `L3` Apply RED to a Kafka consumer or a background worker. What is "duration" there?
+  - `L3` How would you instrument a voice pipeline (STT → LLM → TTS) with RED per stage?
+- [ ] p50/p95/p99 latency and why averages lie ↳ DDIA ch1 "Describing performance" (pdf p33–37) · https://sre.google/sre-book/service-level-objectives/ · Gil Tene talk "How NOT to Measure Latency" (YouTube)
+  - `L1` Why p99 and not average?
+  - `L1` What are p50, p95, p99? Why not use the average?
+  - `L1` What are p50, p95, p99 and p99.9?
+  - `L1` Why p99 and not the average? ↳ averages hide the tail; outliers dominate user experience
+  - `L1` Can you average p99s from two servers?
+  - `L2` How do you measure the p99 of a service correctly across many servers? ↳ merge histograms, never average percentiles
+  - `L2` What is tail latency (p99) and why does fan-out make it worse?
+  - `L2` Can you average percentiles across servers? Why not, and what do you do instead? ↳ percentiles don't compose; merge histograms/sketches then compute
+  - `L2` What is tail latency amplification when one request fans out to many backends? ↳ 100 calls at p99 → most requests hit a slow one
+  - `L2` What is the difference between latency and response time? Service time vs queueing time?
+  - `L2` Why are the slowest requests often the most valuable customers?
+  - `L2` What is an Apdex score, and why is it less used now?
+  - `L2` Where do you measure latency: client, load balancer, app, or all? Why do the numbers differ?
+  - `L2` A histogram with buckets at 100 ms and 1 s says p99 = 950 ms. How accurate is that?
+  - `L3` Why do you sometimes trade a lower average latency for a better p99?
+  - `L3` What are HDR histograms, t-digest and DDSketch, and why do monitoring systems use them?
+  - `L3` What is coordinated omission, and how does it make your latency graphs lie?
+  - `L3` Should you measure latency of failed requests in the same histogram as successes?
+- [ ] Distributed tracing: spans, context propagation, OpenTelemetry ↳ https://opentelemetry.io/docs/concepts/signals/traces/ · https://opentelemetry.io/docs/concepts/context-propagation/ · Google "Dapper" paper https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/
+  - `L1` What are a span and a trace id?
+  - `L1` What is a trace? What is a span?
+  - `L1` What is OpenTelemetry? What problem did it solve? ↳ one vendor-neutral API/SDK/protocol; merged OpenTracing + OpenCensus
+  - `L1` What is context propagation?
+  - `L1` What header carries W3C trace context?
+  - `L1` Trace vs span in one line?
+  - `L1` What is the OTel Collector?
+  - `L1` Head vs tail sampling in one line?
+  - `L2` What is distributed tracing and how does context propagate across services and queues?
+  - `L2` Head-based vs tail-based trace sampling.
+  - `L2` What does a span contain? ↳ trace id, span id, parent id, name, start/end, attributes, events, status, kind
+  - `L2` Explain the W3C `traceparent` header field by field. ↳ version, trace-id, parent span-id, flags (sampled)
+  - `L2` What is `tracestate` and what is baggage? When is baggage dangerous? ↳ propagated to every hop and third parties; no secrets/PII
+  - `L2` Auto-instrumentation vs manual instrumentation: what does each give you?
+  - `L2` What are span kinds (server, client, producer, consumer, internal)?
+  - `L2` What is the OpenTelemetry Collector and why put one between your app and the backend? ↳ batching, retries, sampling, redaction, vendor switch
+  - `L2` What is OTLP?
+  - `L2` What are OTel semantic conventions, and why do they matter?
+  - `L2` Head-based vs tail-based sampling: trade-offs. ↳ head is cheap but blind; tail keeps errors/slow but needs buffering
+  - `L2` How do you trace through a message queue? Parent-child or span links?
+  - `L2` Jaeger vs Zipkin vs Tempo vs Honeycomb vs Datadog APM: what is the difference?
+  - `L2` How do you debug a slow request across 5 services? ↳ find the trace, look at the critical path, then the span's logs
+  - `L2` What is the critical path in a trace waterfall?
+  - `L3` How do you add OpenTelemetry tracing to FastAPI, SQLAlchemy and httpx calls?
+  - `L3` How do you debug a slow request across 5 services?
+  - `L3` How do you keep one request traceable across five services? ↳ request id propagation, OpenTelemetry traces
+  - `L3` How do you debug a system where one action triggers a chain of 8 async events? ↳ correlation ids, tracing, event catalogue
+  - `L3` Instrument a NestJS or FastAPI service with OTel from scratch. What must load first and why? ↳ SDK before other imports so patching works
+  - `L3` What overhead does tracing add, and how do you keep it under 1–2 %?
+  - `L3` Traces are broken: each service shows its own root span. What are the usual causes? ↳ missing propagator, proxy strips headers, lost async context
+  - `L3` How do you trace a long-lived WebSocket session? One giant span or many?
+  - `L3` What are exemplars and how do they connect a Prometheus histogram to a trace?
+- [ ] SLI / SLO / SLA, error budgets; alerting on symptoms ↳ https://sre.google/sre-book/service-level-objectives/ · https://sre.google/workbook/alerting-on-slos/ · https://sre.google/sre-book/monitoring-distributed-systems/
+  - `L1` What are SLI, SLO and SLA?
+  - `L1` Define SLI, SLO and SLA.
+  - `L1` What is an error budget?
+  - `L1` SLI vs SLO vs SLA in one line each?
+  - `L2` What SLOs would you set for an API?
+  - `L2` What is an error budget and how does it change how a team ships?
+  - `L2` What should page a human, and what should only be a ticket? ↳ alert on symptoms/SLO burn, not causes
+  - `L2` What SLOs would you set for a REST API? For a voice assistant? For a batch report job?
+  - `L2` What makes a good SLI? ↳ measures user experience; ratio of good events to valid events
+  - `L2` Request-based vs window-based SLOs: what is the difference?
+  - `L2` Why is 100 % the wrong reliability target?
+  - `L2` What happens when the error budget runs out? What is an error budget policy? ↳ freeze features, focus on reliability, agreed in advance
+  - `L2` Why should an SLA be looser than the internal SLO?
+  - `L2` Where do you measure the SLI: load balancer logs, app metrics, synthetic probes, or client telemetry?
+  - `L2` What are dependency SLOs, and how does your SLO depend on the SLOs of what you call? ↳ serial dependencies multiply availability
+  - `L2` A latency SLO: "99 % of requests under 300 ms" vs "p99 < 300 ms". Are they the same?
+  - `L3` What SLOs would you set for AiRA's realtime voice path, and how would you measure them?
+  - `L3` How do you alert on SLO burn rate, and why use multiple windows?
+  - `L3` Your service depends on an LLM provider at 99.5 %. How can you offer 99.9 %? ↳ multi-provider fallback, caching, degrade gracefully
+  - `L3` How do you define an SLO for LLM answer quality, not just availability?
+  - `L3` How do you get product managers to agree on SLOs and respect the error budget?
+  - `L3` How do you handle planned maintenance and bad deploys in the error budget?
+- [ ] Tools: Prometheus, Grafana, Datadog, Sentry, ELK/Loki ↳ https://prometheus.io/docs/introduction/overview/ · https://grafana.com/docs/loki/latest/ · AIE ch10 "Monitoring and Observability" (pdf p489, for LLM apps)
+  - `L1` What is Grafana? What is Loki? What is the ELK stack?
+  - `L1` Loki indexes what?
+  - `L2` Loki vs Elasticsearch: how do they index logs differently, and what does that cost? ↳ Loki indexes labels only; ES full-text indexes everything
+  - `L2` What is LogQL? Write a query for error lines of one service in the last hour.
+  - `L2` What three dashboards would you build for a new service? ↳ RED overview, USE resources, business KPIs
+  - `L2` What makes a dashboard good for on-call at 3 a.m.? ↳ top-down: SLO → RED → dependencies → resources; few panels
+  - `L2` What is dashboard sprawl and how do you prevent it?
+  - `L2` What are dashboards as code (Grafana provisioning, Jsonnet, Terraform), and why bother?
+  - `L2` What are template variables in Grafana, and why use them?
+  - `L2` Why should Loki labels be low cardinality, like Prometheus labels?
+  - `L3` Self-hosted (Prometheus + Grafana + Loki + Tempo) vs SaaS (Datadog, New Relic, Honeycomb): cost and trade-offs for a startup.
+  - `L3` Design a dashboard for an LLM gateway: which panels, in what order?
+  - `L3` How do you keep log search fast and cheap at 1 TB/day? ↳ retention tiers, sampling, drop debug, object storage, index less
+- [ ] Observability fundamentals: monitoring vs observability, three pillars, wide events, cardinality, golden signals
+  - `L1` What is observability? How is it different from monitoring? ↳ monitoring = known questions; observability = ask new questions without new code
+  - `L1` What are the three pillars (logs, metrics, traces)? Define each in one line.
+  - `L1` What is telemetry?
+  - `L1` Three pillars of observability?
+  - `L1` Four golden signals?
+  - `L2` When do you reach for a log, a metric or a trace? Give one question each answers best.
+  - `L2` What does each pillar cost? Which one gets expensive first as traffic grows? ↳ logs by volume; metrics by cardinality; traces by sampling rate
+  - `L2` What are "known unknowns" vs "unknown unknowns", and why does that distinction matter for microservices?
+  - `L2` What are wide events / structured events, and why does *Observability Engineering* prefer them to the three pillars?
+  - `L2` What is high cardinality and high dimensionality, and why do they matter for debugging?
+  - `L2` Black-box vs white-box monitoring: give an example of each.
+  - `L2` What are Google's four golden signals? ↳ latency, traffic, errors, saturation
+  - `L2` What else besides the three pillars do you use: profiles, events, exceptions (Sentry), real user monitoring?
+  - `L2` What observability did you set up at AiRA, and what was missing when something broke?
+  - `L3` How do you link the three together so you can jump from a spike on a graph to the exact trace and logs? ↳ exemplars, trace_id in logs, shared resource attributes
+  - `L3` You join a team with zero observability. What do you add in week one, and in what order?
+- [ ] Request context propagation: correlation ids via contextvars / AsyncLocalStorage, across HTTP calls, queues and WebSockets
+  - `L1` What is a correlation id / request id? Why do you need one?
+  - `L1` Where does the request id come from, and where do you return it? ↳ generate at edge or accept `X-Request-Id`; echo in response header
+  - `L1` Node API to keep request context across awaits?
+  - `L2` Correlation id vs trace id: are they the same thing?
+  - `L2` How do you make every log line in a request include the request id without passing it through every function? ↳ AsyncLocalStorage (Node), contextvars (Python)
+  - `L2` How does AsyncLocalStorage work, and what can break it? ↳ callbacks outside async chain, some pools/libraries lose context
+  - `L2` How do you carry the id across an HTTP call to another service?
+  - `L2` How do you carry it through a queue (BullMQ, Kafka, Redis Streams) to a background worker? ↳ put it in message headers/metadata
+  - `L2` A user reports "it failed at 3:14 pm". How do you find their request?
+  - `L2` Should you trust a request id sent by the client? ↳ accept but validate format/length; or always mint your own
+  - `L3` One user action fans out into 50 async jobs over 10 minutes. How do you tie them together? ↳ span links, parent id, workflow id
+  - `L3` How do you correlate a WebSocket session (AiRA voice) across many messages, an LLM call and a TTS call?
+  - `L3` How do you correlate mobile client logs with backend logs?
+- [ ] Prometheus: pull model, metric types, labels and cardinality, PromQL (`rate`, `histogram_quantile`), recording rules, scaling
+  - `L1` What is Prometheus? Pull or push?
+  - `L1` Name the four metric types: counter, gauge, histogram, summary. One example each.
+  - `L1` What is a label? What is a time series in Prometheus?
+  - `L1` What is the `/metrics` endpoint and what format does it serve?
+  - `L1` Does Prometheus pull or push?
+  - `L1` Which metric type only goes up?
+  - `L1` Which metric type can go up and down?
+  - `L1` Histogram or summary for aggregating across pods?
+  - `L1` PromQL function for per-second rate of a counter?
+  - `L1` PromQL function for percentiles from buckets?
+  - `L1` Name a label that causes a cardinality explosion.
+  - `L2` Pull model vs push model: pros and cons. How do short-lived batch jobs report? ↳ Pushgateway, or push via OTLP
+  - `L2` Why can a counter only go up? What happens on process restart, and how does `rate()` handle it?
+  - `L2` `rate()` vs `irate()` vs `increase()`: when each?
+  - `L2` Write PromQL for requests per second per route over 5 minutes.
+  - `L2` Write PromQL for the error ratio of an API. ↳ sum(rate(5xx[5m])) / sum(rate(total[5m]))
+  - `L2` Write PromQL for p95 latency from a histogram. ↳ histogram_quantile(0.95, sum by (le) (rate(..._bucket[5m])))
+  - `L2` Histogram vs summary: why are histograms usually preferred? ↳ aggregatable across instances; summaries' quantiles cannot be summed
+  - `L2` How do you choose histogram bucket boundaries? What error does a bad choice cause?
+  - `L2` What is label cardinality, and what is a cardinality explosion? Give a label that would cause one. ↳ user_id, request_id, raw URL path, error message
+  - `L2` How do you name metrics and units? ↳ `http_server_request_duration_seconds`, `_total` suffix for counters, base units
+  - `L2` What are recording rules and why use them?
+  - `L2` How does Prometheus discover targets in Kubernetes?
+  - `L3` Prometheus memory jumped 5× after a deploy. How do you find the offending metric? ↳ TSDB status page, `topk(count by (__name__))`
+  - `L3` What are native (sparse/exponential) histograms and what problem do they fix?
+  - `L3` How do you scale Prometheus for long retention and many clusters? ↳ Thanos, Cortex/Mimir, VictoriaMetrics, remote_write
+  - `L3` What is staleness in Prometheus, and why do gaps appear in graphs?
+  - `L3` Instrument a Node service with `prom-client` and a FastAPI service with `prometheus_client`: what do you expose by default?
+- [ ] Alerting: symptom-based alerts, error-budget burn rates, Alertmanager routing, `for:` clauses, dead-man's-switch alerts
+  - `L1` What makes an alert worth waking someone up for? ↳ urgent, user-visible, actionable, needs a human
+  - `L1` Page vs ticket vs dashboard-only: what goes where?
+  - `L1` What is a burn rate?
+  - `L1` Alert on symptoms or causes?
+  - `L1` What does Alertmanager add on top of Prometheus alerts?
+  - `L2` Why alert on symptoms rather than causes? Give an example of a bad cause-based alert. ↳ "CPU 90 %" vs "error rate breaching SLO"
+  - `L2` What is an error-budget burn rate? What does a burn rate of 14.4 mean? ↳ 2 % of a 30-day budget in one hour
+  - `L2` What is multi-window, multi-burn-rate alerting, and why is it better than a fixed threshold?
+  - `L2` What does the `for:` clause in a Prometheus alert do?
+  - `L2` What does Alertmanager do? ↳ grouping, inhibition, silencing, routing to PagerDuty/Slack
+  - `L2` What should every alert link to? ↳ runbook, dashboard, recent deploys, owner
+  - `L2` "Alert when p95 > 500 ms" — what is wrong with that alert as written?
+  - `L2` How do you alert on something that stopped happening (no data, dead cron job)? ↳ `absent()`, heartbeat / dead-man's-switch
+  - `L2` What is a heartbeat / dead-man's-switch for cron jobs?
+  - `L3` How do you alert on a low-traffic service where one error is 10 % of requests?
+  - `L3` What alerts would you set for AiRA's voice WebSocket and LLM calls?
+  - `L3` How do you monitor something that is supposed to happen but didn't (a nightly job)? ↳ heartbeat / dead-man's-switch alerts
+
+**Learn:** Google SRE book (sre.google/books, free: ch4 SLOs, ch6 monitoring) · opentelemetry.io docs
+
+## 4.10 Serialization and schema evolution
+- [ ] JSON vs Protocol Buffers vs Avro vs MessagePack — size, speed, schema, readability ↳ DDIA ch4 "Formats for Encoding Data" (pdf p130–145) · https://protobuf.dev/overview/ · https://msgpack.org/
+  - `L1` Which serialization formats are common with Kafka? ↳ JSON, Avro, Protobuf
+  - `L1` What is Protocol Buffers?
+  - `L2` Why is protobuf smaller and faster than JSON?
+  - `L2` What is `orjson` / `msgspec` and when is JSON encoding your bottleneck?
+  - `L2` JSON vs Protobuf vs MessagePack: how much do size and parse time differ, and when does it matter?
+- [ ] Backward vs forward compatibility; adding/removing fields safely; field tags in protobuf ↳ DDIA ch4 "Thrift and Protocol Buffers" (pdf p135) and "Avro" (pdf p140) · https://protobuf.dev/programming-guides/proto3/ ("Updating A Message Type")
+  - `L2` You add a required field to an event — what breaks?
+  - `L2` Why do mobile apps make API versioning harder?
+  - `L2` Backward vs forward vs full compatibility: define each and give an example change.
+  - `L2` What are field numbers (tags) in protobuf, and why must you never reuse one?
+  - `L2` How do you add or remove a field without breaking old clients?
+  - `L3` How do you version and evolve schemas shared by several services without breaking old clients?
+- [ ] Schema registry for events (Kafka + Avro/Protobuf) ↳ https://docs.confluent.io/platform/current/schema-registry/index.html · https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html · DDIA ch4 "The merits of schemas" (pdf p145)
+  - `L2` What is a schema registry and why use one?
+- [ ] Versioning event payloads; tolerant readers ↳ https://martinfowler.com/bliki/TolerantReader.html · DDIA ch4 "Message passing data flow" (pdf p154) · https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html
+  - `L2` You need to add a required field to an event read by 6 services. How do you roll it out?
+  - `L2` How do you version events over years?
+  - `L3` How do you version event types without breaking old consumers?
+
+## 4.11 Web servers and process models
+- [ ] WSGI vs ASGI; gunicorn + uvicorn workers; how many workers per CPU ↳ https://asgi.readthedocs.io/en/latest/introduction.html · https://gunicorn.org/design/ (how many workers) · https://fastapi.tiangolo.com/deployment/server-workers/
+  - `L1` WSGI vs ASGI: what is the difference?
+  - `L1` What is uvicorn? What is gunicorn? How do they work together?
+  - `L1` ASGI or WSGI: which supports WebSockets?
+  - `L2` Multi-process vs multi-threaded server: why does Gunicorn/Uvicorn use worker processes for Python?
+  - `L2` How many uvicorn workers would you run on a 4-core box, and why?
+  - `L2` Why was ASGI introduced when WSGI already existed? ↳ WSGI is one sync call per request: no WebSockets, no long-lived connections, no async I/O
+  - `L2` How do you run FastAPI in production (workers, gunicorn/uvicorn)?
+  - `L2` How many uvicorn workers would you run on a 4-core box and why?
+  - `L2` How many uvicorn/gunicorn workers would you run on a 4-core box, and why? ↳ ~one per core for async; more for sync; measure
+  - `L2` How many uvicorn workers would you run on a 4-core box, and how does that relate to connection pool sizes?
+- [ ] Node: one process per core (PM2 cluster / K8s replicas) ↳ https://nodejs.org/api/cluster.html · https://pm2.keymetrics.io/docs/usage/cluster-mode/
+  - `L1` How do you use all CPU cores with Node?
+  - `L1` What is PM2 and what does it do?
+  - `L2` cluster/PM2 inside one VM vs one process per container with many replicas: trade-offs.
+  - `L2` How many Node processes per CPU core, and why? ↳ about one; more causes contention
+  - `L2` What CPU request/limit would you give a Node pod, and why do CPU limits cause throttling? ↳ CFS quota throttling spikes latency; GC threads also use CPU
+  - `L2` How do you share state (sessions, rate limits, caches) across Node instances? ↳ Redis, not in-memory
+  - `L2` What does `NODE_ENV=production` change?
+  - `L2` What metrics do you put on a Node service dashboard? ↳ event-loop lag, ELU, heap used, GC pause, RSS, req rate/latency, active handles
+  - `L2` How do you autoscale a Node service — CPU, event-loop lag, or request rate?
+  - `L3` How does `os.availableParallelism()` differ from `os.cpus().length` inside containers?
+  - `L3` Benchmark plan: Express vs Fastify vs NestJS (Fastify adapter) — what would you measure? ↳ autocannon, p99, ELU, CPU, same payloads
+  - `L3` Node in a container with a 1 CPU limit: how many processes, and how does `--max-old-space-size` relate to the memory limit?
+- [ ] nginx as reverse proxy: `proxy_pass`, upstreams, timeouts, body size limits, WebSocket upgrade headers, gzip, TLS termination, buffering (and turning it off for SSE/streaming) ↳ https://nginx.org/en/docs/http/ngx_http_proxy_module.html (proxy_pass, proxy_buffering, timeouts) · https://nginx.org/en/docs/http/websocket.html · https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/
+  - `L1` What turns off nginx buffering for SSE?
+  - `L1` What is a reverse proxy? Forward proxy? Difference?
+  - `L2` Your SSE stream arrives all at once behind nginx. Why? ↳ proxy buffering; `X-Accel-Buffering: no`
+  - `L2` Your SSE stream arrives all at once behind nginx — why? (proxy buffering)
+  - `L2` How do proxies and load balancers break long-lived connections, and how do you configure around it? ↳ idle timeouts, buffering, HTTP/1.1 upgrade support
+  - `L2` Your SSE stream arrives all at once behind nginx. Why, and how do you fix it? ↳ proxy buffering; `X-Accel-Buffering: no` / `proxy_buffering off`
+  - `L2` What nginx config do you need to proxy WebSockets? ↳ `proxy_http_version 1.1`, Upgrade/Connection headers, long `proxy_read_timeout`
+  - `L2` Your SSE stream arrives all at once at the end when behind nginx. Why? ↳ proxy buffering/gzip; `X-Accel-Buffering: no`, `proxy_buffering off`
+  - `L2` What does nginx do in front of a FastAPI/uvicorn app? ↳ TLS termination, buffering slow clients, static files, limits, routing
+  - `L2` Write the key nginx directives for a reverse proxy: `proxy_pass`, `upstream`, headers, timeouts, `client_max_body_size`.
+  - `L2` What is `413 Request Entity Too Large` from nginx and how do you fix it?
+  - `L2` What are `proxy_connect_timeout`, `proxy_read_timeout` and `proxy_send_timeout`? Which one kills idle WebSockets?
+  - `L2` How do you keep connections from nginx to upstream alive? ↳ `upstream { keepalive N; }`, HTTP/1.1, clear Connection header
+- [ ] Keep-alive and connection limits; slowloris; request timeouts at each hop (LB → nginx → app → DB) ↳ https://www.cloudflare.com/learning/ddos/ddos-attack-tools/slowloris/ · https://nginx.org/en/docs/http/ngx_http_core_module.html (keepalive_timeout, client_body_timeout, client_max_body_size) · DDIA ch8 "Timeouts and unbounded delays" (pdf p295)
+  - `L2` What timeouts must line up across load balancer → nginx → app → DB, and what happens if they don't?
+  - `L2` Keep-alive timeout mismatch between the LB and Node causes random 502s. Explain. ↳ app closes idle socket first; set app timeout > LB timeout
+  - `L2` What is a slowloris attack and how do proxies protect the app from slow clients?
+  - `L2` What is a slowloris attack, and which layer handles it?
+  - `L3` Explain timeouts at each hop: client → CDN → LB → nginx → app → DB. How should they relate? ↳ outer > inner; avoid orphaned work
+
+## 4.12 Files and large payloads
+- [ ] Multipart uploads through the API vs direct-to-storage with presigned/SAS URLs ↳ https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html · https://learn.microsoft.com/en-us/azure/architecture/patterns/valet-key · https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
+  - `L1` What is `multipart/form-data`?
+  - `L1` What is a presigned URL?
+  - `L2` Upload through your API vs direct to S3 with a presigned URL: trade-offs.
+  - `L2` Walk through a presigned upload: who calls what, and how does your DB learn the upload finished? ↳ API signs URL; client PUTs; S3 event or client confirm
+  - `L2` How do you limit file size and type on a presigned upload?
+  - `L2` What does multer do, and why is its memory storage dangerous for big files?
+  - `L2` How do users upload a 2 GB file? ↳ presigned URL direct to S3, multipart upload, resumable, checksum
+  - `L2` Why should uploads not go through your app servers?
+  - `L2` Upload through your API vs direct-to-storage with presigned / SAS URLs: security trade-offs.
+- [ ] Chunked/resumable uploads (tus, S3 multipart); checksums ↳ https://tus.io/protocols/resumable-upload · https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html · https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html
+  - `L3` Design upload of a 5 GB video from a phone on a flaky network
+  - `L3` Design upload of a 5 GB video from a phone on a flaky network. ↳ S3 multipart or tus, resumable chunks, checksums
+- [ ] Streaming downloads and range requests; generating large exports (CSV) as a background job ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests · https://fastapi.tiangolo.com/advanced/custom-response/ (StreamingResponse) · https://nodejs.org/en/learn/modules/backpressuring-in-streams
+  - `L2` How do you stream a large file download from S3 to an HTTP client without buffering?
+  - `L2` Export 1M rows to CSV without blowing memory
+  - `L2` How do you export 1M rows to CSV without blowing memory? ↳ background job, stream rows, upload to storage, give link
+  - `L3` How do you support range requests for video streaming?
+- [ ] File validation: type sniffing, size limits, virus scanning, image processing pipelines (thumbnails) ↳ https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html · https://docs.aws.amazon.com/lambda/latest/dg/with-s3-tutorial.html (S3-triggered thumbnails)
+  - `L2` How do you validate an uploaded file? ↳ magic bytes, size limit, safe filename, virus scan, never trust Content-Type
+  - `L2` How do you generate thumbnails after an image upload? ↳ storage event → queue → worker
+  - `L3` How do you stop an upload endpoint from being used to fill your disk or bucket (abuse)?
+  - `L3` How do you scan uploads for viruses / unsafe content before others can download them?
+  - `L3` Image uploads go through ImageMagick/sharp. What can go wrong? ↳ parser CVEs (ImageTragick), decompression bombs, EXIF PII
+  - `L3` How would you design virus scanning for uploads without blocking the request? ↳ quarantine bucket, async scan, release on clean
+
+## 4.13 Concurrency bugs in web apps
+- [ ] Double submit / double click → idempotency keys, unique constraints ↳ https://stripe.com/blog/idempotency · https://brandur.org/idempotency-keys · DDIA ch11 "Fault tolerance" (pdf p483, idempotence)
+  - `L2` A user double-clicks "Place order". How do you avoid two orders?
+  - `L2` How do you prevent a double charge when the user taps "Pay" twice? ↳ one gateway order per cart, idempotency key, disable button, unique constraints
+- [ ] Overselling inventory → atomic `UPDATE … WHERE stock > 0`, row locks, reservations with expiry ↳ DDIA ch7 "Preventing lost updates" (pdf p255–258, atomic writes, explicit locking) · https://www.postgresql.org/docs/current/explicit-locking.html · DBI ch5 "Lock-Based Concurrency Control" (pdf p178)
+  - `L2` Two users book the last seat at the same moment. How do you prevent double booking? ↳ row lock, conditional UPDATE, unique constraint, or serializable
+  - `L2` 1,000 users buy the last 10 items in one second. How do you avoid overselling? ↳ atomic conditional update `stock > 0`, or reservation with expiry
+  - `L2` Two users book the last seat at the same time — how do you prevent double booking?
+  - `L3` How do you use `select_for_update` to stop overselling?
+  - `L3` 1,000 users buy the last 10 items in one second — how do you avoid overselling?
+- [ ] Optimistic concurrency over HTTP: `ETag` + `If-Match`, version numbers, `412 Precondition Failed` ↳ https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-Match · https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/412 · DBI ch5 "Optimistic Concurrency Control" (pdf p174)
+  - `L2` Two admins edit the same record — how does the second one find out?
+  - `L2` What is optimistic concurrency over HTTP with `ETag` + `If-Match`?
+  - `L2` Two admins edit the same record. How does the second one find out?
+  - `L2` How do you use ETags for optimistic concurrency on updates? ↳ If-Match → 412 if changed
+- [ ] Check-then-act races in code (read, decide, write) and how to make them atomic ↳ DDIA ch7 "Preventing lost updates" (pdf p255) and "Preventing write skew and phantoms" (pdf p259) · OSTEP "Concurrency: An Introduction" https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf
+  - `L2` What is a check-then-act race in a web handler? Give an example and the fix.
+- [ ] Concurrent cron runs / duplicate workers → leases, advisory locks ↳ DDIA ch8 "The truth is defined by the majority" (pdf p314–317, leases and fencing tokens) · https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS · https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+  - `L2` What is Celery beat? How do you stop two beat instances from double-scheduling?
+  - `L2` Use an advisory lock so only one instance runs a cron job. What breaks behind PgBouncer transaction mode? ↳ session locks leak across clients; use xact locks
+  - `L2` Postgres advisory lock vs Redis `SET NX` lock: which is safer, and why?
+  - `L3` How do you stop the same cron job from running twice across two instances? ↳ distributed lock / lease, advisory lock, unique job id
+
+## 4.14 Third-party integrations (payments, webhooks, external APIs)
+- [ ] Payment flow with a gateway (Razorpay/Stripe): create order → client checkout → verify signature on the server → mark paid; never trust the client's "success" ↳ https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/ · https://docs.stripe.com/payments/payment-intents
+  - `L1` Walk through the Razorpay flow: order → checkout → payment → signature verification.
+  - `L1` Why must the server verify the payment signature instead of trusting the client's "success"?
+  - `L1` What do you verify after a Razorpay checkout?
+  - `L2` What exactly does the Razorpay signature cover, and how do you verify it? ↳ HMAC-SHA256 of `order_id|payment_id` with key secret
+  - `L2` Authorise vs capture: what is the difference, and when do you capture later?
+  - `L2` How did you integrate Razorpay at StreetDine? What went wrong and what did you fix?
+  - `L2` Razorpay vs Stripe: what is similar and what differs (orders vs PaymentIntents)?
+  - `L2` What do you log for payments, and what must you never log or store? ↳ no card data; PCI scope; store gateway ids only
+  - `L2` How do you test payments (test keys, test cards, webhook replays with ngrok or CLI)?
+- [ ] Receiving webhooks safely: verify HMAC signatures, respond 2xx fast and process async, dedupe by event id, handle out-of-order and replayed events ↳ https://razorpay.com/docs/webhooks/ · https://docs.stripe.com/webhooks · https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
+  - `L1` What is a payment webhook for, if the client already told you it succeeded?
+  - `L1` How do you verify a webhook?
+  - `L2` The same webhook arrives three times — what happens in your system?
+  - `L2` How do you verify a webhook really came from the provider? ↳ HMAC of raw body with shared secret; constant-time compare
+  - `L2` Why must you verify the signature on the raw body, not the parsed JSON? How does that bite in Express?
+  - `L2` How do you stop replayed webhooks? ↳ timestamp in signed payload; reject old; dedupe event id
+  - `L2` Why should a webhook handler return 2xx fast and process async?
+  - `L2` The same webhook arrives three times. What happens in your system? ↳ dedupe table on event id; idempotent state change
+  - `L2` Webhooks arrive out of order (`payment.captured` before `order.paid`). How do you handle it?
+  - `L2` What do you do if your webhook endpoint was down for an hour?
+  - `L3` Why should webhook state changes be driven by state machines, not by "last event wins"?
+  - `L3` How did you verify WAHA webhooks (HMAC-SHA512), and why must webhook verification happen before parsing?
+  - `L3` Design security for a webhook receiver that triggers payments. ↳ HMAC verify, timestamp tolerance, dedupe by event id, allowlist IPs, idempotent
+- [ ] Idempotent payment state changes and reconciliation (your DB vs the gateway's records, daily jobs) ↳ https://stripe.com/blog/idempotency · https://docs.stripe.com/reconciliation · DDIA ch11 "Fault tolerance" (pdf p482)
+  - `L2` A user is charged but your app shows "payment failed" — how can that happen and how do you fix it?
+  - `L2` What payment states do you track, and what transitions are allowed? ↳ created, authorised, captured, failed, refunded; state machine
+  - `L2` A user is charged but your app shows "payment failed". How can that happen and how do you fix it? ↳ callback lost; webhook + status poll + reconciliation
+  - `L2` The webhook and the client callback both try to mark the order paid. How do you avoid a race? ↳ conditional update on status; idempotent transition
+  - `L2` What is reconciliation, and how often do you run it? What do you compare?
+  - `L2` How do you implement refunds (full, partial) and keep state consistent?
+  - `L3` A payment is captured but the order creation failed. How do you recover? ↳ outbox/saga, auto-refund or retry order, reconciliation alert
+  - `L3` Stripe Link one-time card payments with 3-D Secure polling and an idempotent ledger: how do you make sure an agent never pays twice?
+- [ ] Calling flaky external APIs: timeouts, retries with backoff, rate-limit headers, circuit breakers, caching tokens (OAuth refresh) ↳ https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/ · https://martinfowler.com/bliki/CircuitBreaker.html
+
+## 4.15 Kafka
+- [ ] The log model: topics, partitions, offsets, brokers; why Kafka is fast; Kafka vs SQS, Redis Streams, a DB queue; when not to use it
+  - `L1` What is Kafka, in one sentence?
+  - `L1` What is an event / record / message in Kafka? What fields does a record have? ↳ key, value, headers, timestamp, offset
+  - `L1` What is a topic? What is a partition? What is an offset?
+  - `L1` What is a broker? What is a cluster?
+  - `L1` What is a producer and what is a consumer?
+  - `L1` Why is Kafka called a "distributed commit log"?
+  - `L1` Default port of a Kafka broker?
+  - `L1` Who tracks the read position, the broker or the consumer?
+  - `L1` Does reading a message delete it?
+  - `L1` Push or pull: how do Kafka consumers get data?
+  - `L1` Name one reason **not** to use Kafka.
+  - `L2` Kafka vs Redis Streams: when is Redis Streams enough?
+  - `L2` Kafka vs AWS SQS / SNS / Kinesis / Google Pub/Sub / Azure Service Bus / Event Hubs.
+  - `L2` Kafka vs a database table used as a queue (`SELECT … FOR UPDATE SKIP LOCKED`).
+  - `L2` Why is Kafka fast even though it writes to disk? ↳ sequential append, page cache, batching, zero-copy sendfile, compression
+  - `L2` Why can many consumers read the same data in Kafka without slowing each other down?
+  - `L2` What does "replay" mean, and give a real case where you need it.
+  - `L2` What are typical use cases for Kafka? Give three you have seen.
+  - `L2` When should you **not** use Kafka? ↳ low volume, request/reply, per-message routing/priority, tiny team, delays/scheduling
+  - `L2` Why might a startup choose Redis Streams or Postgres over Kafka? (Tie to AiRA: SSE → Redis Streams → WebSocket.)
+  - `L3` What is the "log as the source of truth" idea, and how does it relate to event sourcing and CDC?
+  - `L3` Why does Kafka push ordering and position tracking onto the consumer instead of the broker?
+  - `L3` Your team wants Kafka for 50 events per minute. What do you say?
+  - `L3` Benchmark plan: Kafka vs Redis Streams for 10k msgs/s — what would you measure and what do you expect?
+- [ ] Partitions and keys: partitioner, per-partition ordering, hot partitions, choosing and changing the partition count
+  - `L1` Why does a topic have partitions?
+  - `L1` Where is ordering guaranteed in Kafka? ↳ only within a partition
+  - `L1` How does a producer decide which partition a record goes to? ↳ explicit partition, hash(key) mod N, sticky partitioner when no key
+  - `L1` Ordering is guaranteed per ___? ↳ partition
+  - `L1` What happens to a keyed record if you add partitions?
+  - `L2` What key would you choose for an orders topic? For a chat-messages topic? For a clickstream topic?
+  - `L2` What happens to ordering if you send records with no key?
+  - `L2` What is a hot partition? How do you detect it and fix it? ↳ skewed key; per-partition lag/bytes; salt key, split entity, more partitions
+  - `L2` How many partitions should a topic have? How do you decide? ↳ target throughput ÷ per-partition throughput; max consumers; future growth
+  - `L2` Can you increase the partition count of an existing topic? What breaks? ↳ key→partition mapping changes; ordering per key breaks
+  - `L2` Can you decrease the partition count? What do you do instead?
+  - `L2` What does a partition look like on disk? ↳ segment files, .log + .index + .timeindex, active segment
+  - `L3` What are the costs of too many partitions? ↳ open files, metadata, leader elections, rebalance time, end-to-end latency
+  - `L3` Explain the sticky partitioner and why it replaced round-robin for keyless records.
+  - `L3` You need global ordering across all events. What are your options and what do they cost?
+  - `L3` How would you write a custom partitioner, and when would you need one?
+- [ ] Producers: acks, linger.ms and batching, compression, retries, idempotent producer, max in-flight requests
+  - `L1` What do `acks=0`, `acks=1` and `acks=all` mean?
+  - `L1` Which `acks` setting can lose data, and when?
+  - `L1` What does `acks=all` wait for?
+  - `L1` Name the four compression codecs.
+  - `L1` What is an idempotent producer?
+  - `L2` What do `linger.ms` and `batch.size` do? How do they trade latency for throughput?
+  - `L2` Which compression types does Kafka support, and where does compression happen? ↳ gzip/snappy/lz4/zstd; per batch at producer
+  - `L2` What happens when the producer's buffer is full? ↳ `buffer.memory`, `max.block.ms`, send blocks then throws
+  - `L2` Producer retries can create duplicates. Why? ↳ ack lost after broker wrote; producer resends
+  - `L2` What is an idempotent producer? How does it work? ↳ producer id + per-partition sequence numbers; broker drops duplicates
+  - `L2` Why can retries reorder messages, and what does `max.in.flight.requests.per.connection` have to do with it?
+  - `L2` What is `delivery.timeout.ms` and how does it relate to `retries`?
+  - `L2` Synchronous vs asynchronous send with a callback: when do you use each?
+  - `L2` How do you handle a failed send in the callback? Retry, log, dead-letter, or crash?
+  - `L3` Walk me through everything that happens from `producer.send()` to the record being committed.
+  - `L3` You must not lose payment events even if a broker dies. List every producer and broker setting you set. ↳ acks=all, idempotence, min.insync.replicas=2, RF=3, no unclean election
+- [ ] Consumer groups and rebalancing: assignment strategies, poll/session timeouts, static membership, parallelism per partition
+  - `L1` What is a consumer group?
+  - `L1` How are partitions shared among consumers in one group?
+  - `L1` What happens if a group has more consumers than partitions?
+  - `L1` Two different groups read the same topic. Do they affect each other?
+  - `L1` Max useful consumers in one group for a topic with 6 partitions?
+  - `L1` Can two consumers in the same group read the same partition at the same time?
+  - `L1` What is a rebalance?
+  - `L2` How do you get "queue" behaviour and how do you get "pub/sub" behaviour with Kafka?
+  - `L2` What is a rebalance? What triggers one?
+  - `L2` What is "stop the world" rebalancing and why is it painful?
+  - `L2` Eager vs cooperative (incremental) rebalancing.
+  - `L2` What are static group membership and `group.instance.id` for? ↳ restart without rebalance during rolling deploys
+  - `L2` What do `session.timeout.ms`, `heartbeat.interval.ms` and `max.poll.interval.ms` control?
+  - `L2` A consumer takes 10 minutes to process one batch and keeps getting kicked out of the group. Why, and how do you fix it? ↳ max.poll.interval.ms; smaller max.poll.records; hand work to a pool, pause partitions
+  - `L2` What do `max.poll.records` and `fetch.min.bytes` / `fetch.max.wait.ms` do?
+  - `L2` What are the partition assignment strategies (range, round-robin, sticky, cooperative-sticky)?
+  - `L2` What is the group coordinator?
+  - `L2` Is a Kafka consumer thread-safe? How do you process in parallel inside one consumer?
+  - `L3` How do you scale consumption beyond the number of partitions? ↳ more partitions, or parallel per-key processing inside the consumer
+  - `L3` How do you keep per-key order while processing a partition with a thread pool?
+  - `L3` What happens to in-flight work when a partition is revoked during a rebalance? How do you avoid double processing? ↳ commit in onPartitionsRevoked
+  - `L3` Explain the newer consumer group protocol (KIP-848) and what it fixes.
+  - `L3` You run 3 consumer groups (search indexer, analytics, email) on one topic. The email consumer is slow. Does it slow the others?
+- [ ] Offsets and commits: auto vs manual commit, commit before/after processing, auto.offset.reset, replaying from a time
+  - `L1` Where are consumer offsets stored? ↳ internal `__consumer_offsets` topic
+  - `L1` What does committing an offset mean?
+  - `L1` What is `__consumer_offsets`?
+  - `L2` Auto-commit vs manual commit: what can go wrong with auto-commit?
+  - `L2` Commit before processing vs after processing: which guarantee does each give? ↳ before = at-most-once; after = at-least-once
+  - `L2` `commitSync` vs `commitAsync`: trade-offs and the usual combination.
+  - `L2` What does `auto.offset.reset` = `earliest` / `latest` / `none` do, and when does it apply?
+  - `L2` How do you reprocess a topic from yesterday 10:00? ↳ offsetsForTimes / kafka-consumer-groups --reset-offsets --to-datetime
+  - `L2` What happens when a committed offset points to data that retention already deleted?
+  - `L3` Can you store offsets outside Kafka (e.g. in Postgres with the results)? Why would you?
+  - `L3` What is the committed offset exactly — the last processed record or the next one to read?
+- [ ] Exactly-once in Kafka: transactions, read_committed, sendOffsetsToTransaction, zombie fencing, limits at the Kafka boundary
+  - `L1` What does `read_committed` hide from consumers?
+  - `L2` Is exactly-once delivery possible in a distributed system? What does Kafka actually promise? ↳ exactly-once *processing* within Kafka (read-process-write)
+  - `L2` How do Kafka transactions work? ↳ transactional.id, producer fencing, transaction coordinator, commit markers
+  - `L2` What is `isolation.level=read_committed`?
+  - `L2` What does `sendOffsetsToTransaction` do and why is it the key to read-process-write exactly-once?
+  - `L2` Kafka EOS ends at the Kafka boundary. You write to Postgres and call an email API. How do you get "effectively once"?
+  - `L3` What is a zombie producer and how does fencing with epochs stop it?
+  - `L3` What is the performance cost of transactions and idempotence?
+- [ ] Replication and durability: replication factor, ISR, min.insync.replicas, high watermark, unclean election, KRaft controller
+  - `L1` What is the replication factor?
+  - `L1` What is a partition leader? What is a follower?
+  - `L1` Do consumers read from followers?
+  - `L1` What does ISR stand for?
+  - `L1` What replaced ZooKeeper?
+  - `L1` What is the high watermark?
+  - `L2` What is the ISR (in-sync replica set)? When does a replica fall out of it?
+  - `L2` What does `min.insync.replicas` do, and how does it combine with `acks=all`?
+  - `L2` RF=3, `min.insync.replicas=2`, `acks=all`, two brokers die. What happens to producers? To consumers?
+  - `L2` What is the high watermark? Why can't consumers read past it?
+  - `L2` What is unclean leader election, and why is it off by default?
+  - `L2` What happens step by step when a leader broker crashes?
+  - `L2` What is the controller? What does it do?
+  - `L2` ZooKeeper vs KRaft: what changed and why?
+  - `L3` What is the leader epoch and what bug did it fix compared to the high-watermark-only design?
+  - `L3` What is rack awareness and why does it matter in a cloud with availability zones?
+  - `L3` Can Kafka lose acknowledged data? Name the exact settings under which it can. ↳ acks=1 + leader crash; unclean election; min.isr=1; fsync assumptions
+  - `L3` Kafka does not fsync every write by default. Why is it still durable enough?
+  - `L3` Follower fetching (KIP-392): when would you let consumers read from a follower?
+- [ ] Retention and compaction: retention.ms, segments, tombstones, tiered storage, large messages (claim check)
+  - `L1` How long does Kafka keep data? What controls it? ↳ retention.ms, retention.bytes, per topic
+  - `L1` What is log compaction?
+  - `L1` What is a tombstone?
+  - `L1` What is a segment?
+  - `L1` What is `retention.ms`?
+  - `L2` Delete vs compact cleanup policy: when do you use each? Can you use both?
+  - `L2` What is a tombstone? How do you delete a key from a compacted topic?
+  - `L2` Give a real use of a compacted topic. ↳ latest state per key: user settings, CDC table snapshot, `__consumer_offsets`
+  - `L2` What is a segment and why does retention delete whole segments, not single records?
+  - `L2` What is the maximum message size, and what do you do with a 50 MB payload? ↳ ~1 MB default; claim-check pattern (store in blob, send pointer)
+  - `L3` What is tiered storage and what problem does it solve?
+  - `L3` How do you handle a GDPR "delete my data" request when events are kept forever? ↳ compaction + tombstones, crypto-shredding
+  - `L3` How does the page cache + zero-copy path work on a consumer read?
+  - `L3` Design an audit log that must never lose an event and must be queryable for 7 years.
+- [ ] Event design: event notification vs state transfer, fat vs thin events, standard fields, topic per type vs per entity
+  - `L2` Event notification vs event-carried state transfer: what goes in the payload?
+  - `L2` Fat events vs thin events: trade-offs.
+  - `L2` What should every event have? ↳ event id, type, version, timestamp, source, correlation id
+  - `L3` One topic per event type, or one topic per entity with many types? Trade-offs for ordering.
+- [ ] Error handling: poison pills, retry topics, dead-letter topics, pausing partitions, ordering trade-offs
+  - `L1` What is a dead-letter topic (DLT / DLQ)?
+  - `L1` What is a DLQ?
+  - `L2` A message cannot be parsed (poison pill). What does your consumer do?
+  - `L2` A downstream API is down for 10 minutes. Do you retry in place, pause, or move on? Why?
+  - `L2` How does a retry-topic chain work (retry-5s, retry-1m, DLT)? What does it do to ordering?
+  - `L2` How do you replay messages from a DLT after fixing the bug?
+  - `L3` Retrying in place blocks the partition; moving to a retry topic breaks per-key order. How do you choose per use case?
+  - `L3` How do you pause and resume consumption of a partition while a dependency recovers? ↳ consumer.pause/resume, keep polling for heartbeats
+- [ ] Operating Kafka: consumer lag, dashboards, under-replicated partitions, sizing, rolling upgrades, managed Kafka, quotas, mirroring
+  - `L1` What is consumer lag?
+  - `L1` Which command shows the lag of a consumer group? ↳ kafka-consumer-groups --describe --group <name>
+  - `L2` Consumer lag is growing. Walk me through how you debug it. ↳ slow processing vs too few consumers vs hot partition vs rebalance storms
+  - `L2` Which metrics would you put on a Kafka dashboard? ↳ lag, under-replicated partitions, ISR shrinks, request latency, bytes in/out, offline partitions
+  - `L2` What does "under-replicated partitions" mean and why page someone for it?
+  - `L2` How do you size a cluster for 100k messages/second of 1 KB each with 7 days retention and RF=3? ↳ ~100 MB/s in, ×3 replication, ~180 TB disk
+  - `L2` How do you do a rolling restart / upgrade of brokers without downtime?
+  - `L2` Managed Kafka (Confluent Cloud, MSK, Event Hubs Kafka API) vs self-hosted: trade-offs.
+  - `L3` How do you rebalance partitions across brokers after adding a broker? What does it cost?
+  - `L3` What are quotas and why does a multi-tenant cluster need them?
+  - `L3` How would you mirror a topic to another region (MirrorMaker 2 / cluster linking) and what happens to offsets?

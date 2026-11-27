@@ -85,6 +85,8 @@ Run them from anywhere; each takes the folder to work on, so they serve every bo
 
 | Path | What it is |
 |------|------------|
+| `tools/build_md_pages.py` | Turns every tracked Markdown note (not `career/`, not AGENTS/BRIEF/README) into `<same name>.html` beside it, so it can be read from the home page. The `.md` stays the source: edit it, rerun, then rerun `build_home.py`. Never overwrites a hand-made `.html` |
+| `tools/build_site.py [out]` | Packs the public website into `_site/` (git-ignored): pages, pictures, the highlight script, the VLSI practice scripts. Leaves out `career/profile`, `career/job-search`, `career/sources`, `.md`/`.py`/PDF/working files; checks every link. Run by `.github/workflows/pages.yml` on every push to `main` → GitHub Pages (https://dhanesh-pottekula.github.io/Notes/). The repo is public, so left-out files are still visible on GitHub, only not on the site |
 | `tools/build_home.py` | Rebuilds `index.html`. Shelves are listed by hand in its `SECTIONS`; book chapters are found automatically; any `.html` no shelf covers shows under "Other pages"; missing paths are skipped and reported. **Rerun after adding a book, chapter or page** |
 | `tools/build_llm_index.py` | Rebuilds `llm/index.html` and each LLM book's `index.html` |
 | `tools/build_book_index.py` | Builds `index.html` for the books with no hand-made one (Database Internals, Murphy, Grimes, Carter; list in its `BOOKS`), so every chapter's "all chapters" link works. Never overwrites a hand-made index (DDIA, Carnegie). **Rerun after adding a chapter to one of them** |
@@ -100,6 +102,7 @@ Run them from anywhere; each takes the folder to work on, so they serve every bo
 | You are adding… | It goes in… | Then |
 |---|---|---|
 | A chapter page of a book | that book's folder (`<subject>/<book>/chNN_*.html`) | `python3 tools/build_book_index.py` (or `build_llm_index.py` for an LLM book), then `python3 tools/build_home.py` |
+| A Markdown note | its subject folder | `python3 tools/build_md_pages.py`, add it to `SECTIONS` in `tools/build_home.py` if its folder has no shelf, `python3 tools/build_home.py` |
 | A new book | `<subject>/<book>/` (new subject → new top-level folder) | add it to `SECTIONS` in `tools/build_home.py`, rebuild, add a row above |
 | A trading note | `trading/concepts/`, `indicators/`, `strategies/` or `backtests/` (table in `trading/AGENTS.md`) — **never loose in `trading/`** | add a row in `trading/AGENTS.md` |
 | A programming note or cheat-sheet | `programming/<language or tool>/` | add a row above |

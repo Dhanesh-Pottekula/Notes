@@ -27,7 +27,7 @@ FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel
          'ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">')
 
 # Folders that hold page parts, not pages (pictures, figures, the shared highlight script, build sources).
-SKIP_DIRS = {".git", "illus", "figs", "assets", "tools", "practice", "sources", "node_modules"}
+SKIP_DIRS = {".git", "_site", "illus", "figs", "assets", "tools", "practice", "sources", "node_modules"}
 
 # (shelf title, one line about the shelf, [(path from Notes root, title, description)]).
 # A path ending in "/" is a book folder of chNN_*.html pages; anything else is one page.
@@ -55,6 +55,12 @@ SECTIONS = [
     ("Programming", "Language and framework notes.", [
         ("programming/python/web-frameworks.html", "Python web frameworks",
          "Django vs Flask vs FastAPI vs Starlette, WSGI vs ASGI, async/await, Pydantic, when to use which."),
+        ("programming/javascript/js_notes.html", "JavaScript fundamentals",
+         "Data types, type conversion and the core language rules, as a cheat-sheet."),
+        ("programming/docker/docker_commands.html", "AWS and Docker set-up commands",
+         "SSH into EC2, install Docker, build, run and clean up containers."),
+        ("programming/linux/shell_scripting.html", "Shell scripting notes",
+         "Everyday Linux commands and shell script basics, one line each."),
     ]),
     ("VLSI physical verification", "From running DRC/LVS to owning sign-off, and the scripting that gets you there.", [
         ("vlsi/tcl_perl_pv/", "Tcl and Perl for physical verification",
@@ -74,6 +80,22 @@ SECTIONS = [
          "The moving-averages chapter as 20 live charts: lag, SMA/WMA/EMA, crossover systems with costs, Bollinger."),
         ("trading/trading_equations.html", "Trader's equation sheet",
          "19 formulas (expectancy, Sharpe, Kelly, ATR, GARCH, Black–Scholes, OU…) with calculators."),
+        ("trading/concepts/", "Trading concepts",
+         "My notes: order flow, VWAP and volume profile, trendlines, index funds, how to sell, the equations and how to use them."),
+        ("trading/indicators/", "Indicators",
+         "KAMA (Kaufman adaptive moving average) and tools that tell a trend from a sideways market."),
+        ("trading/strategies/", "Strategies",
+         "The playbooks: intraday and swing, Stoch RSI + MACD, strategies by timeframe and from the equations, Strategy 5 set-up."),
+        ("trading/backtests/", "Backtest results",
+         "Every backtest write-up: Strategy 2 and Strategy 5 on Nifty 50 names, settings sweeps, delivery and intraday variants."),
+        ("trading/forex/forex_learning_path.html", "Forex learning path (text version)",
+         "The roadmap as one long note: phases, resources, US set-up, backtesting."),
+        ("trading/forex/smc_order_flow_research.html", "Smart-money concepts and order flow research",
+         "What the evidence says about SMC and order-flow trading."),
+    ]),
+    ("Product thinking", "Problems worth solving.", [
+        ("product_thinking/app_ideas/", "App ideas",
+         "100 user problems, and the top-10 research from November 2026."),
     ]),
     ("People skills", "Working with people: managers, teams, interviews.", [
         ("product_thinking/how_to_win_friends/", "How to Win Friends and Influence People",
@@ -176,7 +198,8 @@ def build():
   <div class="kicker">Dhanesh's notes · {total} pages</div>
   <h1>Everything to <em>read</em>, in one place</h1>
   <p>Every study page in this folder, grouped by subject. Open pages from here through
-  <code>python3 Notes/serve_notes.py</code> so your highlights and notes are saved.</p>
+  <code>python3 Notes/serve_notes.py</code> so your highlights and notes are saved to files. On the website,
+  highlights and notes stay in the browser you made them in.</p>
   <input id="q" type="search" placeholder="Find a book, chapter or topic…" autocomplete="off" aria-label="Search pages">
 </header>
 {"".join(sections)}

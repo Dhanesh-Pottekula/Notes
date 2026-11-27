@@ -1,0 +1,167 @@
+title: The script bank: 16 working tools for daily PV jobs
+kicker: Part 5 · Practice scripts · use all through the plan
+lede: Each script here answers a question a PV engineer is really asked: "is it clean?", "what changed since yesterday?", "can we waive it?", "where are the errors?", "why is LVS failing?". All of them were run on the sample files in this folder, and the output shown under each one is the real output. Download them, run them, then break and extend them.
+---
+<h2 id="how">How to use this page</h2>
+<ol>
+<li>Copy the <code>scripts</code> and <code>fixtures</code> folders to a Linux machine (or use this folder directly). Perl 5 and <code>tclsh</code> are already on almost every Linux system.</li>
+<li>From inside <code>scripts</code>, run <code>./run_all.sh</code>. It runs every script on the sample inputs. You should see the same outputs as on this page.</li>
+<li>For each script: read the situation, guess how you would solve it, then read the code, then do the "change it" tasks. Typing a script out yourself teaches more than reading it three times.</li>
+</ol>
+<div class="box warn"><strong>About the sample inputs.</strong> The files in <code>fixtures</code> are small practice files written for this guide. The DRC summary lines and the results-database layout follow the real Calibre formats as read by open-source tools; the LVS report and log samples are simplified lookalikes from memory (details on the <a href="ch04_calibre.html">Calibre page</a>). When you move a script to real files, expect to adjust a regular expression or two. That adjusting is the skill. Never take real design data or foundry decks out of your company's network.</div>
+<div class="tablewrap"><table>
+<tr><th>Level</th><th>Script</th><th>Question it answers</th><th>Main ideas</th></tr>
+<tr><td>1</td><td><a href="#p-summary">drc_summary.pl</a> · <a href="#t-summary">drc_summary.tcl</a></td><td>Is the block clean? Which rules fail?</td><td>read a file, regular expression, hash or dict, sort, exit code</td></tr>
+<tr><td>1</td><td><a href="#t-celldiff">cell_diff.tcl</a></td><td>Which cells are in one list and not the other?</td><td>lists, array lookup</td></tr>
+<tr><td>1</td><td><a href="#p-logscan">log_scan.pl</a></td><td>Did all runs finish? Any errors?</td><td>loop over files, counters, formatted table</td></tr>
+<tr><td>2</td><td><a href="#p-compare">drc_compare.pl</a></td><td>What changed since yesterday?</td><td>module, union of keys, classification</td></tr>
+<tr><td>2</td><td><a href="#p-waive">drc_waive.pl</a></td><td>Clean after waivers?</td><td>second input file, hash of hashes, validation</td></tr>
+<tr><td>2</td><td><a href="#t-layermap">layermap_check.tcl</a></td><td>Is the stream-out layer map sane?</td><td>arrays of lists, duplicate detection</td></tr>
+<tr><td>2</td><td><a href="#p-cdl">cdl_ports.pl</a></td><td>Do subckt pins match between two netlists?</td><td>continuation lines, set comparison</td></tr>
+<tr><td>3</td><td><a href="#p-lvs">lvs_triage.pl</a></td><td>Why is LVS failing, in ten lines?</td><td>state machine over report sections</td></tr>
+<tr><td>3</td><td><a href="#p-lib">PVReport.pm</a> · <a href="#p-rdb">rdb_bbox.pl</a></td><td>Where exactly is each violation?</td><td>multi-line records, references, bounding boxes</td></tr>
+<tr><td>3</td><td><a href="#p-hotspot">rdb_hotspot.pl</a></td><td>Where do violations cluster?</td><td>binning into windows, nested hashes</td></tr>
+<tr><td>3</td><td><a href="#t-genruns">gen_runs.tcl</a></td><td>Set up and launch runs for many blocks</td><td>templates, <code>exec</code> with <code>catch</code>, dry run</td></tr>
+<tr><td>4</td><td><a href="#t-lib">pvlib.tcl</a> · <a href="#t-test">pvlib_test.tcl</a></td><td>A library the other scripts share, with tests</td><td>namespaces, default arguments, self-test</td></tr>
+<tr><td>4</td><td><a href="#t-rdb">rdb_to_tcl.tcl</a></td><td>Hand violations to another Tcl tool</td><td>data as a sourceable Tcl file</td></tr>
+<tr><td>4</td><td><a href="#runall">run_all.sh</a></td><td>Re-run everything after a change</td><td>regression habit</td></tr>
+</table></div>
+
+<h2 id="p-summary">1 · drc_summary.pl: is it clean?</h2>
+<p><strong>Situation.</strong> The run finished overnight. Your lead asks "how does the block look?". The summary file has hundreds of rules, most of them at zero. You want the failing ones, worst first, and a script exit code that a flow can test.</p>
+{{script:drc_summary.pl|out=drc_summary_pl}}
+<p><strong>What to notice.</strong></p>
+<ul>
+<li>The loop has two phases: skip lines until the section header, then read until the dashed line. Without the <code>last</code>, the by-cell section would overwrite or double the numbers.</li>
+<li><code>sort { $count{$b} &lt;=&gt; $count{$a} || $a cmp $b }</code>: biggest count first, and names in order when counts are equal, so the output is the same every run.</li>
+<li>It dies when no rule lines are found. An empty report must never look like a clean report.</li>
+</ul>
+<p><strong>Change it.</strong> Add <code>--csv</code>. Add a <code>--top N</code> option. Print the second (bracketed) count as another column.</p>
+
+<h2 id="t-summary">2 · drc_summary.tcl: the same job in Tcl</h2>
+<p><strong>Why twice.</strong> Seeing one problem solved in both languages is the fastest way to learn the second one. Compare line by line: Perl hash ↔ Tcl dict, <code>sort</code> with a comparison ↔ two <code>lsort</code> passes, <code>die</code> ↔ <code>error</code> caught by <code>catch</code>.</p>
+{{script:drc_summary.tcl|out=drc_summary_tcl}}
+<p><strong>What to notice.</strong> Tcl's <code>lsort</code> keeps the old order for equal items (it is "stable"), so sorting by name first and then by count gives "count, then name". The parsing itself lives in the library <a href="#t-lib"><code>pvlib.tcl</code></a>.</p>
+
+<h2 id="p-compare">3 · drc_compare.pl: what changed since yesterday?</h2>
+<p><strong>Situation.</strong> The block owner says "I fixed the M1 spacing errors". Did they? And did the fix break something else? Absolute counts hide this; differences show it.</p>
+{{script:drc_compare.pl|out=drc_compare_pl}}
+<p><strong>What to notice.</strong></p>
+<ul>
+<li>The rule list is the <em>union</em> of both runs, so a rule that exists in only one deck version shows up as NEW RULE or RULE GONE. A deck update that silently drops a rule is a sign-off risk worth catching.</li>
+<li><code>$o // '-'</code> means "use <code>-</code> when the value is undefined". The <code>//</code> operator is different from <code>||</code>, which would also replace a real 0.</li>
+<li>The most alarming groups are printed first. Order your output for the reader who stops after five lines.</li>
+</ul>
+<p><strong>Change it.</strong> Exit with status 1 when there is any NEW FAIL or WORSE. Flag counts equal to the result cap. Accept more than two files and print a trend row per rule.</p>
+
+<h2 id="p-waive">4 · drc_waive.pl: clean after waivers?</h2>
+<p><strong>Situation.</strong> Some violations are accepted: a foundry bit cell, a density window over analog IP. The agreed list lives in a text file. Sign-off means "nothing open outside that list, and nothing above the agreed count".</p>
+{{fixture:waivers.txt}}
+{{script:drc_waive.pl|out=drc_waive_pl}}
+<p><strong>What to notice.</strong></p>
+<ul>
+<li>A waiver has a maximum count. Four antenna errors against a waiver for two is still a failure. Waiving by rule name alone would hide new errors forever.</li>
+<li>The fourth argument of <code>split ' ', $line, 4</code> keeps the reason text together with its spaces.</li>
+<li>The input is validated with the file name and line number in the message.</li>
+<li>It reports stale waivers. A waiver nobody needs any more should be removed before it covers a future real error.</li>
+</ul>
+<p><strong>Change it.</strong> Real waivers are usually by location, not only by count. Combine this with <code>read_rdb</code>: a waiver line gives a rule and a box, and a violation is waived only when its box lies inside.</p>
+
+<h2 id="p-logscan">5 · log_scan.pl: did everything finish?</h2>
+<p><strong>Situation.</strong> Forty blocks ran overnight. Before reading any result you need to know which runs are real: finished, without errors.</p>
+{{script:log_scan.pl|out=log_scan_pl}}
+<p><strong>What to notice.</strong> Three states, not two. A log with no error and no completion line is "still running or killed", and treating it as clean is the classic mistake. <code>$first ||= $1</code> keeps the first error only, which is usually the cause; later ones are consequences.</p>
+<p><strong>Change it.</strong> The message patterns are samples: collect the real error and completion lines from your own logs and update the three patterns. Add a column for peak memory if your logs print it. Sort by run time to find the block that needs more CPUs.</p>
+
+<h2 id="t-celldiff">6 · cell_diff.tcl: two lists, what is missing?</h2>
+<p><strong>Situation.</strong> Cells in the merged GDS against cells that have a LEF; cells in the netlist against cells in the layout; yesterday's waiver list against today's. It is always the same question.</p>
+{{script:cell_diff.tcl|out=cell_diff_tcl}}
+<p><strong>What to notice.</strong> The comment in <code>only_in</code> is the lesson: an array lookup per name, not an <code>lsearch</code> per name. On a full chip that is the difference between seconds and hours.</p>
+
+<h2 id="t-layermap">7 · layermap_check.tcl: check the map before stream-out</h2>
+<p><strong>Situation.</strong> A new metal option arrives and somebody edits the layer map by hand. One wrong digit merges two layers in the GDS, and the run reports thousands of shorts that do not exist in the design.</p>
+{{fixture:layer.map}}
+{{script:layermap_check.tcl|out=layermap_tcl}}
+<p><strong>What to notice.</strong> The key of the array is the pair <code>layer/datatype</code>, and each value is a <em>list</em> of everything mapped there. "Group by a key, then look for groups bigger than one" is the general recipe for finding duplicates of any kind.</p>
+<p><strong>Change it.</strong> Real map files have their own column order: adapt the <code>lassign</code> line to your team's format.</p>
+
+<h2 id="p-cdl">8 · cdl_ports.pl: do the pins match?</h2>
+<p><strong>Situation.</strong> LVS at top level fails with hundreds of connectivity errors. Often the cause is small: a cell's pin list differs between the schematic netlist and the layout side (a missing test-enable pin, power pins in a different order). Comparing pin lists takes a second and can save a full LVS iteration.</p>
+{{script:cdl_ports.pl|out=cdl_ports_pl}}
+<p><strong>What to notice.</strong></p>
+<ul>
+<li>SPICE continues a long line with <code>+</code> at the start of the next line. The reader joins those first, then parses. "Normalise the text, then parse it" keeps every parser simple.</li>
+<li>Names are compared in lower case, because SPICE is case-insensitive.</li>
+<li>Pin order matters in SPICE: instances connect by position. Same pins in a different order is a real problem, so it is reported separately.</li>
+</ul>
+
+<h2 id="p-lvs">9 · lvs_triage.pl: the first ten lines of an LVS debug</h2>
+<p><strong>Situation.</strong> The LVS report is 80,000 lines. You need the verdict, the error types, which cells are wrong and which object counts differ, so you know where to start.</p>
+{{script:lvs_triage.pl|out=lvs_triage_pl}}
+<p><strong>What to notice.</strong> The <code>$section</code> variable is the whole trick. The word INCORRECT appears in the verdict box and in the cell table; only the section tells you which one you are looking at. <code>$verdict //= $1</code> keeps the first verdict found and ignores later ones.</p>
+<p><strong>Change it.</strong> Print the incorrect cells in hierarchy order (lowest first) by reading the hierarchy from the netlist with the reader from script 8.</p>
+
+<h2 id="p-lib">10 · PVReport.pm: one parser, many scripts</h2>
+<p><strong>Why a module.</strong> When the summary format needs a fix, you want to fix it in one file, not in five scripts. This module holds the summary reader and the results-database reader.</p>
+{{script:lib/PVReport.pm}}
+<p><strong>Reading <code>read_rdb</code>.</strong> A violation is several lines: a header (<code>p 1 4</code>), optional property lines that start with a letter, and then that many coordinate lines. The reader keeps a little state between lines: the previous line (it becomes the rule name when the counts line appears) and a countdown of rule-text lines to skip. Each violation is stored as a hash reference with a bounding box, in microns.</p>
+
+<h2 id="p-rdb">11 · rdb_bbox.pl: one line per violation</h2>
+{{fixture:top.drc.results|1-16}}
+{{script:rdb_bbox.pl|out=rdb_bbox_pl}}
+<p><strong>What to notice.</strong> The message "6 violations read" goes to the error stream with <code>warn</code>, so <code>rdb_bbox.pl file &gt; out.csv</code> gives a clean CSV. The optional second argument filters by rule with a regular expression.</p>
+
+<h2 id="p-hotspot">12 · rdb_hotspot.pl: where do they cluster?</h2>
+<p><strong>Situation.</strong> 3,000 spacing errors look hopeless. Binned into windows, they often turn out to be three places: one bad macro abutment, one congested channel, one power-switch column. That changes the conversation with the block owner from "3,000 errors" to "three problems".</p>
+{{script:rdb_hotspot.pl|out=rdb_hotspot_pl}}
+<p><strong>What to notice.</strong> <code>floor(centre / window)</code> turns a coordinate into a window index. The data structure is a hash of hashes: window → rule → count. Different rules in the same window (here M1 and M2 spacing together) usually share one root cause.</p>
+
+<h2 id="t-genruns">13 · gen_runs.tcl: set up and launch many blocks</h2>
+<p><strong>Situation.</strong> Every block needs its own run directory and control file. Typing them by hand produces the wrong top cell name sooner or later.</p>
+{{fixture:blocks.list}}
+{{script:gen_runs.tcl|out=gen_runs_tcl}}
+<p><strong>What to notice.</strong></p>
+<ul>
+<li><strong>Dry run by default.</strong> It writes the files and prints the commands; only <code>-run</code> executes. Any script that launches jobs or changes files should be able to show what it would do first.</li>
+<li>The template uses <code>@NAME@</code> markers and <code>string map</code>, so SVRF's own quotes and braces need no escaping.</li>
+<li>The deck path comes from an environment variable, with a visible fallback.</li>
+<li><code>exec</code> is inside <code>catch</code>, and failed blocks are collected and reported at the end, so one bad block does not stop the other thirty-nine.</li>
+<li>The launch step itself was not executed here (no Calibre on this machine); the dry-run output above is real.</li>
+</ul>
+<p><strong>Change it.</strong> Submit through your farm's queue command. Add an LVS template. After each run, call <code>pv::read_summary</code> and print the status.</p>
+
+<h2 id="t-lib">14 · pvlib.tcl: a small Tcl library</h2>
+{{script:pvlib.tcl}}
+<h3 id="t-test">pvlib_test.tcl: tests for the library</h3>
+<p>Seven checks, one second. Run it after every edit of the library. A PV utility that silently returns a wrong box is worse than no utility.</p>
+{{script:pvlib_test.tcl|out=pvlib_test_tcl}}
+
+<h2 id="t-rdb">15 · rdb_to_tcl.tcl: hand the violations to the layout tool</h2>
+<p><strong>Situation.</strong> You want to step through violations inside Innovus, or select what lies under each one. The simplest bridge between two Tcl programs is a file of Tcl data that the second one loads with <code>source</code>.</p>
+{{script:rdb_to_tcl.tcl|out=rdb_to_tcl_tcl}}
+<<<text | The file it wrote (boxes grown by 0.5 um so the zoom shows some surroundings)
+# made by rdb_to_tcl.tcl from top.drc.results; boxes grown by 0.5 um
+set pv_viol {
+  {M1.S.1 9.500 19.500 10.550 21.400}
+  {M1.S.1 9.900 19.500 10.960 20.800}
+  {M1.S.1 51.500 80.500 52.560 82.100}
+  {M2.S.1 10.500 20.500 11.560 22.000}
+  {M2.S.1 90.000 14.500 91.060 16.300}
+  {ANT.M2 52.500 81.500 57.500 82.570}
+}
+>>>
+<p>The Innovus side that walks this list is <a href="ch03_innovus.html#recipes">recipe 4 on the Innovus page</a>.</p>
+
+<h2 id="runall">16 · run_all.sh: your regression</h2>
+<p>One command re-runs everything and saves each output. After you change a parser, run it and compare the outputs with the previous ones (<code>diff -r</code>). This is how you find out that your "small fix" for the LVS report broke the DRC compare.</p>
+{{script:run_all.sh}}
+
+<h2 id="next">Projects that turn this into interview material</h2>
+<ol>
+<li><strong>Nightly dashboard.</strong> Chain scripts 13 → 5 → 1 → 4 → 3 into one command that prints a table: block, run status, open rules after waivers, LVS verdict, change since yesterday. Write it as CSV and HTML.</li>
+<li><strong>Location-based waivers.</strong> Waiver file with rule and box; a violation is waived when it lies inside. Report waived, open and stale.</li>
+<li><strong>Hotspot hand-off.</strong> From a results file to the ten worst windows, to a Tcl file, to an Innovus proc that lists the instances and nets in each window.</li>
+<li><strong>Pre-run gate.</strong> One script that refuses to launch when the layout is older than the database, the top cell is missing, the layer map has duplicates or netlist ports differ.</li>
+<li><strong>Port everything to the other language.</strong> Every Perl script here in Tcl, and every Tcl script in Perl. Then one of them in Python.</li>
+</ol>
+<p>For each project, be ready to say in an interview: what problem it solved, how much time it saved per week, and one bug you found in it and how.</p>

@@ -1,0 +1,319 @@
+title: Perl for reports, logs and netlists
+kicker: Part 2 · Perl · about 3 weeks
+lede: Tcl drives the tools. Perl digests what the tools print. A sign-off run leaves behind summaries, results databases, LVS reports, logs and netlists, often millions of lines. Perl was built to read text like that and turn it into a short answer. Every example on this page was really run.
+---
+<h2 id="why">Where Perl fits in a PV day</h2>
+<div class="tablewrap"><table>
+<tr><th>Job</th><th>Better tool</th><th>Why</th></tr>
+<tr><td>Query or change the design inside Innovus or the Calibre viewer</td><td>Tcl</td><td>it is the tool's own language</td></tr>
+<tr><td>Summarise a DRC run, compare two runs, apply waivers</td><td>Perl</td><td>regular expressions and hashes are built into the language</td></tr>
+<tr><td>Check 40 block logs before the morning meeting</td><td>Perl</td><td>fast on big files, one-liners from the shell</td></tr>
+<tr><td>Edit or compare SPICE/CDL and Verilog netlists</td><td>Perl</td><td>line joining and pattern replace are short</td></tr>
+<tr><td>Launch many runs on the farm</td><td>either, or shell</td><td>whatever your team's flow already uses</td></tr>
+</table></div>
+<p>Most teams have years of Perl in their flow directory. You will read and repair Perl long before you write a new tool, so reading skill matters as much as writing skill. Python is taking over new work in many companies; the thinking on this page (patterns, hashes, state machines) carries over directly.</p>
+<div class="box tip"><strong>Start every script with these three lines.</strong> <code>use strict</code> forces you to declare variables, so a typo in a name is an error and not a silent empty value. <code>use warnings</code> tells you about suspicious code. They save more debugging time than anything else in Perl.</div>
+<<<perl run | The skeleton of every script
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+my $block = "top";
+my $count = 40;
+print "Block $block has $count DRC results\n";
+printf "%-6s %5d %8.3f\n", $block, $count, 0.07;
+>>>
+
+<h2 id="data">Three kinds of variable</h2>
+<p>The first character tells you the kind: <code>$</code> one value, <code>@</code> a list in order, <code>%</code> a lookup table.</p>
+<<<perl run | Scalar, array, hash
+use strict; use warnings;
+
+my $rule  = "M1.S.1";                           # scalar
+my @layers = ("M1", "M2", "M3");                # array
+my %count  = ("M1.S.1" => 12, "PO.S.2" => 15);  # hash: key => value
+
+push @layers, "M4";                             # add at the end
+print "layers: @layers\n";
+print "how many: ", scalar(@layers), "   first: $layers[0]   last: $layers[-1]\n";
+
+$count{"ANT.M2"} = 4;                           # add a key
+$count{"M1.S.1"}++;                             # change a value
+print "M1.S.1 -> $count{'M1.S.1'}\n";
+print "has LUP.1? ", (exists $count{"LUP.1"} ? "yes" : "no"), "\n";
+
+for my $r (sort keys %count) {
+    printf "%-8s %3d\n", $r, $count{$r};
+}
+>>>
+<div class="box trap"><strong>Trap: one element of an array is a scalar.</strong> The array is <code>@layers</code>, but its first element is <code>$layers[0]</code>. The hash is <code>%count</code>, but one value is <code>$count{key}</code>. The symbol says what you get back, not what the container is.</div>
+<h3>Useful array and hash tools</h3>
+<<<perl run | sort, grep, map, join, split: five words that replace most loops
+use strict; use warnings;
+
+my %count = ("M1.S.1" => 12, "M1.W.1" => 0, "PO.S.2" => 15, "ANT.M2" => 4);
+
+my @failing = grep { $count{$_} > 0 } keys %count;             # keep some
+my @worst   = sort { $count{$b} <=> $count{$a} } @failing;      # numeric, big first
+my @labels  = map  { "$_($count{$_})" } @worst;                 # change each
+print join(", ", @labels), "\n";
+
+my @fields = split ' ', "  blkA   /proj/gds/blkA.gds   blkA_top ";   # ' ' = any spaces, trims too
+print "block=$fields[0] top=$fields[2]\n";
+my ($layer, $kind, $num) = split /\./, "M1.S.1";                # split on a real dot
+print "layer=$layer kind=$kind\n";
+
+my %seen;
+my @unique = grep { !$seen{$_}++ } qw(M2 M1 M2 M3 M1);          # classic: remove duplicates
+print "@unique\n";
+>>>
+<p><code>&lt;=&gt;</code> compares numbers, <code>cmp</code> compares text. Sorting counts with <code>cmp</code> puts 15 before 4, which is a favourite interview trap.</p>
+
+<h2 id="regex">Regular expressions</h2>
+<p>This is the reason Perl is still on every PV engineer's machine. A pattern sits between slashes, and <code>=~</code> means "test this string against it". Brackets capture pieces into <code>$1</code>, <code>$2</code>.</p>
+<<<perl run | Match, capture, replace
+use strict; use warnings;
+
+my $line = "RULECHECK M1.S.1 ..................... TOTAL Result Count = 12   (12)";
+
+if ($line =~ /^RULECHECK\s+(\S+)\s.*TOTAL Result Count\s*=\s*(\d+)\s*\((\d+)\)/) {
+    print "rule=$1 first=$2 second=$3\n";
+}
+
+my ($x1, $y1, $x2, $y2) = "bbox 10 20 15 28" =~ /(\d+)/g;       # /g in a list: every match
+print "width ", $x2 - $x1, "\n";
+
+my $path = "/proj/demo/gds/blkA.gds";
+(my $cell = $path) =~ s{.*/|\.gds$}{}g;                          # copy, then strip dir and extension
+print "$cell\n";
+
+my $name = "u_core/u_ram/BIT[3]";
+(my $safe = $name) =~ s/[\/\[\]]/_/g;                            # make a file-name-safe string
+print "$safe\n";
+
+print "case-insensitive ok\n" if "vdd" =~ /^VDD$/i;
+>>>
+<div class="tablewrap"><table>
+<tr><th>Piece</th><th>Meaning</th><th>Piece</th><th>Meaning</th></tr>
+<tr><td><code>\d \s \w</code></td><td>digit, space, word character</td><td><code>\D \S \W</code></td><td>the opposites</td></tr>
+<tr><td><code>+ * ?</code></td><td>one or more, zero or more, optional</td><td><code>+? *?</code></td><td>same, but take as little as possible</td></tr>
+<tr><td><code>^ $</code></td><td>start, end of the string</td><td><code>\b</code></td><td>word boundary</td></tr>
+<tr><td><code>(...)</code></td><td>capture into <code>$1</code>…</td><td><code>(?:...)</code></td><td>group without capturing</td></tr>
+<tr><td><code>/i</code></td><td>ignore case</td><td><code>/g</code></td><td>all matches, not only the first</td></tr>
+<tr><td><code>/x</code></td><td>allow spaces and comments inside the pattern</td><td><code>\Q$var\E</code></td><td>treat the variable's text literally (rule names contain dots)</td></tr>
+</table></div>
+<div class="box trap"><strong>Trap: greedy <code>.*</code>.</strong> <code>.*</code> takes as much as it can. In <code>/(.*)\.(\w+)/</code> on <code>M1.S.1</code>, the first group becomes <code>M1.S</code>, not <code>M1</code>. Use <code>(.*?)</code> for "as little as possible", or better, say exactly what you mean: <code>([^.]+)</code> = "characters that are not a dot".</div>
+
+<h2 id="files">Reading and writing files</h2>
+<<<perl run | The standard loop: open, read line by line, close
+use strict; use warnings;
+
+my $file = "../fixtures/top.drc.summary";
+open(my $fh, '<', $file) or die "cannot open $file: $!\n";
+my %count;
+while (my $line = <$fh>) {
+    chomp $line;                                   # remove the newline
+    next unless $line =~ /^RULECHECK\s+(\S+)\s.*=\s*(\d+)/;
+    $count{$1} = $2;
+}
+my $lines = $.;                                    # $. is the current line number; save it before close
+close $fh;
+print scalar(keys %count), " rules read from $lines lines\n";
+
+open(my $out, '>', "../src/out/failing_perl.csv") or die "cannot write: $!\n";
+print $out "rule,count\n";
+print $out "$_,$count{$_}\n" for grep { $count{$_} } sort keys %count;
+close $out;
+print -s "../src/out/failing_perl.csv", " bytes written\n";
+>>>
+<ul>
+<li><code>'&lt;'</code> read, <code>'&gt;'</code> write (replaces the file), <code>'&gt;&gt;'</code> append.</li>
+<li><code>or die "...: $!"</code> on every <code>open</code>. <code>$!</code> is the system's reason ("No such file", "Permission denied").</li>
+<li>Reading line by line uses almost no memory, so it works on a 20 GB log. Reading a whole file into an array does not.</li>
+<li>File tests: <code>-e</code> exists, <code>-f</code> plain file, <code>-d</code> directory, <code>-s</code> size, <code>-M</code> age in days.</li>
+</ul>
+
+<h2 id="refs">References: tables inside tables</h2>
+<p>Real questions have two levels: "violations per rule <em>per cell</em>", "pins <em>per subckt</em>". A hash value can only be one scalar, so Perl stores a <strong>reference</strong> (an arrow pointing at another array or hash). The arrow <code>-&gt;</code> follows it. This is the step from beginner to useful.</p>
+<<<perl run | A hash of hashes built from the by-cell section, and an array of hashes
+use strict; use warnings;
+
+my %by_cell;                       # cell => { rule => count }
+my $cell;
+open(my $fh, '<', "../fixtures/top.drc.summary") or die $!;
+while (<$fh>) {
+    $cell = $1 if /^CELL\s+(\S+)/;
+    $by_cell{$cell}{$1} = $2 if defined $cell && /^\s+RULECHECK\s+(\S+)\s.*=\s*(\d+)/;
+}
+close $fh;
+
+for my $c (sort keys %by_cell) {
+    my $rules = $by_cell{$c};                      # a reference to the inner hash
+    my @names = sort keys %$rules;                 # %$rules = "the hash it points to"
+    print "$c: ", join(" ", map { "$_=$rules->{$_}" } @names), "\n";
+}
+
+my @viol = (                                       # array of hash references
+    { rule => "M1.S.1", bbox => [10.0, 20.0, 10.05, 20.9] },
+    { rule => "ANT.M2", bbox => [53.0, 82.0, 57.0, 82.07] },
+);
+for my $v (@viol) {
+    my ($llx, $lly, $urx, $ury) = @{ $v->{bbox} };
+    printf "%-7s width %.2f\n", $v->{rule}, $urx - $llx;
+}
+>>>
+<div class="tablewrap"><table>
+<tr><th>You have</th><th>Make a reference</th><th>Use it</th></tr>
+<tr><td>array <code>@a</code></td><td><code>\@a</code> or <code>[1, 2, 3]</code></td><td><code>$r-&gt;[0]</code>, <code>@$r</code>, <code>scalar(@$r)</code></td></tr>
+<tr><td>hash <code>%h</code></td><td><code>\%h</code> or <code>{ a =&gt; 1 }</code></td><td><code>$r-&gt;{a}</code>, <code>keys %$r</code></td></tr>
+<tr><td>sub <code>foo</code></td><td><code>\&amp;foo</code> or <code>sub { ... }</code></td><td><code>$r-&gt;(args)</code></td></tr>
+</table></div>
+<p>Notice that <code>$by_cell{$cell}{$1} = $2</code> created the inner hash by itself. Perl calls this autovivification. It is convenient, and it is also why a test like <code>if ($h{a}{b})</code> quietly creates <code>$h{a}</code>. Test the outer key first when that matters.</p>
+<p>When a structure confuses you, print it: <code>use Data::Dumper; print Dumper(\%by_cell);</code></p>
+
+<h2 id="subs">Subroutines and your own module</h2>
+<<<perl run | Arguments arrive in @_, return a list or a reference
+use strict; use warnings;
+
+sub bbox_area {
+    my ($llx, $lly, $urx, $ury) = @_;
+    return ($urx - $llx) * ($ury - $lly);
+}
+sub worst {                                  # takes a hash reference, returns two values
+    my ($count) = @_;
+    my ($top) = sort { $count->{$b} <=> $count->{$a} } keys %$count;
+    return ($top, $count->{$top});
+}
+print bbox_area(0, 0, 2, 3), "\n";
+my ($rule, $n) = worst({ "M1.S.1" => 12, "PO.S.2" => 15 });
+print "$rule $n\n";
+>>>
+<p>When three scripts need the same parser, move it into a module: a file that ends in <code>.pm</code>, starts with <code>package Name;</code>, and ends with <code>1;</code>. The practice module <a href="ch05_script_bank.html#p-lib"><code>lib/PVReport.pm</code></a> holds the summary reader and the results-database reader. A script next to it loads it like this:</p>
+<<<perl run | Using the shared module
+use strict; use warnings;
+use lib "./lib";                       # in a real script: use FindBin qw($Bin); use lib "$Bin/lib";
+use PVReport qw(read_summary read_rdb);
+
+my $count = read_summary("../fixtures/top.drc.summary");
+print "PO.S.2 has $count->{'PO.S.2'} results\n";
+
+my ($top, $viol) = read_rdb("../fixtures/top.drc.results");
+print "top cell $top, ", scalar(@$viol), " violations, first one is $viol->[0]{rule}\n";
+>>>
+
+<h2 id="state">The state machine: how to parse any report</h2>
+<p>Reports are not tables. They have sections, and the same kind of line means different things in different sections. In the DRC summary, <code>RULECHECK</code> lines appear once in the main section and again under each cell. The reliable method is always the same:</p>
+<ol>
+<li>Keep one variable that says "which section am I in?".</li>
+<li>Change it when you see a section header.</li>
+<li>Only then decide what the current line means.</li>
+</ol>
+<<<perl run | Section-aware parsing of the LVS report sample
+use strict; use warnings;
+
+open(my $fh, '<', "../fixtures/top.lvs.report") or die $!;
+my $section = 'header';
+my (%lines_in, @bad);
+while (my $line = <$fh>) {
+    if    ($line =~ /OVERALL COMPARISON RESULTS/) { $section = 'verdict' }
+    elsif ($line =~ /CELL\s+SUMMARY/)             { $section = 'cells' }
+    elsif ($line =~ /NUMBERS OF OBJECTS/)         { $section = 'counts' }
+    $lines_in{$section}++;
+
+    push @bad, $2 if $section eq 'cells' && $line =~ /^\s+(INCORRECT)\s+(\S+)/;
+}
+close $fh;
+print "$_: $lines_in{$_} lines\n" for sort keys %lines_in;
+print "incorrect cells: @bad\n";
+>>>
+<p>The complete version is <a href="ch05_script_bank.html#p-lvs"><code>lvs_triage.pl</code></a>. The results-database reader in <code>PVReport.pm</code> uses the same idea with a counter ("skip the next N lines of rule text").</p>
+
+<h2 id="oneliners">One-liners from the shell</h2>
+<p>For a quick question you do not need a file. <code>-n</code> wraps your code in a "for each line" loop, <code>-e</code> gives the code, <code>-a</code> splits each line into <code>@F</code>, <code>-l</code> handles newlines, <code>-i.bak</code> edits a file in place and keeps a backup.</p>
+<<<shell | Run these in the scripts folder; the answers below were produced by the same commands
+# failing rules only
+perl -ne 'print "$1 $2\n" if /^RULECHECK\s+(\S+).*=\s*(\d+)/ && $2 > 0' ../fixtures/top.drc.summary
+
+# total results in the main section (stop at the BY CELL header)
+perl -ne 'last if /BY CELL/; $t += $1 if /^RULECHECK.*=\s*(\d+)/; END { print "$t\n" }' ../fixtures/top.drc.summary
+
+# column 3 of a list file, skipping comments
+perl -lane 'next if /^#/ || !@F; print $F[2]' ../fixtures/blocks.list
+
+# how many subckts in a netlist
+perl -ne '$n++ if /^\s*\.subckt/i; END { print "$n\n" }' ../fixtures/lay.cdl
+
+# rename a cell everywhere in a netlist, keeping a backup copy
+perl -i.bak -pe 's/\bclk_gate\b/clk_gate_v2/g' my_copy.cdl
+>>>
+<<<perl run | The first four one-liners, executed
+for my $cmd (
+  q{perl -ne 'print "$1 $2\n" if /^RULECHECK\s+(\S+).*=\s*(\d+)/ && $2 > 0' ../fixtures/top.drc.summary},
+  q{perl -ne 'last if /BY CELL/; $t += $1 if /^RULECHECK.*=\s*(\d+)/; END { print "$t\n" }' ../fixtures/top.drc.summary},
+  q{perl -lane 'next if /^#/ || !@F; print $F[2]' ../fixtures/blocks.list},
+  q{perl -ne '$n++ if /^\s*\.subckt/i; END { print "$n\n" }' ../fixtures/lay.cdl},
+) { print "--\n", `$cmd`; }
+>>>
+<div class="box trap"><strong>Why the <code>^</code> matters.</strong> The by-cell section repeats every failing rule on indented lines. <code>^RULECHECK</code> matches only lines that start at column one, so each rule is counted once. Remove the <code>^</code> and every count doubles. One character decides whether the number in your status mail is right, so always test a parser on a file where you already know the answer.</div>
+
+<h2 id="pro">Pro habits</h2>
+<h3>Options, usage text and exit codes</h3>
+<<<perl run | Getopt::Long gives your script real options
+use strict; use warnings;
+use Getopt::Long;
+
+@ARGV = ('--window', '20', '--rule', 'M1', '--verbose', 'top.drc.results');   # pretend command line
+my %opt = (window => 10, rule => '.');
+GetOptions(\%opt, 'window=f', 'rule=s', 'verbose!', 'help')
+    or die "usage: $0 [--window um] [--rule regex] [--verbose] <drc.results>\n";
+my $file = shift @ARGV or die "no input file\n";
+print "window=$opt{window} rule=$opt{rule} verbose=$opt{verbose} file=$file\n";
+>>>
+<h3>Running other programs</h3>
+<<<perl run | Backticks capture output, system() gives the exit status
+use strict; use warnings;
+
+my $lines = `wc -l < ../fixtures/top.drc.summary`;      # capture what the command prints
+chomp $lines; $lines =~ s/\s+//g;
+print "summary has $lines lines\n";
+
+my $rc = system("grep -q INCORRECT ../fixtures/top.lvs.report");
+print "grep exit status: ", $rc >> 8, " (0 means the word was found)\n";
+
+my @logs = glob("../fixtures/logs/*.log");
+print scalar(@logs), " logs found\n";
+print "DISPLAY is ", (defined $ENV{DISPLAY} ? "set" : "not set"), "\n";
+>>>
+<h3>Things that separate a tool from a throwaway script</h3>
+<ul>
+<li><strong>Fail loudly.</strong> If the summary has no <code>RULECHECK</code> lines, <code>die</code>. A script that prints "0 violations" for an empty or truncated file is dangerous at sign-off.</li>
+<li><strong>Say where.</strong> Error messages should name the file and line: <code>die "$file line $.: ..."</code>.</li>
+<li><strong>Data to stdout, chatter to stderr</strong> (<code>warn</code>), so <code>script &gt; out.csv</code> stays clean.</li>
+<li><strong>Exit non-zero on problems</strong>, so flows can react.</li>
+<li><strong>Core modules only</strong> (<code>List::Util</code>, <code>File::Basename</code>, <code>File::Find</code>, <code>Getopt::Long</code>, <code>Data::Dumper</code>, <code>POSIX</code>). Compute farms rarely let you install from CPAN.</li>
+<li><strong>Big files:</strong> read line by line, compile a fixed pattern once with <code>qr//</code>, and test the cheap condition first.</li>
+<li><strong>Check syntax without running:</strong> <code>perl -c script.pl</code>. Step through with <code>perl -d script.pl</code>.</li>
+</ul>
+
+<h2 id="traps">Traps</h2>
+<div class="tablewrap"><table>
+<tr><th>You wrote</th><th>What goes wrong</th><th>Write this</th></tr>
+<tr><td class="wrap"><code>if ($a == $b)</code> on names</td><td>text compared as numbers: every name equals every other</td><td><code>eq</code>, <code>ne</code> for text</td></tr>
+<tr><td class="wrap"><code>sort @counts</code></td><td>text order: 15 before 4</td><td class="wrap"><code>sort { $a &lt;=&gt; $b } @counts</code></td></tr>
+<tr><td class="wrap"><code>/M1.S.1/</code></td><td>dots match any character: also matches <code>M1xSy1</code></td><td class="wrap"><code>/M1\.S\.1/</code> or <code>/\Q$rule\E/</code></td></tr>
+<tr><td class="wrap"><code>my $n = @list;</code> vs <code>my ($n) = @list;</code></td><td>first is the count, second is the first element</td><td>know which you want</td></tr>
+<tr><td class="wrap"><code>open(F, $file);</code></td><td>no error check, old global handle</td><td class="wrap"><code>open(my $fh, '&lt;', $file) or die ...</code></td></tr>
+<tr><td class="wrap">forgot <code>chomp</code></td><td>the last field keeps a newline; hash keys never match</td><td><code>chomp</code> right after reading</td></tr>
+<tr><td class="wrap"><code>$1</code> used after a failed match</td><td>still holds the value from an older match</td><td>use <code>$1</code> only inside <code>if (/.../)</code></td></tr>
+<tr><td class="wrap"><code>keys %h</code> order</td><td>random, changes between runs</td><td><code>sort keys %h</code> for stable reports</td></tr>
+</table></div>
+
+<h2 id="practice">Practice, in order</h2>
+<ol>
+<li>Type the examples yourself. For each regular expression, change the input line until it stops matching, so you learn what each piece guards.</li>
+<li>Extend <a href="ch05_script_bank.html#p-summary"><code>drc_summary.pl</code></a> with a <code>--csv</code> option using <code>Getopt::Long</code>.</li>
+<li>Add a by-cell mode: print each cell with its failing rules (use the hash-of-hashes example above).</li>
+<li>Write <code>rule_group.pl</code>: group rules by the text before the first dot (M1, M2, ANT…) and print a total per group.</li>
+<li>Extend <code>cdl_ports.pl</code> to also compare the number of device lines inside each subckt.</li>
+<li>Take the oldest Perl script in your team's flow directory and write one comment per block explaining what it does. Reading old code is the real job.</li>
+</ol>

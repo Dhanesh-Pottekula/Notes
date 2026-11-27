@@ -1,0 +1,248 @@
+title: Scripting questions for PV interviews, with worked answers
+kicker: Part 6 · Interview practice · weeks 11–12
+lede: The scripting round is usually small problems on a whiteboard or shared editor, plus "tell me about a script you wrote". Answer each question on paper first, then open the answer. Every answer that contains code was executed, so the output printed under it is what the code really does.
+---
+<h2 id="how">How the scripting round usually goes</h2>
+<ul>
+<li><strong>Small language problems:</strong> reverse a list, count words, find duplicates, parse a line. They test whether you really write code or only edit other people's.</li>
+<li><strong>Read this code:</strong> "what does this print?" Quoting in Tcl and context in Perl are the favourite traps.</li>
+<li><strong>Your own work:</strong> "what did you automate?" Have one project you can explain: problem, approach, a bug, time saved.</li>
+<li><strong>Scenario:</strong> "you have 5,000 DRC errors, what do you do?" The strong answer always includes sorting, grouping and comparing with scripts.</li>
+</ul>
+<p>Say your plan out loud before writing: input, data structure, loop, output. Interviewers score the thinking more than the syntax.</p>
+
+<h2 id="tcl">Tcl</h2>
+<details><summary>1. What is the difference between <code>"..."</code> and <code>{...}</code>?</summary>
+<p>Both group words into one. Inside double quotes, variables and commands are still substituted. Inside braces nothing is substituted; the text is passed as it is, and the command receiving it may evaluate it later (this is what <code>if</code>, <code>while</code>, <code>proc</code> and <code>expr</code> do).</p>
+<<<tcl run |
+set n 3
+puts "n is $n, next is [expr {$n + 1}]"
+puts {n is $n, next is [expr {$n + 1}]}
+>>>
+</details>
+<details><summary>2. Reverse a list without <code>lreverse</code>.</summary>
+<<<tcl run |
+proc rev {l} {
+    set out {}
+    foreach item $l { set out [linsert $out 0 $item] }
+    return $out
+}
+puts [rev {M1 M2 M3 M4}]
+>>>
+<p>Follow-up they may ask: "is it efficient?" Inserting at the front copies the list each time. Walking the index down from <code>[llength $l]-1</code> and using <code>lappend</code> is better for long lists.</p>
+</details>
+<details><summary>3. Remove duplicates from a list but keep the original order.</summary>
+<p><code>lsort -unique</code> removes duplicates but sorts. To keep order, remember what you have seen.</p>
+<<<tcl run |
+proc uniq {l} {
+    set out {}
+    foreach item $l {
+        if {![info exists seen($item)]} {
+            set seen($item) 1
+            lappend out $item
+        }
+    }
+    return $out
+}
+puts [uniq {M2 M1 M2 M3 M1}]
+>>>
+</details>
+<details><summary>4. Count how many times each word appears in a file.</summary>
+<<<tcl run |
+set fh [open ../fixtures/lay.cdl r]
+set words [regexp -all -inline {\S+} [string tolower [read $fh]]]
+close $fh
+foreach w $words {
+    if {![info exists n($w)]} { set n($w) 0 }
+    incr n($w)
+}
+set pairs {}
+foreach w [array names n] { lappend pairs [list $w $n($w)] }
+foreach p [lrange [lsort -integer -decreasing -index 1 [lsort -index 0 $pairs]] 0 4] {
+    puts [format "%-10s %d" {*}$p]
+}
+>>>
+</details>
+<details><summary>5. What does this print, and why? <code>set a 5; set b a; puts [set $b]</code></summary>
+<p><code>$b</code> is <code>a</code>, so <code>[set $b]</code> becomes <code>[set a]</code>, and <code>set</code> with one argument returns the value of that variable. This is how you read a variable whose name is stored in another variable.</p>
+<<<tcl run |
+set a 5
+set b a
+puts [set $b]
+>>>
+</details>
+<details><summary>6. What is <code>upvar</code> for? Write a proc that adds 1 to a variable given by name.</summary>
+<p><code>upvar</code> links a local name to a variable in the caller's scope, so a proc can change it. You pass the variable's name, not its value. It is the way to pass arrays to procs.</p>
+<<<tcl run |
+proc bump {varName} {
+    upvar 1 $varName v
+    incr v
+}
+set errors 9
+bump errors
+puts $errors
+>>>
+</details>
+<details><summary>7. Given a list of boxes <code>{llx lly urx ury}</code>, return the one with the largest area.</summary>
+<<<tcl run |
+proc biggest {boxes} {
+    set best {}
+    set bestArea -1
+    foreach box $boxes {
+        lassign $box llx lly urx ury
+        set area [expr {($urx - $llx) * ($ury - $lly)}]
+        if {$area > $bestArea} { set bestArea $area; set best $box }
+    }
+    return $best
+}
+puts [biggest {{0 0 1 1} {0 0 4 0.5} {2 2 3 5}}]
+>>>
+</details>
+<details><summary>8. Why is <code>expr {$a + $b}</code> better than <code>expr $a + $b</code>?</summary>
+<p>Without braces Tcl substitutes first and <code>expr</code> then parses the resulting text a second time. That is slower (the expression cannot be compiled once), and if a variable holds text like <code>[exit]</code> it would be executed. With braces, <code>expr</code> reads the variables itself.</p>
+</details>
+<details><summary>9. How do you run an external program and not let its failure stop your script?</summary>
+<p><code>exec</code> raises an error when the program exits non-zero or writes to its error stream. Wrap it in <code>catch</code>, which returns 1 on error and stores the message.</p>
+<<<tcl run |
+if {[catch {exec ls /no/such/dir} msg]} {
+    puts "command failed, carrying on"
+}
+puts "still running"
+>>>
+</details>
+<details><summary>10. From a line like <code>RULECHECK M1.S.1 .... TOTAL Result Count = 12 (12)</code>, extract the rule and the count.</summary>
+<<<tcl run |
+set line "RULECHECK M1.S.1 ..................... TOTAL Result Count = 12   (12)"
+regexp {^RULECHECK\s+(\S+).*=\s*(\d+)} $line -> rule n
+puts "$rule $n"
+>>>
+<p>Say why each part is there: <code>^</code> so indented by-cell lines do not match, <code>\S+</code> because rule names contain dots, <code>.*=</code> to jump over the dots to the equals sign.</p>
+</details>
+
+<h2 id="perl">Perl</h2>
+<details><summary>11. Difference between <code>my $n = @list;</code> and <code>my ($n) = @list;</code></summary>
+<p>Context. The first is scalar context: you get the number of elements. The second is list context: you get the first element.</p>
+<<<perl run |
+my @list = ("M1", "M2", "M3");
+my $count = @list;
+my ($first) = @list;
+print "$count $first\n";
+>>>
+</details>
+<details><summary>12. Count word occurrences in a file and print the top five.</summary>
+<<<perl run |
+use strict; use warnings;
+my %n;
+open(my $fh, '<', "../fixtures/lay.cdl") or die $!;
+while (<$fh>) { $n{lc $_}++ for split; }
+close $fh;
+my @top = sort { $n{$b} <=> $n{$a} || $a cmp $b } keys %n;
+printf "%-10s %d\n", $_, $n{$_} for @top[0 .. 4];
+>>>
+</details>
+<details><summary>13. Sort a hash by value, largest first.</summary>
+<<<perl run |
+my %count = ("M1.S.1" => 12, "PO.S.2" => 15, "ANT.M2" => 4);
+print "$_ $count{$_}\n" for sort { $count{$b} <=> $count{$a} } keys %count;
+>>>
+<p>Know why <code>&lt;=&gt;</code> and not <code>cmp</code>: <code>cmp</code> compares as text and would put 4 above 15.</p>
+</details>
+<details><summary>14. Remove duplicate lines from a file, keeping the first of each. As a one-liner.</summary>
+<<<perl run |
+print `perl -ne 'print unless \$seen{\$_}++' ../fixtures/gds_cells.txt ../fixtures/lef_cells.txt`;
+>>>
+<p>The command itself is <code>perl -ne 'print unless $seen{$_}++' file1 file2</code>. <code>$seen{$_}++</code> is 0 (false) the first time a line appears and true afterwards.</p>
+</details>
+<details><summary>15. What is a reference? Build a hash whose values are arrays.</summary>
+<p>A reference is a scalar that points to an array, hash or sub. Since hash values must be scalars, nested data is built from references.</p>
+<<<perl run |
+use strict; use warnings;
+my %rules_by_layer;
+for my $rule (qw(M1.S.1 M1.W.1 M2.S.1 VIA1.EN.1 M2.EN.1)) {
+    my ($layer) = split /\./, $rule;
+    push @{ $rules_by_layer{$layer} }, $rule;
+}
+for my $layer (sort keys %rules_by_layer) {
+    my $list = $rules_by_layer{$layer};            # array reference
+    printf "%-5s %d rules: %s\n", $layer, scalar(@$list), join(" ", @$list);
+}
+>>>
+</details>
+<details><summary>16. <code>chomp</code> versus <code>chop</code>? <code>==</code> versus <code>eq</code>? <code>die</code> versus <code>warn</code>?</summary>
+<ul>
+<li><code>chomp</code> removes a trailing newline only if there is one. <code>chop</code> removes the last character whatever it is.</li>
+<li><code>==</code> compares numbers, <code>eq</code> compares text. Using <code>==</code> on names makes all names equal (they are all 0 as numbers).</li>
+<li><code>die</code> prints to the error stream and stops with a non-zero exit code. <code>warn</code> prints and continues.</li>
+</ul>
+</details>
+<details><summary>17. Print lines 5 to 8 of a file. Print every line that has exactly 3 fields.</summary>
+<<<perl run |
+print `perl -ne 'print if 5 .. 8' ../fixtures/top.drc.summary`;
+print "--\n";
+print `perl -lane 'print if \@F == 3' ../fixtures/blocks.list`;
+>>>
+<p>Commands: <code>perl -ne 'print if 5 .. 8' file</code> (the range operator compares against the line number) and <code>perl -lane 'print if @F == 3' file</code> (<code>-a</code> splits each line into <code>@F</code>; in a comparison an array gives its length). The comment line of the list has six words, so it is not printed.</p>
+</details>
+<details><summary>18. Swap two columns in a file. Replace a net name in a netlist only as a whole word.</summary>
+<<<perl run |
+print `perl -lane 'print "\$F[2] \$F[0]"' ../fixtures/blocks.list | tail -3`;
+print `perl -pe 's/\\bVSS\\b/VSSA/g' ../fixtures/src.cdl | grep -m2 VSSA`;
+>>>
+<p>Commands: <code>perl -lane 'print "$F[2] $F[0]"' file</code> and <code>perl -pe 's/\bVSS\b/VSSA/g' file</code>. <code>\b</code> is a word boundary, so <code>VSS</code> changes but <code>VSSX</code> would not.</p>
+</details>
+<details><summary>19. Your regular expression <code>/(.*)\.(.*)/</code> on <code>M1.S.1</code> gives the wrong layer. Why?</summary>
+<p><code>.*</code> is greedy: the first group takes as much as possible, so it becomes <code>M1.S</code>.</p>
+<<<perl run |
+"M1.S.1" =~ /(.*)\.(.*)/;       print "greedy:     $1 | $2\n";
+"M1.S.1" =~ /(.*?)\.(.*)/;      print "non-greedy: $1 | $2\n";
+"M1.S.1" =~ /^([^.]+)\.(.*)/;   print "explicit:   $1 | $2\n";
+>>>
+</details>
+
+<h2 id="scenario">Scenario questions</h2>
+<details><summary>20. The run finished with 5,000 DRC violations. What do you do first?</summary>
+<ol>
+<li><strong>Check the run is valid:</strong> right layout version, right top cell, right deck and switches, log finished without errors.</li>
+<li><strong>Count per rule</strong>, sorted. Usually three or four rules hold 90% of the errors.</li>
+<li><strong>Look for export causes first:</strong> a whole layer failing, or errors in every instance of one cell, points to the layer map, a missing cell GDS or a wrong library version, not to routing.</li>
+<li><strong>Use hierarchy:</strong> the by-cell view shows whether 3,000 errors are one error inside a cell placed 3,000 times.</li>
+<li><strong>Cluster by location:</strong> errors in one window usually share one cause.</li>
+<li><strong>Compare with the previous run</strong> to see what is new.</li>
+<li>Only then open the viewer on one example of each group, and route each group to its owner.</li>
+</ol>
+<p>Naming a script for each step (<a href="ch05_script_bank.html">summary, compare, hotspot</a>) is what turns this into a strong answer.</p>
+</details>
+<details><summary>21. How would you automate nightly sign-off for 40 blocks?</summary>
+<p>Describe the chain: one block list as the single source of names and paths; a pre-run gate (fresh layout, top cell present, layer map and ports sane); generated run directories and control files from a template; launch through the farm with a job limit; log scan for finished, failed or still running; summaries after waivers; comparison with the previous night; one published table. Mention dry-run mode, exit codes, and that an unfinished run must never be shown as clean. Details on the <a href="ch04_calibre.html#daily">Calibre page</a>.</p>
+</details>
+<details><summary>22. LVS is incorrect at top level. What is your order of attack?</summary>
+<ol>
+<li>Read the verdict block and the error types.</li>
+<li>Fix the lowest incorrect cell in the hierarchy first.</li>
+<li>Check ports and text: missing or misplaced labels and wrong pin lists cause a large share of top-level failures.</li>
+<li>Check object counts: more nets in layout suggests opens, fewer suggests shorts; extra instances suggest physical cells missing from the netlist.</li>
+<li>Shorts on power and ground first; they hide everything else.</li>
+<li>Then connectivity and property discrepancies, cross-probing in the viewer.</li>
+</ol>
+</details>
+<details><summary>23. When would you choose Tcl, Perl, Python or shell?</summary>
+<ul>
+<li><strong>Tcl</strong> for anything inside an EDA tool or its rule files.</li>
+<li><strong>Perl</strong> for text reports and logs, and because the existing flow is full of it.</li>
+<li><strong>Python</strong> for new, larger utilities with structure, tests and libraries (CSV, JSON, plotting, web dashboards), if the company allows it on the farm.</li>
+<li><strong>Shell</strong> for gluing a few commands together and for job submission wrappers.</li>
+</ul>
+<p>The mature answer adds: "and I follow what my team already uses, because a script nobody else can maintain is a liability."</p>
+</details>
+<details><summary>24. Tell me about a script you wrote.</summary>
+<p>Prepare this before any interview. Four sentences: the manual task and how long it took; what your script does and in which language; the result in numbers (hours saved, errors caught before a run, how many people use it); one thing that went wrong and how you fixed it. If you have not written one yet, build one project from the <a href="ch05_script_bank.html#next">project list</a> for your team first. A small real tool beats a large imaginary one.</p>
+</details>
+
+<h2 id="drill">A drill for the last week</h2>
+<ul class="check">
+<li>Write questions 3, 4, 7, 12, 13 and 15 on paper, no shell, ten minutes each.</li>
+<li>Explain questions 1, 8, 11 and 19 aloud to someone who does not program.</li>
+<li>Write one summary parser from an empty file in under fifteen minutes, in each language.</li>
+<li>Rehearse your project story until it fits in two minutes.</li>
+<li>Prepare two questions of your own about the team's sign-off flow and how much of it is scripted.</li>
+</ul>

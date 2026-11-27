@@ -56,6 +56,10 @@ SECTIONS = [
         ("programming/python/web-frameworks.html", "Python web frameworks",
          "Django vs Flask vs FastAPI vs Starlette, WSGI vs ASGI, async/await, Pydantic, when to use which."),
     ]),
+    ("VLSI physical verification", "From running DRC/LVS to owning sign-off, and the scripting that gets you there.", [
+        ("vlsi/tcl_perl_pv/", "Tcl and Perl for physical verification",
+         "The whole PV roadmap (DRC, LVS, antenna, ERC, tape-out) plus a 12-week scripting plan: Tcl, Perl, Innovus dbGet, Calibre automation, 16 tested scripts, interview questions."),
+    ]),
     ("Trading", "Chart reading, the trader's mindset, and the maths behind sizing and risk.", [
         ("trading/forex/index.html", "Forex learning roadmap",
          "8 phases from set-up to a live track record, 200+ checked resources, base rates on who actually profits."),

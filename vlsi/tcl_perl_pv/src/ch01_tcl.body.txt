@@ -1,0 +1,355 @@
+title: Tcl from zero to the level a PV engineer needs
+kicker: Part 1 · Tcl · about 3 weeks
+lede: Every big EDA tool gives you a Tcl prompt: Innovus, Calibre (its viewer, its batch shells and its TVF rule files), PrimeTime, ICC2. Learn the language once and you can script all of them. This page teaches Tcl with layout-flavoured examples. Every example on this page was really run, and the output under it is the real output.
+---
+<h2 id="why">Why Tcl first</h2>
+<p>In physical verification you spend your day moving between tools. The commands are different in each tool, but the language around the commands is the same. <code>foreach</code>, <code>if</code>, <code>proc</code>, lists and <code>regexp</code> work the same way in Innovus as in the Calibre viewer. So this page has two halves in your head:</p>
+<ul>
+<li><strong>The language</strong> (this page): how to hold data, loop, make decisions, read files, write procs.</li>
+<li><strong>The tool commands</strong> (<a href="ch03_innovus.html">Innovus</a>, <a href="ch04_calibre.html">Calibre</a>): the special commands each tool adds on top.</li>
+</ul>
+<div class="box tip"><strong>How to practise without a licence.</strong> Type <code>tclsh</code> in any Linux or Mac terminal. That is plain Tcl with no EDA commands, and it is enough for everything on this page. Code here is written for Tcl 8.5, because some EDA tools still ship that version. Check yours with <code>puts [info patchlevel]</code>.</div>
+
+<h2 id="rule">The one rule: a line is a command and its words</h2>
+<p>Tcl has almost no grammar. Each line is <em>command word word word</em>. Before the command runs, Tcl does three kinds of replacement inside the words:</p>
+<div class="tablewrap"><table>
+<tr><th>You write</th><th>Tcl does</th><th>Name</th></tr>
+<tr><td><code>$name</code></td><td>puts the value of the variable there</td><td>variable substitution</td></tr>
+<tr><td><code>[command ...]</code></td><td>runs that command first and puts its result there</td><td>command substitution</td></tr>
+<tr><td><code>"..."</code></td><td>makes one word; <code>$</code> and <code>[ ]</code> still work inside</td><td>soft quoting</td></tr>
+<tr><td><code>{...}</code></td><td>makes one word; nothing inside is replaced</td><td>hard quoting</td></tr>
+</table></div>
+<<<tcl run | The four kinds of word
+set layer M2
+set width 0.07
+puts "layer is $layer, twice the width is [expr {$width * 2}]"
+puts {layer is $layer, twice the width is [expr {$width * 2}]}
+>>>
+<p>The second <code>puts</code> printed the text as it is, because braces switch all replacement off. This is the whole secret of Tcl. When a script behaves strangely, ask: "which words did Tcl see, after replacement?"</p>
+<div class="box trap"><strong>Trap: comments are commands too.</strong> A <code>#</code> starts a comment only where a command could start. To put a comment after a command on the same line, write <code>;#</code>. A comment with an unbalanced brace in it can break the whole file, because Tcl counts braces before it looks for comments.</div>
+
+<h2 id="numbers">Variables and arithmetic</h2>
+<p><code>set</code> makes a variable. Everything is stored as text; <code>expr</code> does the maths. Always put braces around the expression. It is faster, and it protects you from surprises when a value contains spaces or brackets.</p>
+<<<tcl run | set, expr, incr, format
+set llx 10.000
+set urx 10.050
+set gap [expr {$urx - $llx}]
+puts "gap = $gap"
+puts "gap, 3 decimals = [format %.3f $gap]"
+
+set count 0
+incr count          ;# add 1
+incr count 5        ;# add 5
+puts "count = $count"
+
+puts [expr {7 / 2}]       ;# integer divide
+puts [expr {7 / 2.0}]     ;# real divide
+puts [expr {int(2500 * 0.001 * 1000 + 0.5)}]   ;# round to an integer database unit
+>>>
+<div class="box trap"><strong>Trap: floating point.</strong> Look at the first line of output: it is not exactly 0.05. Coordinates in microns are fractions that a computer cannot store exactly. Never test two micron values with <code>==</code>. Either compare with a tolerance (<code>abs($a - $b) &lt; 0.0005</code>) or convert to integer database units first, the way layout tools do internally.</div>
+
+<h2 id="strings">Strings</h2>
+<p>Report parsing is string work. These are the commands you will use every day.</p>
+<<<tcl run | The string commands worth memorising
+set rule "M1.S.1"
+puts [string length $rule]
+puts [string toupper "vdd"]
+puts [string range $rule 0 1]              ;# characters 0 to 1
+puts [string first "." $rule]              ;# index of the first dot
+puts [string match "M1.*" $rule]           ;# glob pattern: 1 = matches
+puts [string equal -nocase "VSS" "vss"]
+puts [string trim "   top.gds   "]
+puts [string map {. _} $rule]              ;# replace every dot
+puts [split $rule "."]                     ;# string -> list
+puts [join {M1 S 1} "/"]                   ;# list -> string
+>>>
+<h3>Regular expressions</h3>
+<p><code>regexp</code> answers "does this line look like that?" and can pull pieces out. <code>regsub</code> replaces. Put the pattern in braces so Tcl does not touch the backslashes.</p>
+<<<tcl run | regexp with capture groups on a real Calibre summary line
+set line "RULECHECK M1.S.1 ..................... TOTAL Result Count = 12   (12)"
+
+if {[regexp {^RULECHECK\s+(\S+)\s.*TOTAL Result Count\s*=\s*(\d+)} $line whole rule n]} {
+    puts "rule=$rule count=$n"
+}
+
+# -all -inline returns every match as a list
+puts [regexp -all -inline {\d+} "bbox 10 20 15 28"]
+
+# regsub: remove a comment and squeeze spaces
+set raw "blkA    /proj/gds/blkA.gds   blkA   # final version"
+regsub {#.*} $raw {} clean
+regsub -all {\s+} [string trim $clean] { } clean
+puts "<$clean>"
+>>>
+<div class="tablewrap"><table>
+<tr><th>Pattern</th><th>Means</th><th>Pattern</th><th>Means</th></tr>
+<tr><td><code>^</code> <code>$</code></td><td>start, end of the string</td><td><code>\d</code> <code>\s</code> <code>\S</code> <code>\w</code></td><td>digit, space, non-space, word character</td></tr>
+<tr><td><code>.</code></td><td>any one character</td><td><code>*</code> <code>+</code> <code>?</code></td><td>zero or more, one or more, optional</td></tr>
+<tr><td><code>[A-Z0-9_]</code></td><td>one character from the set</td><td><code>( )</code></td><td>capture this part</td></tr>
+<tr><td><code>\.</code></td><td>a real dot</td><td><code>a|b</code></td><td>a or b</td></tr>
+</table></div>
+
+<h2 id="lists">Lists: the main data structure</h2>
+<p>A list is words separated by spaces. A bounding box <code>{llx lly urx ury}</code> is a list of four numbers. The result of almost every EDA query is a list. If you are fluent with lists, you are fluent in tool scripting.</p>
+<<<tcl run | Build, read, change, sort and search lists
+set layers {M1 M2 M3}
+lappend layers M4 M5                       ;# add at the end (changes the variable)
+puts "count: [llength $layers]"
+puts "first: [lindex $layers 0]   last: [lindex $layers end]"
+puts "middle: [lrange $layers 1 3]"
+puts "where is M3? index [lsearch -exact $layers M3]"
+puts "has M9? [expr {[lsearch -exact $layers M9] >= 0}]"
+
+set box {10.0 20.0 10.05 20.9}
+lassign $box llx lly urx ury               ;# unpack a list into variables
+puts "width [expr {$urx - $llx}]  height [expr {$ury - $lly}]"
+
+set counts {12 0 5 3 15}
+puts [lsort -integer -decreasing $counts]
+puts [lsort -unique {M2 M1 M2 M3 M1}]
+>>>
+<h3>Lists inside lists</h3>
+<p>A table is a list of rows, and each row is a list. <code>lsort -index</code> sorts by a column. This is exactly how the practice script <a href="ch05_script_bank.html#t-summary"><code>drc_summary.tcl</code></a> ranks rules.</p>
+<<<tcl run | A table as a list of lists
+set rows {
+    {M1.S.1 12}
+    {PO.S.2 15}
+    {M2.S.1 5}
+}
+foreach row [lsort -integer -decreasing -index 1 $rows] {
+    lassign $row rule n
+    puts [format "%-8s %3d" $rule $n]
+}
+set names {}
+foreach row $rows { lappend names [lindex $row 0] }     ;# pull out column 0
+puts "names only: [lsort $names]"
+>>>
+<div class="box trap"><strong>Trap: build lists with list commands, not with quotes.</strong> <code>set box "$llx $lly $urx $ury"</code> works for numbers, but breaks the day a value has a space or a brace in it (an instance name with an escaped bus bit, for example). <code>[list $a $b]</code> and <code>lappend</code> always quote correctly.</div>
+
+<h2 id="maps">Arrays and dicts: look things up by name</h2>
+<p>Use these when the question is "how many per rule?", "which cell owns this?", "have I seen this name already?". An <strong>array</strong> is the old style and is everywhere in existing EDA scripts. A <strong>dict</strong> is a value you can pass to a proc and return from it, so new code usually prefers it.</p>
+<<<tcl run | Counting violations per metal layer, both ways
+set rules {M1.S.1 M1.W.1 M2.S.1 M2.EN.1 M1.A.1 VIA1.EN.1}
+
+# array
+foreach r $rules {
+    set layer [lindex [split $r .] 0]
+    if {![info exists n($layer)]} { set n($layer) 0 }
+    incr n($layer)
+}
+foreach layer [lsort [array names n]] { puts "array: $layer -> $n($layer)" }
+
+# dict
+set d [dict create]
+foreach r $rules {
+    dict incr d [lindex [split $r .] 0]
+}
+dict for {layer cnt} $d { puts "dict:  $layer -> $cnt" }
+puts "M2 count: [dict get $d M2]   has M9? [dict exists $d M9]"
+>>>
+
+<h2 id="flow">Decisions and loops</h2>
+<<<tcl run | if, foreach, for, while, switch, break and continue
+set results {{M1.S.1 12} {LUP.1 0} {ANT.M2 4} {DEN.M3 1}}
+foreach item $results {
+    lassign $item rule n
+    if {$n == 0} continue                       ;# clean: go to the next one
+    switch -glob $rule {
+        ANT.*   { set kind "antenna, fix with diode or layer hop" }
+        DEN.*   { set kind "density, fix with fill" }
+        default { set kind "geometry rule" }
+    }
+    puts [format "%-8s %2d  %s" $rule $n $kind]
+}
+
+for {set i 1} {$i <= 3} {incr i} { puts "metal M$i" }
+
+set tries 0
+while {$tries < 3} { incr tries }
+puts "tried $tries times"
+
+foreach {x y} {10 20 30 40} { puts "point $x,$y" }      ;# two values per turn
+>>>
+<div class="box trap"><strong>Trap: the opening brace must be on the same line.</strong> <code>if {$n == 0}</code> followed by <code>{</code> on the next line is an error, because a newline ends the command. Write <code>if {...} {</code> and <code>} else {</code> on one line.</div>
+
+<h2 id="procs">Procs: your own commands</h2>
+<p>A proc is a named piece of script. Put anything you do twice into a proc. Variables inside a proc are local; the outside world is invisible unless you ask for it.</p>
+<<<tcl run | Arguments, default values, any number of arguments, returning a list
+proc bbox_area {box} {
+    lassign $box llx lly urx ury
+    return [expr {($urx - $llx) * ($ury - $lly)}]
+}
+proc grow {box {margin 1.0}} {                 ;# margin is optional
+    lassign $box llx lly urx ury
+    return [list [expr {$llx - $margin}] [expr {$lly - $margin}] \
+                 [expr {$urx + $margin}] [expr {$ury + $margin}]]
+}
+proc total {args} {                            ;# "args" collects all remaining words
+    set sum 0
+    foreach n $args { incr sum $n }
+    return $sum
+}
+puts [bbox_area {0 0 2 3}]
+puts [grow {1 1 2 2}]
+puts [grow {1 1 2 2} 0.5]
+puts [total 12 5 3 15]
+>>>
+<h3>Reaching outside: global and upvar</h3>
+<<<tcl run | upvar lets a proc change the caller's variable (pass the NAME, not the value)
+proc add_violation {tableName rule} {
+    upvar 1 $tableName t                 ;# t is now the caller's array
+    if {![info exists t($rule)]} { set t($rule) 0 }
+    incr t($rule)
+}
+add_violation seen M1.S.1
+add_violation seen M1.S.1
+add_violation seen ANT.M2
+parray seen
+>>>
+<p>Use <code>upvar</code> for arrays (they cannot be passed by value) and for big lists you want to change in place. Use <code>global name</code> only for true settings such as a debug flag.</p>
+
+<h2 id="files">Files and directories</h2>
+<p>Three patterns cover nearly all report work: read line by line, read everything and split, write a new file.</p>
+<<<tcl run | Read a summary line by line, write a CSV, list files
+set fh [open ../fixtures/top.drc.summary r]
+set failing {}
+while {[gets $fh line] >= 0} {
+    if {[regexp {^RULECHECK\s+(\S+)\s.*=\s*(\d+)} $line -> rule n] && $n > 0} {
+        lappend failing [list $rule $n]
+    }
+}
+close $fh
+puts "failing rules: [llength $failing]"
+
+set out [open ../src/out/failing.csv w]
+puts $out "rule,count"
+foreach row $failing { puts $out [join $row ,] }
+close $out
+
+puts "csv exists: [file exists ../src/out/failing.csv], size [file size ../src/out/failing.csv] bytes"
+foreach f [lsort [glob -directory ../fixtures/logs *.log]] {
+    puts "[file tail $f]  root=[file rootname [file tail $f]]  ext=[file extension $f]"
+}
+>>>
+<div class="tablewrap"><table>
+<tr><th>Command</th><th>Gives you</th></tr>
+<tr><td><code>file exists $f</code> · <code>file isdirectory $f</code></td><td>1 or 0</td></tr>
+<tr><td><code>file join $dir $name</code></td><td>a path built with the right slashes</td></tr>
+<tr><td><code>file tail $f</code> · <code>file dirname $f</code></td><td>last part of the path · everything before it</td></tr>
+<tr><td><code>file rootname $f</code> · <code>file extension $f</code></td><td>name without <code>.gds</code> · the <code>.gds</code></td></tr>
+<tr><td><code>file mkdir $dir</code> · <code>file delete $f</code> · <code>file copy $a $b</code></td><td>make, remove, copy</td></tr>
+<tr><td><code>file mtime $f</code></td><td>time of last change, in seconds (compare to see which file is newer)</td></tr>
+<tr><td><code>glob -nocomplain *.log</code></td><td>matching file names; <code>-nocomplain</code> returns an empty list instead of an error</td></tr>
+</table></div>
+
+<h2 id="errors">Errors, other programs and the environment</h2>
+<p>A script that stops at 2 a.m. with a red error and no message costs you a morning. Three tools prevent that: <code>catch</code>, <code>error</code>, and exit codes.</p>
+<<<tcl run | catch an error, raise your own, call a shell program, read the environment
+# catch returns 0 when the script worked, 1 when it raised an error
+if {[catch {open /no/such/file.gds r} msg]} {
+    puts "could not open: $msg"
+}
+
+proc need_file {f} {
+    if {![file exists $f]} { error "input file missing: $f" }
+    return $f
+}
+if {[catch {need_file top.gds} msg]} { puts "stopped cleanly: $msg" }
+
+# exec runs a shell program and returns what it printed
+puts "lines in summary: [lindex [exec wc -l ../fixtures/top.drc.summary] 0]"
+
+# a program that exits non-zero makes exec raise an error: always wrap it
+set status [catch {exec grep -c NOSUCHWORD ../fixtures/top.drc.summary} out]
+puts "grep status=$status output=$out"
+
+# environment variables live in the global array env
+if {[info exists env(HOME)]} { puts "HOME is set" }
+puts "script arguments: $argc -> $argv"
+>>>
+<div class="box tip"><strong>Exit codes are how scripts talk to each other.</strong> End a checking script with <code>exit 1</code> when it found problems and <code>exit 0</code> when clean. Then a Makefile, a shell <code>if</code>, or a regression system can react without reading your output.</div>
+
+<h2 id="pro">Pro habits</h2>
+<h3>Namespaces and a personal library</h3>
+<p>Once you have ten procs, put them in one file inside a namespace, so their names cannot clash with tool commands. Load it with <code>source</code>. The practice library <a href="ch05_script_bank.html#t-lib"><code>pvlib.tcl</code></a> is built this way.</p>
+<<<tcl run | A namespace, and loading a library that sits next to the script
+namespace eval demo {
+    variable tolerance 0.0005
+    proc same {a b} {
+        variable tolerance
+        return [expr {abs($a - $b) < $tolerance}]
+    }
+}
+puts [demo::same 10.050 10.0502]
+puts [demo::same 10.050 10.060]
+
+source pvlib.tcl
+puts [pv::bbox_overlap {0 0 2 2} {1 1 3 3}]
+puts [pv::bbox_union {0 0 1 1} {5 5 6 6}]
+>>>
+<h3>{*}, subst and string map: building commands safely</h3>
+<<<tcl run | Expand a list into separate words; fill a template
+set opts {-integer -decreasing}
+puts [lsort {*}$opts {3 10 2}]            ;# {*} turns one list word into many words
+
+set template {LAYOUT PATH "@GDS@"
+LAYOUT PRIMARY "@TOP@"}
+puts [string map {@GDS@ /proj/top.gds @TOP@ top} $template]
+>>>
+<h3>Speed: the mistake that turns 5 seconds into 5 hours</h3>
+<p>A full-chip database has millions of instances. Searching a list inside a loop is slow, because each search walks the list again. Put the names into an array or dict once, then every lookup is instant.</p>
+<<<tcl run | Same answer, very different cost
+set n 3000
+set big {}
+for {set i 0} {$i < $n} {incr i} { lappend big inst_$i }
+set wanted {}
+for {set i 0} {$i < $n} {incr i 3} { lappend wanted inst_$i }
+
+set slow [time {
+    set hits 0
+    foreach w $wanted { if {[lsearch -exact $big $w] >= 0} { incr hits } }
+}]
+set fast [time {
+    foreach b $big { set seen($b) 1 }
+    set hits2 0
+    foreach w $wanted { if {[info exists seen($w)]} { incr hits2 } }
+}]
+puts "both found $hits and $hits2 names"
+puts "array lookup was [expr {[lindex $slow 0] > [lindex $fast 0] ? {faster} : {slower}}] than lsearch"
+>>>
+<h3>Looking inside a running session</h3>
+<div class="tablewrap"><table>
+<tr><th>Command</th><th>Use it to</th></tr>
+<tr><td><code>info exists var</code></td><td>test before reading, so a missing variable is not an error</td></tr>
+<tr><td><code>info commands *drc*</code></td><td>find tool commands by name. Works in every Tcl-based tool, and is the fastest way to learn a new one</td></tr>
+<tr><td><code>info procs</code> · <code>info body name</code> · <code>info args name</code></td><td>list procs, read someone else's proc without finding the file</td></tr>
+<tr><td><code>info script</code></td><td>path of the file being sourced, to find files next to it</td></tr>
+<tr><td><code>puts stderr "..."</code></td><td>print messages that do not mix into the data you write to stdout</td></tr>
+<tr><td><code>time {script} 10</code></td><td>measure how long something takes</td></tr>
+<tr><td><code>clock format [clock seconds]</code></td><td>a timestamp for log lines and run directory names</td></tr>
+</table></div>
+
+<h2 id="traps">Ten traps that catch everyone</h2>
+<div class="tablewrap"><table>
+<tr><th>#</th><th>What you wrote</th><th>What goes wrong</th><th>Write this</th></tr>
+<tr><td>1</td><td class="wrap"><code>expr $a * $b</code></td><td>slow, and unsafe if a value has brackets</td><td class="wrap"><code>expr {$a * $b}</code></td></tr>
+<tr><td>2</td><td class="wrap"><code>if {$x} <br>{ ... }</code></td><td>brace on a new line: error</td><td class="wrap"><code>if {$x} {</code></td></tr>
+<tr><td>3</td><td class="wrap"><code>set x 5 # note</code></td><td>"wrong # args"</td><td class="wrap"><code>set x 5 ;# note</code></td></tr>
+<tr><td>4</td><td class="wrap"><code>lappend $list x</code></td><td>appends to a variable named by the value</td><td class="wrap"><code>lappend list x</code></td></tr>
+<tr><td>5</td><td class="wrap"><code>set l [lsort $l]</code> forgotten</td><td><code>lsort</code>, <code>lrange</code>, <code>string</code> return a new value; they do not change the variable</td><td>assign the result</td></tr>
+<tr><td>6</td><td class="wrap"><code>$a == $b</code> on names</td><td>"007" equals "7" because both look like numbers</td><td class="wrap"><code>$a eq $b</code> for text</td></tr>
+<tr><td>7</td><td class="wrap"><code>regexp "\d+" $s</code></td><td>inside quotes Tcl eats the backslash</td><td class="wrap"><code>regexp {\d+} $s</code></td></tr>
+<tr><td>8</td><td class="wrap"><code>exec calibre ...</code> bare</td><td>any non-zero exit or any stderr text aborts your loop</td><td class="wrap"><code>catch {exec ...} msg</code></td></tr>
+<tr><td>9</td><td class="wrap">names with <code>[3]</code> or <code>\</code></td><td>bus bits and escaped names get substituted</td><td>keep them in braces; build with <code>list</code></td></tr>
+<tr><td>10</td><td class="wrap"><code>open</code> without <code>close</code></td><td>long sessions run out of file handles</td><td>close every handle you open</td></tr>
+</table></div>
+
+<h2 id="practice">Practice, in order</h2>
+<ol>
+<li>Type every example on this page yourself in <code>tclsh</code>. Change one thing in each and predict the output before you press Enter.</li>
+<li>Write <code>proc bbox_center {box}</code> that returns <code>{x y}</code>. Add it to <code>pvlib.tcl</code> and add two checks to <code>pvlib_test.tcl</code>.</li>
+<li>Read <code>fixtures/waivers.txt</code> into a dict of <code>rule → max count</code>, skipping comments and blank lines.</li>
+<li>Rewrite the Perl <a href="ch05_script_bank.html#p-compare"><code>drc_compare.pl</code></a> in Tcl using <code>pv::read_summary</code>. Compare your output with the Perl output line by line.</li>
+<li>Take a real summary from your own run (never copy it outside your company) and run <code>drc_summary.tcl</code> on it. If the result looks wrong, the fix is one regular expression: that is the real exercise.</li>
+</ol>
+<p>Then go on to <a href="ch02_perl.html">Perl</a>, or straight to the <a href="ch05_script_bank.html">script bank</a> if you want to see complete tools.</p>

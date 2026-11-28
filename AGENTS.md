@@ -20,6 +20,7 @@ Notes/
 ├── programming/          python/ javascript/ docker/ linux/ practice/
 ├── career/               interview prep pages, profile, job search → career/AGENTS.md
 ├── vlsi/                 Tcl + Perl for physical verification (generated pages + runnable scripts)
+├── roadmaps/             long-term plans: reading, trading, digital art, personal styling (interactive pages)
 │
 │   not for reading
 ├── assets/annotate/      the highlight + notes feature every page loads
@@ -62,6 +63,22 @@ home page link to chapters by path. Add new things around the pages instead.
 Inside a book folder: `chNN_*.html` (the pages), `index.html` (where there is one), `illus/` (pictures +
 `scenes*.json` prompts), `figs/` (figures cropped from the PDF + `MANIFEST.tsv`), `BRIEF.md` (the spec the pages were
 written to). How pages are made: `../docs/PIPELINE.md`, `../docs/PAGE_SPEC.md`, `../docs/ILLUSTRATIONS.md`.
+
+## Roadmaps (long-term plans)
+
+Shown on the home page's **Roadmaps** shelf, together with `syllabus.html`, the forex roadmap and the PV roadmap
+(those three stay where they are; the shelf only links to them).
+
+| Path | What it is |
+|------|------------|
+| `roadmaps/reading_roadmap.html` | **Reading roadmap**: 50 books into philosophy from easy to hard (data is inside the page), plus books you add. Your own order (drag, arrows, type a position), sorts, categories, status To read / Reading / Read. **Reading now shelf with its own order**: card 1 is the current book; reorder with the arrows, by dragging the dots, by clicking the number, or with Arrange (same as my list / shortest / easiest). State is saved in the browser (`localStorage` key `reading-roadmap-v2`: `order`, `now`, `status`, `removed`, `custom`, `sort`), so it is per browser and per address; move it with Save backup / Load backup |
+| `roadmaps/trading_roadmap.html` | **Trading roadmap**: phases from zero to a disciplined intraday and swing trader in the Indian market (what to study, tools, paper trading, when to use real money, risk rules) |
+| `roadmaps/digital_art_roadmap.html` | **Digital art roadmap**: phases from learning to see to finished digital paintings, with what to buy and when |
+| `roadmaps/personal_styling_roadmap.html` | **Personal styling, 12 weeks**: colour, proportion, fit, fabric, silhouette, then buying decisions; 48 tickable activities and notes saved in the browser (`style-first-principles-v1:*`) |
+
+These four were copied on 2026-11-28 from `~/Documents/documents/longterm plans/` (originals left there; that folder
+also holds identity documents, so copy single files by name only). The copies here are the ones to edit from now on.
+They keep their own design: do **not** run `theme_toggle.py` or `annotate_inject.py` on `roadmaps/`.
 
 ## Notes by subject
 
@@ -109,6 +126,7 @@ Run them from anywhere; each takes the folder to work on, so they serve every bo
 | An app or product idea | `product_thinking/app_ideas/` | add a row above |
 | Career or interview material | see `career/AGENTS.md` | add a row there |
 | A note on a new subject | a new lower_snake_case top-level folder | add it to the layout and a row above |
+| A roadmap or long-term plan | `roadmaps/<name>_roadmap.html` | add it to the Roadmaps shelf in `SECTIONS` of `tools/build_home.py`, rebuild, add a row above |
 | A script for the pages | `tools/` | add a row above |
 
 ## Conventions

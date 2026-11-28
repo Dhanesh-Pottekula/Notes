@@ -8,6 +8,7 @@ Run it again after adding a book, a chapter or a page. What it does:
   Anything listed that is not on disk is skipped and reported, so nothing links to a missing page.
 - A book folder links to its own index.html (or its first chapter when it has none) and expands to every
   chNN_*.html in it, titled by the chapter's <h1>, so new chapters appear without editing this file.
+- A page may be listed on more than one shelf (the Roadmaps shelf repeats the study roadmaps); it is counted once.
 - Every other .html under Notes that no shelf covers is listed under "Other pages", so no page is ever
   unreachable from here. Give it a proper shelf by adding it to SECTIONS.
 - Same look as the book index pages (DDIA index styles + the light/dark switch from tools/theme_toggle.py).
@@ -37,6 +38,22 @@ SECTIONS = [
          "Month by month: DSA ↔ real systems, V8, event loop, TypeScript, PostgreSQL, Redis, system design, Kafka, AI infra, Docker, Linux, Kubernetes, CI/CD."),
         ("career/interview-topics/", "Interview prep, topic by topic",
          "14 topics, ~1,140 tickable points and ~12,460 L1/L2/L3 questions in popups; spoken answers for your own projects; sources per topic."),
+    ]),
+    ("Roadmaps", "The long-term plans: what to read, what to learn, and in what order.", [
+        ("roadmaps/reading_roadmap.html", "Reading roadmap",
+         "Books into philosophy, from easy to hard. Set your own order, keep a Reading now shelf in the order you will read it, mark books read, add your own."),
+        ("roadmaps/trading_roadmap.html", "Trading roadmap",
+         "From zero to a disciplined intraday and swing trader in the Indian market: what to study, which tools, when to use real money, how to survive."),
+        ("roadmaps/digital_art_roadmap.html", "Digital art roadmap",
+         "From zero to digital paintings: learning to see, fundamentals, colour and light, what to buy and when."),
+        ("roadmaps/personal_styling_roadmap.html", "Personal styling, 12 weeks",
+         "Colour, proportion, fit, fabric and silhouette from first principles, ending in how to decide what to buy. 48 tickable activities."),
+        ("syllabus.html", "6-month backend roadmap",
+         "Month by month: DSA ↔ real systems, TypeScript, PostgreSQL, Redis, system design, Kafka, AI infra, Docker, Kubernetes."),
+        ("trading/forex/index.html", "Forex learning roadmap",
+         "8 phases from set-up to a live track record, 200+ checked resources."),
+        ("vlsi/tcl_perl_pv/ch00_pv_roadmap.html", "Physical verification roadmap",
+         "DRC, LVS, antenna, ERC and tape-out: from running the checks to owning sign-off."),
     ]),
     ("AI engineering and LLMs", "Read in this order: how LLMs work → building AI apps → one full production system.", [
         ("llm/hands_on_llms/", "Hands-On Large Language Models",
@@ -160,18 +177,18 @@ def build():
                 if not chs:
                     missing.append(path)
                     continue
+                total += len({os.path.normpath(os.path.join(NOTES, h)) for _, h, _ in chs} - covered)
                 covered.update(os.path.normpath(os.path.join(NOTES, h)) for _, h, _ in chs)
                 index = os.path.join(full, "index.html")
                 covered.add(os.path.normpath(index))
                 href = os.path.relpath(index, NOTES) if os.path.exists(index) else chs[0][1]
-                total += len(chs)
                 cards.append(card(href, str(i), title, desc, f"{len(chs)} pages", chapter_list(chs)))
             else:
                 if not os.path.isfile(full):
                     missing.append(path)
                     continue
+                total += os.path.normpath(full) not in covered          # a page listed on two shelves counts once
                 covered.add(os.path.normpath(full))
-                total += 1
                 cards.append(card(path, str(i), title, desc, "1 page"))
         if cards:
             sections.append(f'<section class="plate"><h2>{html.escape(shelf)}</h2><p class="about">{html.escape(about)}</p>'

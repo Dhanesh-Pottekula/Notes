@@ -76,8 +76,8 @@ Shown on the home page's **Roadmaps** shelf, together with `syllabus.html`, the 
 | `roadmaps/digital_art_roadmap.html` | **Digital art roadmap**: phases from learning to see to finished digital paintings, with what to buy and when |
 | `roadmaps/personal_styling_roadmap.html` | **Personal styling, 12 weeks**: colour, proportion, fit, fabric, silhouette, then buying decisions; 48 tickable activities and notes saved in the browser (`style-first-principles-v1:*`) |
 
-These four were copied on 2026-11-28 from `~/Documents/documents/longterm plans/` (originals left there; that folder
-also holds identity documents, so copy single files by name only). The copies here are the ones to edit from now on.
+These four were copied here on 2026-11-28 from the long-term plans folder outside the workspace (originals left
+there). The copies here are the ones to edit from now on.
 They keep their own design: do **not** run `theme_toggle.py` or `annotate_inject.py` on `roadmaps/`.
 
 ## Notes by subject
@@ -103,7 +103,7 @@ Run them from anywhere; each takes the folder to work on, so they serve every bo
 | Path | What it is |
 |------|------------|
 | `tools/build_md_pages.py` | Turns every tracked Markdown note (not `career/`, not AGENTS/BRIEF/README) into `<same name>.html` beside it, so it can be read from the home page. The `.md` stays the source: edit it, rerun, then rerun `build_home.py`. Never overwrites a hand-made `.html` |
-| `tools/build_site.py [out]` | Packs the public website into `_site/` (git-ignored): pages, pictures, the highlight script, the VLSI practice scripts. Leaves out `career/profile`, `career/job-search`, `career/sources`, `.md`/`.py`/PDF/working files; checks every link. Run by `.github/workflows/pages.yml` on every push to `main` → GitHub Pages (https://dhanesh-pottekula.github.io/Notes/). The repo is public, so left-out files are still visible on GitHub, only not on the site |
+| `tools/build_site.py [out]` | Packs the public website into `_site/` (git-ignored): pages, pictures, the highlight script, the VLSI practice scripts. Leaves out `career/profile`, `career/job-search`, `career/sources`, `.md`/`.py`/PDF/working files; checks every link. Run by `.github/workflows/pages.yml` on every push to `main` → GitHub Pages (https://dhanesh-pottekula.github.io/Notes/). The same push also deploys to Vercel (https://learning-os-nine-tau.vercel.app/, settings in `vercel.json`, which runs this script too). The repo is public, so left-out files are still visible on GitHub, only not on the site |
 | `tools/build_home.py` | Rebuilds `index.html`. Shelves are listed by hand in its `SECTIONS`; book chapters are found automatically; any `.html` no shelf covers shows under "Other pages"; missing paths are skipped and reported. **Rerun after adding a book, chapter or page** |
 | `tools/build_llm_index.py` | Rebuilds `llm/index.html` and each LLM book's `index.html` |
 | `tools/build_book_index.py` | Builds `index.html` for the books with no hand-made one (Database Internals, Murphy, Grimes, Carter; list in its `BOOKS`), so every chapter's "all chapters" link works. Never overwrites a hand-made index (DDIA, Carnegie). **Rerun after adding a chapter to one of them** |
